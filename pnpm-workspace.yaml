@@ -16,3 +16,4 @@ catalog:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  sharp: false

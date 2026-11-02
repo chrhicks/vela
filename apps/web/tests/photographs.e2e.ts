@@ -19,7 +19,7 @@ const details = (page: Page) => page.getByRole('region', { name: 'Exposure detai
 
 const originalDownload = (page: Page) => page.getByRole('link', { name: /Download original FITS/ })
 
-const displayDownload = (page: Page) => page.getByRole('link', { name: /Download (?:display|original preview) PNG/i })
+const displayDownload = (page: Page) => page.getByRole('link', { name: /Download (?:display|original preview) JPEG/i })
 
 function row(page: Page, id: string) {
   return list(page).locator(`a[href^="${photographsBase}/${encodeURIComponent(id)}?"]`)
@@ -248,12 +248,12 @@ test('opening one legacy photograph publishes only its matching display version 
   const { scene } = await openPhotographsScene(page, 'photographs-legacy')
   const id = scene.selectedId!
   const original = `/api/rigs/fra400/saved-images/${id}`
-  await expect(preview(page).getByRole('img')).toHaveAttribute('src', `${original}/previews/background-v1/fit`)
-  await expect(displayDownload(page)).toHaveAttribute('href', `${original}/previews/background-v1/download-preview`)
+  await expect(preview(page).getByRole('img')).toHaveAttribute('src', `${original}/previews/background-v2/fit`)
+  await expect(displayDownload(page)).toHaveAttribute('href', `${original}/previews/background-v2/download-preview`)
   await expect(originalDownload(page)).toHaveAttribute('href', `${original}/fits`)
   expect(scene.images().filter(image => image.previewRendering?.status === 'current').map(image => image.id)).toEqual([id])
   expect(scene.detailReads.every(imageId => imageId === id)).toBe(true)
-  expect(scene.fileReads.filter(path => path.includes('/previews/background-v1/')).every(path => path.includes(`/${id}/`))).toBe(true)
+  expect(scene.fileReads.filter(path => path.includes('/previews/background-v2/')).every(path => path.includes(`/${id}/`))).toBe(true)
 })
 
 test('unavailable refresh keeps original preview and exact downloads while explaining preserved FITS', async ({ page }) => {
@@ -261,7 +261,7 @@ test('unavailable refresh keeps original preview and exact downloads while expla
   const selected = scene.images()[0]!
   await expectSelected(page, selected)
   await expect(details(page)).toContainText(/original FITS/i)
-  await expect(page.getByRole('link', { name: /original preview PNG/i })).toHaveAttribute('href', selected.previewDownloadUrl)
+  await expect(page.getByRole('link', { name: /original preview JPEG/i })).toHaveAttribute('href', selected.previewDownloadUrl)
   await expect(originalDownload(page)).toHaveCount(1)
   expect(selected.previewRendering?.status).toBe('unavailable')
   expect(scene.fileReads.some(path => path.includes('/previews/'))).toBe(false)
@@ -497,4 +497,21 @@ test.describe('remote browser timezone', () => {
     await expect(details(page)).toContainText('1 Oct 2026 · 01:39:08')
     await expect(page.getByText('Vela server time · America/New_York', { exact: true })).toBeVisible()
   })
+})
+
+test('the library and fitted selection never request full-size previews until 100% is chosen', async ({ page }) => {
+  const { scene } = await openPhotographsScene(page, 'photographs-library')
+  await expect(library(page)).toBeVisible()
+  await settledRendering(page)
+  expect(scene.fileReads.length).toBeGreaterThan(0)
+  expect(scene.fileReads.every(path => path.endsWith('/fit'))).toBe(true)
+  await library(page).getByRole('link').first().click()
+  await expect(list(page)).toBeVisible()
+  await list(page).getByRole('link').first().click()
+  await expect(preview(page).getByRole('button', { name: '100%', exact: true })).toBeEnabled()
+  await settledRendering(page)
+  expect(scene.fileReads.every(path => path.endsWith('/fit'))).toBe(true)
+  await preview(page).getByRole('button', { name: '100%', exact: true }).click()
+  await expect(preview(page).getByRole('region', { name: /Image at 100 percent/ })).toBeVisible()
+  expect(scene.fileReads.filter(path => path.endsWith('/preview'))).toHaveLength(1)
 })

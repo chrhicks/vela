@@ -102,14 +102,14 @@ Saved images are available at the per-rig `/observe/saved-images` route independ
 of camera readiness. [Photographs](../photographs/README.md) owns the dated
 collection and selected-image composition, validating retained metadata and exact
 same-origin download resources. Capture owns retention actions; browsing uses
-real preview URLs and native download links for FITS and preview PNG.
+real preview URLs and native download links for FITS and preview JPEG.
 
 Manual-save feedback is owned by the image viewer rather than a keyed frame
 button. A new exposure may replace displayed pixels while an earlier save is
 pending; its outcome and explicit retry stay associated with the selected image.
 ## Retained-preview versions
 
-Saved-image validation pins native, fit and PNG-download URLs to the same declared
+Saved-image validation pins native, fit and JPEG-download URLs to the same declared
 renderer version, or to the legacy original URLs when refresh is unavailable.
 The saved-image page displays server-owned rendering status separately from the
 capture facts. Opening a legacy detail may take time to prepare its bounded

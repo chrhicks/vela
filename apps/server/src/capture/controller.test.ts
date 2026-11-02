@@ -522,7 +522,7 @@ it('retains an acquired image when optional star analysis is unavailable', async
   }
 })
 
-it('keeps the selected completed frame with exact data and preview without saving future frames', async () => {
+it('keeps the selected completed frame with exact data and a JPEG preview without saving future frames', async () => {
   const { controller, complete, savedImages, frame } = setup()
   const selected = await complete(10)
   const latest = await complete(20)
@@ -530,9 +530,7 @@ it('keeps the selected completed frame with exact data and preview without savin
   const saved = await controller.keep(selected.id)
   expect(saved).toMatchObject({ id: selected.id, exposureSeconds: 10, saved: true })
   expect(controller.snapshot().latestImage).toEqual(latest)
-  expect(await savedImages.file('fra 400', selected.id, 'native')).toEqual(
-    controller.image(selected.id),
-  )
+  expect((await savedImages.file('fra 400', selected.id, 'native'))?.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]))
   const fits = (await savedImages.file('fra 400', selected.id, 'fits'))!
   expect(fits.toString('ascii', 0, 2880)).toContain('BITPIX  =                   16')
   expect(fits.readInt16BE(2880 + 2) + 32_768).toBe(frame.pixels[1])

@@ -8,7 +8,7 @@ export type PreviewFrame = {
   color: ImageColor
 }
 
-export const PREVIEW_VERSION = 'background-v1'
+export const PREVIEW_VERSION = 'background-v2'
 
 export function linkedRange(pixels: ArrayLike<number>) {
   const stride = Math.max(1, Math.floor(pixels.length / 200_000) | 1)

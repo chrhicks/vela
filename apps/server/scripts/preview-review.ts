@@ -36,7 +36,7 @@ for (const fixture of corpus) {
   if (await stat(resolve(destination, 'metadata.json')).catch(() => undefined)) continue
   await mkdir(destination, { recursive: true })
 
-  for (const file of ['original.fits', 'preview.png', 'fit.png', 'metadata.json']) {
+  for (const file of ['original.fits', 'fit.png', 'metadata.json']) {
     await copyFile(resolve(sourcePath(fixture.id), file), resolve(destination, file))
   }
 }
@@ -130,7 +130,6 @@ await store.save(
   },
   {
     fits: Buffer.from('Deliberately unsupported review-only file; no retained original modified.'),
-    native: await readFile(resolve(sourcePath(cooledId), 'preview.png')),
     fit: await readFile(resolve(sourcePath(cooledId), 'fit.png')),
   },
 )

@@ -216,14 +216,14 @@ export function createCaptureController(
 
       const files: SavedImageFiles = {
         fits: image.fits,
-        native: image.native,
+        fit: image.fit ?? image.native,
         previewVersion: PREVIEW_VERSION,
       }
 
       saved = await savedImages.save(
         settings.rigId,
         image.metadata,
-        image.fit ? { ...files, fit: image.fit } : files,
+        files,
       )
     }
 

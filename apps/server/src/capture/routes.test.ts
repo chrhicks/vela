@@ -482,7 +482,6 @@ it('retains a displayed frame and serves original and preview downloads while di
   subject.captures[0]!.resolve(frame)
   await vi.waitFor(() => expect(subject.operations.owner('sim')).toBeUndefined())
   const image = (await subject.get()).json().latestImage
-  const originalPreview = (await subject.app.inject(image.imageUrl)).rawPayload
   subject.disconnect()
   const keepUrl = `${image.imageUrl}/keep`
   expect(
@@ -512,8 +511,8 @@ it('retains a displayed frame and serves original and preview downloads while di
   expect(fits.headers['content-disposition']).toContain('attachment; filename=')
   expect(fits.rawPayload.toString('ascii', 0, 2880)).toContain('BITPIX  =                   16')
   expect(fits.rawPayload.readInt16BE(2880 + 6) + 32_768).toBe(1000)
-  expect((await subject.app.inject(saved.previewDownloadUrl)).rawPayload).toEqual(originalPreview)
-  expect((await subject.app.inject(saved.imageUrl)).rawPayload).toEqual(originalPreview)
+  expect((await subject.app.inject(saved.previewDownloadUrl)).headers['content-type']).toBe('image/jpeg')
+  expect((await subject.app.inject(saved.imageUrl)).headers['content-type']).toBe('image/jpeg')
   expect((await subject.app.inject('/api/web/rigs/other/saved-images')).statusCode).toBe(404)
 })
 

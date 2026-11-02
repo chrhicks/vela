@@ -25,7 +25,6 @@ const image: CaptureImage = {
 
 const files = {
   fits: Buffer.from('original'),
-  native: Buffer.from('preview'),
   fit: Buffer.from('small'),
 }
 
@@ -81,16 +80,16 @@ describe('saved image store', () => {
       expect(await store.get('other-rig', image.id)).toBeUndefined()
       expect(await store.file('other-rig', image.id, 'fits')).toBeUndefined()
       expect(await store.file('rig/../one', image.id, 'fits')).toEqual(files.fits)
-      expect(await store.file('rig/../one', image.id, 'native')).toEqual(files.native)
+      await expect(store.file('rig/../one', image.id, 'native')).rejects.toThrow('Invalid retained FITS size')
       expect(await store.file('rig/../one', image.id, 'fit')).toEqual(files.fit)
       await store.save(
         'rig/../one',
         { ...image, id: '../next', capturedAt: '2026-09-05T20:00:00-04:00' },
-        { fits: files.fits, native: files.native },
+        { fits: files.fits, fit: files.fit },
       )
       expect((await store.list('rig/../one')).map(item => item.id)).toEqual(['../next', 'frame-1'])
-      expect((await store.get('rig/../one', '../next'))?.fitImageUrl).toBeUndefined()
-      expect(await store.file('rig/../one', '../next', 'fit')).toBeUndefined()
+      expect((await store.get('rig/../one', '../next'))?.fitImageUrl).toBeDefined()
+      expect(await store.file('rig/../one', '../next', 'fit')).toEqual(files.fit)
     },
   )
 
@@ -143,7 +142,7 @@ describe('saved image store', () => {
     const openFile: typeof fs.open = async (...args) => {
       const handle = await realOpen(...args)
 
-      if (String(args[0]).endsWith('/preview.png')) {
+      if (String(args[0]).endsWith('/fit.png')) {
         vi.spyOn(handle, 'sync').mockImplementation(() => {
           announce()
 

@@ -1,7 +1,7 @@
 # Saved images
 
 This boundary retains a completed acquisition as original lossless integer FITS,
-the native processed PNG, an optional smaller PNG, and image metadata. It stores
+a fitted PNG and image metadata. Full-size display JPEGs are rendered on demand. It stores
 artifacts, not capture runs. A repeated save of the same rig/frame returns the
 existing artifact, including when manual and automatic saving overlap.
 
@@ -30,8 +30,8 @@ The server defaults to `saved-images/` beside its Rig catalog (normally
 review catalogs therefore keep review artifacts separate from the main catalog.
 
 The per-rig web routes list and inspect retained metadata without inspecting
-hardware. File routes serve the original FITS and exact native preview downloads;
-the optional fitted preview is used for collection thumbnails. New images retain
+hardware. File routes serve the original FITS, fitted PNGs and on-demand native JPEGs.
+Collection thumbnails only request fitted PNGs. New images retain
 an optional `subject` snapshot of the selected target ID, name and catalog identity.
 It records observing intent, not a measured pointing or solved frame. Explicit null
 means no chosen subject; absent legacy metadata remains valid and is not rewritten.
@@ -60,43 +60,34 @@ without a source remains camera-reported; reading it does not rewrite files.
 
 ## Current previews, immutable originals
 
-Display rendering is separate from durable capture facts. Original FITS,
-`preview.png`, `fit.png` and `metadata.json` are never rewritten by preview refresh.
-The legacy `/preview`, `/fit`, `/download-preview` and `/fits` routes keep serving
-those same bytes, respecting their immutable cache contract.
+New saves store `original.fits`, `fit.png`, `metadata.json` and a source-FITS
+SHA-256 descriptor in `previews/background-v2/manifest.json`. Small images use
+their native PNG as the fit. No save or refresh writes `preview.png`.
+The production files live on `/mnt/storage/vela/saved-images`, mounted in the
+server container at `/data/saved-images`.
 
-Opening a saved-image detail lazily prepares `background-v1` if absent. Collection
-listing only describes published previews: older thumbnails are explicitly labeled
-as original until that image is opened, then use its current fitted derivative.
-This avoids an unbounded archive conversion on a collection GET. One file-store
-instance owns a shared per-image promise and serial refresh queue, so simultaneous
-detail requests share work and only one retained original is decoded at a time.
-The application composes one file store; this is not a multi-process job system.
+Full-size preview and download routes, both versioned and unversioned, read the
+original FITS and apply the existing stretch and debayer. They encode JPEG at
+quality 90 with 4:4:4 chroma through sharp. Downloads have a `.jpg` extension.
+No JPEG is written to disk. One store-wide queue serializes retained FITS decode,
+stretch and encode with fitted-preview refreshes. Concurrent full-size requests
+for one image share a promise, removed at completion. Decoded frames and JPEGs
+are not cached after the response.
 
-Refresh reads a bounded, validated Vela FITS, verifies dimensions and color against
-the retained metadata, then uses the production renderer. It writes and syncs the
-native PNG, optional fit PNG and source-FITS SHA-256 descriptor in an ignored staging
-directory. One directory rename publishes the complete `previews/background-v1/`
-pair; no partial version is advertised. Completed versions survive restart and are
-reused. Interrupted staging directories remain invisible. A refresh failure returns
-an explicit unavailable state with the original view/download, logs its cause and
-does not overwrite or claim to have corrected the old preview.
+The renderer version is `background-v2` because the stored layout now contains
+only a fitted preview. Existing `background-v1` descriptors still locate their
+root or versioned `fit.png`. Old v1 URLs remain accepted. Neither layout reads or
+requires an old `preview.png`; those files can be removed separately after deploy.
+There is no cleanup script or cache in this change.
 
-New captures declare their renderer version when saving. Their first PNG already
-has the selected treatment, so a descriptor references the original native/fit pair
-without duplicating large PNGs. Those descriptors are inside the original save's
-atomic staging publication. The memory store models new capture retention and
-versioned URLs for isolated tests; retained-file regeneration belongs to the file
-implementation.
-
-Current image/fit/download URLs include `/previews/background-v1/`. Unknown versions
-are rejected. Metadata responses use `no-store`; version-specific files stay
-immutable. The default PNG download is exactly the current native displayed
-treatment, not the old PNG. The first PNG remains physically preserved and reachable
-through the legacy URL. This **Match display** behavior was explicitly selected
-with treatment B in the workshop; it is not a change to original FITS samples or
-capture metadata. `SavedImage.previewRendering` communicates current, legacy or
-unavailable rendering independently of image capture facts.
+Opening an image with no descriptor prepares only its fit and descriptor in an
+atomic staging directory. Library listing describes files without rendering.
+Thumbnails never fall back to full-size routes. Capture and observe viewers request
+fitted images by default. The inspection viewer holds the selected exposure when
+100% is requested, so new captures do not start full-size saved-image renders.
+The fit stays visible with the existing full-resolution loading message while a
+JPEG renders. Missing or unreadable originals return the existing unavailable
+response, and the viewer keeps its fit and shows its load failure message.
 
 ## Device-free adoption review
 
@@ -118,7 +109,7 @@ review file exercises honest fallback without damaging any retained source.
 
 Open `http://127.0.0.1:5193/rigs/348c775f-d075-4cfe-90a3-b8e74d84b244/observe/saved-images`.
 The same prefix with `/capture` supports new one-shot replay captures (uncheck
-Repeat until stopped). Download a refreshed PNG, inspect fit/100% and collection
+Repeat until stopped). Download a full-size JPEG, inspect fit/100% and collection
 thumbnails, and open `unsupported-review-fixture` to inspect the legacy fallback.
 Screenshots and hash/byte-equality results live in the ignored review `evidence/`
 directory. This runtime is restartable and isolated from the real Rig catalog.

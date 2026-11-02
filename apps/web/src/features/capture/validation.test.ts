@@ -272,14 +272,14 @@ it('accepts legacy and known start sources and rejects unknown sources for live 
 })
 
 it('pins native, fit and download to one declared renderer version and rejects mixed or foreign resources', () => {
-  const base = '/api/rigs/rig-1/saved-images/frame-1/previews/background-v1'
+  const base = '/api/rigs/rig-1/saved-images/frame-1/previews/background-v2'
 
   const current = {
     ...savedImage,
     imageUrl: `${base}/preview`,
     fitImageUrl: `${base}/fit`,
     previewDownloadUrl: `${base}/download-preview`,
-    previewRendering: { status: 'current', version: 'background-v1' },
+    previewRendering: { status: 'current', version: 'background-v2' },
   }
 
   expect(isSavedImage(current, 'rig-1')).toBe(true)

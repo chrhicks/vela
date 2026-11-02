@@ -185,7 +185,7 @@ export function SelectedPhotograph({ image, rigId, position, viewerRef, timeZone
             </aside>
           ) : fitsDownload}
           <a className="vela-button" data-tone="neutral" href={displayed.previewDownloadUrl} download>
-            Download {original ? 'original preview' : 'display'} PNG ↓
+            Download {original ? 'original preview' : 'display'} JPEG ↓
           </a>
           {!fallback && <p>The FITS file retains the original capture data.</p>}
         </div>
