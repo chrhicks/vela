@@ -7,10 +7,10 @@ import { openPackage } from './query.ts'
 
 const usage = `Usage:
   rig-session build --name <session> --from <iso> --to <iso> --out <dir>
-                    [--saved-images <dir>] [--traces <file>] [--mount-csv <file>] [--frame-records <file>] [--recording <dir>] [--journal <file>]
+                    [--saved-images <dir>] [--traces <file>] [--mount-csv <file>] [--frame-records <dir|file>] [--recording <dir>] [--journal <dir|file>]
                     [--allow-in-repo]
   rig-session accept --from <iso> --to <iso> [--scratch <dir>] [--allow-in-repo] [--allow-growth]
-                    [--saved-images <dir>] [--traces <file>] [--mount-csv <file>] [--frame-records <file>] [--recording <dir>] [--journal <file>]
+                    [--saved-images <dir>] [--traces <file>] [--mount-csv <file>] [--frame-records <dir|file>] [--recording <dir>] [--journal <dir|file>]
   rig-session query <package-dir> <sql>`
 
 const inputOptions = {
