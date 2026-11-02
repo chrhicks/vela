@@ -34,6 +34,8 @@ export function eventIdOf(draft: Draft): EventId {
       return brandEventId(`attestation:${draft.rig}:${draft.at}`)
     case 'solve':
       return brandEventId(`solve:${draft.body.imageId}:${draft.body.solverVersion}`)
+    case 'solve-result':
+      return brandEventId(`solve-result:${draft.body.frameEventId}:${draft.body.solve.solverVersion}:${draft.body.purpose}`)
     case 'session':
       return brandEventId(`session:${draft.body.setupId}:${draft.body.phase}`)
     case 'gap':

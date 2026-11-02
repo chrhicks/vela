@@ -109,6 +109,14 @@ export function sampleEvents(): RigEvent[] {
         ],
       },
     }),
+    seal({
+      ...stamp(at), kind: 'solve-result',
+      body: {
+        frameEventId: seal(stateDraft(7)).id, purpose: 'framing',
+        solve: { status: 'no-solution', imageId, solverVersion: 'astap-test', solveMs: 50, hint: null, reason: 'no-match' },
+        verdict: { status: 'rejected', reasons: ['no-match'], measured: null },
+      },
+    }),
     ...alignmentEvents,
     seal({
       ...stamp(at),
