@@ -126,6 +126,7 @@ const text = [
   '| Fix | Blind travel before (degrees) | After (degrees) | Budget after (arcmin) |',
   '| --- | --- | --- | --- |', ...resets, '',
   `Largest blind travel ${maxBlind.toFixed(6)} degrees.`, '',
+  'Snapshot travel is spherical separation, so RA coordinate jumps near a pole are not axis half-turns. Observed operation axis travel takes precedence when larger than the sampled distance.', '',
   'The 7.02 arcsec per blind degree policy uses step 3\'s p90 reported landing offset as a conservative charge, not an empirical sky-error bound. Confidence budgets are 1.2 arcmin for high and 3 arcmin for low, and are capped by the position state. They allocate 2% and 5% of a one-degree reference field, following the relative alignment and framing needs of step 6. Scale quality remains a separate solve verdict.', '',
 ].join('\n')
 

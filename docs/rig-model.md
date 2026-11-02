@@ -76,7 +76,7 @@ An alignment trial's journal holds the site in `evidence.physical.site` and in o
 
 ## Pointing assessment
 
-`assess(model)` returns the position state, confidence, error budget in arcminutes, blind travel in degrees and last fix. It reads no clock. The reducer accumulates axis travel, including reversals and observed operation travel when available, and resets it on a current-epoch solve. History-only solves cannot reset it. Clock inputs still own staleness.
+`assess(model)` returns the position state, confidence, error budget in arcminutes, blind travel in degrees and last fix. It reads no clock. The reducer accumulates spherical travel between reported positions, including reversals, and uses observed operation axis travel when available, and resets it on a current-epoch solve. History-only solves cannot reset it. Clock inputs still own staleness. Spherical separation keeps a right-ascension coordinate jump near a pole from counting as a half-turn of travel. An operation's recorded axis travel remains authoritative when it exceeds the sampled distance, so a sparsely sampled reversal is not lost.
 
 The budget is the last fix's pointing residual plus 7.02 arcseconds per blind degree. Step 3's AM5 profile measured a 7.02 arcsecond p90 reported landing offset over 30 gotos. Charging that amount per degree is a conservative policy, not a measured sky-error slope or a statistical bound. The confidence table in `assess.ts` allocates 2% and 5% of a one-degree reference field, or 1.2 and 3 arcminutes, for high and low confidence. It follows step 6's relative alignment and framing needs without treating plate-scale error as pointing error. The position state caps confidence, so moving and unknown remain none and uncertain cannot be high.
 

@@ -27,7 +27,8 @@ it('grows by the path, including a reversal, and caps confidence while moving', 
     model = step(model, snapshot({ at: s(second), mount: { at: s(second), raHours, decDegrees: 0, slewing: true } })).model
   }
 
-  expect(assess(model)).toMatchObject({ confidence: 'none', blindTravelDegrees: 30, position: { state: 'moving' } })
+  expect(assess(model)).toMatchObject({ confidence: 'none', position: { state: 'moving' } })
+  expect(assess(model).blindTravelDegrees).toBeCloseTo(30)
   expect(assess(model).budgetArcmin).toBeCloseTo(initial.budgetArcmin + 30 * blindErrorArcminPerDegree)
   expect(assess(model).lastFix).toEqual(initial.lastFix)
   expect(initial.blindTravelDegrees).toBe(0)
@@ -84,9 +85,13 @@ it('applies the budget table at its boundaries and caps uncertain positions', ()
     expect(assess(withBudget).confidence).toBe(confidence)
   }
 
-  const stale = step(model, clock(2000)).model
+  const fix = { ...position.fix, errorArcmin: { east: 0.1, north: 0, total: 0.1 } }
+  const precise = { ...model, mount: { ...model.mount, value: { ...position, fix } } }
+  const stale = step(precise, clock(2000)).model
+
+  expect(assess(precise).confidence).toBe('high')
   expect(assess(stale).position.state).toBe('uncertain')
-  expect(assess(stale)).toEqual(assess(stale))
+  expect(assess(stale).confidence).toBe('low')
 })
 
 it('resets travel at a new session', () => {
@@ -106,4 +111,12 @@ it('does not turn repeated tracking-off snapshots or sidereal drift into blind m
   expect(assess(model).blindTravelDegrees).toBe(0)
   model = step(model, snapshot({ at: s(20), mount: { at: s(20), ...atRest, raHours: 2 + 20_000 * 24 / 86_164_090.5 } })).model
   expect(assess(model).blindTravelDegrees).toBeCloseTo(0)
+})
+
+it.each([89, -89, 90, -90])('does not count an RA jump at declination %s as a half-turn of travel', decDegrees => {
+  const start = run([snapshot({ at: s(0), mount: { at: s(0), raHours: 0.1, decDegrees } })]).model
+  const next = step(start, snapshot({ at: s(1), mount: { at: s(1), raHours: 12.1, decDegrees } })).model
+
+  expect(assess(next).blindTravelDegrees).toBeCloseTo(2 * (90 - Math.abs(decDegrees)))
+  expect(assess(next).position.state).toBe('unknown')
 })

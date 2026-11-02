@@ -267,9 +267,8 @@ function countedTravel(a: MountSample, b: MountSample): number {
   if (a.raHours === b.raHours && a.decDegrees === b.decDegrees) return 0
 
   const siderealDegrees = a.tracking ? 0 : (b.at - a.at) * 360 / 86_164_090.5
-  const ra = ((b.raHours - a.raHours) * 15 - siderealDegrees + 540) % 360 - 180
 
-  return Math.hypot(ra, b.decDegrees - a.decDegrees)
+  return separationDegrees(a, { raHours: b.raHours - siderealDegrees / 15, decDegrees: b.decDegrees })
 }
 
 function travelSince(track: MountTrack, from: EpochMs, to: number = Infinity): number {
