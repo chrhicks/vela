@@ -32,7 +32,8 @@
     "zod": "4.5.4",
     "@vela/equipment": "workspace:*",
     "@vela/cria": "workspace:*",
-    "@vela/rig-events": "workspace:*"
+    "@vela/rig-events": "workspace:*",
+    "@vela/rig-model": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

@@ -23,7 +23,7 @@ export interface PointingFix {
 
 export type UnknownReason = 'never-solved' | 'session-start' | 'power-cycled'
 
-export type UncertainReason = 'moved-without-solve' | 'operation-uncertain' | 'stream-gap' | 'mount-unavailable' | 'stale'
+export type UncertainReason = 'moved-without-solve' | 'operation-uncertain' | 'stream-gap' | 'mount-unavailable' | 'stale' | 'vela-restarted'
 
 export type ContinuityLoss = 'stream-gap' | 'mount-unavailable'
 
@@ -35,6 +35,7 @@ export type Resting =
 export type MountPosition = Resting | { readonly state: 'moving'; readonly since: EpochMs; readonly before: Resting }
 
 export type MountInput =
+  | { readonly t: 'vela-restarted'; readonly at: EpochMs }
   | { readonly t: 'moved'; readonly at: EpochMs }
   | { readonly t: 'settled'; readonly at: EpochMs; readonly how: 'confirmed' | 'uncertain' }
   | { readonly t: 'continuity-lost'; readonly at: EpochMs; readonly why: ContinuityLoss }
@@ -93,6 +94,12 @@ function newer(current: PointingFix | null, offered: PointingFix): boolean {
  * eligibility.
  */
 export function nextMount(position: MountPosition, input: MountInput): MountPosition {
+  if (input.t === 'vela-restarted') {
+    const resting = position.state === 'moving' ? position.before : position
+
+    return { state: 'uncertain', since: input.at, reason: 'vela-restarted', lastFix: lastFixOf(resting) }
+  }
+
   if (input.t === 'session-start' || input.t === 'power-cycled') return restart(input)
 
   switch (position.state) {
@@ -107,7 +114,7 @@ export function nextMount(position: MountPosition, input: MountInput): MountPosi
   }
 }
 
-type Remaining = Exclude<MountInput, { t: 'session-start' | 'power-cycled' }>
+type Remaining = Exclude<MountInput, { t: 'session-start' | 'power-cycled' | 'vela-restarted' }>
 
 function fromUnknown(position: Extract<MountPosition, { state: 'unknown' }>, input: Remaining): MountPosition {
   switch (input.t) {

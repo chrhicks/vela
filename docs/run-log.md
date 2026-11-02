@@ -48,3 +48,28 @@ The log never switches itself off. A write that fails closes its file, so a torn
 ```
 
 `state` is `ok`, `retrying` (the last write failed and the log is trying again), `closed`, or `off` when no directory is set. `status` stays `ok` while the log retries, so a full disk does not make the container unhealthy.
+
+## Live rig model and restart
+
+The server feeds one read-only model per rig from the run log's own append input.
+A timer supplies clock inputs once a second. Reads never advance model time.
+The host's `get(rigId)` returns a detached `assess` result. `GET /api/rigs/:rigId/model`
+returns it, or 503 while the model restores or has no input, and 404 for an unknown rig.
+JSON represents an unbounded budget or travel as `null`.
+
+At startup the host replays every retained JSONL file in filename order, using
+`createLogReader` to decode each whole line. Repeated event ids are applied once.
+An unterminated last line is ignored, even when it is valid JSON. An invalid whole
+line leaves the model unavailable and reports a restore error.
+
+Replay runs asynchronously. Other routes remain available. New append inputs wait
+behind replay in arrival order. The run log queues its writes until replay finishes
+so rotation cannot delete a file that replay still needs. A failed replay releases
+the writer too. On shutdown the host stops its clock and abandons further replay.
+
+A restart input then marks each restored position `uncertain` with reason
+`vela-restarted`, preserving its last fix and blind-travel budget. It closes the old
+motion epoch and clears pending joins and the old track, so a late solve or telemetry
+across the downtime cannot claim uninterrupted coverage. No command is replayed.
+The model runs only when the run log is configured. The later stream service will
+replace this in-process host.
