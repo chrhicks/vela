@@ -12,7 +12,8 @@
     "frame-sources": "node frame-sources.ts",
     "indi-parity": "node indi-parity.ts",
     "am5-profile": "node am5-profile.ts",
-    "backfill": "node backfill.ts"
+    "backfill": "node backfill.ts",
+    "corpus": "node corpus.ts"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
