@@ -183,7 +183,7 @@ export async function replayAlignmentDiagnostics(
       }
 
       case 'dropped':
-        if (closed() || entry.position <= lastPosition)
+        if (closed() ? !report.baseline || entry.position !== lastPosition : entry.position <= lastPosition)
           throw new Error('Alignment diagnostic dropped fix is out of order')
         lastPosition = entry.position
         report.dropped.push({ position: entry.position, reason: entry.reason })
