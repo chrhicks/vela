@@ -43,10 +43,12 @@ import { createMemorySavedImageStore, type SavedImageStore } from './saved-image
 import { registerSavedImages } from './saved-images/routes.js'
 import { registerTargets, type TargetOptions } from './targets/routes.js'
 import { createSurveyCache, registerSurvey, type SurveyCache } from './targets/survey.js'
+import type { ModelHost } from './rig-model/host.js'
 import type { RunLog } from './run-log/run-log.js'
 
 interface BuildAppOptions {
   readonly equipment?: EquipmentComposition
+  readonly models?: Pick<ModelHost, 'get'>
   readonly runLog?: Pick<RunLog, 'health' | 'append'>
   readonly attestation?: Attestation
   readonly targets?: Omit<TargetOptions, 'createAdapter' | 'createAcquisition' | 'createInspector'>
@@ -82,6 +84,7 @@ export function buildApp({
   alerts: alertSettings = { thresholds: defaultThresholds, notifier: null },
   equipment = createEquipmentComposition(),
   runLog,
+  models,
   attestation = noAttestation,
   alpacaDiscovery = equipment.alpacaDiscovery,
   createConnector = equipment.createConnector,
@@ -172,6 +175,13 @@ export function buildApp({
     createConnector,
     createInspector,
     now,
+  })
+
+  app.get<{ Params: { rigId: string } }>('/api/rigs/:rigId/model', async (request, reply) => {
+    if (!await rigCatalog.get(request.params.rigId)) return reply.code(404).send({ error: 'rig-not-found' })
+    const assessment = models?.get(request.params.rigId)
+
+    return assessment ?? reply.code(503).send({ error: 'rig-model-unavailable' })
   })
 
   app.get('/api/health', async () => ({ status: 'ok', runLog: runLog?.health() ?? { state: 'off' } }))

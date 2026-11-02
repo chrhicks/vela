@@ -39,6 +39,7 @@ const positions: Record<MountState, MountPosition> = {
 }
 
 const inputs: Record<MountInputKind, MountInput> = {
+  'vela-restarted': { t: 'vela-restarted', at: at(100) },
   moved: { t: 'moved', at: at(100) },
   settled: { t: 'settled', at: at(100), how: 'confirmed' },
   'continuity-lost': { t: 'continuity-lost', at: at(100), why: 'stream-gap' },
@@ -70,6 +71,7 @@ const expected: Record<MountState, Record<MountInputKind, string>> = {
     expired: 'unknown:never-solved',
     'session-start': 'unknown:session-start',
     'power-cycled': 'unknown:power-cycled',
+    'vela-restarted': 'uncertain:vela-restarted',
   },
   known: {
     moved: 'moving>known:1',
@@ -79,6 +81,7 @@ const expected: Record<MountState, Record<MountInputKind, string>> = {
     expired: 'uncertain:stale',
     'session-start': 'unknown:session-start',
     'power-cycled': 'unknown:power-cycled',
+    'vela-restarted': 'uncertain:vela-restarted',
   },
   moving: {
     moved: 'moving>known:1',
@@ -88,6 +91,7 @@ const expected: Record<MountState, Record<MountInputKind, string>> = {
     expired: 'moving>known:1',
     'session-start': 'unknown:session-start',
     'power-cycled': 'unknown:power-cycled',
+    'vela-restarted': 'uncertain:vela-restarted',
   },
   uncertain: {
     moved: 'moving>uncertain:moved-without-solve',
@@ -97,6 +101,7 @@ const expected: Record<MountState, Record<MountInputKind, string>> = {
     expired: 'uncertain:moved-without-solve',
     'session-start': 'unknown:session-start',
     'power-cycled': 'unknown:power-cycled',
+    'vela-restarted': 'uncertain:vela-restarted',
   },
 }
 

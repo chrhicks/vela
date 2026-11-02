@@ -4,10 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "built": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
-    "test:types": "tsc -p tsconfig.json"
+    "test:types": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@vela/rig-events": "workspace:*",

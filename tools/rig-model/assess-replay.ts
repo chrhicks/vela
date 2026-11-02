@@ -92,7 +92,7 @@ const result = await replayNight({
   settleMs: 600_000,
   onStep({ model }, input) {
     const current = assess(model)
-    const at = input.kind === 'clock' ? input.at : input.seenAt
+    const at = 'seenAt' in input ? input.seenAt : input.at
     maxBlind = Math.max(maxBlind, current.blindTravelDegrees)
 
     if (current.lastFix?.imageId !== previous?.lastFix?.imageId && current.lastFix) {

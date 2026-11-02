@@ -3,7 +3,7 @@ import { buildApp } from './app.js'
 import { openFileRigCatalog } from './rig/catalog.js'
 import { resolveRigCatalogPath } from './rig/catalog-path.js'
 import { alignmentSettings } from './alignment/routes.js'
-import { access } from 'node:fs/promises'
+import { access, open } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
 import { frameRecordsOn, frameRigId, noFrameRecords } from './capture/frame-records.js'
@@ -17,11 +17,25 @@ import { loadAlertsConfiguration } from './alerts/config.js'
 import { createPushoverNotifier } from './alerts/pushover.js'
 import { createHorizon } from './targets/horizon.js'
 import { openRunLog, type RunLog } from './run-log/run-log.js'
+import { createModelHost, modelRunLog } from './rig-model/host.js'
 import { createAttestation } from './attestation/attestation.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
-const runLog: RunLog | undefined = process.env.VELA_RUN_LOG_DIR ? openRunLog({ directory: resolve(process.env.VELA_RUN_LOG_DIR) }) : undefined
+const runLogDirectory = process.env.VELA_RUN_LOG_DIR ? resolve(process.env.VELA_RUN_LOG_DIR) : undefined
+
+const models = createModelHost(runLogDirectory)
+
+void models.ready.catch(error => console.error('Rig model restore failed:', error))
+
+const runLog: RunLog | undefined = runLogDirectory ? modelRunLog(openRunLog({
+  directory: runLogDirectory,
+  async openFile(...args) {
+    await models.ready.catch(() => {})
+
+    return open(...args)
+  },
+}), models) : undefined
 
 const frameRecords = runLog ? frameRecordsOn(runLog) : noFrameRecords
 
@@ -39,6 +53,7 @@ function shutdown() {
     try {
       await app?.close()
     } finally {
+      models.close()
       await runLog?.close()
       await captureRuns.close()
       await telemetry.shutdown()
@@ -143,7 +158,7 @@ try {
       createRejectedStore(resolve(dirname(rigCatalogPath), 'rejected')), runLog,
     )
 
-    const options = { rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns,
+    const options = { models, rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns,
       targets: { ...targets, ...(recordRejected && { recordRejected }) },
       surveyCache, equipment, alerts, attestation, ...(runLog && { runLog }),
     }

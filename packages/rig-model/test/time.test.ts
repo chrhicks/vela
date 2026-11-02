@@ -21,7 +21,7 @@ function withTicks(events: readonly RigEvent[], everySeconds: number | null, unt
 
   for (let second = 0; second <= until; second += everySeconds) ticks.push(clock(second))
 
-  return [...events, ...ticks].map((input, index) => ({ input, index })).sort((a, b) => (a.input.kind === 'clock' ? a.input.at : a.input.seenAt) - (b.input.kind === 'clock' ? b.input.at : b.input.seenAt) || a.index - b.index).map(item => item.input)
+  return [...events, ...ticks].map((input, index) => ({ input, index })).sort((a, b) => ((a.input.kind === 'clock' || a.input.kind === 'vela-restarted') ? a.input.at : a.input.seenAt) - ((b.input.kind === 'clock' || b.input.kind === 'vela-restarted') ? b.input.at : b.input.seenAt) || a.index - b.index).map(item => item.input)
 }
 
 describe('a known position goes stale on the clock', () => {

@@ -60,7 +60,12 @@ export interface ClockInput {
   readonly at: EpochMs
 }
 
-export type ModelInput = RigEvent | ClockInput
+export interface RestartInput {
+  readonly kind: 'vela-restarted'
+  readonly at: EpochMs
+}
+
+export type ModelInput = RigEvent | ClockInput | RestartInput
 
 export type Output = Draft<Envelope<AssessKind>>
 
@@ -664,7 +669,17 @@ export function step(model: RigModel, input: ModelInput): StepResult {
 
   if (advancesTime(input)) advance(w, out, input.kind === 'clock' ? input.at : input.seenAt)
 
-  if (input.kind !== 'clock') handle(w, out, input)
+  if (input.kind === 'vela-restarted') {
+    advance(w, out, input.at)
+    breakEpoch(w, w.track.coveredUntil ?? input.at)
+    hold(w, 'gap', true)
+    w.track = emptyTrack
+    hold(w, 'motion', false)
+    w.motion = { slewing: false, active: new Set(), uncertain: false, settleAt: null }
+    w.link = { ...w.link, operations: new Map(), lastSeenAt: null }
+    w.pending = { frames: new Map(), solves: new Map() }
+    moveMount(w, out, { t: 'vela-restarted', at: input.at })
+  } else if (input.kind !== 'clock') handle(w, out, input)
 
   for (const imageId of w.pending.frames.keys()) decide(w, out, imageId)
 
