@@ -1,8 +1,4 @@
-import { appendFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { MakeTime, RotateVector, Rotation_EQD_EQJ, Vector } from 'astronomy-engine'
-import { diagnosticJournalName } from './diagnostic-schema.js'
-import type { AlignmentMeasurement, AlignmentSample } from './geometry.js'
 
 type Vec3 = readonly [number, number, number]
 
@@ -54,14 +50,4 @@ export function rigidField(axis: Vec3, mountAngleDegrees: number, declinationDeg
   const cd: [number, number, number, number] = [scale * dot(pixelX!, east), -scale * dot(pixelY!, east), scale * dot(pixelX!, north), -scale * dot(pixelY!, north)]
 
   return { raDegrees: ((alpha / radians) + 360) % 360, decDegrees: delta / radians, cd }
-}
-
-/** Adds the `baseline` entry that three-point journals held before plan step 34b. Nothing writes one now, but replay still reads them. */
-export async function appendThreePointBaseline(
-  directory: string,
-  samples: readonly AlignmentSample[],
-  latitudeDegrees: number,
-  measurement: AlignmentMeasurement,
-) {
-  await appendFile(join(directory, diagnosticJournalName), `${JSON.stringify({ type: 'baseline', samples, latitudeDegrees, measurement })}\n`)
 }

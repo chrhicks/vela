@@ -231,16 +231,6 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
           attributes: { 'alignment.run.id': runId, 'rig.id': rigId },
         })
         .end()
-      diagnostics = await options.openDiagnostics?.({
-        runId,
-        rigId,
-        rigName,
-        mode: options.mode,
-        cameraId: settings.cameraId,
-        telescopeId: settings.telescopeId,
-        cameraName: physical?.cameraName ?? 'Configured offline camera',
-        exposureSeconds,
-      })
       signal.throwIfAborted()
       await run(signal)
     })
@@ -642,9 +632,20 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
   /** Six positions along the RA sweep: the offline model's five equal moves, or the physical mount's five rotations. */
   async function run(signal: AbortSignal) {
+    const diagnosticInfo = {
+      runId,
+      rigId: view.rigId!,
+      rigName: view.rigName!,
+      cameraId: settings.cameraId,
+      telescopeId: settings.telescopeId,
+      cameraName: physical?.cameraName ?? 'Configured offline camera',
+      exposureSeconds,
+    }
+
     let solver: Solver
 
     if (options.mode === 'physical') {
+      diagnostics = await options.openDiagnostics?.({ ...diagnosticInfo, mode: 'physical' })
       patch({ activity: 'homing' })
       fieldHeightDegrees = (await step('alignment.prepare', () => options.physical.prepare(signal)))
         .fieldHeightDegrees
@@ -653,6 +654,11 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     } else {
       solver = options.solver
       const initial = await hardware.pointing(settings.telescopeId, signal)
+      diagnostics = await options.openDiagnostics?.({
+        ...diagnosticInfo,
+        mode: 'offline',
+        simulator: { latitudeDegrees: initial.latitudeDegrees, siderealTimeDegrees: initial.siderealTimeDegrees, at: new Date(now()).toISOString() },
+      })
 
       if (initial.coordinateSystem !== 'j2000' || !initial.tracking)
         throw new Error('The configured simulator’s J2000 frame and tracking are required')

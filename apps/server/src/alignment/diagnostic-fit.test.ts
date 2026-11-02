@@ -6,17 +6,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fitPolarAxis } from '@vela/rig-sky'
 import { simulatorSiderealDegrees } from './alignment-events.js'
 import { createAlignmentDiagnostics, type AlignmentFrameEvidence } from './diagnostics.js'
+import { openRunLog } from '../run-log/run-log.js'
+import { decodeLine, encodeEvent, seal } from '@vela/rig-events'
 import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
-import { diagnosticEntrySchema, diagnosticJournalName } from './diagnostic-schema.js'
 import { baselineFromAxis, measureAlignment } from './geometry.js'
-import { readBothWays } from './events-fixture.js'
+import { readBothFormats } from './events-fixture.js'
 import { fixture } from './physical-fixture.js'
 import { sweepFix } from './sweep-fit.js'
 
 const roots: string[] = []
 
 interface ReadTrials {
-  readTrials(root: string): Promise<{
+  readTrials(root: string, runLog?: string): Promise<{
     problems: unknown[]
     trials: {
       outcome: string
@@ -62,14 +63,20 @@ async function recordSweep(slipDegrees: number, drop: number) {
   roots.push(root)
   const onError = vi.fn()
 
+  const trialsRoot = join(root, 'trials')
+  const runLog = join(root, 'log')
+  const log = openRunLog({ directory: runLog })
+
   const run = (await createAlignmentDiagnostics(
-    root,
+    trialsRoot,
+    log,
     onError,
   )({
     runId: randomUUID(),
     rigId: 'simulator',
     rigName: 'Simulator',
     mode: 'offline',
+    simulator,
     cameraId: 'camera',
     telescopeId: 'mount',
     cameraName: 'Simulator camera',
@@ -117,14 +124,20 @@ async function recordSweep(slipDegrees: number, drop: number) {
   await run.finish(baseline ? { phase: 'finished', error: null } : { phase: 'failed', error: 'not rigid' })
   expect(onError).not.toHaveBeenCalled()
 
-  return { root, directory: join(root, (await readdir(root))[0]!), fit, baseline }
+  await log.close()
+
+  return { root: trialsRoot, runLog, directory: join(trialsRoot, (await readdir(trialsRoot))[0]!), fit, baseline }
 }
 
-describe('a journal of five fixes and one dropped position', () => {
+describe('a run log of five fixes and one dropped position', () => {
   it('replays a rigid sweep from its recorded frames and rebuilds the adjusting baseline from the fitted axis', async () => {
-    const { directory, fit, baseline } = await recordSweep(0, 4)
-    const report = await replayAlignmentDiagnostics(directory)
+    const { directory, runLog, fit, baseline } = await recordSweep(0, 4)
+    const report = await replayAlignmentDiagnostics(directory, runLog)
 
+    const both = await readBothFormats(directory, runLog)
+    expect(both.events).toEqual(both.journal)
+    expect(both.events.trials).toHaveLength(1)
+    expect(both.events.problems).toEqual([])
     expect(report.counts).toMatchObject({ frames: 5, measurements: 1, verifiedOriginals: 5 })
     expect(report.dropped).toEqual([{ position: 4, reason: 'no-solve' }])
     expect(report.rigidity?.status).toBe('rigid')
@@ -135,8 +148,8 @@ describe('a journal of five fixes and one dropped position', () => {
   })
 
   it('reads back through readTrials with the dropped fix, the fit and the polar readings', async () => {
-    const { root } = await recordSweep(0, 4)
-    const { trials, problems } = await readTrials(root)
+    const { root, runLog } = await recordSweep(0, 4)
+    const { trials, problems } = await readTrials(root, runLog)
     const [trial] = trials
 
     expect(problems).toEqual([])
@@ -148,9 +161,9 @@ describe('a journal of five fixes and one dropped position', () => {
   })
 
   it('names the step in a sweep whose camera slipped and gives it no polar reading', async () => {
-    const { root, directory } = await recordSweep(0.5, 4)
-    const { trials } = await readTrials(root)
-    const report = await replayAlignmentDiagnostics(directory)
+    const { root, runLog, directory } = await recordSweep(0.5, 4)
+    const { trials } = await readTrials(root, runLog)
+    const report = await replayAlignmentDiagnostics(directory, runLog)
 
     expect(trials[0]?.fits[0]).toMatchObject({ status: 'not-rigid', steps: [{ before: '3', after: '5' }] })
     expect(trials[0]?.fits[0]?.missArcmin).toBeGreaterThan(trials[0]!.fits[0]!.thresholdArcmin)
@@ -161,30 +174,19 @@ describe('a journal of five fixes and one dropped position', () => {
   })
 
   it('refuses a fit entry that disagrees with the frames it names', async () => {
-    const { directory } = await recordSweep(0, 4)
-    const journal = join(directory, diagnosticJournalName)
+    const { directory, runLog } = await recordSweep(0, 4)
+    const journal = join(runLog, (await readdir(runLog))[0]!)
     const lines = (await readFile(journal, 'utf8')).trimEnd().split('\n')
     const index = lines.findIndex(line => line.includes('"type":"fit"'))
-    const entry = diagnosticEntrySchema.parse(JSON.parse(lines[index]!))
+    const decoded = decodeLine(lines[index]!)
 
-    if (entry.type !== 'fit') throw new Error('expected a fit entry')
-    lines[index] = JSON.stringify({ ...entry, verdict: { ...entry.verdict, status: 'not-rigid' } })
+    if (!decoded.ok || decoded.event.kind !== 'alignment' || decoded.event.body.type !== 'fit') throw new Error('expected a fit entry')
+    const event = decoded.event
+    const body = decoded.event.body
+    lines[index] = encodeEvent(seal({ ...event, body: { ...body, verdict: { ...body.verdict, status: 'not-rigid' } } }))
     await writeFile(journal, lines.join('\n') + '\n')
 
-    await expect(replayAlignmentDiagnostics(directory)).rejects.toThrow('disagrees')
+    await expect(replayAlignmentDiagnostics(directory, runLog)).rejects.toThrow('disagrees')
   })
 
-  it.each([
-    ['rigid', 0],
-    ['not-rigid', 0.5],
-  ])('gives a %s offline sweep the same replay report and trial from alignment events as from its journal', async (status, slipDegrees) => {
-    const { directory } = await recordSweep(slipDegrees, 4)
-    const { journal, events } = await readBothWays(directory, { simulator })
-
-    expect(events).toEqual(journal)
-    expect(journal.report.rigidity?.status).toBe(status)
-    expect(journal.report.counts).toMatchObject({ frames: 5, verifiedOriginals: 5 })
-    expect(journal.trials).toHaveLength(1)
-    expect(journal.problems).toEqual([])
-  })
 })

@@ -47,7 +47,7 @@ import type { RunLog } from './run-log/run-log.js'
 
 interface BuildAppOptions {
   readonly equipment?: EquipmentComposition
-  readonly runLog?: Pick<RunLog, 'health'>
+  readonly runLog?: Pick<RunLog, 'health' | 'append'>
   readonly attestation?: Attestation
   readonly targets?: Omit<TargetOptions, 'createAdapter' | 'createAcquisition' | 'createInspector'>
   readonly surveyCache?: SurveyCache
@@ -110,6 +110,7 @@ export function buildApp({
   })
 
   registerAlignment(app, rigCatalog, alignment, operations, undefined, {
+    runLog,
     createInspector,
     settingsForRig: equipment.alignmentSettings,
     createAcquisition: equipment.createAcquisition,

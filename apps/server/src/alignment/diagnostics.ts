@@ -1,24 +1,22 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { appendFile, mkdir, mkdtemp, unlink, writeFile } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { mkdir, mkdtemp, unlink, writeFile } from 'node:fs/promises'
+import { basename, isAbsolute, join } from 'node:path'
 import type {
   CameraGeometry,
   Frame,
   Pointing,
   TelescopeStatus,
 } from '@vela/equipment'
+import { decodeEvent, epochMs, rigId, seal, type Envelope } from '@vela/rig-events'
+import type { RunLog } from '../run-log/run-log.js'
 import type { PolarFit, Site } from '@vela/rig-sky'
 import { encodeCaptureFits } from '../imaging/fits.js'
 import type { SkyPosition, SolveResult } from '../plate-solving/judged-solver.js'
 import type { AlignmentMeasurement, AlignmentSample } from './geometry.js'
 import {
-  diagnosticEntrySchema,
-  diagnosticJournalName,
   diagnosticRunInfoSchema,
   maximumFitsBytes,
   maximumFixes,
-  maximumJournalBytes,
-  type DiagnosticEntry,
   type DroppedReason,
 } from './diagnostic-schema.js'
 
@@ -26,12 +24,11 @@ export type AlignmentDiagnosticRunInfo = {
   runId: string
   rigId: string
   rigName: string
-  mode: 'offline' | 'physical'
   cameraId: string
   telescopeId: string
   cameraName: string
   exposureSeconds: number
-}
+} & ({ mode: 'physical' } | { mode: 'offline'; simulator: Extract<Envelope<'alignment'>['body'], { mode: 'offline' }>['simulator'] })
 
 export type AlignmentFrameEvidence = {
   phase: 'baseline' | 'adjusting'
@@ -71,36 +68,29 @@ export type AlignmentDiagnosticsFactory = (
   run: AlignmentDiagnosticRunInfo,
 ) => Promise<AlignmentDiagnosticRun | undefined>
 
-/** Opt-in evidence only. The controller awaits each call sequentially; a recording
- * failure disables this run without changing the outcome of any rig operation. */
+/** FITS stay with the trial; numerical evidence goes to the shared run log. */
 export function createAlignmentDiagnostics(
   root: string,
+  log: Pick<RunLog, 'append'>,
   onError: (error: Error) => void,
 ): AlignmentDiagnosticsFactory {
+  function report(error: Error) {
+    try {
+      onError(error)
+    } catch {
+    }
+  }
+
   return async run => {
-    let disabled = false
-    let journalBytes = 0
+    let n = 0
     let baselineFrames = 0
     let latestAdjustment: string | undefined
 
-    function disable(error: Error) {
-      if (disabled) return
-      disabled = true
-
-      try {
-        onError(error)
-      } catch {
-        // Even a failed reporting sink must not reject into a physical operation.
-      }
-    }
-
     async function record(work: () => Promise<void>) {
-      if (disabled) return
-
       try {
         await work()
       } catch (error) {
-        disable(
+        report(
           error instanceof Error
             ? error
             : new Error('Alignment diagnostic recording failed', { cause: error }),
@@ -113,19 +103,18 @@ export function createAlignmentDiagnostics(
       diagnosticRunInfoSchema.parse(run)
       await mkdir(root, { recursive: true })
       const directory = await mkdtemp(join(root, `${run.runId}-`))
-      const journal = join(directory, diagnosticJournalName)
 
-      async function append(entry: DiagnosticEntry) {
-        const line = `${JSON.stringify(entry)}\n`
-        const bytes = Buffer.byteLength(line)
+      function append(body: Envelope<'alignment'>['body']) {
+        const at = epochMs(Date.now())
+        const decoded = decodeEvent({ v: 1, id: 'pending', rig: run.rigId, source: 'vela:alignment', kind: 'alignment', at, seenAt: at, body })
 
-        if (journalBytes + bytes > maximumJournalBytes)
-          throw new Error('Alignment diagnostic journal exceeds 4 MiB')
-        await appendFile(journal, line)
-        journalBytes += bytes
+        if (!decoded.ok || decoded.event.kind !== 'alignment') throw new Error('Invalid alignment event')
+        log.append(seal({ rig: rigId(run.rigId), source: decoded.event.source, kind: 'alignment', at, seenAt: at, body: decoded.event.body }))
       }
 
-      await append({ type: 'run', schemaVersion: 1, createdAt: new Date().toISOString(), run })
+      const part = () => ({ runId: run.runId, n: ++n })
+
+      append({ ...run, type: 'run', ...part(), folder: basename(directory) })
 
       return {
         recordFrame: (frame, evidence) =>
@@ -148,8 +137,9 @@ export function createAlignmentDiagnostics(
             const fits = await encodeCaptureFits(frame, run)
             const filename = `${evidence.phase}-${randomUUID()}.fits`
             await writeFile(join(directory, filename), fits, { flag: 'wx' })
-            await append({
+            append({
               type: 'frame',
+              ...part(),
               original: {
                 filename,
                 bytes: fits.length,
@@ -174,39 +164,39 @@ export function createAlignmentDiagnostics(
               if (previous) await unlink(join(directory, previous))
             }
           }),
-        recordFit: (fixes, latitudeDegrees, fit) =>
-          record(() => {
+        recordFit: (fixes, _latitudeDegrees, fit) =>
+          record(async () => {
             const { axis, altitudeArcsec, azimuthArcsec, totalArcsec, verdict } = fit
             // A fit that is not rigid has no polar error, so none is journalled with it.
             const polar = verdict.status === 'rigid' ? { axis, altitudeArcsec, azimuthArcsec, totalArcsec } : null
 
-            return append(diagnosticEntrySchema.parse({ type: 'fit', fixes, latitudeDegrees, polar, verdict }))
+            append({ type: 'fit', ...part(), fixes, polar, verdict })
           }),
         recordDropped: (position, reason, detail) =>
-          record(() =>
+          record(async () =>
             append(
-              diagnosticEntrySchema.parse({ type: 'dropped', position, reason, detail: detail?.slice(0, 500) ?? null }),
+              { type: 'dropped', ...part(), position, reason, detail: detail?.slice(0, 500) ?? null },
             ),
           ),
         // Both current alignment modes measure with sidereal tracking enabled.
         recordMeasurement: (sample, measurement, mount) =>
-          record(() =>
+          record(async () =>
             append({
               type: 'measurement',
+              ...part(),
               sample,
               measurement,
               tracking: true,
-              mount,
+              ...(mount && { mount }),
             }),
           ),
         finish: outcome =>
           record(async () => {
-            await append({ type: 'outcome', ...outcome })
-            disabled = true
+            append({ type: 'outcome', ...part(), ...outcome })
           }),
       }
     } catch (error) {
-      disable(
+      report(
         error instanceof Error
           ? error
           : new Error('Alignment diagnostic recording failed', { cause: error }),

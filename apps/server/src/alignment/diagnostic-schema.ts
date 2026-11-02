@@ -3,7 +3,8 @@ import { z } from 'zod'
 
 export const diagnosticJournalName = 'journal.jsonl'
 
-export const maximumJournalBytes = 4 * 1024 * 1024
+/** Read limit for old journals only; current events use the shared run log. */
+export const maximumLegacyJournalBytes = 4 * 1024 * 1024
 
 export const maximumFitsBytes = 128 * 1024 * 1024
 
