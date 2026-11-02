@@ -469,6 +469,21 @@ describe('framing controller', () => {
     expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', error: null, errorDetail: null })
   })
 
+  it('reports that it turned tracking on and that the goto was then refused', async () => {
+    const fake = workshop()
+    fake.mount.tracking = false
+    fake.hardware.slew = vi.fn(async () => {
+      throw new Error('EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert')
+    })
+    await fake.start().finished
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'failed',
+      notice: 'Tracking was off. Vela turned it on.',
+      error: 'The mount refused the goto. Nothing moved.',
+      errorDetail: 'EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert',
+    })
+  })
+
   it('leaves a goto failure that may have moved the mount as it is', async () => {
     const fake = workshop()
     fake.hardware.slew = vi.fn(async () => { throw new EquipmentError('EQUATORIAL_EOD_COORD on ZWO AM5: no answer within 10 seconds', { reason: 'protocol-error', endpoint: 'Cria' }) })
