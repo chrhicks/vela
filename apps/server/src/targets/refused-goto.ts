@@ -1,4 +1,6 @@
-/** The mount's driver answered a goto with a refusal, so the mount did not move. */
+import { CommandNotStartedError, type CommandNotStartedReason } from '@vela/equipment'
+
+/** A goto the mount did not take, in words that say what happened and that nothing moved. */
 export class RefusedGotoError extends Error {
   readonly detail: string
 
@@ -9,16 +11,25 @@ export class RefusedGotoError extends Error {
   }
 }
 
-/** Cria's rejection of a write it sent, when the driver gave no message: "<PROPERTY> on <device>: the driver reported Alert". */
-const bareRefusal = /^[A-Z][A-Z0-9_]+ on [^:]+: the driver reported Alert$/
+const unreachable: ReadonlyArray<CommandNotStartedReason> = ['disconnected', 'unavailable']
 
-/**
- * Plain words for a goto the driver refused. Cria reports a refusal and an unknown outcome through the same error
- * type, and its unknown-outcome messages come in many shapes. Only the one text a refusal alone produces counts, so
- * "Nothing moved" is never said about a goto that may have moved the mount.
- */
+/** Cria's words without its "<PROPERTY> on <device>: " prefix, unless all it said was that the driver reported Alert. */
+function criaText(message: string) {
+  const said = /^(?:[A-Z][A-Z0-9_]+ on [^:]+: )?(.+)$/s.exec(message)?.[1]?.trim()
+
+  return said && said !== 'the driver reported Alert' ? said.replace(/[.\s]+$/, '') : undefined
+}
+
 export function refusedGoto(error: Error): RefusedGotoError | undefined {
-  if (!bareRefusal.test(error.message)) return undefined
+  if (!(error instanceof CommandNotStartedError)) return undefined
+  const text = criaText(error.message)
 
-  return new RefusedGotoError('The mount refused the goto. Nothing moved.', error.message)
+  const plain =
+    error.refusal === 'busy'
+      ? 'The mount is busy with another operation. Nothing moved.'
+      : unreachable.includes(error.refusal)
+        ? 'Vela cannot reach the mount. Nothing moved.'
+        : 'The mount refused the goto. Nothing moved.'
+
+  return new RefusedGotoError(text ? `${plain} Cria says: ${text}.` : plain, error.message)
 }

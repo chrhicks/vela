@@ -3,13 +3,14 @@ export {
   CaptureStoppedError,
   CaptureRetryableError,
   CaptureUncertainError,
+  CommandNotStartedError,
   FocuserStoppedError,
   FocuserUncertainError,
   FramingStoppedError,
   FrameLostError,
 } from './error.js'
 
-export type { EquipmentErrorReason, EquipmentErrorOptions } from './error.js'
+export type { CommandNotStartedReason, EquipmentErrorReason, EquipmentErrorOptions } from './error.js'
 
 export type {
   Acquisition,
