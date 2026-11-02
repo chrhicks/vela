@@ -50,7 +50,7 @@ export type SolveVerdict =
 /**
  * The configured focal length sits 0.2% to 0.8% from the scale of every good frame of the audit corpus, and the
  * audit's false solves were 8% and 20% off. Alignment fits orientation and scale across frames, so it gets a
- * band 3 times the worst good frame. Framing only needs the field centre, so it gets 6 times, which still
+ * band 2.5 times the worst good frame. Framing only needs the field centre, so it gets 6 times, which still
  * rejects both false solves.
  */
 export const scaleTolerance = { framing: 0.05, alignment: 0.02 } as const satisfies Record<Purpose, number>
