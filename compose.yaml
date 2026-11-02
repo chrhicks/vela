@@ -1,7 +1,7 @@
 # Vela on one host. Config and data live in XDG directories on the host and are mounted in:
 #   ${VELA_CONFIG_DIR}  default $XDG_CONFIG_HOME/vela  (cria.json, alerts.json)
 #   ${VELA_DATA_DIR}    default $XDG_DATA_HOME/vela    (rigs.yaml, saved-images, survey-cache, traces,
-#                                                       alignment-diagnostics, astap/)
+#                                                       alignment-diagnostics, astap/, attestation.json)
 # There is no login: whoever can reach VELA_PORT can drive the rig. See docs/docker.md.
 name: vela
 

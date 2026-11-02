@@ -17,7 +17,7 @@ import { stateDraft } from './samples.ts'
 
 describe('the registry', () => {
   it('splits every kind into the fact branch or the assess branch', () => {
-    const facts: FactKind[] = ['cria.state', 'cria.exchange', 'cria.image', 'cria.stream', 'frame', 'autofocus', 'solve', 'session', 'gap']
+    const facts: FactKind[] = ['cria.state', 'cria.exchange', 'cria.image', 'cria.stream', 'frame', 'autofocus', 'attestation', 'solve', 'session', 'gap']
     const assessments: AssessKind[] = ['mount-position', 'pointing-fix']
 
     expect(new Set<Kind>([...facts, ...assessments])).toEqual(new Set(Object.keys(kinds)))

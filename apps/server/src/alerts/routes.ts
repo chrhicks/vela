@@ -16,13 +16,12 @@ export interface AlertsOptions {
   focuserReaderFor?: (rigId: string) => (signal: AbortSignal) => Promise<number | null>
   /** Lets a collapse of the star count teach the horizon where stars vanished, and read it for a cause. */
   horizon?: Horizon
+  /** Lines for the rig page about what differs from the pinned manifest. */
+  attestationWarnings?: (rigId: string) => string[]
   now?: () => number
 }
 
 const emptyBody = z.strictObject({})
-
-// The browser reads this shape from @vela/model; the annotation keeps the monitor's view assignable to it.
-const viewOf = (monitor: AlertMonitor): AlertsView => monitor.view()
 
 export function registerAlerts(
   app: FastifyInstance,
@@ -33,9 +32,17 @@ export function registerAlerts(
     mountReaderFor,
     focuserReaderFor,
     horizon,
+    attestationWarnings = () => [],
     now,
   }: AlertsOptions,
 ) {
+  // The browser reads this shape from @vela/model; the annotation keeps the monitor's view assignable to it.
+  function viewOf(monitor: AlertMonitor): AlertsView {
+    const view = monitor.view()
+
+    return { ...view, attestation: attestationWarnings(view.rigId) }
+  }
+
   const monitors = new Map<string, AlertMonitor>()
 
   function monitorFor(rig: { id: string; name: string }) {

@@ -14,6 +14,7 @@ export const kinds = {
   'cria.stream': { branch: 'fact', producers: ['vela'] },
   frame: { branch: 'fact', producers: ['vela'] },
   autofocus: { branch: 'fact', producers: ['vela'] },
+  attestation: { branch: 'fact', producers: ['vela'] },
   solve: { branch: 'fact', producers: ['solver'] },
   session: { branch: 'fact', producers: ['operator'] },
   gap: { branch: 'fact', producers: ['vela', 'cria', 'solver'] },

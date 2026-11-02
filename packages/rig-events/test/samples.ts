@@ -96,6 +96,19 @@ export function sampleEvents(): RigEvent[] {
     }),
     seal({
       ...stamp(at),
+      kind: 'attestation',
+      body: {
+        pinnedAt: '2026-10-26T19:00:00.000Z',
+        items: [
+          { item: 'astap', status: 'match', pinned: 'a'.repeat(64), observed: 'a'.repeat(64) },
+          { item: 'catalog', status: 'changed', pinned: 'b'.repeat(64), observed: 'c'.repeat(64) },
+          { item: 'cria', status: 'missing', pinned: '{"protocolVersion":5}', observed: null },
+          { item: 'optics', status: 'unpinned', pinned: null, observed: 'focalLengthMm=400' },
+        ],
+      },
+    }),
+    seal({
+      ...stamp(at),
       kind: 'solve',
       body: {
         status: 'solved',

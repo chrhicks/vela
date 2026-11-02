@@ -131,6 +131,18 @@ export const AutofocusBody = Schema.Struct({
   samples: Schema.Array(AutofocusSample),
 })
 
+const AttestationItem = Schema.Struct({
+  item: Schema.String,
+  status: Schema.Literals(['match', 'changed', 'missing', 'unpinned']),
+  pinned: Schema.NullOr(Schema.String),
+  observed: Schema.NullOr(Schema.String),
+})
+
+export const AttestationBody = Schema.Struct({
+  pinnedAt: Schema.String,
+  items: Schema.Array(AttestationItem),
+})
+
 const PlateWcs = Schema.Struct({
   width: Schema.Number,
   height: Schema.Number,
@@ -231,6 +243,8 @@ export type CriaStreamBody = typeof CriaStreamBody.Type
 export type FrameBody = typeof FrameBody.Type
 
 export type AutofocusBody = typeof AutofocusBody.Type
+
+export type AttestationBody = typeof AttestationBody.Type
 
 export type SolveBody = typeof SolveBody.Type
 

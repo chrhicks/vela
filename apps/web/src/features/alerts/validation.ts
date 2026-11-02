@@ -33,6 +33,7 @@ const alertsView = z.object({
   watching: z.boolean(),
   alerts: z.array(alert),
   unavailable: z.array(text),
+  attestation: z.array(text),
   phone,
   unattended: z.boolean(),
   thresholds: z.record(z.string(), z.number()),

@@ -94,6 +94,7 @@ describe('alerts routes', () => {
       watching: false,
       alerts: [],
       unavailable: [],
+      attestation: [],
       phone: { state: 'ready' },
       thresholds: { starsCollapsedRatio: 0.15, hfrBadPixels: 6, meridianTrackLimitHours: 0.0669 },
     })

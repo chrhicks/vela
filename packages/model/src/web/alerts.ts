@@ -35,6 +35,8 @@ export interface AlertsView {
   alerts: AlertView[]
   /** Watches that cannot run, such as "meridian watch unavailable: pier side". */
   unavailable: string[]
+  /** Where what is installed differs from the pinned manifest. A warning only: nothing is blocked. */
+  attestation: string[]
   phone: PhoneAlertsView
   /** The phone is paged only while the current run is Unattended; alerts show here either way. */
   unattended: boolean

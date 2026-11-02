@@ -25,6 +25,8 @@ import { registerMountControls } from './rig/mount-control.js'
 import { getTarget } from './targets/catalog/index.js'
 import { registerCapture } from './capture/routes.js'
 import { registerAlerts, type AlertsOptions } from './alerts/routes.js'
+import { noAttestation, type Attestation } from './attestation/attestation.js'
+import { registerAttestation } from './attestation/routes.js'
 import { focuserReaderFor } from './alerts/focuser.js'
 import { mountReaderFor } from './alerts/mount.js'
 import { defaultThresholds } from './alerts/thresholds.js'
@@ -46,6 +48,7 @@ import type { RunLog } from './run-log/run-log.js'
 interface BuildAppOptions {
   readonly equipment?: EquipmentComposition
   readonly runLog?: Pick<RunLog, 'health'>
+  readonly attestation?: Attestation
   readonly targets?: Omit<TargetOptions, 'createAdapter' | 'createAcquisition' | 'createInspector'>
   readonly surveyCache?: SurveyCache
   readonly savedImages?: SavedImageStore
@@ -79,6 +82,7 @@ export function buildApp({
   alerts: alertSettings = { thresholds: defaultThresholds, notifier: null },
   equipment = createEquipmentComposition(),
   runLog,
+  attestation = noAttestation,
   alpacaDiscovery = equipment.alpacaDiscovery,
   createConnector = equipment.createConnector,
   createInventory = equipment.createInventory,
@@ -115,10 +119,13 @@ export function buildApp({
 
   const alerts = registerAlerts(app, rigCatalog, {
     ...alertSettings,
+    attestationWarnings: attestation.warningsFor,
     mountReaderFor: rigId => mountReaderFor(rigId, rigCatalog, equipment),
     focuserReaderFor: rigId => focuserReaderFor(rigId, rigCatalog, equipment),
     ...(targets?.horizon && { horizon: targets.horizon }),
   })
+
+  registerAttestation(app, attestation)
 
   const capture = registerCapture(app, rigCatalog, operations, {
     alerts,
