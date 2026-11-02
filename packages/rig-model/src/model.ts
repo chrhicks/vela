@@ -263,12 +263,22 @@ function sampleOf(observation: MountObservation, previous: MountSample | undefin
   }
 }
 
+// Step 3 AM5 profile: largest measured 9x speed 11002 arcsec/s. Double it for receive-time jitter.
+// A faster reported change can be a reference reset, so its distance is unknown until another solve.
+const maxReportedSpeedDegreesPerSecond = 2 * 11002 / 3600
+
+function plausibleTravel(degrees: number, elapsedMs: number): number {
+  return degrees <= maxReportedSpeedDegreesPerSecond * elapsedMs / 1000 ? degrees : Infinity
+}
+
 function countedTravel(a: MountSample, b: MountSample): number {
   if (a.raHours === b.raHours && a.decDegrees === b.decDegrees) return 0
 
   const siderealDegrees = a.tracking ? 0 : (b.at - a.at) * 360 / 86_164_090.5
 
-  return separationDegrees(a, { raHours: b.raHours - siderealDegrees / 15, decDegrees: b.decDegrees })
+  const degrees = separationDegrees(a, { raHours: b.raHours - siderealDegrees / 15, decDegrees: b.decDegrees })
+
+  return plausibleTravel(degrees, b.at - a.at)
 }
 
 function travelSince(track: MountTrack, from: EpochMs, to: number = Infinity): number {
@@ -418,10 +428,11 @@ function onState(w: Working, out: Output[], event: Envelope<'cria.state'>) {
     if (!observed || operation.phase !== 'settled' || w.link.operations.get(operation.id) === 'settled' ||
       (coveredBefore !== null && (operation.settledAt ?? 0) <= coveredBefore) || operation.startedAt < (fix?.at ?? 0)) continue
 
-    const travel = Math.hypot(observed.rightAscensionDegrees, observed.declinationDegrees)
+    const travel = plausibleTravel(Math.hypot(observed.rightAscensionDegrees, observed.declinationDegrees), (operation.settledAt ?? observation.at) - operation.startedAt)
     const sampled = travelSince(w.track, operation.startedAt, observation.at)
 
-    w.blindTravelDegrees += Math.max(0, travel - sampled)
+    if (travel === Infinity || sampled === Infinity) w.blindTravelDegrees = Infinity
+    else w.blindTravelDegrees += Math.max(0, travel - sampled)
   }
 
   followMotion(w, out, observation, coveredBefore)

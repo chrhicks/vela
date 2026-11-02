@@ -23,7 +23,7 @@ it('grows by the path, including a reversal, and caps confidence while moving', 
   let model = fixed()
   const initial = assess(model)
 
-  for (const [second, raHours] of [[11, 3], [12, 2]] as const) {
+  for (const [second, raHours] of [[13, 3], [16, 2]] as const) {
     model = step(model, snapshot({ at: s(second), mount: { at: s(second), raHours, decDegrees: 0, slewing: true } })).model
   }
 
@@ -44,8 +44,8 @@ it('counts a short RA wrap rather than a full turn and ignores old samples', () 
 
 it('uses observed axis travel once, without adding the sampled part twice', () => {
   const start = run([snapshot({ at: s(0), mount: { at: s(0), raHours: 2, decDegrees: 40 } })]).model
-  const operation = { ...homeOperation({ id: operationId(1), acceptedAt: s(1), startedAt: s(2), settledAt: s(4) }), motion: { ...motion, observed: { ...motion.observed, travel: { rightAscensionDegrees: 30, declinationDegrees: 0 } }, commanded: { ...motion.commanded, sentAt: s(2) }, stopped: { ...motion.stopped, at: s(4) } } }
-  const event = snapshot({ at: s(5), mount: { at: s(5), raHours: 3, decDegrees: 40 }, operations: [operation] })
+  const operation = { ...homeOperation({ id: operationId(1), acceptedAt: s(1), startedAt: s(2), settledAt: s(12) }), motion: { ...motion, observed: { ...motion.observed, travel: { rightAscensionDegrees: 30, declinationDegrees: 0 } }, commanded: { ...motion.commanded, sentAt: s(2) }, stopped: { ...motion.stopped, at: s(12) } } }
+  const event = snapshot({ at: s(13), mount: { at: s(13), raHours: 3, decDegrees: 40 }, operations: [operation] })
   const next = step(start, event).model
 
   expect(assess(next).blindTravelDegrees).toBeCloseTo(30)
@@ -119,4 +119,47 @@ it.each([89, -89, 90, -90])('does not count an RA jump at declination %s as a ha
 
   expect(assess(next).blindTravelDegrees).toBeCloseTo(2 * (90 - Math.abs(decDegrees)))
   expect(assess(next).position.state).toBe('unknown')
+})
+
+it('makes an impossible reported jump unbounded until the next current-epoch fix', () => {
+  let model = fixed()
+
+  const inputs = inOrder(
+    tracking(11, 20, { raHours: 2, decDegrees: 90 }),
+    frame({ image: imageIdOf(4), capturedAt: s(12), exposureSeconds: 2, seenAt: s(14) }),
+    solved(imageIdOf(4), { raDegrees: 30, decDegrees: 89.9 }, s(15)),
+  )
+
+  model = step(model, inputs[0]!).model
+
+  expect(assess(model)).toMatchObject({ blindTravelDegrees: Infinity, budgetArcmin: Infinity, confidence: 'none' })
+
+  for (const input of inputs.slice(1)) model = step(model, input).model
+  expect(model.mount.value.state).toBe('known')
+  expect(assess(model).blindTravelDegrees).toBe(0)
+  expect(assess(model).budgetArcmin).toBe(assess(model).lastFix?.errorArcmin.total)
+})
+
+it.each([89, -89, 90, -90])('does not trust an impossible operation axis jump at declination %s', decDegrees => {
+  const start = run([snapshot({ at: s(0), mount: { at: s(0), raHours: 0.1, decDegrees } })]).model
+
+  const operation = {
+    ...homeOperation({ id: operationId(2), acceptedAt: s(0), startedAt: s(0), settledAt: s(1) }),
+    motion: {
+      ...motion,
+      commanded: { ...motion.commanded, sentAt: s(0) },
+      observed: {
+        from: { rightAscensionDegrees: 1.5, declinationDegrees: decDegrees },
+        to: { rightAscensionDegrees: 181.5, declinationDegrees: decDegrees },
+        travel: { rightAscensionDegrees: 180, declinationDegrees: 0 },
+      },
+      stopped: { ...motion.stopped, at: s(1) },
+    },
+  }
+
+  const event = snapshot({ at: s(1), mount: { at: s(1), raHours: 12.1, decDegrees }, operations: [operation] })
+  const model = step(start, event).model
+
+  expect(assess(model)).toMatchObject({ blindTravelDegrees: Infinity, budgetArcmin: Infinity, confidence: 'none' })
+  expect(assess(step(model, event).model).blindTravelDegrees).toBe(Infinity)
 })
