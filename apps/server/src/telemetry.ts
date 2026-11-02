@@ -99,6 +99,7 @@ export function createTraceFileExporter(
   async function write(lines: string[]) {
     if (!initialized) {
       await mkdir(dirname(file), { recursive: true })
+
       const size = await stat(file).then(
         info => info.size,
         error => {
@@ -107,7 +108,9 @@ export function createTraceFileExporter(
         },
       )
       committedBytes ??= size
+
       if (size > committedBytes) await truncate(file, committedBytes)
+
       fileBytes = Math.min(size, committedBytes)
       initialized = true
     }
@@ -160,11 +163,13 @@ export function createTraceFileExporter(
     export(spans, callback) {
       const reject = (error: Error) => {
         dropped += spans.length
+
         if (error !== backingOff) report(error)
         callback({ code: ExportResultCode.FAILED, error })
       }
 
       if (closed) return reject(new Error('Trace exporter is closed'))
+
       if (isBackingOff()) return reject(backingOff)
       let lines: string[]
 
