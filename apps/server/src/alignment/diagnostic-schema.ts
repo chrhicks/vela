@@ -159,6 +159,7 @@ export const diagnosticEntrySchema = z.discriminatedUnion('type', [
     run: diagnosticRunInfoSchema,
   }),
   frameEntry,
+  /** Read only: the three-point journals of before plan step 34b. Nothing writes this entry now. */
   z.object({
     type: z.literal('baseline'),
     samples: z.tuple([sample, sample, sample]).readonly(),
@@ -171,7 +172,7 @@ export const diagnosticEntrySchema = z.discriminatedUnion('type', [
     latitudeDegrees: number.gt(0).lt(85),
     /** The fixes the fit used, in sweep order. Each is the sample of the `baseline` frame at that position. */
     fixes: z.array(z.object({ position: positiveInteger.max(maximumFixes), sample })).min(minimumFixes).max(maximumFixes),
-    /** The axis in the hour-angle frame (z up) and its error; null when the camera never turned, so there is no axis. */
+    /** The axis in the hour-angle frame (z up) and its error; null unless the verdict is rigid. */
     polar: z
       .object({
         axis: z.tuple([number, number, number]),

@@ -50,10 +50,15 @@ export interface AlignmentView {
   warning: string | null
   error: string | null
   /**
-   * Set with the `not-rigid` phase: the three baseline positions did not turn as one rigid body, so Vela measured
-   * no polar error. The miss is in arcminutes, and the threshold is the miss at which a baseline stops being rigid.
+   * Set with the `not-rigid` phase: the sweep positions did not turn as one rigid body, so Vela measured no polar
+   * error. The miss is in arcminutes, and the threshold is the miss at which a sweep stops being rigid. `steps`
+   * names the neighbouring positions between which the camera turned more than the mount did, if the fit found any.
    */
-  rigidity?: null | { missArcmin: number; thresholdArcmin: number }
+  rigidity?: null | {
+    missArcmin: number
+    thresholdArcmin: number
+    steps?: { beforePosition: number; afterPosition: number }[]
+  }
   /** Latest acquired frame, available even before a successful solve. */
   preview?: null | (AlignmentExposureImage & {
     capturedAt: string

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
+import { axisOfPoleError, baselineFromAxis, measureAlignment, type AlignmentSample } from './geometry.js'
 
 const radians = Math.PI / 180
 
@@ -37,14 +37,12 @@ function sample(
   }
 }
 
-function baseline(altitude: number, azimuth: number) {
-  return createAlignmentBaseline(
-    [
-      sample(altitude, azimuth, 10, 359),
-      sample(altitude, azimuth, 30, 359.1),
-      sample(altitude, azimuth, 50, 359.2),
-    ],
-    33.45,
+/** The adjusting baseline of a mount with this tilt, measured from its sample at the last joint. */
+function baseline(altitude: number, azimuth: number, joint = 50, declination = 60, latitudeDegrees = 33.45) {
+  return baselineFromAxis(
+    axisOfPoleError({ altitudeArcsec: altitude, azimuthArcsec: azimuth }, latitudeDegrees),
+    sample(altitude, azimuth, joint, 359.2, declination, latitudeDegrees),
+    latitudeDegrees,
   )
 }
 
@@ -112,14 +110,7 @@ describe('polar measurement from solved directions', () => {
         const altitude = altitudeDegrees! * 3600
         const azimuth = azimuthDegrees! * 3600
 
-        const reference = createAlignmentBaseline(
-          [
-            sample(altitude, azimuth, -130, 359, declination),
-            sample(altitude, azimuth, -76, 359.1, declination),
-            sample(altitude, azimuth, -22, 359.2, declination),
-          ],
-          33.45,
-        )
+        const reference = baseline(altitude, azimuth, -22, declination)
 
         check(reference.measurement, altitude, azimuth)
         check(
@@ -136,51 +127,34 @@ describe('polar measurement from solved directions', () => {
     },
   )
   it('recovers twenty-degree corrections for the physical starting declination', () => {
-    const reference = createAlignmentBaseline(
-      [
-        sample(72000, -72000, -130, 359, 80),
-        sample(72000, -72000, -76, 359.1, 80),
-        sample(72000, -72000, -22, 359.2, 80),
-      ],
-      33.45,
-    )
+    const reference = baseline(72000, -72000, -22, 80)
 
     check(reference.measurement, 72000, -72000)
     check(measureAlignment(reference, sample(36000, -36000, -25, 2.2, 80), true), 36000, -36000)
     check(measureAlignment(reference, sample(0, 0, -25, 2.2, 80), true), 0, 0)
   })
   it.each([
-    { legDegrees: 54, altitude: 480, azimuth: -360 },
-    { legDegrees: 60, altitude: 21600, azimuth: -28800 },
-    { legDegrees: 54, altitude: 72000, azimuth: -72000 },
+    { legDegrees: 21.6, altitude: 480, azimuth: -360 },
+    { legDegrees: 24, altitude: 21600, azimuth: -28800 },
+    { legDegrees: 21.6, altitude: 72000, azimuth: -72000 },
   ])(
     'recovers the positive corridor with $legDegrees-degree legs and offsets ($altitude, $azimuth)',
     ({ legDegrees, altitude, azimuth }) => {
       const latitudeDegrees = 33.45
       const siderealDegreesPerSecond = 360 / 86164.0905
       const initialSidereal = 359.7
-      const finalElapsedSeconds = 145
-      const finalJoint = 130 - 2 * legDegrees - finalElapsedSeconds * siderealDegreesPerSecond
+      const finalElapsedSeconds = 250
+      const finalJoint = 130 - 5 * legDegrees - finalElapsedSeconds * siderealDegreesPerSecond
       const finalSidereal = initialSidereal + finalElapsedSeconds * siderealDegreesPerSecond
 
       const sidereal = (elapsedSeconds: number) =>
         (initialSidereal + elapsedSeconds * siderealDegreesPerSecond) % 360
 
       // These are ideal mechanical rays, not recorded mount coordinates or sky solves.
-      // A nominal +130,+76,+22 corridor also advances with tracking during each leg.
-      const reference = createAlignmentBaseline(
-        [
-          sample(altitude, azimuth, 130, sidereal(0), 80, latitudeDegrees),
-          sample(
-            altitude,
-            azimuth,
-            130 - legDegrees - 70 * siderealDegreesPerSecond,
-            sidereal(70),
-            80,
-            latitudeDegrees,
-          ),
-          sample(altitude, azimuth, finalJoint, sidereal(finalElapsedSeconds), 80, latitudeDegrees),
-        ],
+      // The corridor's last joint also advances with tracking through the sweep's legs.
+      const reference = baselineFromAxis(
+        axisOfPoleError({ altitudeArcsec: altitude, azimuthArcsec: azimuth }, latitudeDegrees),
+        sample(altitude, azimuth, finalJoint, sidereal(finalElapsedSeconds), 80, latitudeDegrees),
         latitudeDegrees,
       )
 
@@ -215,14 +189,7 @@ describe('polar measurement from solved directions', () => {
     },
   )
   it('rejects a numerical jump to the second altitude solution instead of reporting a false correction', () => {
-    const reference = createAlignmentBaseline(
-      [
-        sample(90000, -72000, -130, 359),
-        sample(90000, -72000, -76, 359.1),
-        sample(90000, -72000, -22, 359.2),
-      ],
-      33.45,
-    )
+    const reference = baseline(90000, -72000, -22)
 
     // This sightline fits both zero altitude error and an alternative ~57.86° root.
     // Undamped iteration crosses the elevation fold and would publish the latter.
@@ -233,10 +200,8 @@ describe('polar measurement from solved directions', () => {
   it('supports fixed joints separately from tracking', () => {
     check(measureAlignment(baseline(480, -360), sample(-100, 150, 50, 2.2), false), -100, 150)
   })
-  it('rejects coincident baselines and malformed measurements instead of reporting an aligned pole', () => {
-    const point = sample(0, 0, 10, 1)
-    expect(() => createAlignmentBaseline([point, point, point], 33.45)).toThrow(/baseline/)
-    expect(() => measureAlignment(baseline(480, -360), { ...point, raDegrees: NaN }, true)).toThrow(
+  it('rejects a malformed measurement instead of reporting an aligned pole', () => {
+    expect(() => measureAlignment(baseline(480, -360), { ...sample(0, 0, 10, 1), raDegrees: NaN }, true)).toThrow(
       /sample/,
     )
   })

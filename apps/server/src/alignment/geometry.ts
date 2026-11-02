@@ -1,3 +1,5 @@
+import { poleError } from '@vela/rig-sky'
+
 /** Ideal northern equatorial mount geometry. Inputs must share one fixed celestial
  * frame and the corresponding local sidereal angle; no epoch conversion is implied. */
 export interface AlignmentSample {
@@ -29,25 +31,18 @@ const pole: Vector = [0, 0, 1]
 
 const east: Vector = [0, 1, 0]
 
-export function createAlignmentBaseline(
-  samples: readonly [AlignmentSample, AlignmentSample, AlignmentSample],
-  latitudeDegrees: number,
-): AlignmentBaseline {
-  if (!Number.isFinite(latitudeDegrees) || latitudeDegrees <= 0 || latitudeDegrees >= 85) {
-    throw new Error('Alignment requires a northern latitude between 0 and 85 degrees')
-  }
+/** The polar axis (hour-angle frame, z up) that a recorded altitude and azimuth error describe, the inverse of `poleError`. */
+export function axisOfPoleError({ altitudeArcsec, azimuthArcsec }: Pick<AlignmentMeasurement, 'altitudeArcsec' | 'azimuthArcsec'>, latitudeDegrees: number): [number, number, number] {
+  const latitude = latitudeDegrees * rad
+  const altitude = latitude + (altitudeArcsec * rad) / 3600
+  const azimuth = (azimuthArcsec * rad) / 3600
+  const [up, north, toEast] = [Math.sin(altitude), Math.cos(altitude) * Math.cos(azimuth), Math.cos(altitude) * Math.sin(azimuth)]
 
-  const points = samples.map(localDirection)
-  const first = difference(points[1]!, points[0]!)
-  const second = difference(points[2]!, points[0]!)
-  const normal = cross(first, second)
-
-  // Tiny baselines amplify plate-solve noise into an arbitrary pole estimate.
-  if (length(first) < 0.01 || length(second) < 0.01 || length(normal) < 0.0001) {
-    throw new Error('The three solved positions do not provide a usable rotation baseline')
-  }
-
-  return baselineFromAxis(scale(normal, 1 / length(normal)), samples[2], latitudeDegrees)
+  return [
+    up * Math.cos(latitude) - north * Math.sin(latitude),
+    toEast,
+    up * Math.sin(latitude) + north * Math.cos(latitude),
+  ]
 }
 
 /** The adjusting baseline for a polar axis (hour-angle frame, z up) and the sample the adjustments are measured from. */
@@ -57,7 +52,7 @@ export function baselineFromAxis(
   latitudeDegrees: number,
 ): AlignmentBaseline {
   const axis = fitted[2] < 0 ? scale(fitted, -1) : fitted
-  const errors = axisErrors(axis, latitudeDegrees)
+  const errors = poleError(axis, latitudeDegrees)
   assertFiniteAngles(errors.altitudeArcsec, errors.azimuthArcsec)
 
   const nominalDirection = unadjust(
@@ -152,7 +147,7 @@ export function measureAlignment(
   const axis = adjust(pole, altitude, azimuth, baseline.latitudeDegrees)
 
   return {
-    ...axisErrors(axis, baseline.latitudeDegrees),
+    ...poleError(axis, baseline.latitudeDegrees),
     correctionTarget: coordinates(rotate(nominal, pole, sample.siderealTimeDegrees * rad)),
   }
 }
@@ -174,22 +169,6 @@ function localDirection(sample: AlignmentSample): Vector {
   const dec = sample.decDegrees * rad
 
   return [Math.cos(dec) * Math.cos(ra), Math.cos(dec) * Math.sin(ra), Math.sin(dec)]
-}
-
-function axisErrors(axis: Vector, latitudeDegrees: number) {
-  const latitude = latitudeDegrees * rad
-
-  const altitude = Math.asin(
-    Math.max(-1, Math.min(1, axis[0] * Math.cos(latitude) + axis[2] * Math.sin(latitude))),
-  )
-
-  const azimuth = Math.atan2(axis[1], -axis[0] * Math.sin(latitude) + axis[2] * Math.cos(latitude))
-
-  return {
-    altitudeArcsec: (altitude / rad - latitudeDegrees) * 3600,
-    azimuthArcsec: (azimuth / rad) * 3600,
-    totalArcsec: (Math.atan2(Math.hypot(axis[0], axis[1]), axis[2]) / rad) * 3600,
-  }
 }
 
 function assertFiniteAngles(altitude: number, azimuth: number) {

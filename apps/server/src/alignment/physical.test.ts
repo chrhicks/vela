@@ -113,6 +113,14 @@ function observatory(mechanicalSign = -1, sweep: { sweepRateDegreesPerSecond?: n
   }
 }
 
+/** The rest of the sweep: four more moves after the first. */
+async function sweepToTheEnd(fake: ReturnType<typeof observatory>) {
+  for (let move = 0; move < 4; move++) {
+    await fake.alignment.move(signal)
+    await fake.alignment.validate(signal)
+  }
+}
+
 describe('physical alignment sweep', () => {
   it('prepares a tracking-off mount by homing and restoring tracking', async () => {
     const fake = observatory()
@@ -232,27 +240,27 @@ describe('physical alignment sweep', () => {
   })
 
   it.each([-1, 1])(
-    'observes mechanical sign %s and completes two continuous westward legs',
+    'observes mechanical sign %s and completes five continuous westward legs',
     async sign => {
       const fake = observatory(sign)
       await fake.alignment.prepare(signal)
       const startRa = fake.mount.rightAscensionDegrees
       await fake.alignment.move(signal)
       const firstTravel = (startRa - fake.mount.rightAscensionDegrees + 360) % 360
-      expect(firstTravel).toBeCloseTo(57)
+      expect(firstTravel).toBeCloseTo(22.8)
       await fake.alignment.validate(signal)
-      await fake.alignment.move(signal)
+      await sweepToTheEnd(fake)
       const totalTravel = (startRa - fake.mount.rightAscensionDegrees + 360) % 360
       expect(totalTravel).toBeCloseTo(114)
       expect(fake.mount.declinationDegrees).toBe(80)
       expect(fake.acquisition.move).toHaveBeenCalledExactlyOnceWith('mount', 0.25, 1, signal)
-      expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(2)
+      expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(5)
 
       for (const [, rate, distance] of vi.mocked(fake.acquisition.rotateRightAscension).mock
         .calls) {
         expect(rate).toBe(-sign)
-        expect(distance).toBeLessThan(-56)
-        expect(distance).toBeGreaterThan(-58)
+        expect(distance).toBeLessThan(-22)
+        expect(distance).toBeGreaterThan(-24)
       }
 
       await fake.alignment.validate(signal)
@@ -263,7 +271,7 @@ describe('physical alignment sweep', () => {
     const fake = observatory()
     await fake.alignment.prepare(signal)
     await fake.alignment.move(signal)
-    await fake.alignment.move(signal)
+    await sweepToTheEnd(fake)
     fake.mount.observedAt = new Date(
       Date.parse(fake.mount.observedAt) + 2 * 60 * 60 * 1000,
     ).toISOString()
@@ -295,12 +303,12 @@ describe('physical alignment sweep', () => {
 
   it('accepts modest motor overshoot without a corrective movement', async () => {
     const fake = observatory()
-    fake.mechanics.overshoot = 3
+    fake.mechanics.overshoot = 1.2
     await fake.alignment.prepare(signal)
     const startRa = fake.mount.rightAscensionDegrees
     await fake.alignment.move(signal)
     const travel = (startRa - fake.mount.rightAscensionDegrees + 360) % 360
-    expect(travel).toBeCloseTo(60)
+    expect(travel).toBeCloseTo(24)
     expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(1)
     await fake.alignment.validate(signal)
   })
@@ -431,7 +439,7 @@ describe('physical alignment sweep', () => {
 })
 
 describe('reported Cria axis travel', () => {
-  it.each([53.5, 60.5])('rejects a %s degree total sweep even when later telemetry looks acceptable', async total => {
+  it.each([21.1, 24.5])('rejects a %s degree total sweep even when later telemetry looks acceptable', async total => {
     const fake = observatory()
     await fake.alignment.prepare(signal)
     vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
@@ -444,10 +452,10 @@ describe('reported Cria axis travel', () => {
     fake.mount.primaryAxisRates = [{ name: 'probe', degreesPerSecond: 0.2507 }, { name: 'sweep', degreesPerSecond: 0.998 }, { name: 'fast', degreesPerSecond: 3.008 }]
     await fake.alignment.prepare(signal)
     vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
-    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async () => ({ travelledDegrees: -57.05 }))
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async () => ({ travelledDegrees: -22.85 }))
     await expect(fake.alignment.move(signal)).resolves.toBeUndefined()
     expect(fake.acquisition.move).toHaveBeenCalledExactlyOnceWith('mount', 0.2507, 1, signal)
-    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -0.998, -57.25, signal)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -0.998, -23.05, signal)
   })
 })
 
@@ -458,7 +466,8 @@ const am5Rates = [
 ]
 
 describe('multi-leg sweep', () => {
-  function am5(sweep: { sweepRateDegreesPerSecond?: number; maxLegSeconds?: number } = {}) {
+  /** A leg limit of 35 s makes the first 23.05° at 8x three legs. */
+  function am5(sweep: { sweepRateDegreesPerSecond?: number; maxLegSeconds?: number } = { maxLegSeconds: 35 }) {
     const fake = observatory(-1, sweep)
     fake.mount.primaryAxisRates = am5Rates
     vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
@@ -492,7 +501,7 @@ describe('multi-leg sweep', () => {
       expect(distance).toBeLessThan(0)
     }
 
-    expect(-distances.reduce((sum, distance) => sum + distance, 0)).toBeCloseTo(57.25)
+    expect(-distances.reduce((sum, distance) => sum + distance, 0)).toBeCloseTo(23.05)
   })
 
   it('makes up one leg’s overshoot in the next legs', async () => {
@@ -500,10 +509,10 @@ describe('multi-leg sweep', () => {
     await fake.alignment.prepare(signal)
     reportTravel(fake, (distance, leg) => distance - (leg === 0 ? 0.6 : 0))
     await fake.alignment.move(signal)
-    // SAFETY: a 57° sweep at 8x with the default leg limit is always three legs, asserted by the first test.
+    // SAFETY: a 23.05° sweep at 8x with a 35 s leg limit is always three legs, asserted by the first test.
     const [first, second, third] = asked(fake) as [number, number, number]
     expect(Math.abs(second)).toBeLessThan(Math.abs(first))
-    expect(first + second + third).toBeCloseTo(-57.25 + 0.6)
+    expect(first + second + third).toBeCloseTo(-23.05 + 0.6)
   })
 
   it('makes up one leg’s undershoot in the next legs', async () => {
@@ -511,16 +520,16 @@ describe('multi-leg sweep', () => {
     await fake.alignment.prepare(signal)
     reportTravel(fake, (distance, leg) => distance + (leg === 0 ? 0.6 : 0))
     await fake.alignment.move(signal)
-    // SAFETY: a 57° sweep at 8x with the default leg limit is always three legs, asserted by the first test.
+    // SAFETY: a 23.05° sweep at 8x with a 35 s leg limit is always three legs, asserted by the first test.
     const [first, second, third] = asked(fake) as [number, number, number]
     expect(Math.abs(second)).toBeGreaterThan(Math.abs(first))
-    expect(first + second + third).toBeCloseTo(-57.25 - 0.6)
+    expect(first + second + third).toBeCloseTo(-23.05 - 0.6)
   })
 
   it('sends no more legs once the corridor is reached', async () => {
     const fake = am5()
     await fake.alignment.prepare(signal)
-    reportTravel(fake, () => -55)
+    reportTravel(fake, () => -22.5)
     await fake.alignment.move(signal)
     expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(1)
   })
@@ -529,7 +538,7 @@ describe('multi-leg sweep', () => {
     const fake = am5()
     await fake.alignment.prepare(signal)
     reportTravel(fake, distance => distance * 0.8)
-    await expect(fake.alignment.move(signal)).rejects.toThrow(/RA sweep expected 54–60° westward; mount reported \d+\.\d+° over 3 legs \(/)
+    await expect(fake.alignment.move(signal)).rejects.toThrow(/RA sweep expected 21.6–24° westward; mount reported \d+\.\d+° over 3 legs \(/)
     expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(3)
   })
 
@@ -538,11 +547,11 @@ describe('multi-leg sweep', () => {
     await fake.alignment.prepare(signal)
     reportTravel(fake, distance => distance)
     await fake.alignment.move(signal)
-    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -3.008, -57.25, signal)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledExactlyOnceWith('mount', -3.008, -23.05, signal)
   })
 
   it('splits into more legs when the leg limit is lowered', async () => {
-    const fake = am5({ maxLegSeconds: 50 })
+    const fake = am5({ maxLegSeconds: 20 })
     await fake.alignment.prepare(signal)
     reportTravel(fake, distance => distance)
     await fake.alignment.move(signal)
@@ -600,12 +609,12 @@ describe('multi-leg sweep', () => {
   })
 
   it('measures each leg from the mount position when the adapter reports no travel', async () => {
-    const fake = observatory(-1, { maxLegSeconds: 30 })
+    const fake = observatory(-1, { maxLegSeconds: 15 })
     await fake.alignment.prepare(signal)
     const startRa = fake.mount.rightAscensionDegrees
     await fake.alignment.move(signal)
     expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(2)
-    expect((startRa - fake.mount.rightAscensionDegrees + 360) % 360).toBeCloseTo(57, 0)
+    expect((startRa - fake.mount.rightAscensionDegrees + 360) % 360).toBeCloseTo(22.8, 0)
   })
 })
 
@@ -619,7 +628,7 @@ describe('sweep leg trace', () => {
   beforeEach(() => exporter.reset())
 
   function am5Fake() {
-    const fake = observatory(-1)
+    const fake = observatory(-1, { maxLegSeconds: 35 })
     fake.mount.primaryAxisRates = am5Rates
     vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
 
@@ -646,8 +655,8 @@ describe('sweep leg trace', () => {
       })),
     )
     const [first] = legs().map(span => span.attributes)
-    expect(first?.['alignment.sweep.asked_degrees']).toBeCloseTo(19.0833, 3)
-    expect(first?.['alignment.sweep.travelled_degrees']).toBeCloseTo(19.1833, 3)
+    expect(first?.['alignment.sweep.asked_degrees']).toBeCloseTo(7.6833, 3)
+    expect(first?.['alignment.sweep.travelled_degrees']).toBeCloseTo(7.7833, 3)
   })
 
   it('records a failed leg with its error and duration', async () => {

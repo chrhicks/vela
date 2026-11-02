@@ -26,9 +26,10 @@ const unit = (a: Vec3) => scale(a, 1 / Math.hypot(...a))
  * frame that sidereal time belongs to. The hour-angle frame has x on the meridian at the equator, y toward east and z at
  * the pole, so it holds no site. The axes are the +x pixel direction, the +y pixel direction and the boresight.
  * A mirrored WCS (negative determinant) flips the +y axis so the three stay a right-handed rotation; the other
- * two are unaffected.
+ * two are unaffected. `fixedFrame` is for a simulated sky whose pole and sidereal time are those of J2000 itself, so
+ * the solve is not moved to the equator of date.
  */
-export function cameraOrientation(field: SolvedField, at: Date, localSiderealDegrees: number): CameraOrientation {
+export function cameraOrientation(field: SolvedField, at: Date, localSiderealDegrees: number, { fixedFrame = false } = {}): CameraOrientation {
   const alpha = field.raDegrees * radians
   const delta = field.decDegrees * radians
   const east: Vec3 = [-Math.sin(alpha), Math.cos(alpha), 0]
@@ -40,12 +41,13 @@ export function cameraOrientation(field: SolvedField, at: Date, localSiderealDeg
   const pixelY = scale(unit(minus(tilted, scale(pixelX, dot(tilted, pixelX)))), c11 * c22 - c12 * c21 < 0 ? -1 : 1)
 
   const time = MakeTime(at)
-  const precession = Rotation_EQJ_EQD(time)
+  const precession = fixedFrame ? undefined : Rotation_EQJ_EQD(time)
   const sine = Math.sin(localSiderealDegrees * radians)
   const cosine = Math.cos(localSiderealDegrees * radians)
 
   const hourAngleFrame = (direction: Vec3): Vec3 => {
-    const ofDate = RotateVector(precession, new Vector(direction[0], direction[1], direction[2], time))
+    const vector = new Vector(direction[0], direction[1], direction[2], time)
+    const ofDate = precession ? RotateVector(precession, vector) : vector
 
     return [ofDate.x * cosine + ofDate.y * sine, -ofDate.x * sine + ofDate.y * cosine, ofDate.z]
   }

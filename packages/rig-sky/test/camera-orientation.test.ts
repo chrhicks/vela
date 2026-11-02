@@ -41,6 +41,14 @@ describe('cameraOrientation', () => {
     expectVector(pixelY, [0, 0, -1], 3)
   })
 
+  it('leaves the solve in the J2000 frame for a simulated sky, at any date', () => {
+    const wcs = field(100, 30, northUp)
+    const now = new Date('2026-11-01T00:00:00Z')
+
+    expectVector(cameraOrientation(wcs, now, 0, { fixedFrame: true }).boresight, [Math.cos(30 * radians) * Math.cos(100 * radians), Math.cos(30 * radians) * Math.sin(100 * radians), Math.sin(30 * radians)])
+    expect(separationDegrees(cameraOrientation(wcs, now, 0).boresight, cameraOrientation(wcs, now, 0, { fixedFrame: true }).boresight)).toBeGreaterThan(0.3)
+  })
+
   it('rolls the pixel axes with the WCS rotation', () => {
     const angle = 30 * radians
     const rolled = [-0.001 * Math.cos(angle), 0.001 * Math.sin(angle), -0.001 * Math.sin(angle), 0.001 * Math.cos(angle)] as const

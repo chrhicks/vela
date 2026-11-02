@@ -11,7 +11,8 @@ import {
 } from './diagnostics.js'
 import { diagnosticJournalName, maximumJournalBytes } from './diagnostic-schema.js'
 import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
-import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
+import { axisOfPoleError, baselineFromAxis, measureAlignment, type AlignmentSample } from './geometry.js'
+import { appendThreePointBaseline } from './sweep-fixture.js'
 
 const roots: string[] = []
 
@@ -79,7 +80,7 @@ const evidence: AlignmentFrameEvidence = {
 }
 
 describe('bounded alignment diagnostic recording', () => {
-  it('replays an offline baseline and preserves a stopped attempt before any solved frame', async () => {
+  it('replays an offline three-point baseline and preserves a stopped attempt before any solved frame', async () => {
     const root = await temporaryRoot()
     const onError = vi.fn()
     const create = createAlignmentDiagnostics(root, onError)
@@ -104,19 +105,20 @@ describe('bounded alignment diagnostic recording', () => {
       })
     }
 
-    const baseline = createAlignmentBaseline(samples, 33.45)
-    const measurement = measureAlignment(baseline, samples[2], true)
-    await run.recordBaseline(samples, 33.45, baseline.measurement)
+    const firstDirectory = (await readdir(root))[0]!
+    const recorded = baselineFromAxis(axisOfPoleError({ altitudeArcsec: 480, azimuthArcsec: -360 }, 33.45), samples[2], 33.45)
+    const measurement = measureAlignment(recorded, samples[2], true)
+    await appendThreePointBaseline(join(root, firstDirectory), samples, 33.45, recorded.measurement)
     await run.recordMeasurement(samples[2], measurement)
     await run.finish({ phase: 'finished', error: null })
-    const firstDirectory = (await readdir(root))[0]!
-    expect(await replayAlignmentDiagnostics(join(root, firstDirectory))).toMatchObject({
+    const report = await replayAlignmentDiagnostics(join(root, firstDirectory))
+    expect(report).toMatchObject({
       mode: 'offline',
-      baseline,
-      finalMeasurement: measurement,
       outcome: { phase: 'finished' },
       counts: { frames: 3, measurements: 1, physicalFrames: 0, verifiedOriginals: 3 },
     })
+    expect(report.finalMeasurement?.altitudeArcsec).toBeCloseTo(480, 6)
+    expect(report.finalMeasurement?.azimuthArcsec).toBeCloseTo(-360, 6)
     const earlyStop = (await create(info))!
     await earlyStop.finish({ phase: 'stopped', error: null })
     const secondDirectory = (await readdir(root)).find(name => name !== firstDirectory)!

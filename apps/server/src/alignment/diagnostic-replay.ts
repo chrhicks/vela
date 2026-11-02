@@ -2,7 +2,15 @@ import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { open } from 'node:fs/promises'
 import { join } from 'node:path'
-import { fitPolarAxis, type PolarFit, type RigidityVerdict, type Site } from '@vela/rig-sky'
+import {
+  cameraOrientation,
+  fitPolarAxis,
+  rigidityVerdict,
+  type PolarFit,
+  type RigidityVerdict,
+  type SweepVerdict,
+  type Site,
+} from '@vela/rig-sky'
 import {
   diagnosticEntrySchema,
   diagnosticJournalName,
@@ -12,14 +20,13 @@ import {
   type DiagnosticFrameEntry,
 } from './diagnostic-schema.js'
 import {
+  axisOfPoleError,
   baselineFromAxis,
-  createAlignmentBaseline,
   measureAlignment,
   type AlignmentBaseline,
   type AlignmentMeasurement,
   type AlignmentSample,
 } from './geometry.js'
-import { baselineRigidity, type RigidityFrame } from './baseline-rigidity.js'
 import { physicalAlignmentSample } from './physical-coordinates.js'
 import { sweepFix } from './sweep-fit.js'
 
@@ -36,12 +43,12 @@ export interface AlignmentDiagnosticReplayReport {
     verifiedOriginals: number
   }
   baseline: AlignmentBaseline | null
-  /** The polar axis fitted again from the recorded sweep fixes; null for a three-point journal. */
+  /** The polar axis fitted again from the recorded sweep fixes; null for a three-point journal and for a fit that is not rigid, which has no polar error. */
   fit: PolarFit | null
   /** Sweep positions that gave no fix, with the reason the journal recorded. */
   dropped: { position: number; reason: string }[]
-  /** Judged again from the recorded solves: the fit's verdict, or for a three-point physical journal the three-point one. Null for a three-point offline run, which has no mount reading. */
-  rigidity: RigidityVerdict | null
+  /** Judged again from the recorded solves: the fit's verdict (with its steps), or for a three-point physical journal the three-point one. Null for a three-point offline run, which has no mount reading. */
+  rigidity: SweepVerdict | RigidityVerdict | null
   finalMeasurement: AlignmentMeasurement | null
   maximumDiscrepancies: {
     measurementArcsec: number
@@ -104,7 +111,8 @@ export async function replayAlignmentDiagnostics(
   const baselineFrames: DiagnosticFrameEntry[] = []
   const originalNames = new Set<string>()
   let lastPosition = 0
-  const closed = () => report.baseline ?? report.fit
+  let fitted: PolarFit | undefined
+  const closed = () => report.baseline ?? fitted
   let latestFrame: DiagnosticFrameEntry | undefined
   let latestAdjustment: DiagnosticFrameEntry | undefined
   let outcome: Extract<DiagnosticEntry, { type: 'outcome' }> | undefined
@@ -191,12 +199,14 @@ export async function replayAlignmentDiagnostics(
         }
 
         const fixes = baselineFrames.map(frame => sweepFix(frame.evidence.position, frame.evidence))
-        report.fit = fitPolarAxis(fixes, entry.latitudeDegrees)
-        report.rigidity = report.fit.verdict
-        compareFit(report, report.fit, entry)
+        fitted = fitPolarAxis(fixes, entry.latitudeDegrees)
+        report.rigidity = fitted.verdict
+        compareFit(report, fitted, entry)
 
-        if (report.fit.verdict.status === 'rigid' && entry.polar)
-          report.baseline = baselineFromAxis(entry.polar.axis, entry.fixes.at(-1)!.sample, entry.latitudeDegrees)
+        if (fitted.verdict.status === 'rigid') {
+          report.fit = fitted
+          report.baseline = baselineFromAxis(fitted.axis, entry.fixes.at(-1)!.sample, entry.latitudeDegrees)
+        }
 
         break
       }
@@ -212,14 +222,18 @@ export async function replayAlignmentDiagnostics(
           throw new Error('Alignment diagnostic baseline does not match its three solved frames')
         }
 
-        report.baseline = createAlignmentBaseline(entry.samples, entry.latitudeDegrees)
+        // A three-point journal is read, not refitted: its recorded pole stands, and only its rigidity is judged again.
+        report.baseline = baselineFromAxis(
+          axisOfPoleError(entry.measurement, entry.latitudeDegrees),
+          entry.samples[2],
+          entry.latitudeDegrees,
+        )
         compareMeasurement(report, report.baseline.measurement, entry.measurement)
 
         if (first.run.mode === 'physical') {
-          report.rigidity = baselineRigidity(
-            // SAFETY: three baseline frames were checked above, and a physical frame has its mount reading.
-            baselineFrames.map(rigidityFrame) as [RigidityFrame, RigidityFrame, RigidityFrame],
-          )
+          // A physical frame has its mount reading, and three baseline frames were checked above.
+          const [one, two, three] = baselineFrames.map(threePointPosition)
+          report.rigidity = rigidityVerdict([one!, two!, three!])
 
           if (entry.rigidity)
             report.maximumDiscrepancies.rigidityMissArcmin = Math.abs(
@@ -289,7 +303,7 @@ function compareFit(
   if (
     fit.verdict.status !== verdict.status ||
     poses(fit.verdict.steps).join() !== poses(verdict.steps).join() ||
-    Number.isFinite(fit.totalArcsec) !== (recorded.polar !== null)
+    (fit.verdict.status === 'rigid') !== (recorded.polar !== null)
   ) {
     throw new Error('Alignment diagnostic fit disagrees with the verdict recomputed from its frames')
   }
@@ -305,11 +319,12 @@ function compareFit(
     )
 }
 
-function rigidityFrame(frame: DiagnosticFrameEntry): RigidityFrame {
+function threePointPosition({ evidence }: DiagnosticFrameEntry) {
+  const { sample, solution, physical } = evidence
+
   return {
-    solved: frame.evidence.solution.wcs,
-    sample: frame.evidence.sample,
-    mountRightAscensionDegrees: frame.evidence.physical!.before.rightAscensionDegrees,
+    mountAngleDegrees: physical!.before.rightAscensionDegrees - sample.siderealTimeDegrees,
+    orientation: cameraOrientation(solution.wcs, new Date(sample.capturedAt), sample.siderealTimeDegrees),
   }
 }
 

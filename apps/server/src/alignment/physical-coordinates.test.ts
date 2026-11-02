@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fixture } from './physical-fixture.js'
-import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
+import { axisOfPoleError, baselineFromAxis, measureAlignment, type AlignmentSample } from './geometry.js'
 import {
   localSiderealDegrees,
   physicalAlignmentSample,
@@ -48,11 +48,13 @@ describe('physical alignment coordinate boundary', () => {
         ).toBe(1000)
       }
 
-      const baseline = createAlignmentBaseline(samples, site.latitudeDegrees)
-      // Allows the shorter Astronomy Engine nutation/aberration model versus ERFA,
-      // including amplification from fitting a pole to a finite three-point arc.
-      expect(Math.abs(baseline.measurement.altitudeArcsec - reference.altitude)).toBeLessThan(1)
-      expect(Math.abs(baseline.measurement.azimuthArcsec - reference.azimuth)).toBeLessThan(1)
+      const baseline = baselineFromAxis(
+        axisOfPoleError({ altitudeArcsec: reference.altitude, azimuthArcsec: reference.azimuth }, site.latitudeDegrees),
+        samples[2],
+        site.latitudeDegrees,
+      )
+
+      // Allows the shorter Astronomy Engine nutation/aberration model versus ERFA.
       const current = sample(reference.adjusted)
       const measurement = measureAlignment(baseline, current, true)
       expect(Math.abs(measurement.altitudeArcsec - (reference.altitude ? 120 : 0))).toBeLessThan(1)

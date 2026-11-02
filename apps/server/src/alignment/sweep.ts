@@ -2,12 +2,14 @@ import type { TelescopeStatus } from '@vela/equipment'
 
 type Rates = Pick<TelescopeStatus, 'primaryAxisRates'>
 
-/** The baseline geometry, not mount facts: one RA step of about 57° with a 54–60° corridor. */
-export const SWEEP_TARGET_DEGREES = 57
+/** The sweep geometry, not mount facts: six positions, five RA steps of about 22.8° (114° in all) with a 21.6–24° corridor each. */
+export const SWEEP_POSITIONS = 6
 
-export const SWEEP_MINIMUM_DEGREES = 54
+export const SWEEP_TARGET_DEGREES = 22.8
 
-export const SWEEP_MAXIMUM_DEGREES = 60
+export const SWEEP_MINIMUM_DEGREES = 21.6
+
+export const SWEEP_MAXIMUM_DEGREES = 24
 
 /** Cria times a rotate out at 120 s; a leg stays under it. Settable per rig. */
 export const DEFAULT_MAX_LEG_SECONDS = 100
