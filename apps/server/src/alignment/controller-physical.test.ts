@@ -469,15 +469,18 @@ it('retries validation of the same captured frame without repeating an exposure'
   })
 })
 
-it('drops a position whose exposure failed safely without exposing it again, but stops on an unclassified transport failure', async () => {
+it('exposes a position whose exposure failed safely once more, but stops on an unclassified transport failure', async () => {
   const subject = setup()
   vi.mocked(subject.hardware.capture)
     .mockRejectedValueOnce(new AlpacaCaptureRetryableError(readTimeout()))
     .mockRejectedValueOnce(readTimeout())
   await subject.controller.start('physical', 'Physical rig')
+  await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+  expect(subject.controller.snapshot().warning).toBe('Exposure failed (Device read timed out), retrying.')
+  control.waits.shift()!()
   await vi.waitFor(() => expect(subject.controller.active()).toBe(false))
   expect(subject.hardware.capture).toHaveBeenCalledTimes(2)
-  expect(subject.physical.move).toHaveBeenCalledOnce()
+  expect(subject.physical.move).not.toHaveBeenCalled()
   expect(subject.physical.pointing).toHaveBeenCalledTimes(2)
   expect(subject.controller.snapshot()).toMatchObject({
     phase: 'failed',
