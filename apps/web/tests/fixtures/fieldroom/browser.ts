@@ -22,6 +22,7 @@ export async function routeQuietAlerts(page: Page) {
         watching: false,
         alerts: [],
         unavailable: [],
+        attestation: [],
         phone: { state: 'not-configured' },
         thresholds: {},
       },

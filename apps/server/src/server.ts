@@ -16,6 +16,7 @@ import { loadAlertsConfiguration } from './alerts/config.js'
 import { createPushoverNotifier } from './alerts/pushover.js'
 import { createHorizon } from './targets/horizon.js'
 import { openRunLog, type RunLog } from './run-log/run-log.js'
+import { createAttestation } from './attestation/attestation.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
@@ -128,10 +129,19 @@ try {
 
   const equipment = createEquipmentComposition(cria, equipmentOptions)
 
+  const attestation = createAttestation({
+    manifestPath: resolve(dirname(rigCatalogPath), 'attestation.json'),
+    ...(targets.solver && { solver: targets.solver }),
+    rigs: () => rigCatalog.list(),
+    criaOrigin: rig => cria.find(configuration => configuration.id === rig.source?.configurationId)?.url,
+    ...(runLog && { runLog }),
+  })
+
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns, targets, surveyCache, equipment, alerts, ...(runLog && { runLog }) }
+    const options = { rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns, targets, surveyCache, equipment, alerts, attestation, ...(runLog && { runLog }) }
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
+    void attestation.check()
   }
 } catch (error) {
   console.error(error)

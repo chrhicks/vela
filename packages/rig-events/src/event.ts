@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
 import {
+  AttestationBody,
   AutofocusBody,
   CriaExchangeBody,
   CriaImageBody,
@@ -35,6 +36,7 @@ export const RigEventSchema = Schema.Union([
   envelope('cria.stream', CriaStreamBody),
   envelope('frame', FrameBody),
   envelope('autofocus', AutofocusBody),
+  envelope('attestation', AttestationBody),
   envelope('solve', SolveBody),
   envelope('session', SessionBody),
   envelope('gap', GapBody),

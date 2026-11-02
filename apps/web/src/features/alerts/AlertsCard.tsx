@@ -68,6 +68,16 @@ export function AlertsCard() {
         </ul>
       )}
 
+      {view.attestation.length > 0 && (
+        <ul className="alerts-card__list" aria-label="Setup differs from the pinned manifest">
+          {view.attestation.map(line => (
+            <li key={line} data-level="warn">
+              <strong>Warning</strong> {line}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <div className="alerts-card__test">
         <Button
           disabled={phoneNotSetUp || offline}

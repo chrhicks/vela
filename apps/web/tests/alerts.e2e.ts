@@ -66,6 +66,7 @@ function alertsView(patch: Partial<AlertsView> = {}): AlertsView {
     watching: true,
     alerts: [],
     unavailable: [],
+    attestation: [],
     phone: { state: 'ready' },
     unattended: true,
     thresholds: { starsCollapsedRatio: 0.3, hfrBadPixels: 6, meridianNearMinutes: 20 },
@@ -194,6 +195,18 @@ test('the rig page card shows the phone failing, each alert’s delivery and the
   await card.getByRole('button', { name: 'Send test' }).click()
   await expect(card).toContainText('The test was not sent: Pushover answered 500.')
   expect(rig.posts).toEqual(['test'])
+})
+
+test('the card lists what differs from the pinned manifest as warnings', async ({ page }) => {
+  await useRig(page, alertsView({ attestation: ['Star catalog differs from what was pinned on 2026-11-01.'] }))
+
+  await page.goto('/rigs/rig-1')
+
+  const card = page.getByRole('region', { name: 'Alerts', exact: true })
+
+  await expect(card.getByRole('list', { name: 'Setup differs from the pinned manifest' })).toContainText(
+    'Warning Star catalog differs from what was pinned on 2026-11-01.',
+  )
 })
 
 test('without phone keys the card says so and does not offer a test it cannot send', async ({ page }) => {
