@@ -216,12 +216,12 @@ describe('target and framing HTTP boundary', () => {
     expect(subject.operations.owner('rig')).toBeUndefined()
   })
 
-  it('links only observed parked or tracking-off prerequisites to mount controls', async () => {
+  it('links only an observed parked mount to mount controls, since a check turns tracking on itself', async () => {
     const subject = setup()
     subject.mount.tracking = false
-    expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
-      mountControlReason: 'tracking-off', enabled: true,
-    })
+    const idle = (await subject.app.inject('/api/web/rigs/rig/framing')).json()
+    expect(idle).toMatchObject({ enabled: true })
+    expect(idle.mountControlReason).toBeUndefined()
     subject.mount.parked = true
     expect((await subject.app.inject('/api/web/rigs/rig/framing')).json()).toMatchObject({
       mountControlReason: 'parked', enabled: false,

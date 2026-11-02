@@ -489,23 +489,50 @@ describe('framing controller', () => {
     expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', desired: edited })
   })
 
-  it.each(['parked', 'tracking-off'] as const)(
-    'names the current %s prerequisite without changing mount state or exposing',
-    async condition => {
-      const fake = workshop()
-      fake.mount.parked = condition === 'parked'
-      fake.mount.tracking = false
-      await fake.start({ check: true }).finished
-      expect(fake.controller.snapshot()).toMatchObject({
-        phase: 'needs-check',
-        error: expect.stringContaining(condition === 'parked' ? 'mount is parked' : 'tracking is off'),
-      })
-      expect(fake.hardware.slew).not.toHaveBeenCalled()
-      expect(fake.hardware.tracking).not.toHaveBeenCalled()
-      expect(fake.hardware.capture).not.toHaveBeenCalled()
-      expect(fake.solver.solve).not.toHaveBeenCalled()
-    },
-  )
+  it('names a parked mount without changing mount state or exposing', async () => {
+    const fake = workshop()
+    fake.mount.parked = true
+    fake.mount.tracking = false
+    await fake.start({ check: true }).finished
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'needs-check',
+      error: expect.stringContaining('mount is parked'),
+    })
+    expect(fake.hardware.slew).not.toHaveBeenCalled()
+    expect(fake.hardware.tracking).not.toHaveBeenCalled()
+    expect(fake.hardware.capture).not.toHaveBeenCalled()
+    expect(fake.solver.solve).not.toHaveBeenCalled()
+  })
+
+  it('turns tracking on itself before checking the current frame, and says so', async () => {
+    const fake = workshop()
+    fake.mount.tracking = false
+    await fake.start({ check: true }).finished
+    expect(fake.hardware.tracking).toHaveBeenCalledOnce()
+    expect(fake.hardware.tracking).toHaveBeenCalledWith(true, expect.any(AbortSignal))
+    expect(fake.hardware.slew).not.toHaveBeenCalled()
+    expect(fake.hardware.capture).toHaveBeenCalledOnce()
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'checked',
+      error: null,
+      notice: 'Tracking was off. Vela turned it on.',
+    })
+    await fake.start({ check: true }).finished
+    expect(fake.controller.snapshot().notice).toBeNull()
+  })
+
+  it('asks for tracking in Your Rig when the mount keeps it off after one request', async () => {
+    const fake = workshop()
+    fake.mount.tracking = false
+    fake.hardware.tracking = vi.fn(async () => {})
+    await fake.start({ check: true }).finished
+    expect(fake.hardware.tracking).toHaveBeenCalledOnce()
+    expect(fake.hardware.capture).not.toHaveBeenCalled()
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'needs-check',
+      error: expect.stringContaining('still off after Vela turned it on'),
+    })
+  })
 
   it('applies the current solved correction to the newly edited destination', async () => {
     const fake = workshop()
