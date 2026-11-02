@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { rigidityVerdict, type Baseline, type BaselinePosition } from '@vela/rig-sky'
+import { homedir } from 'node:os'
+import { cameraOrientation, rigidityVerdict, type Baseline, type BaselinePosition, type CameraOrientation, type SolvedField } from '@vela/rig-sky'
 
-const usage = `usage: rigidity-check.ts [--tool DIR] [--report FILE.md]
+const usage = `usage: rigidity-check.ts [--tool DIR] [--trials DIR] [--report FILE.md]
 exit 0 the plan's check holds, 1 it does not, 2 bad arguments`
 
 const given = new Map<string, string>()
@@ -24,9 +25,17 @@ const toolDirectory = given.get('tool') ?? '/home/chicks/dev/personal/home/bots/
 
 const fixturesDirectory = join(toolDirectory, 'tests', 'fixtures')
 
+const trialsDirectory = given.get('trials') ?? join(homedir(), '.local/share/vela/alignment-diagnostics/trials')
+
 const agreementArcmin = 1e-6
 
 const recordedToleranceArcmin = 0.3
+
+/** Tolerance for the conversion from solves against the camera orientations the Python tool stored, in arcminutes. */
+const solveOrientationToleranceArcmin = 0.5
+
+/** Tolerance for the miss computed from solves against the Python tool's miss. */
+const solveMissToleranceArcmin = 0.01
 
 /** Alignments that finished at a few tenths of an arcmin on 2026-10-31 while the mount was loose. */
 const readSmallOnTheNight = new Map([
@@ -37,6 +46,17 @@ const readSmallOnTheNight = new Map([
 interface FixtureRow {
   readonly trial: string
   readonly baseline: Baseline
+}
+
+/** What a trial journal's baseline frame holds that the conversion needs. Its site fields are never read or printed. */
+interface JournalFrame {
+  readonly type: string
+  readonly evidence?: {
+    readonly phase: string
+    readonly sample?: { readonly capturedAt: string; readonly siderealTimeDegrees: number }
+    readonly solution: { readonly wcs: SolvedField }
+    readonly physical?: { readonly before: { readonly rightAscensionDegrees: number } }
+  }
 }
 
 interface PythonRow {
@@ -70,6 +90,32 @@ function readFixture(file: string): FixtureRow {
     throw new Error(`${file} is not a schema 1 baseline of three positions`)
 
   return { trial: fixture.name, baseline: [position(first), position(second), position(third)] }
+}
+
+/** The three baseline positions the way Vela's alignment builds them from a trial's recorded solves. */
+function baselineFromSolves(trial: string): Baseline | undefined {
+  const directory = readdirSync(trialsDirectory).find(name => name.startsWith(trial))
+
+  if (directory === undefined) return undefined
+
+  // SAFETY: Vela's diagnostic journal writes one JSON object per line; only the fields named in JournalFrame are read.
+  const frames = readFileSync(join(trialsDirectory, directory, 'journal.jsonl'), 'utf8')
+    .split('\n')
+    .filter(line => line.trim() !== '')
+    .map(line => JSON.parse(line) as JournalFrame)
+    .filter(line => line.type === 'frame' && line.evidence?.phase === 'baseline' && line.evidence.sample !== undefined)
+    .slice(0, 3)
+
+  const [first, second, third] = frames.map((frame): BaselinePosition => {
+    const { sample, solution, physical } = frame.evidence!
+
+    return {
+      mountAngleDegrees: physical!.before.rightAscensionDegrees - sample!.siderealTimeDegrees,
+      orientation: cameraOrientation(solution.wcs, new Date(sample!.capturedAt), sample!.siderealTimeDegrees),
+    }
+  })
+
+  return first && second && third ? [first, second, third] : undefined
 }
 
 const pythonProgram = `
@@ -114,6 +160,31 @@ const rows = fixtures.map(({ trial, baseline }) => {
   }
 })
 
+const orientationDifferenceArcmin = (a: CameraOrientation, b: CameraOrientation) =>
+  Math.max(
+    ...(['pixelX', 'pixelY', 'boresight'] as const).map(axis =>
+      Math.acos(Math.max(-1, Math.min(1, a[axis][0] * b[axis][0] + a[axis][1] * b[axis][1] + a[axis][2] * b[axis][2]))),
+    ),
+  ) *
+  (180 / Math.PI) *
+  60
+
+const fromSolves = fixtures.map(({ trial, baseline }) => {
+  const solved = baselineFromSolves(trial)
+
+  if (solved === undefined) return { trial, missing: true as const }
+
+  const verdict = rigidityVerdict(solved)
+
+  return {
+    trial,
+    missing: false as const,
+    verdict,
+    orientationDifference: Math.max(...solved.map((position, index) => orientationDifferenceArcmin(position.orientation, baseline[index]!.orientation))),
+    mountAngleDifference: Math.max(...solved.map((position, index) => Math.abs(((position.mountAngleDegrees - baseline[index]!.mountAngleDegrees + 540) % 360) - 180))),
+  }
+})
+
 const largestDifference = Math.max(...rows.map(row => Math.abs(row.difference)))
 
 const failures = [
@@ -125,12 +196,39 @@ const failures = [
   ...rows.filter(row => row.note !== undefined && row.verdict.status !== 'not-rigid').map(row => `${row.trial}: ${row.note} but TS says rigid`),
 ]
 
+for (const row of fromSolves) {
+  const reference = python.find(entry => entry.trial === row.trial)!
+
+  if (row.missing) continue
+
+  if (Math.abs(row.verdict.missArcmin - reference.miss) > solveMissToleranceArcmin)
+    failures.push(`${row.trial}: from the solves the miss is ${row.verdict.missArcmin.toFixed(4)}, Python says ${reference.miss.toFixed(4)}`)
+
+  if ((row.verdict.status === 'rigid') !== (reference.verdict === 'rigid'))
+    failures.push(`${row.trial}: from the solves TS says ${row.verdict.status}, Python says ${reference.verdict}`)
+
+  if (row.orientationDifference > solveOrientationToleranceArcmin)
+    failures.push(`${row.trial}: the orientation from the solves is ${row.orientationDifference.toFixed(3)} arcmin from the Python tool's`)
+
+  const note = readSmallOnTheNight.get(row.trial)
+
+  if (note !== undefined && row.verdict.status !== 'not-rigid') failures.push(`${row.trial}: ${note} but the solves say rigid`)
+}
+
 if (fixtures.length !== 19) failures.push(`expected 19 trial fixtures, found ${fixtures.length}`)
 
 const table = rows.map(
   row =>
     `| ${row.trial} | ${row.reference.recorded.toFixed(1)} | ${row.reference.miss.toFixed(4)} | ${row.verdict.missArcmin.toFixed(4)} | ${row.difference.toExponential(1)} | ${row.verdict.status} | ${row.reference.verdict} | ${row.note ?? ''} |`,
 )
+
+const solveTable = fromSolves.map(row => {
+  const reference = python.find(entry => entry.trial === row.trial)!
+
+  return row.missing
+    ? `| ${row.trial} | no journal | | | | | |`
+    : `| ${row.trial} | ${reference.miss.toFixed(4)} | ${row.verdict.missArcmin.toFixed(4)} | ${(row.verdict.missArcmin - reference.miss).toExponential(1)} | ${row.orientationDifference.toFixed(4)} | ${row.mountAngleDifference.toExponential(1)} | ${row.verdict.status} |`
+})
 
 const report = [
   '# Rigidity verdict against the Python mount-rigidity tool',
@@ -143,6 +241,16 @@ const report = [
   '',
   `Largest difference between TS and Python: ${largestDifference.toExponential(2)} arcmin (tolerance ${agreementArcmin} arcmin). TS against the recorded misses: tolerance ${recordedToleranceArcmin} arcmin, as in the Python tool's test.`,
   `Verdicts: ${rows.filter(row => row.verdict.status === 'rigid').length} rigid, ${rows.filter(row => row.verdict.status === 'not-rigid').length} not rigid. ${rows.filter(row => !row.verdictsAgree).length} disagree with the Python tool.`,
+  '',
+  '## From the recorded solves',
+  '',
+  `Each trial's baseline rebuilt from its journal's ASTAP solves (centre, CD matrix, sample time, sidereal time, mount right ascension) by \`cameraOrientation\`, then judged. Orientation is the largest angle between a pixel or boresight axis here and the Python tool's stored one; mount angle is the largest difference in degrees, modulo a full turn. The orientations differ by about 0.19 arcmin because Vela moves a J2000 solve to the true equator of date, as the sidereal time does, and the Python tool to the mean one. A constant tilt of that size moves the miss by under 0.003 arcmin.`,
+  '',
+  '| Trial | Python miss | TS miss from solves | Difference | Orientation, arcmin | Mount angle, deg | Verdict |',
+  '| --- | --- | --- | --- | --- | --- | --- |',
+  ...solveTable,
+  '',
+  `${fromSolves.filter(row => !row.missing).length} of ${fromSolves.length} trials had a journal to rebuild from.`,
   failures.length === 0 ? 'Check: pass.' : `Check: FAIL\n${failures.map(failure => `- ${failure}`).join('\n')}`,
   '',
 ].join('\n')
