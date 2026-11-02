@@ -27,6 +27,7 @@ export const alignmentScenes = [
   'alignment-stop-unconfirmed',
   'alignment-stopped',
   'alignment-finished',
+  'alignment-not-rigid',
   'alignment-enlarged-baseline',
 ] as const
 
@@ -191,6 +192,20 @@ export function createAlignmentScene(name: AlignmentScene) {
       phase: name === 'alignment-stopped' ? 'stopped' : 'finished',
       active: false,
       activity: 'idle',
+    }
+  }
+
+  if (name === 'alignment-not-rigid') {
+    view = {
+      ...view,
+      phase: 'not-rigid',
+      active: false,
+      activity: 'idle',
+      position: 3,
+      solvedPositions: 3,
+      measuredAt: null,
+      measurement: null,
+      rigidity: { missArcmin: 33.4, thresholdArcmin: 2 },
     }
   }
 

@@ -104,6 +104,7 @@ for (const name of [
   'alignment-unavailable',
   'alignment-stopped',
   'alignment-finished',
+  'alignment-not-rigid',
 ] satisfies AlignmentScene[]) {
   test(`alignment operational ${name}`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 782 })
@@ -115,6 +116,19 @@ for (const name of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
 }
+
+test('a baseline that was not rigid shows the miss and the limit, and no polar error or adjustment', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 782 })
+  const { scene } = await openAlignmentScene(page, 'alignment-not-rigid')
+  await expect(page.getByRole('alert')).toContainText('Not rigid')
+  await expect(page.getByRole('alert')).toContainText('33.4′')
+  await expect(page.getByRole('alert')).toContainText('limit is 2′')
+  await expect(page.getByRole('heading', { name: 'Mount is not rigid', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Start again', exact: true })).toBeEnabled()
+  await expect(page.locator('.vela-polar-total')).toHaveCount(0)
+  await expect(page.getByText(/Move (left|right|up|down)/)).toHaveCount(0)
+  expect(scene.writes).toEqual([])
+})
 
 test('appearance preserves alignment viewport, solve and command state', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 782 })

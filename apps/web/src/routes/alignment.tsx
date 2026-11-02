@@ -43,7 +43,7 @@ function useAlignment(rigId: string) {
         if (
           endUnconfirmed.current &&
           !next.active &&
-          ['stopped', 'finished', 'failed'].includes(next.phase)
+          ['stopped', 'finished', 'failed', 'not-rigid'].includes(next.phase)
         ) {
           endUnconfirmed.current = false
           setError(null)
@@ -166,7 +166,11 @@ const alignmentSchema = z.object({
   mode: z.enum(['physical', 'offline']).optional(),
   cameraName: z.string().optional(),
   active: z.boolean(),
-  phase: z.enum(['setup', 'baseline', 'adjusting', 'stopped', 'finished', 'failed']),
+  phase: z.enum(['setup', 'baseline', 'adjusting', 'stopped', 'finished', 'failed', 'not-rigid']),
+  rigidity: z
+    .object({ missArcmin: z.number().nonnegative(), thresholdArcmin: z.number().positive() })
+    .nullable()
+    .optional(),
   activity: z.enum([
     'idle',
     'exposing',
@@ -303,6 +307,8 @@ function alignmentActivity(view: AlignmentView, offline: boolean) {
 
   if (view.phase === 'finished') return 'Alignment ended by you'
 
+  if (view.phase === 'not-rigid') return 'Mount is not rigid'
+
   if (!view.active) return 'Measurements stopped'
 
   if (view.activity === 'waiting') return 'Waiting for the next image'
@@ -394,6 +400,8 @@ function AlignmentPage({ rigId }: { rigId: string }) {
   const lastCorrection = !view.active || interrupted || endUnconfirmed || pending
   const goodEnough = measurement && !lastCorrection ? goodEnoughDrift(measurement.totalArcsec) : null
 
+  const notRigid = view.phase === 'not-rigid' ? view.rigidity : null
+
   const nextInstruction = view.active
     ? 'After the third solve, the adjustment view will show your alignment error and the target reticle.'
     : physical
@@ -401,7 +409,9 @@ function AlignmentPage({ rigId }: { rigId: string }) {
       : 'Start with the simulator’s large-error preset and clear camera. Keep its offsets unchanged until all three positions are measured.'
 
   const preparationInstruction =
-    physical && !view.active
+    notRigid
+      ? 'Check the telescope clamp, the camera and the cables for play, then start again.'
+      : physical && !view.active
       ? 'Use sidereal tracking. Keep the mount’s adjustment knobs still until all three positions are measured. You can stop at any time.'
       : 'You can stop the measurement at any time.'
 
@@ -485,20 +495,34 @@ function AlignmentPage({ rigId }: { rigId: string }) {
           {error || view.error || view.unavailableReason}
         </p>
       )}
+      {notRigid && (
+        <div className="vela-polar-solve-warning" role="alert">
+          <strong>Not rigid</strong>
+          <p>
+            The camera did not turn with the mount as one rigid body, so a polar error from these positions
+            would not be trustworthy. It missed its predicted position by {notRigid.missArcmin.toFixed(1)}′,
+            and the limit is {notRigid.thresholdArcmin.toFixed(0)}′. No polar error is shown.
+          </p>
+        </div>
+      )}
       {baseline ? (
         <div className="vela-polar-baseline">
           <Panel className="vela-polar-baseline__summary">
             <h2>
               {view.active
                 ? 'Measuring your alignment'
-                : view.phase === 'setup'
-                  ? 'Find your starting alignment'
-                  : 'Measurement stopped'}
+                : notRigid
+                  ? 'Mount is not rigid'
+                  : view.phase === 'setup'
+                    ? 'Find your starting alignment'
+                    : 'Measurement stopped'}
             </h2>
             <p>
               {view.active
                 ? 'Keep the mount’s adjustment knobs still while Vela measures three positions.'
-                : 'Vela will take and solve images at three positions, then show you how to adjust the mount.'}
+                : notRigid
+                  ? 'Vela measured no polar error from these three positions.'
+                  : 'Vela will take and solve images at three positions, then show you how to adjust the mount.'}
             </p>
             <ol className="vela-polar-points" aria-label="Three measurement positions">
               {[1, 2, 3].map(point => {

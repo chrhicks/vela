@@ -50,6 +50,12 @@ available during device-read retry but is disabled while the browser cannot reac
 Vela or while an end command is stopping/unconfirmed. Finish is an operator action,
 not an assertion of measured alignment accuracy.
 
+## Not rigid
+
+When the server ends a run in the `not-rigid` phase, the route shows the miss and its threshold in a warning, and
+the baseline panel reads "Mount is not rigid". There is no measurement, so no total, direction or reticle appears,
+and Start again begins a fresh baseline. `rigidity` is only meaningful with that phase.
+
 ## Good enough
 
 Chris reaches about two arcminutes of polar error in a few minutes, then spends much
