@@ -162,6 +162,24 @@ They do not establish outdoor accuracy, atmospheric refraction, flexure, or the
 actual mount's motion response. Direction and repeatability require a prepared
 physical-rig trial. The configured offline path remains available separately.
 
+## Rigid check
+
+Three points always fit one circle, so the baseline's polar error says nothing about whether the mount
+turned as one rigid body. A loose telescope clamp or cable drag breaks that assumption, and on 2026-10-31
+alignments still finished at 0.2′ and 0.14′. After the third physical baseline position, `baseline-rigidity.ts`
+turns each solve into the camera's orientation in the hour-angle frame (`cameraOrientation` in `@vela/rig-sky`)
+and `rigidityVerdict` predicts where the camera should point at position 3 from positions 1 and 2. A miss of
+2′ or more is not rigid.
+
+A `not-rigid` verdict ends the run in the `not-rigid` phase with the miss and the 2′ threshold. Vela measures no
+polar error: the view has no measurement and no adjustment advice, and the adjusting loop never starts. A rigid
+verdict continues as before. The offline model has no mount reading to judge and carries no verdict.
+
+The journal's `baseline` entry keeps the verdict beside the baseline's own numbers, so a trial that reported a
+small error while loose can be told apart later. Replay judges it again from the three recorded solves.
+`recorded-trials.test.ts` replays the 19 trials of the mount-rigidity tool through that path. It reads
+`VELA_RECORDED_TRIALS` or `~/.local/share/vela/alignment-diagnostics/trials` and skips when the trials are absent.
+
 ## Adjustment geometry
 
 There is no fixed five-degree correction cutoff. Finite-value, usable-baseline,

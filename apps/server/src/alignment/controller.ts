@@ -8,6 +8,7 @@ import {
   type Acquisition,
   type Frame,
 } from '@vela/equipment'
+import { baselineRigidity, type RigidityFrame } from './baseline-rigidity.js'
 import { createAlignmentBaseline, measureAlignment, type AlignmentSample } from './geometry.js'
 import { describeRejection, type PlateSolver, type SkyPosition } from '../plate-solving/judged-solver.js'
 import { projectSky } from '../targets/sky.js'
@@ -86,6 +87,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
     measuredAt: null,
     warning: null,
     error: null,
+    rigidity: null,
     measurement: null,
     preview: null,
   }
@@ -214,6 +216,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       measuredAt: null,
       exposureStartedAt: null,
       error: null,
+      rigidity: null,
       warning: null,
     })
     images.clear()
@@ -278,7 +281,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       await running
     }
 
-    if (view.phase !== 'failed')
+    if (view.phase !== 'failed' && view.phase !== 'not-rigid')
       patch({ phase: finished && view.measurement ? 'finished' : 'stopped' })
 
     return view
@@ -619,6 +622,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         solved,
         solvedAt,
         sample,
+        mountRightAscensionDegrees: actual?.observation.mount.rightAscensionDegrees,
         mount,
         timing,
         frameRecord,
@@ -684,7 +688,19 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
 
     const first = await solvedFrame(solver, signal, false)
     const samples: AlignmentSample[] = [first.sample]
+    const rigidityFrames: RigidityFrame[] = []
     let current = first
+
+    const keepForRigidity = (frame: typeof first) => {
+      if (frame.mountRightAscensionDegrees !== undefined)
+        rigidityFrames.push({
+          solved: frame.solved.wcs,
+          sample: frame.sample,
+          mountRightAscensionDegrees: frame.mountRightAscensionDegrees,
+        })
+    }
+
+    keepForRigidity(first)
 
     for (let position = 2; position <= 3; position++) {
       patch({ activity: 'moving', position, solvedPositions: position - 1 })
@@ -696,13 +712,48 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       else await hardware.move(settings.telescopeId, 1.5, 12, signal)
       current = await solvedFrame(solver, signal, false)
       samples.push(current.sample)
+      keepForRigidity(current)
     }
 
     // SAFETY: the initial sample and the two completed loop iterations supply exactly three solved positions.
     const baselineSamples = samples as [AlignmentSample, AlignmentSample, AlignmentSample]
     const baseline = createAlignmentBaseline(baselineSamples, first.latitude)
-    await diagnostics?.recordBaseline(baselineSamples, first.latitude, baseline.measurement)
+
+    // The offline model has no mount reading to judge, so only physical runs carry a verdict.
+    // SAFETY: a physical run keeps one frame for each of its three solved positions.
+    const rigidity = physical
+      ? baselineRigidity(rigidityFrames as [RigidityFrame, RigidityFrame, RigidityFrame])
+      : undefined
+
+    await diagnostics?.recordBaseline(baselineSamples, first.latitude, baseline.measurement, rigidity)
     signal.throwIfAborted()
+
+    if (rigidity) {
+      tracer
+        .startSpan('alignment.rigidity', {
+          attributes: {
+            'alignment.run.id': runId,
+            'rig.id': view.rigId,
+            'alignment.rigidity.status': rigidity.status,
+            'alignment.rigidity.miss_arcmin': rigidity.missArcmin,
+            'alignment.rigidity.threshold_arcmin': rigidity.thresholdArcmin,
+          },
+        })
+        .end()
+    }
+
+    if (rigidity?.status === 'not-rigid') {
+      patch({
+        phase: 'not-rigid',
+        activity: 'idle',
+        solvedPositions: 3,
+        warning: null,
+        rigidity: { missArcmin: rigidity.missArcmin, thresholdArcmin: rigidity.thresholdArcmin },
+      })
+
+      return
+    }
+
     patch({ phase: 'adjusting', solvedPositions: 3 })
 
     while (true) {

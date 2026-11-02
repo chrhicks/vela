@@ -7,7 +7,7 @@ import type {
   Pointing,
   TelescopeStatus,
 } from '@vela/equipment'
-import type { Site } from '@vela/rig-sky'
+import type { RigidityVerdict, Site } from '@vela/rig-sky'
 import { encodeCaptureFits } from '../imaging/fits.js'
 import type { SkyPosition, SolveResult } from '../plate-solving/judged-solver.js'
 import type { AlignmentMeasurement, AlignmentSample } from './geometry.js'
@@ -52,6 +52,7 @@ export interface AlignmentDiagnosticRun {
     samples: readonly [AlignmentSample, AlignmentSample, AlignmentSample],
     latitudeDegrees: number,
     measurement: AlignmentMeasurement,
+    rigidity?: RigidityVerdict,
   ): Promise<void>
   recordMeasurement(
     sample: AlignmentSample,
@@ -168,13 +169,14 @@ export function createAlignmentDiagnostics(
               if (previous) await unlink(join(directory, previous))
             }
           }),
-        recordBaseline: (samples, latitudeDegrees, measurement) =>
+        recordBaseline: (samples, latitudeDegrees, measurement, rigidity) =>
           record(() =>
             append({
               type: 'baseline',
               samples,
               latitudeDegrees,
               measurement,
+              ...(rigidity && { rigidity }),
             }),
           ),
         // Both current alignment modes measure with sidereal tracking enabled.

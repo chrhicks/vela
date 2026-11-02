@@ -31,7 +31,7 @@ export interface AlignmentView {
   rigName: string
   enabled: boolean
   unavailableReason: string | null
-  phase: 'setup' | 'baseline' | 'adjusting' | 'stopped' | 'finished' | 'failed'
+  phase: 'setup' | 'baseline' | 'adjusting' | 'stopped' | 'finished' | 'failed' | 'not-rigid'
   activity:
     | 'idle'
     | 'exposing'
@@ -49,6 +49,11 @@ export interface AlignmentView {
   measuredAt: string | null
   warning: string | null
   error: string | null
+  /**
+   * Set with the `not-rigid` phase: the three baseline positions did not turn as one rigid body, so Vela measured
+   * no polar error. The miss is in arcminutes, and the threshold is the miss at which a baseline stops being rigid.
+   */
+  rigidity?: null | { missArcmin: number; thresholdArcmin: number }
   /** Latest acquired frame, available even before a successful solve. */
   preview?: null | (AlignmentExposureImage & {
     capturedAt: string
