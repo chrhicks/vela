@@ -74,6 +74,14 @@ An alignment trial's journal holds the site in `evidence.physical.site` and in o
 | Arrival-order shuffles give identical output | `order.test.ts` |
 | Staleness from clock events matches between live-style and replay-style input | `time.test.ts` |
 
+## Pointing assessment
+
+`assess(model)` returns the position state, confidence, error budget in arcminutes, blind travel in degrees and last fix. It reads no clock. The reducer accumulates axis travel, including reversals and observed operation travel when available, and resets it on a current-epoch solve. History-only solves cannot reset it. Clock inputs still own staleness.
+
+The budget is the last fix's pointing residual plus 7.02 arcseconds per blind degree. Step 3's AM5 profile measured a 7.02 arcsecond p90 reported landing offset over 30 gotos. Charging that amount per degree is a conservative policy, not a measured sky-error slope or a statistical bound. The confidence table in `assess.ts` allocates 2% and 5% of a one-degree reference field, or 1.2 and 3 arcminutes, for high and low confidence. It follows step 6's relative alignment and framing needs without treating plate-scale error as pointing error. The position state caps confidence, so moving and unknown remain none and uncertain cannot be high.
+
+`node tools/rig-model/assess-replay.ts --report FILE.md` replays October 26 through the backfill's importer and reducer using its read-only solve cache. It lists each goto's state sequence and travel between solves. Early gotos without saved light-frame solves remain unknown. The report contains no site coordinates.
+
 ## Backfill
 
 `pnpm rig-model:backfill` (in `tools/rig-model/`) runs the saved light frames through the model: it solves each with the real ASTAP (cached by the file's sha256), stamps the frame with the end of its exposure and the solve with its finish, and feeds a night's frames, solves and mount snapshots to `step` in the order they would have arrived. The mount comes from errai's INDI recordings where one overlaps the night, else from Vela's Cria journal. It reports alignment evidence, pointing residual and drift apart, and exits 3 (incomplete) when a change of the polar axis is bracketed but exposures Cria was told to take inside the bracket have no kept pixels. The command, its options and its exit codes are in [tools/rig-model/README.md](../tools/rig-model/README.md).

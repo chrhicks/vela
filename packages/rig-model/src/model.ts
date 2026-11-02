@@ -118,6 +118,7 @@ export interface RigModel {
   readonly link: Link
   readonly site: Belief<Site | null, 'site'>
   readonly mount: Belief<MountPosition, 'setup'>
+  readonly blindTravelDegrees: number
   readonly track: MountTrack
   readonly epochs: Epochs
   readonly holds: Holds
@@ -138,6 +139,7 @@ export function createModel(config: ModelConfig): RigModel {
     link: { instanceId: null, bindingId: null, lastSeenAt: null, operations: new Map() },
     site: believe('site', null, 'none', origin, []),
     mount: believe('setup', { state: 'unknown', since: origin, reason: 'never-solved' }, 'none', origin, []),
+    blindTravelDegrees: 0,
     track: emptyTrack,
     epochs: noEpochs,
     holds: { motion: false, gap: false, unavailable: false },
@@ -185,6 +187,10 @@ function moveMount(w: Working, out: Output[], input: MountInput, evidence: reado
   const after = nextMount(before, input)
 
   if (after === before) return
+
+  if (input.t === 'session-start' || input.t === 'power-cycled') w.blindTravelDegrees = 0
+
+  if (input.t === 'fix' && after.state === 'known') w.blindTravelDegrees = travelSince(w.track, input.fix.at)
 
   w.mount = believe('setup', after, confidenceOf(after), input.at, [...w.mount.evidence, ...evidence])
 
@@ -255,6 +261,28 @@ function sampleOf(observation: MountObservation, previous: MountSample | undefin
     pierSide: observation.pierSide,
     fresh: position.fresh,
   }
+}
+
+function countedTravel(a: MountSample, b: MountSample): number {
+  if (a.raHours === b.raHours && a.decDegrees === b.decDegrees) return 0
+
+  const siderealDegrees = a.tracking ? 0 : (b.at - a.at) * 360 / 86_164_090.5
+  const ra = ((b.raHours - a.raHours) * 15 - siderealDegrees + 540) % 360 - 180
+
+  return Math.hypot(ra, b.decDegrees - a.decDegrees)
+}
+
+function travelSince(track: MountTrack, from: EpochMs, to: number = Infinity): number {
+  let total = 0
+
+  for (let index = 1; index < track.samples.length; index++) {
+    const a = track.samples[index - 1]!
+    const b = track.samples[index]!
+
+    if (b.at > from && b.at <= to && a.frame === b.frame) total += countedTravel(a, b)
+  }
+
+  return total
 }
 
 function followMotion(w: Working, out: Output[], observation: MountObservation, coveredBefore: EpochMs | null) {
@@ -374,12 +402,29 @@ function onState(w: Working, out: Output[], event: Envelope<'cria.state'>) {
       endMotion(w, out, 'confirmed')
     }
 
+    if (!restarted && previous && sample.at > previous.at && previous.frame === sample.frame)
+      w.blindTravelDegrees += countedTravel(previous, sample)
+
     w.track = appendSample(w.track, sample, epochMs(at - w.config.keepMs))
   }
 
   const coveredBefore = w.track.coveredUntil
 
   w.track = cover(w.track, at)
+
+  for (const operation of observation.operations) {
+    const observed = operation.motion?.observed?.travel
+    const fix = w.mount.value.state === 'moving' ? lastFixOf(w.mount.value.before) : lastFixOf(w.mount.value)
+
+    if (!observed || operation.phase !== 'settled' || w.link.operations.get(operation.id) === 'settled' ||
+      (coveredBefore !== null && (operation.settledAt ?? 0) <= coveredBefore) || operation.startedAt < (fix?.at ?? 0)) continue
+
+    const travel = Math.hypot(observed.rightAscensionDegrees, observed.declinationDegrees)
+    const sampled = travelSince(w.track, operation.startedAt, observation.at)
+
+    w.blindTravelDegrees += Math.max(0, travel - sampled)
+  }
+
   followMotion(w, out, observation, coveredBefore)
   reopenIfClear(w, at)
 
