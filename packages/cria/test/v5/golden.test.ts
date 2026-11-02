@@ -2,8 +2,8 @@
  * Cria's recorded protocol 5 wire, decoded with @cria/wire.
  *
  * wire.golden.json is a verbatim copy of ts/testing/golden/wire.golden.json in
- * public Cria at 9333a927408d712449c587813db388525c6f7311, so `git hash-object`
- * on it prints that file's blob, 858c2ac20a4a0a54e6b55f3201071e763a400b7e.
+ * public Cria at 06ab310669238d2316c1b2d40421df6c4ad7f420, so `git hash-object`
+ * on it prints that file's blob, 686467b7d22099a03a20ecfd0e6d42b346d60857.
  * Cria's golden test recorded it from a running Cria and replaced IDs and times
  * with placeholders; `resolve` puts back values the schemas accept. Replace the
  * copy only together with the Cria pin.
@@ -61,6 +61,7 @@ function resolve(text: string): string {
     .replace(/<(?:instance|binding|request|operation|image|id)-\d+>/g, uuid)
     .replaceAll('"<time>"', String(Date.UTC(2026, 9, 15, 21)))
     .replaceAll('"<elapsed>"', '1.5')
+    .replaceAll('"<angle>"', '1.5')
     .replaceAll('"<sequence>"', '1')
     .replace(/"<(\d+) characters>"/g, (_, length: string) => JSON.stringify('x'.repeat(Number(length))))
     .replaceAll('<utc>', '2026-10-15T21:00:00')
