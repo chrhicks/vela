@@ -35,8 +35,8 @@ function imageOf(index: number, capturedAt: number, exposureSeconds: number): Sa
   }
 }
 
-function solvedAt(index: number, capturedAt: number, exposureSeconds: number, decDegrees: number, solveMs = 900): Solved {
-  const centre = { raDegrees: sky.raHours * 15, decDegrees }
+function solvedAt(index: number, capturedAt: number, exposureSeconds: number, decDegrees: number, solveMs = 900, raDegrees = sky.raHours * 15): Solved {
+  const centre = { raDegrees, decDegrees }
 
   const body: SolveBody = {
     status: 'solved',
@@ -107,7 +107,7 @@ describe('rig backfill', () => {
     const drifts = driftsOf(rows)
     const trials = [trial('finished', T0 - 15 * 60_000, 60)]
     const inside: Exposure[] = [10, 11, 12].map(minute => ({ at: epochMs(T0 - minute * 30_000), seconds: 10 }))
-    const commanded: Exposure[] = [{ at: epochMs(T0 - 20 * 60_000), seconds: 10 }, ...inside, { at: epochMs(T0 + 60_000), seconds: 30 }]
+    const commanded: Exposure[] = [{ at: epochMs(T0 - 20 * 60_000), seconds: 10 }, ...inside, { at: epochMs(T0 + 20 * 60_000), seconds: 30 }]
 
     const finding = findingOf({ drifts, trials, commanded, kept: [] })
 
@@ -115,7 +115,9 @@ describe('rig backfill', () => {
 
     if (finding.kind !== 'shift') return
 
-    expect([finding.shift.from, finding.shift.to]).toEqual([T0 - 15 * 60_000, T0])
+    expect(finding.shift.from).toBe(T0 - 15 * 60_000)
+    expect(finding.shift.to).toBeGreaterThan(T0)
+    expect(finding.shift.to).toBeLessThan(T0 + 20 * 37_000)
     expect(finding.complete).toBe(false)
     expect(finding.shift.unkept).toHaveLength(3)
 
@@ -127,11 +129,46 @@ describe('rig backfill', () => {
     expect(findingOf({ drifts, trials: [trial('stopped', T0 - 15 * 60_000, 60)], commanded, kept: [] })).toMatchObject({ kind: 'shift', shift: { alignment: { outcome: 'stopped' } } })
   })
 
+  it('ends the bracket where the shortest disagreeing stretch ends, so a change inside a run is inside it', async () => {
+    const stepAt = 4 * 60_000
+
+    const steady = Array.from({ length: 21 }, (_, index) => {
+      const offset = index * 30_000
+      const minutes = Math.max(0, offset - stepAt) / 60_000
+
+      return solvedAt(index + 1, T0 + offset, 25, sky.decDegrees + (minutes > 0 ? 60 + 16 * minutes : 0) * arcsecInDegrees)
+    })
+
+    const { rows } = await replayNight({ solved: steady, mount: stream(tracking(T0 - 60_000, T0 + 15 * 60_000)), settleMs: 600_000 })
+    const finding = findingOf({ drifts: driftsOf(rows), trials: [trial('finished', T0 - 15 * 60_000, 60)], commanded: [], kept: [] })
+
+    expect(finding.kind).toBe('shift')
+    expect(finding.kind === 'shift' && finding.shift.to).toBeGreaterThan(T0 + stepAt)
+  })
+
+  it('does not call a drift a polar shift without a later alignment as large as it needs', async () => {
+    const eastOnly = Array.from({ length: 20 }, (_, index) => {
+      const eastDegrees = (8 * arcsecInDegrees * ((index * 37_000) / 60_000)) / Math.cos((sky.decDegrees * Math.PI) / 180)
+
+      return solvedAt(index + 1, T0 + index * 37_000, 30, sky.decDegrees, 900, sky.raHours * 15 + eastDegrees)
+    })
+
+    const { rows } = await replayNight({ solved: eastOnly, mount: stream(tracking(T0 - 60_000, T0 + 20 * 60_000)), settleMs: 600_000 })
+    const alone = findingOf({ drifts: driftsOf(rows), trials: [trial('finished', T0 - 15 * 60_000, 60)], commanded: [], kept: [] })
+    const later = findingOf({ drifts: driftsOf(rows), trials: [trial('finished', T0 - 15 * 60_000, 60), { ...trial('finished', T0 + 40 * 60_000, 2400), runId: 'later' }], commanded: [], kept: [] })
+
+    expect(alone).toMatchObject({ kind: 'shift', shift: { corroboration: undefined } })
+    expect(later).toMatchObject({ kind: 'shift', shift: { corroboration: { runId: 'later' } } })
+    expect(outcomeOf([{ night: 'e', finding: alone }], { event: 'e', control: undefined })).toMatchObject({ code: 1 })
+    expect(outcomeOf([{ night: 'e', finding: later }], { event: 'e', control: undefined })).toMatchObject({ code: 0 })
+    expect(outcomeOf([{ night: 'c', finding: { kind: 'no-alignment' } }], { event: undefined, control: 'c' })).toMatchObject({ code: 1 })
+  })
+
   it('exits incomplete for the event night, passed for a quiet control, and failed when they swap', async () => {
     const run = async (north: number) => {
       const { rows } = await replayNight({ solved: drifting(north), mount: stream(tracking(T0 - 60_000, T0 + 20 * 60_000)), settleMs: 600_000 })
 
-      return findingOf({ drifts: driftsOf(rows), trials: [trial('finished', T0 - 15 * 60_000, 60)], commanded: [{ at: epochMs(T0 - 5 * 60_000), seconds: 10 }], kept: [] })
+      return findingOf({ drifts: driftsOf(rows), trials: [trial('finished', T0 - 15 * 60_000, 60), { ...trial('finished', T0 + 40 * 60_000, 2400), runId: 'later' }], commanded: [{ at: epochMs(T0 - 5 * 60_000), seconds: 10 }], kept: [] })
     }
 
     const event = { night: '2026-10-26', finding: await run(fast) }

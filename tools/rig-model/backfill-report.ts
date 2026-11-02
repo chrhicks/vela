@@ -87,7 +87,7 @@ export function markdownOf(report: Report): string {
       case 'steady':
         return `steady (${finding.tested} runs)`
       case 'shift':
-        return finding.complete ? 'shift, bracketed' : 'shift, **incomplete**'
+        return `${finding.shift.corroboration ? 'shift' : 'drift beyond alignment, not corroborated'}, ${finding.complete ? 'bracketed' : '**incomplete**'}`
     }
   }
 
@@ -171,20 +171,20 @@ export function markdownOf(report: Report): string {
         lines.push('No alignment reading came before a fitted run, so drift could not be held against one.')
         break
       case 'steady':
-        lines.push(`${finding.tested} fitted runs held against the last alignment reading. None needs more than ${marginArcmin} arcmin above it. No change of the polar axis shows.`)
+        lines.push(`${finding.tested} fitted runs held against the last alignment reading. None needs more than ${marginArcmin} arcmin above it.`)
         break
       case 'shift': {
         const { shift } = finding
         const first = shift.unkept?.[0]
         const last = shift.unkept?.[shift.unkept.length - 1]
-        const later = night.trials.flatMap(trial => (trial.readings[0] !== undefined && trial.readings[0].at > shift.to ? [{ run: trial.runId.slice(0, 8), reading: trial.readings[0] }] : []))[0]
-
         lines.push(
-          `The polar axis moved after the alignment of run ${shift.alignment.runId.slice(0, 8)} (${shift.alignment.outcome}, ${fixed(shift.alignment.totalArcmin, 2)} arcmin at ${when(shift.alignment.at)}). **Earliest bracket the pixels and telemetry support: ${when(shift.from)} to ${when(shift.to)}** (${fixed((shift.to - shift.from) / 60_000)} minutes). The run that ends it, from ${clock(shift.drift.from)}, drifts ${fixed(shift.drift.northArcsecPerMin, 2)} arcsec/min north and ${fixed(shift.drift.eastArcsecPerMin, 2)} east, which needs at least ${fixed(shift.drift.polarLowerArcmin)} arcmin of polar error.`,
+          `The drift disagrees with the alignment of run ${shift.alignment.runId.slice(0, 8)} (${shift.alignment.outcome}, ${fixed(shift.alignment.totalArcmin, 2)} arcmin at ${when(shift.alignment.at)}). **Earliest bracket the pixels and telemetry support: ${when(shift.from)} to ${when(shift.to)}** (${fixed((shift.to - shift.from) / 60_000)} minutes). The bracket ends where the shortest stretch from the start of the run at ${clock(shift.drift.from)} that disagrees on its own ends (${shift.drift.frames} exposures). That stretch drifts ${fixed(shift.drift.northArcsecPerMin, 2)} arcsec/min north and ${fixed(shift.drift.eastArcsecPerMin, 2)} east. If a polar error caused it, the error is at least ${fixed(shift.drift.polarLowerArcmin)} arcmin.`,
           '',
         )
 
-        if (later !== undefined) lines.push(`Later alignment evidence: run ${later.run} first read ${fixed(later.reading.totalArcsec / 60)} arcmin at ${when(later.reading.at)}. It is not used to place the bracket.`, '')
+        if (shift.corroboration !== undefined)
+          lines.push(`**Corroborated.** Run ${shift.corroboration.runId.slice(0, 8)} later read ${fixed(shift.corroboration.totalArcmin)} arcmin at ${when(shift.corroboration.at)}, as large as the drift needs. It is not used to place the bracket.`, '')
+        else lines.push('**Not corroborated.** No later alignment reading is as large as the drift needs, so a tracking-rate error, flexure or refraction explains the drift as well as a polar error does.', '')
 
         if (shift.unkept === undefined) lines.push('**Incomplete.** This night has no recording of the camera commands, so the tool cannot say whether pixels inside the bracket were kept.')
         else if (shift.unkept.length === 0) lines.push('Complete: every exposure commanded inside the bracket has kept pixels, so the bracket cannot be narrowed further.')
