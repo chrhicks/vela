@@ -248,6 +248,8 @@ export interface FramingView {
       })
     | null
   error: string | null
+  /** The raw device text behind a plain `error`, for a details line. */
+  errorDetail?: string | null
   /** What Vela did on its own during this request, such as turning tracking on. */
   notice?: string | null
   exposureSeconds: number

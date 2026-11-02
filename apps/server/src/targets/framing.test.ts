@@ -453,6 +453,47 @@ describe('framing controller', () => {
     },
   )
 
+  it('puts a refused goto into plain words, keeps the raw text as detail, and clears it on the next request', async () => {
+    const fake = workshop()
+    const raw = 'EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert'
+    fake.hardware.slew = vi.fn(async () => { throw new Error(raw) })
+    await fake.start().finished
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'failed',
+      error: 'The mount refused the goto. Nothing moved.',
+      errorDetail: raw,
+    })
+    expect(fake.hardware.capture).not.toHaveBeenCalled()
+    await fake.start({ check: true }).finished
+    expect(fake.controller.snapshot()).toMatchObject({ phase: 'checked', error: null, errorDetail: null })
+  })
+
+  it('reports that it turned tracking on and that the goto was then refused', async () => {
+    const fake = workshop()
+    fake.mount.tracking = false
+    fake.hardware.slew = vi.fn(async () => {
+      throw new Error('EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert')
+    })
+    await fake.start().finished
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'failed',
+      notice: 'Tracking was off. Vela turned it on.',
+      error: 'The mount refused the goto. Nothing moved.',
+      errorDetail: 'EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert',
+    })
+  })
+
+  it('leaves a goto failure that may have moved the mount as it is', async () => {
+    const fake = workshop()
+    fake.hardware.slew = vi.fn(async () => { throw new Error('EQUATORIAL_EOD_COORD on ZWO AM5: no answer within 10 seconds') })
+    await fake.start().finished
+    expect(fake.controller.snapshot()).toMatchObject({
+      phase: 'failed',
+      error: 'EQUATORIAL_EOD_COORD on ZWO AM5: no answer within 10 seconds',
+      errorDetail: null,
+    })
+  })
+
   it('checks the current frame without issuing a slew or tracking command', async () => {
     const fake = workshop()
     const edited = { raDegrees: 12, decDegrees: 23 }
