@@ -330,7 +330,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       { 'alignment.position': view.position },
     )
       .catch(error => {
-        throw asFailedExposure(error) ?? error
+        throw error instanceof Error ? (asFailedExposure(error) ?? error) : error
       })
       .finally(() => {
         capturePending = false
@@ -968,7 +968,7 @@ function exposureFailed({ detail }: Dropped) {
  * A camera that reports a failed exposure has no frame and is idle, so a new exposure is safe. Only the exposure's own
  * failure counts: an uncertain exposure needs a person, and transport and wire errors have their own handling.
  */
-function asFailedExposure(error: unknown) {
+function asFailedExposure(error: Error) {
   if (error instanceof CaptureRetryableError) return error
 
   if (

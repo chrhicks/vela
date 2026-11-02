@@ -418,9 +418,11 @@ it('retries a failed sweep exposure at the same position and keeps it when the s
 
 it('ends the run at once when the camera cannot say whether an exposure ran', async () => {
   const subject = setup()
+
   const capture = vi.fn(async () => {
     throw new CaptureUncertainError('Cria cannot confirm the exposure', { reason: 'protocol-error', endpoint: 'Cria' })
   })
+
   subject.setCapture(capture)
   await subject.controller.start('sim', 'Simulator')
   await vi.waitFor(() => expect(subject.controller.snapshot().active).toBe(false))
