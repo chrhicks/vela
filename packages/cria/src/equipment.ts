@@ -4,7 +4,7 @@ import {
   CaptureStoppedError, CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError, FocuserUncertainError,
   FrameLostError, FramingStoppedError,
   type Acquisition, type CameraCooling, type CaptureFrameType, type CameraCoolingObservation,
-  type ExposureSettings, type Focuser, type Framing, type TelescopeStatus,
+  type ExposureSettings, type Focuser, type Framing, type MountPointing, type TelescopeStatus,
 } from '@vela/equipment'
 import { imageBytesPixels } from '@vela/equipment/image-bytes'
 import { outcomeOf, type CriaConnection } from './connection.js'
@@ -123,15 +123,48 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
     }
   }
 
-  /** A mount that cannot be read leaves out its pier side and never costs the camera's settings. */
-  async function mountPierSide(id: string, signal?: AbortSignal) {
-    try {
-      const side = (await observed(id, 'mount', signal, false)).pierSide()
+  /** A mount that cannot be read leaves out its pier side and pointing, and never costs the camera's settings. */
+  async function mountSettings(id: string, signal?: AbortSignal): Promise<Pick<ExposureSettings, 'pierSide' | 'mount'>> {
+    let readings: DeviceReadings
 
-      return side === 'east' || side === 'west' ? side : undefined
+    try {
+      readings = await observed(id, 'mount', signal, false)
     } catch {
-      return undefined
+      return {}
     }
+
+    const settings: Pick<ExposureSettings, 'pierSide' | 'mount'> = {}
+
+    try {
+      const side = readings.pierSide()
+
+      if (side === 'east' || side === 'west') settings.pierSide = side
+    } catch {}
+
+    try {
+      const coordinateSystem = readings.coordinateSystem()
+
+      if (coordinateSystem === 'unknown') return settings
+
+      const mount: MountPointing = {
+        rightAscensionDegrees: readings.number('rightAscensionHours') * 15,
+        declinationDegrees: readings.number('declinationDegrees'),
+        coordinateSystem,
+        tracking: readings.boolean('tracking'),
+        slewing: readings.boolean('slewing'),
+      }
+
+      const latitudeDegrees = readings.optionalNumber('latitudeDegrees')
+      const longitudeDegrees = readings.optionalNumber('longitudeDegrees')
+      const elevationMeters = readings.optionalNumber('elevationMeters')
+
+      if (latitudeDegrees !== undefined && longitudeDegrees !== undefined)
+        mount.site = { latitudeDegrees, longitudeDegrees, ...(elevationMeters !== undefined && { elevationMeters }) }
+
+      settings.mount = mount
+    } catch {}
+
+    return settings
   }
 
   const acquisition: Acquisition = {
@@ -204,11 +237,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
     async exposureSettings({ cameraId, telescopeId }, signal) {
       const settings = cameraSettings(await observed(cameraId, 'camera', signal, false))
 
-      const pierSide = telescopeId === undefined ? undefined : await mountPierSide(telescopeId, signal)
-
-      if (pierSide) settings.pierSide = pierSide
-
-      return settings
+      return telescopeId === undefined ? settings : { ...settings, ...(await mountSettings(telescopeId, signal)) }
     },
     async pointing(id, signal) {
       const readings = await observed(id, 'mount', signal)

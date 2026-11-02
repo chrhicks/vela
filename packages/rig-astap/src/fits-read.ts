@@ -32,6 +32,11 @@ function readHeader(bytes: Uint8Array): { readonly cards: Map<string, string>; r
   return undefined
 }
 
+/** The header cards of a FITS file, key to raw value with quotes and comments removed. */
+export function readFitsCards(bytes: Uint8Array): ReadonlyMap<string, string> {
+  return readHeader(bytes)?.cards ?? new Map()
+}
+
 function colorOf(pattern: string | undefined): FrameColor | undefined {
   if (pattern === undefined) return { kind: 'mono' }
 

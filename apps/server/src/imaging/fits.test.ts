@@ -329,7 +329,7 @@ describe('camera, optics and target settings', () => {
     expect(withSettings.subarray(2880)).toEqual(without.subarray(2880))
   })
 
-  it('writes no site or pointing key under any input', async () => {
+  it('ignores stray site and pointing properties that are not the mount reading', async () => {
     const hostile = {
       ...settings,
       SITELAT: 1,

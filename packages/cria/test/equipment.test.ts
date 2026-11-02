@@ -345,6 +345,14 @@ describe('protocol 5 Promise capabilities', () => {
           sensorTemperatureC: -10,
           setpointC: -10,
           pierSide: 'east',
+          mount: {
+            rightAscensionDegrees: expect.any(Number),
+            declinationDegrees: expect.any(Number),
+            coordinateSystem: 'topocentric',
+            tracking: true,
+            slewing: false,
+            site: { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 },
+          },
         })
 
         await viewed({ gain: fresh(250), temperatureC: fresh(-9.5) })
@@ -392,6 +400,30 @@ describe('protocol 5 Promise capabilities', () => {
         await vi.advanceTimersByTimeAsync(1000)
 
         expect(await equipment.acquisition.exposureSettings!(ids)).not.toHaveProperty('pierSide')
+      })
+
+      it('reads the mount pointing without a site when the mount reports no location, and none when its frame is unknown', async () => {
+        const unreported = { status: 'unavailable', reason: 'unsupported' } as const
+
+        cria.deviceView = device => device.kind === 'mount'
+          ? { ...device, readings: { ...device.readings, latitudeDegrees: unreported, longitudeDegrees: unreported } }
+          : device
+        await vi.advanceTimersByTimeAsync(1000)
+
+        const settings = await equipment.acquisition.exposureSettings!(ids)
+
+        expect(settings.mount).toMatchObject({ coordinateSystem: 'topocentric', tracking: true })
+        expect(settings.mount).not.toHaveProperty('site')
+
+        cria.deviceView = device => device.kind === 'mount'
+          ? { ...device, readings: { ...device.readings, coordinateSystem: unreported } }
+          : device
+        await vi.advanceTimersByTimeAsync(1000)
+
+        const unframed = await equipment.acquisition.exposureSettings!(ids)
+
+        expect(unframed).not.toHaveProperty('mount')
+        expect(unframed).toMatchObject({ pierSide: 'east', gain: 100 })
       })
 
       it('keeps the camera settings when the mount cannot be read, and reads no mount without a telescope', async () => {
