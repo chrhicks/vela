@@ -155,6 +155,149 @@ const PlateWcs = Schema.Struct({
 
 const Hint = Schema.NullOr(Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number, radiusDegrees: Schema.Number }))
 
+const AlignmentSample = Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number, capturedAt: Schema.String })
+
+const AlignmentMeasurement = Schema.Struct({
+  altitudeArcsec: Schema.Number,
+  azimuthArcsec: Schema.Number,
+  totalArcsec: Schema.Number,
+  correctionTarget: SkyPosition,
+})
+
+const AlignmentCoordinateSystem = Schema.Literals(['other', 'topocentric', 'j2000', 'j2050', 'b1950'])
+
+const AlignmentMount = Schema.Struct({
+  rightAscensionDegrees: Schema.Number,
+  declinationDegrees: Schema.Number,
+  coordinateSystem: Schema.Union([AlignmentCoordinateSystem, Schema.Literal('unknown')]),
+  tracking: Schema.Boolean,
+  trackingRate: Schema.optionalKey(Schema.Literals(['sidereal', 'lunar', 'solar', 'king'])),
+  rightAscensionRateSecondsPerSiderealSecond: Schema.optionalKey(Schema.Number),
+  declinationRateArcsecondsPerSecond: Schema.optionalKey(Schema.Number),
+  pierSide: Schema.optionalKey(Schema.Literals(['east', 'west', 'unknown'])),
+  slewing: Schema.Boolean,
+  parked: Schema.Boolean,
+  observedAt: Schema.String,
+})
+
+const AlignmentCamera = Schema.Struct({
+  cameraName: Schema.String,
+  sensorWidthPixels: Schema.Int,
+  sensorHeightPixels: Schema.Int,
+  pixelWidthMicrons: Schema.Number,
+  pixelHeightMicrons: Schema.Number,
+  binX: Schema.Int,
+  binY: Schema.Int,
+  width: Schema.Int,
+  height: Schema.Int,
+  startX: Schema.Int,
+  startY: Schema.Int,
+})
+
+const AlignmentStep = Schema.Struct({
+  labelBefore: Schema.String,
+  labelAfter: Schema.String,
+  excessArcmin: Schema.Number,
+  baselineArcmin: Schema.Number,
+  turnDegrees: Schema.Number,
+  mountAngleBeforeDegrees: Schema.Number,
+  mountAngleAfterDegrees: Schema.Number,
+})
+
+/** Which trial an alignment event belongs to, and its place in it: ids are `alignment:<runId>:<n>`, and `n` counts from the `run` event at 1. */
+const AlignmentPart = {
+  runId: Schema.String,
+  n: Schema.Int.pipe(Schema.check(Schema.isGreaterThanOrEqualTo(1))),
+}
+
+const AlignmentRun = {
+  type: Schema.Literal('run'),
+  ...AlignmentPart,
+  folder: Schema.String,
+  rigName: Schema.String,
+  cameraId: Schema.String,
+  telescopeId: Schema.String,
+  cameraName: Schema.String,
+  exposureSeconds: Schema.Number,
+}
+
+/**
+ * One entry of an alignment trial. No body names a site or a sidereal time. A physical trial's site is the first mount snapshot of its
+ * rig in the same run log file, and an offline trial's `run` names the simulator's latitude and its sidereal time at one instant.
+ */
+export const AlignmentBody = Schema.Union([
+  Schema.Struct({ ...AlignmentRun, mode: Schema.Literal('physical') }),
+  Schema.Struct({
+    ...AlignmentRun,
+    mode: Schema.Literal('offline'),
+    simulator: Schema.Struct({ latitudeDegrees: Schema.Number, siderealTimeDegrees: Schema.Number, at: Schema.String }),
+  }),
+  Schema.Struct({
+    type: Schema.Literal('frame'),
+    ...AlignmentPart,
+    original: Schema.Struct({ filename: Schema.String, bytes: Schema.Int, sha256: Schema.String }),
+    capture: Schema.Struct({
+      width: Schema.Int,
+      height: Schema.Int,
+      capturedAt: Schema.String,
+      capturedAtSource: Schema.Literals(['camera', 'server-estimate']),
+      color: Schema.Union([Schema.Struct({ kind: Schema.Literal('mono') }), Schema.Struct({ kind: Schema.Literal('bayer'), pattern: Schema.Literals(['rggb', 'grbg', 'gbrg', 'bggr']) })]),
+    }),
+    evidence: Schema.Struct({
+      phase: Schema.Literals(['baseline', 'adjusting']),
+      position: Schema.Int,
+      solution: Schema.Struct({ ...SkyPosition.fields, capturedAt: Schema.String, wcs: PlateWcs }),
+      sample: AlignmentSample,
+      hint: SkyPosition,
+      fieldHeightDegrees: Schema.Number,
+      physical: Schema.optionalKey(Schema.Struct({ camera: AlignmentCamera, before: AlignmentMount, after: AlignmentMount })),
+      offlinePointing: Schema.optionalKey(
+        Schema.Struct({ rightAscensionDegrees: Schema.Number, declinationDegrees: Schema.Number, tracking: Schema.Boolean, coordinateSystem: AlignmentCoordinateSystem }),
+      ),
+    }),
+  }),
+  Schema.Struct({
+    type: Schema.Literal('fit'),
+    ...AlignmentPart,
+    fixes: Schema.Array(Schema.Struct({ position: Schema.Int, sample: AlignmentSample })),
+    polar: Schema.NullOr(
+      Schema.Struct({
+        axis: Schema.Tuple([Schema.Number, Schema.Number, Schema.Number]),
+        altitudeArcsec: Schema.Number,
+        azimuthArcsec: Schema.Number,
+        totalArcsec: Schema.Number,
+      }),
+    ),
+    verdict: Schema.Struct({
+      status: Schema.Literals(['rigid', 'not-rigid']),
+      missArcmin: Schema.Number,
+      thresholdArcmin: Schema.Number,
+      steps: Schema.Array(AlignmentStep),
+    }),
+  }),
+  Schema.Struct({
+    type: Schema.Literal('dropped'),
+    ...AlignmentPart,
+    position: Schema.Int,
+    reason: Schema.Literals(['no-solve', 'rejected', 'capture-failed']),
+    detail: Schema.NullOr(Schema.String),
+  }),
+  Schema.Struct({
+    type: Schema.Literal('measurement'),
+    ...AlignmentPart,
+    sample: AlignmentSample,
+    measurement: AlignmentMeasurement,
+    tracking: Schema.Literal(true),
+    mount: Schema.optionalKey(AlignmentMount),
+  }),
+  Schema.Struct({
+    type: Schema.Literal('outcome'),
+    ...AlignmentPart,
+    phase: Schema.Literals(['finished', 'stopped', 'failed']),
+    error: Schema.NullOr(Schema.String),
+  }),
+])
+
 export const SolveBody = Schema.Union([
   Schema.Struct({
     status: Schema.Literal('solved'),
@@ -245,6 +388,8 @@ export type FrameBody = typeof FrameBody.Type
 export type AutofocusBody = typeof AutofocusBody.Type
 
 export type AttestationBody = typeof AttestationBody.Type
+
+export type AlignmentBody = typeof AlignmentBody.Type
 
 export type SolveBody = typeof SolveBody.Type
 

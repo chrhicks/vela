@@ -12,7 +12,7 @@ export interface FrameSourcePaths {
   readonly savedImages: string
   /** The `frames.jsonl` Vela wrote until plan step 13a. */
   readonly frameRecords: string
-  /** The run log directory (`VELA_RUN_LOG_DIR`), which holds `frame` events since then. */
+  /** The run log directory (`VELA_RUN_LOG_DIR`), which holds `frame` events since then, and `alignment` events. */
   readonly runLog: string
   readonly trials: string
 }
@@ -42,7 +42,11 @@ export interface FrameSources {
 
 /** Reads every frame source once. Read-only: it opens nothing for writing. */
 export async function scanFrameSources(paths: FrameSourcePaths): Promise<FrameSources> {
-  const [savedImages, frameRecords, trials] = await Promise.all([readSavedImages(paths.savedImages), frameRecordPaths(paths).then(readFrameRecords), readTrials(paths.trials)])
+  const [savedImages, frameRecords, trials] = await Promise.all([
+    readSavedImages(paths.savedImages),
+    frameRecordPaths(paths).then(readFrameRecords),
+    access(paths.runLog).then(() => paths.runLog, () => undefined).then(runLog => readTrials(paths.trials, runLog)),
+  ])
 
   return {
     savedImages,

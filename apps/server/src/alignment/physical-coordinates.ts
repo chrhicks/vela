@@ -1,5 +1,4 @@
-import { SiderealTime } from 'astronomy-engine'
-import { fromMount, toMount, type Site } from '@vela/rig-sky'
+import { fromMount, localSiderealDegrees, toMount, type Site } from '@vela/rig-sky'
 import type { PlateWcs, SkyPosition } from '../plate-solving/judged-solver.js'
 import { projectSky } from '../targets/sky.js'
 import type { AlignmentSample } from './geometry.js'
@@ -28,21 +27,6 @@ export function physicalAlignmentSample(
     capturedAt: midpoint.toISOString(),
     siderealTimeDegrees: localSiderealDegrees(midpoint, site),
   }
-}
-
-export function localSiderealDegrees(at: Date, site: Site): number {
-  if (
-    !Number.isFinite(at.getTime()) ||
-    !Number.isFinite(site.longitudeDegrees) ||
-    Math.abs(site.longitudeDegrees) > 180 ||
-    !Number.isFinite(site.latitudeDegrees) ||
-    Math.abs(site.latitudeDegrees) > 90 ||
-    (site.elevationMeters !== undefined && !Number.isFinite(site.elevationMeters))
-  ) {
-    throw new Error('Physical alignment requires a valid observing time and site')
-  }
-
-  return (((SiderealTime(at) * 15 + site.longitudeDegrees) % 360) + 360) % 360
 }
 
 /** The fitter returns an apparent equator-of-date target; ASTAP WCS is J2000. */

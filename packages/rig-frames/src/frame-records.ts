@@ -84,7 +84,7 @@ export interface FrameRecords {
 }
 
 /** An old `frames.jsonl` is one file. A run log is a directory of `run-*.jsonl` files, which sort in time order. */
-async function filesOf(path: string): Promise<readonly string[]> {
+export async function runLogFiles(path: string): Promise<readonly string[]> {
   if (!(await stat(path)).isDirectory()) return [path]
 
   return (await readdir(path)).filter(name => /^run-.+\.jsonl$/.test(name)).toSorted().map(name => join(path, name))
@@ -105,7 +105,7 @@ export async function readFrameRecords(paths: readonly string[]): Promise<FrameR
     let files: readonly string[]
 
     try {
-      files = await filesOf(path)
+      files = await runLogFiles(path)
     } catch (error) {
       problems.push({ path, line: null, reason: reasonOf(error) })
       continue

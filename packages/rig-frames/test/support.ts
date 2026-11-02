@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { appendFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { epochMs } from '@vela/rig-events'
+import { encodeEvent, epochMs, rigId, seal, sourceId, type AlignmentBody } from '@vela/rig-events'
 import { imageIdOf, syntheticSite } from '@vela/rig-testing'
 import type { FrameRecord, SavedImage } from '@vela/rig-frames'
 
@@ -195,3 +195,51 @@ export const frameRecord = (overrides: Partial<FrameRecord> & { readonly attempt
   statistics: null,
   ...overrides,
 })
+
+export const loggedRunId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+
+export async function writeLoggedTrial(dataDir: string, { createdAt = '2026-10-27T01:30:00.000Z', duplicate = false } = {}): Promise<string> {
+  const folder = `${loggedRunId}-xYz123`
+  const directory = join(dataDir, 'alignment-diagnostics/trials', folder)
+  const at = Date.parse(createdAt)
+  const polar = { altitudeArcsec: 3, azimuthArcsec: 4, totalArcsec: 5 }
+  const sample = { raDegrees: 91.5, decDegrees: 10.25, capturedAt: '2026-10-27T01:30:12.000Z' }
+  const filename = 'baseline-55555555-5555-4555-8555-555555555555.fits'
+
+  const bodies: AlignmentBody[] = [
+    { type: 'run', runId: loggedRunId, n: 1, folder, rigName: 'Test Rig', mode: 'offline', cameraId: 'c', telescopeId: 't', cameraName: 'Test Camera', exposureSeconds: 2, simulator: { latitudeDegrees: 41.5, siderealTimeDegrees: 211.75, at: createdAt } },
+    {
+      type: 'frame',
+      runId: loggedRunId,
+      n: 2,
+      original: { filename, bytes: 2880, sha256: sha256(filename) },
+      capture: { width: 64, height: 48, capturedAt: sample.capturedAt, capturedAtSource: 'camera', color: { kind: 'mono' } },
+      evidence: {
+        phase: 'baseline',
+        position: 1,
+        solution: { raDegrees: 91.5, decDegrees: 10.25, capturedAt: sample.capturedAt, wcs: { width: 64, height: 48, referenceX: 32.5, referenceY: 24.5, raDegrees: 91.5, decDegrees: 10.25, cd: [-5.2e-6, 0.000535, -0.000535, -5.6e-6] } },
+        sample,
+        hint: { raDegrees: 91.4, decDegrees: 10.2 },
+        fieldHeightDegrees: 2.5,
+        offlinePointing: { rightAscensionDegrees: 91.5, declinationDegrees: 10.25, tracking: true, coordinateSystem: 'j2000' },
+      },
+    },
+    { type: 'fit', runId: loggedRunId, n: 3, fixes: [{ position: 1, sample }], polar: { axis: [0, 0, 1], ...polar }, verdict: { status: 'rigid', missArcmin: 0.5, thresholdArcmin: 2, steps: [] } },
+    { type: 'dropped', runId: loggedRunId, n: 4, position: 2, reason: 'no-solve', detail: null },
+    { type: 'measurement', runId: loggedRunId, n: 5, sample, measurement: { ...polar, correctionTarget: { raDegrees: 1, decDegrees: 2 } }, tracking: true },
+    { type: 'outcome', runId: loggedRunId, n: 6, phase: 'finished', error: null },
+  ]
+
+  const lines = [...bodies, ...(duplicate ? [bodies[1]!] : [])].map((body, index) => {
+    const when = epochMs(at + index)
+
+    return `${encodeEvent(seal({ rig: rigId(rigName), source: sourceId('vela:alignment'), at: when, seenAt: when, kind: 'alignment', body }))}\n`
+  })
+
+  await mkdir(directory, { recursive: true })
+  await mkdir(join(dataDir, 'run-log'), { recursive: true })
+  await writeFile(join(dataDir, 'run-log/run-20261027T013000000Z-00001.jsonl'), lines.join(''))
+  await writeFile(join(directory, filename), Buffer.alloc(2880))
+
+  return directory
+}

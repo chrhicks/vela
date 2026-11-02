@@ -21,8 +21,8 @@ import {
 import { createAlignmentController } from './controller.js'
 import type { PhysicalAlignment } from './physical.js'
 import { axisOfPoleError } from './geometry.js'
+import { localSiderealDegrees } from '@vela/rig-sky'
 import {
-  localSiderealDegrees,
   physicalAlignmentSample,
   projectPhysicalAlignmentTarget,
 } from './physical-coordinates.js'
@@ -34,6 +34,7 @@ import {
   type AlignmentDiagnosticsFactory,
 } from './diagnostics.js'
 import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
+import { readBothWays } from './events-fixture.js'
 
 const control: {
   waits: Array<() => void>
@@ -728,6 +729,31 @@ it('replays a physical controller trial from its actual recorded bundle', async 
     expect(report.finalMeasurement?.totalArcsec).toBe(
       subject.controller.snapshot().measurement?.totalArcsec,
     )
+  } finally {
+    await subject.controller.stop()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+it('gives a physical controller trial the same replay report and trial from alignment events as from its journal', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'vela-physical-controller-events-'))
+  const subject = setup(createAlignmentDiagnostics(directory, () => {}))
+
+  try {
+    await subject.baseline()
+    await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+    control.waits.shift()!()
+    const adjusted = await subject.nextSolve()
+    adjusted.complete()
+    await vi.waitFor(() => expect(control.waits).toHaveLength(1))
+    await subject.controller.stop(true)
+
+    const { journal, events } = await readBothWays(join(directory, (await readdir(directory))[0]!), { site: fixture.site })
+
+    expect(events).toEqual(journal)
+    expect(journal.report).toMatchObject({ mode: 'physical', counts: { frames: 7, measurements: 2, physicalFrames: 7, verifiedOriginals: 7 }, rigidity: { status: 'rigid' } })
+    expect(journal.trials).toHaveLength(1)
+    expect(journal.problems).toEqual([])
   } finally {
     await subject.controller.stop()
     await rm(directory, { recursive: true, force: true })

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { fixture } from './physical-fixture.js'
 import { axisOfPoleError, baselineFromAxis, measureAlignment, type AlignmentSample } from './geometry.js'
+import { localSiderealDegrees } from '@vela/rig-sky'
 import {
-  localSiderealDegrees,
   physicalAlignmentSample,
   projectPhysicalAlignmentTarget,
 } from './physical-coordinates.js'

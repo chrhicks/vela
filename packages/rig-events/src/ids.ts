@@ -26,6 +26,8 @@ export function eventIdOf(draft: Draft): EventId {
       return brandEventId(draft.body.image ? `frame:${draft.body.image.id}` : `frame:${draft.body.runId}:${draft.body.attempt}`)
     case 'autofocus':
       return brandEventId(`autofocus:${draft.rig}:${draft.body.startedAt}`)
+    case 'alignment':
+      return brandEventId(`alignment:${draft.body.runId}:${draft.body.n}`)
     case 'attestation':
       return brandEventId(`attestation:${draft.rig}:${draft.at}`)
     case 'solve':

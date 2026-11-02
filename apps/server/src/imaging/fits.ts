@@ -1,8 +1,7 @@
 import { setImmediate } from 'node:timers/promises'
 import type { ExposureSettings, MountPointing } from '@vela/equipment'
 import type { CaptureImage, FrameType } from '@vela/model/web'
-import { fromMount, toMount, type EquatorialPosition, type Site } from '@vela/rig-sky'
-import { localSiderealDegrees } from '../alignment/physical-coordinates.js'
+import { fromMount, localSiderealDegrees, toMount, type EquatorialPosition, type Site } from '@vela/rig-sky'
 import { carriesFilter, imageTypeKeyword } from './frame-type.js'
 import type { ImageColor } from './preview.js'
 

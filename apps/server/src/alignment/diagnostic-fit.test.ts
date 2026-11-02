@@ -4,10 +4,12 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fitPolarAxis } from '@vela/rig-sky'
+import { simulatorSiderealDegrees } from './alignment-events.js'
 import { createAlignmentDiagnostics, type AlignmentFrameEvidence } from './diagnostics.js'
 import { replayAlignmentDiagnostics } from './diagnostic-replay.js'
 import { diagnosticEntrySchema, diagnosticJournalName } from './diagnostic-schema.js'
 import { baselineFromAxis, measureAlignment } from './geometry.js'
+import { readBothWays } from './events-fixture.js'
 import { fixture } from './physical-fixture.js'
 import { sweepFix } from './sweep-fit.js'
 
@@ -34,7 +36,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
-const siderealTimeDegrees = 40
+const simulator = { latitudeDegrees: fixture.site.latitudeDegrees, siderealTimeDegrees: 40, at: new Date(Date.UTC(2026, 10, 1, 4, 0, 0)).toISOString() }
 
 const decDegrees = 60
 
@@ -83,6 +85,7 @@ async function recordSweep(slipDegrees: number, drop: number) {
     }
 
     const solved = { raDegrees, decDegrees }
+    const siderealTimeDegrees = simulatorSiderealDegrees(simulator, capturedAt)
 
     const evidence: AlignmentFrameEvidence = {
       phase: 'baseline',
@@ -169,5 +172,19 @@ describe('a journal of five fixes and one dropped position', () => {
     await writeFile(journal, lines.join('\n') + '\n')
 
     await expect(replayAlignmentDiagnostics(directory)).rejects.toThrow('disagrees')
+  })
+
+  it.each([
+    ['rigid', 0],
+    ['not-rigid', 0.5],
+  ])('gives a %s offline sweep the same replay report and trial from alignment events as from its journal', async (status, slipDegrees) => {
+    const { directory } = await recordSweep(slipDegrees, 4)
+    const { journal, events } = await readBothWays(directory, { simulator })
+
+    expect(events).toEqual(journal)
+    expect(journal.report.rigidity?.status).toBe(status)
+    expect(journal.report.counts).toMatchObject({ frames: 5, verifiedOriginals: 5 })
+    expect(journal.trials).toHaveLength(1)
+    expect(journal.problems).toEqual([])
   })
 })
