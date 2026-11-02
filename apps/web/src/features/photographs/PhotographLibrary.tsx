@@ -130,9 +130,9 @@ function PhotographThumbnail({ image }: { image: SavedImage }) {
 
   return (
     <span className="photographs__thumbnail">
-      {failed
+      {failed || !image.fitImageUrl
         ? <span>Preview unavailable</span>
-        : <img src={image.fitImageUrl ?? image.imageUrl} alt="" loading="lazy" onError={() => setFailed(true)} />}
+        : <img src={image.fitImageUrl} alt="" loading="lazy" onError={() => setFailed(true)} />}
     </span>
   )
 }

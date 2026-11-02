@@ -158,7 +158,7 @@ const savedImage = captureImage.safeExtend({
   previewDownloadUrl: z.string(),
   previewRendering: z
     .discriminatedUnion('status', [
-      z.object({ status: z.literal('current'), version: z.literal('background-v1') }),
+      z.object({ status: z.literal('current'), version: z.literal('background-v2') }),
       z.object({ status: z.literal('legacy') }),
       z.object({ status: z.literal('unavailable') }),
     ])

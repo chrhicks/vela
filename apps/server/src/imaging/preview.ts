@@ -1,8 +1,12 @@
+import sharp from 'sharp'
 import { createDisplayStretch } from './display-stretch.js'
 import { encodePng } from './png.js'
 import { bayerPixel, type BayerPattern } from './bayer.js'
 import { setImmediate } from 'node:timers/promises'
 import { backgroundOffsets, linkedRange } from './background.js'
+
+// Retained-image renders must not keep full-size buffers in libvips' operation cache.
+sharp.cache(false)
 
 /** A display stretch at native dimensions; acquisition pixels remain unchanged. */
 export type ImageColor = { kind: 'mono' } | { kind: 'bayer'; pattern: BayerPattern }
@@ -44,6 +48,37 @@ export async function capturePreviews(
   if (factor <= 1) return { native, fit: undefined }
 
   return { native, fit: await fitPng(image, factor) }
+}
+
+export async function previewJpeg(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor,
+): Promise<Buffer> {
+  const image = await stretchImage(width, height, pixels, color)
+  const channels = color.kind === 'bayer' ? 3 : 1
+  const stride = width * channels
+  const data = Buffer.allocUnsafe(stride * height)
+
+  for (let y = 0; y < height; y++) {
+    image.data.copy(data, y * stride, y * (stride + 1) + 1, (y + 1) * (stride + 1))
+
+    if (y % 256 === 0) await yieldTo(undefined)
+  }
+
+  return sharp(data, { raw: { width, height, channels } })
+    .jpeg({ quality: 90, chromaSubsampling: '4:4:4' })
+    .toBuffer()
+}
+
+export async function retainedFit(
+  width: number,
+  height: number,
+  pixels: ArrayLike<number>,
+  color: ImageColor,
+) {
+  return fitPng(await stretchImage(width, height, pixels, color), fitFactor(width, height))
 }
 
 /** Native pixels averaged per fit pixel; a fit dimension of at most 1600 pixels. */

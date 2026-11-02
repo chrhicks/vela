@@ -25,7 +25,7 @@ type PreviewKind = 'fit' | 'native'
 
 function withRendering(image: SavedImage, rendering: Rendering): SavedImage {
   const base = `${artifactPath}/${encodeURIComponent(image.id)}`
-  const preview = rendering === 'current' ? `${base}/previews/background-v1` : base
+  const preview = rendering === 'current' ? `${base}/previews/background-v2` : base
 
   return {
     ...image,
@@ -33,7 +33,7 @@ function withRendering(image: SavedImage, rendering: Rendering): SavedImage {
     fitImageUrl: `${preview}/fit`,
     previewDownloadUrl: `${preview}/download-preview`,
     previewRendering: rendering === 'current'
-      ? { status: 'current', version: 'background-v1' }
+      ? { status: 'current', version: 'background-v2' }
       : { status: rendering },
   }
 }
@@ -191,7 +191,7 @@ export function createPhotographsScene(name: PhotographsScene) {
         return { status: 200, resource: 'photographs-fits' }
       }
 
-      const prefixes = publishedCurrent.has(image.id) ? [base, `${base}/previews/background-v1`] : [base]
+      const prefixes = publishedCurrent.has(image.id) ? [base, `${base}/previews/background-v2`] : [base]
 
       for (const prefix of prefixes) {
         const kind = pathname === `${prefix}/fit` ? 'fit'

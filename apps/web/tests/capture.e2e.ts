@@ -857,7 +857,7 @@ test('saved collection opens a retained image and original downloads without cam
     'href',
     saved.fitsUrl,
   )
-  await expect(page.getByRole('link', { name: /Download (?:display|original preview) PNG/ })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: /Download (?:display|original preview) JPEG/ })).toHaveAttribute(
     'href',
     saved.previewDownloadUrl,
   )

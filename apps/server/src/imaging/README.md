@@ -156,7 +156,7 @@ bitwise checksum reference checks PNG framing across multiple batches.
 
 ## Display-only background treatment
 
-`background.ts` owns renderer version `background-v1`, selected in the retained
+`background.ts` owns renderer version `background-v2`, selected in the retained
 image workshop. It estimates RGB background medians from the same dimmest quarter
 of an 8 × 8 spatial grid, subtracts each channel's excess over the lowest channel,
 and caps each offset at 10% of the existing linked display range. The original

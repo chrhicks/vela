@@ -56,10 +56,10 @@ export function registerSavedImages(
   )
 
   const resources = [
-    { suffix: 'preview', kind: 'native', type: 'image/png', download: false },
+    { suffix: 'preview', kind: 'native', type: 'image/jpeg', download: false },
     { suffix: 'fit', kind: 'fit', type: 'image/png', download: false },
     { suffix: 'fits', kind: 'fits', type: 'application/fits', download: true },
-    { suffix: 'download-preview', kind: 'native', type: 'image/png', download: true },
+    { suffix: 'download-preview', kind: 'native', type: 'image/jpeg', download: true },
   ] as const
 
   for (const resource of resources) {
@@ -70,7 +70,7 @@ export function registerSavedImages(
         async (request, reply) => {
           const { rigId, imageId } = request.params
 
-          if (versioned && request.params.version !== PREVIEW_VERSION)
+          if (versioned && ![PREVIEW_VERSION, 'background-v1'].includes(request.params.version ?? ''))
             return reply.code(404).send({ error: 'Unknown preview version' })
 
           if (!(await catalog.get(rigId))) return reply.code(404).send({ error: 'Rig not found' })
@@ -89,7 +89,7 @@ export function registerSavedImages(
 
             if (resource.download) {
               const stamp = metadata.capturedAt.replace(/[^0-9T]/g, '-')
-              const name = `capture-${stamp}-${encodeURIComponent(imageId)}.${resource.kind === 'fits' ? 'fits' : 'png'}`
+              const name = `capture-${stamp}-${encodeURIComponent(imageId)}.${resource.kind === 'fits' ? 'fits' : 'jpg'}`
               reply.header('content-disposition', `attachment; filename="${name}"`)
             }
 

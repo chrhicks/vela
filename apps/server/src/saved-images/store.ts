@@ -1,23 +1,24 @@
 import { z } from 'zod'
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CaptureImage, SavedImage } from '@vela/model/web'
 import { PREVIEW_VERSION } from '../imaging/background.js'
+import { previewJpeg } from '../imaging/preview.js'
+import { readRetainedFits } from '../imaging/read-retained-fits.js'
 import { frameTypes } from '../imaging/frame-type.js'
 import { createRetainedPreviews, currentPreview, markCurrentPreview } from './previews.js'
 import { syncDirectory, writeDurable } from './durable-files.js'
 
 export type SavedImageFiles = {
   fits: Buffer
-  native: Buffer
-  fit?: Buffer
+  fit: Buffer
   previewVersion?: typeof PREVIEW_VERSION
 }
 
 type FileKind = 'fits' | 'native' | 'fit'
 
-const filenames = { fits: 'original.fits', native: 'preview.png', fit: 'fit.png' }
+const filenames = { fits: 'original.fits', fit: 'fit.png' }
 
 export interface SavedImageStore {
   save(rigId: string, image: CaptureImage, files: SavedImageFiles): Promise<SavedImage>
@@ -31,7 +32,7 @@ export interface SavedImageStore {
   previewFile(rigId: string, imageId: string, kind: 'native' | 'fit'): Promise<Buffer | undefined>
 }
 
-function metadata(rigId: string, image: CaptureImage, files: SavedImageFiles): SavedImage {
+function metadata(rigId: string, image: CaptureImage): SavedImage {
   const url = `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(image.id)}`
   const { fitImageUrl: _fitImageUrl, ...original } = image
 
@@ -45,7 +46,7 @@ function metadata(rigId: string, image: CaptureImage, files: SavedImageFiles): S
     previewDownloadUrl: `${url}/download-preview`,
   }
 
-  return files.fit ? { ...saved, fitImageUrl: `${url}/fit` } : saved
+  return { ...saved, fitImageUrl: `${url}/fit` }
 }
 
 function newest(images: SavedImage[]) {
@@ -71,17 +72,16 @@ export function createMemorySavedImageStore(): SavedImageStore {
       const existing = rig.get(image.id)
 
       if (existing) return structuredClone(existing.image)
-      const original = metadata(rigId, image, files)
+      const original = metadata(rigId, image)
 
       const saved =
-        files.previewVersion === PREVIEW_VERSION ? currentPreview(original, !!files.fit) : original
+        files.previewVersion === PREVIEW_VERSION ? currentPreview(original, true) : original
 
       const copied: SavedImageFiles = {
         fits: Buffer.from(files.fits),
-        native: Buffer.from(files.native),
+        fit: Buffer.from(files.fit),
       }
 
-      if (files.fit) copied.fit = Buffer.from(files.fit)
       rig.set(image.id, { image: saved, files: copied })
 
       return structuredClone(saved)
@@ -109,7 +109,15 @@ export function createMemorySavedImageStore(): SavedImageStore {
     },
     fitsPath: () => undefined,
     async file(rigId, imageId, kind) {
-      const file = rigs.get(rigId)?.get(imageId)?.files[kind]
+      const files = rigs.get(rigId)?.get(imageId)?.files
+
+      if (kind === 'native' && files) {
+        const frame = await readRetainedFits(files.fits)
+
+        return previewJpeg(frame.width, frame.height, frame.pixels, frame.color)
+      }
+
+      const file = kind === 'native' ? undefined : files?.[kind]
 
       return file && Buffer.from(file)
     },
@@ -167,17 +175,16 @@ export async function openFileSavedImageStore(
     const temporary = await mkdtemp(join(directory, '.pending-'))
 
     try {
-      const saved = metadata(rigId, image, files)
+      const saved = metadata(rigId, image)
 
-      for (const kind of ['fits', 'native', 'fit'] as const) {
-        if (files[kind])
-          await writeDurable(join(temporary, filenames[kind]), files[kind]!, openFile)
+      for (const kind of ['fits', 'fit'] as const) {
+        await writeDurable(join(temporary, filenames[kind]), files[kind], openFile)
       }
 
       await writeDurable(join(temporary, 'metadata.json'), JSON.stringify(saved), openFile)
 
       if (files.previewVersion === PREVIEW_VERSION)
-        await markCurrentPreview(temporary, files.fits, !!files.fit, openFile)
+        await markCurrentPreview(temporary, files.fits, true, openFile)
       await syncDirectory(temporary)
 
       try {
@@ -233,14 +240,20 @@ export async function openFileSavedImageStore(
       return image && previews.refresh(directory, image)
     },
     async previewFile(rigId, imageId, kind) {
-      if (!(await get(rigId, imageId))) return undefined
+      const image = await get(rigId, imageId)
 
-      return previews.file(imagePath(rigId, imageId), kind)
+      if (!image) return undefined
+
+      return kind === 'native'
+        ? previews.jpeg(imagePath(rigId, imageId), image)
+        : previews.file(imagePath(rigId, imageId))
     },
     async file(rigId, imageId, kind) {
       const image = await readMetadata(imagePath(rigId, imageId), rigId, imageId)
 
       if (!image || (kind === 'fit' && !image.fitImageUrl)) return undefined
+
+      if (kind === 'native') return previews.jpeg(imagePath(rigId, imageId), image)
 
       return readFile(join(imagePath(rigId, imageId), filenames[kind]))
     },
@@ -286,15 +299,6 @@ async function readMetadata(
   }
 
   const image = parsed.data
-
-  for (const filename of [
-    filenames.fits,
-    filenames.native,
-    ...(image.fitImageUrl ? [filenames.fit] : []),
-  ]) {
-    if (!(await stat(join(directory, filename))).isFile())
-      throw new Error(`Missing saved image file ${filename}`)
-  }
 
   // Reconstruct URLs rather than trusting persisted URLs as navigation targets.
   const url = `/api/rigs/${encodeURIComponent(rigId)}/saved-images/${encodeURIComponent(image.id)}`

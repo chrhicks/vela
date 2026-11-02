@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, open, readFile, rename, rm, stat } from 'node:fs/promis
 import { join } from 'node:path'
 import type { SavedImage } from '@vela/model/web'
 import { PREVIEW_VERSION } from '../imaging/background.js'
-import { capturePreviews } from '../imaging/preview.js'
+import { retainedFit, previewJpeg } from '../imaging/preview.js'
 import { MAX_RETAINED_FITS_BYTES, readRetainedFits } from '../imaging/read-retained-fits.js'
 import { syncDirectory, writeDurable } from './durable-files.js'
 
@@ -32,7 +32,7 @@ export function currentPreview(image: SavedImage, fit: boolean): SavedImage {
   return fit ? { ...current, fitImageUrl: `${base}/fit` } : current
 }
 
-/** Called inside a new save's unpublished staging directory; first PNG already uses this renderer. */
+/** Published atomically with the new capture and its fitted PNG. */
 export async function markCurrentPreview(
   directory: string,
   fits: Buffer,
@@ -51,30 +51,36 @@ export async function markCurrentPreview(
 }
 
 async function descriptor(directory: string) {
-  const path = join(versionDirectory(directory), 'manifest.json')
+  for (const version of [PREVIEW_VERSION, 'background-v1']) {
+    const versionPath = join(directory, 'previews', version)
+    const path = join(versionPath, 'manifest.json')
 
-  const info = await stat(path).catch(error => {
-    if (error.code === 'ENOENT') return undefined
-    throw error
-  })
+    const info = await stat(path).catch(error => {
+      if (error.code === 'ENOENT') return undefined
+      throw error
+    })
 
-  if (!info) return undefined
+    if (!info) continue
 
-  if (!info.isFile() || info.size > 4096) throw new Error('Invalid saved-preview descriptor')
-  const value = descriptorSchema.parse(JSON.parse(await readFile(path, 'utf8')))
-  const source = value.source === 'original' ? directory : versionDirectory(directory)
+    if (!info.isFile() || info.size > 4096) throw new Error('Invalid saved-preview descriptor')
+    const value = descriptorSchema.parse(JSON.parse(await readFile(path, 'utf8')))
+    const source = value.source === 'original' ? directory : versionPath
 
-  for (const file of ['preview.png', ...(value.fit ? ['fit.png'] : [])]) {
-    const info = await stat(join(source, file))
+    if (value.fit) {
+      const fit = await stat(join(source, 'fit.png'))
 
-    if (!info.isFile() || info.size === 0) throw new Error('Incomplete saved-preview pair')
+      if (!fit.isFile() || fit.size === 0) throw new Error('Incomplete fitted preview')
+    }
+
+    return { ...value, directory: source }
   }
 
-  return { ...value, directory: source }
+  return undefined
 }
 
 export function createRetainedPreviews(openFile: typeof open) {
   const pending = new Map<string, Promise<SavedImage>>()
+  const renders = new Map<string, Promise<Buffer>>()
   // One original is decoded at a time. The queue retains only identities, not 26MP arrays.
   let queue = Promise.resolve()
 
@@ -109,19 +115,17 @@ export function createRetainedPreviews(openFile: typeof open) {
         (frame.color.kind === 'mono' ? 'mono' : 'color') !== image.color
       )
         throw new Error('FITS does not match saved capture dimensions or color')
-      const rendered = await capturePreviews(frame.width, frame.height, frame.pixels, frame.color)
+      const fit = await retainedFit(frame.width, frame.height, frame.pixels, frame.color)
       const parent = join(directory, 'previews')
       await mkdir(parent, { recursive: true })
       await syncDirectory(directory)
       const temporary = await mkdtemp(join(parent, '.pending-'))
 
       try {
-        await writeDurable(join(temporary, 'preview.png'), rendered.native, openFile)
-
-        if (rendered.fit) await writeDurable(join(temporary, 'fit.png'), rendered.fit, openFile)
+        await writeDurable(join(temporary, 'fit.png'), fit, openFile)
         await writeDurable(
           join(temporary, 'manifest.json'),
-          JSON.stringify({ source: 'derived', fit: !!rendered.fit, fitsSha256: sha256(fits) }),
+          JSON.stringify({ source: 'derived', fit: true, fitsSha256: sha256(fits) }),
           openFile,
         )
         await syncDirectory(temporary)
@@ -131,7 +135,7 @@ export function createRetainedPreviews(openFile: typeof open) {
         await rm(temporary, { recursive: true, force: true })
       }
 
-      return currentPreview(image, !!rendered.fit)
+      return currentPreview(image, true)
     } catch (error) {
       console.warn(`Saved preview refresh unavailable for ${image.id}`, error)
 
@@ -158,12 +162,37 @@ export function createRetainedPreviews(openFile: typeof open) {
 
       return operation
     },
-    async file(directory: string, kind: 'native' | 'fit') {
+    jpeg(directory: string, image: SavedImage) {
+      const existing = renders.get(directory)
+
+      if (existing) return existing
+
+      const operation = queue.then(async () => {
+        const path = join(directory, 'original.fits')
+        const info = await stat(path)
+
+        if (!info.isFile() || info.size > MAX_RETAINED_FITS_BYTES)
+          throw new Error('Original FITS exceeds preview limits')
+        const frame = await readRetainedFits(await readFile(path))
+
+        if (frame.width !== image.width || frame.height !== image.height ||
+          (frame.color.kind === 'mono' ? 'mono' : 'color') !== image.color)
+          throw new Error('FITS does not match saved capture dimensions or color')
+
+        return previewJpeg(frame.width, frame.height, frame.pixels, frame.color)
+      }).finally(() => renders.delete(directory))
+
+      queue = operation.then(() => undefined, () => undefined)
+      renders.set(directory, operation)
+
+      return operation
+    },
+    async file(directory: string) {
       const current = await descriptor(directory)
 
-      if (!current || (kind === 'fit' && !current.fit)) return undefined
+      if (!current?.fit) return undefined
 
-      return readFile(join(current.directory, kind === 'native' ? 'preview.png' : 'fit.png'))
+      return readFile(join(current.directory, 'fit.png'))
     },
   }
 }
