@@ -40,7 +40,7 @@ export interface ReplayRig {
     readonly frameRecords: string
     readonly savedImages: string
     readonly traces: string
-    readonly journal: string
+    readonly runLog: string
     readonly logs: string
   }
   /** Resolves with the name of the first service to end, which is a failure while the rig is running. */
@@ -78,7 +78,7 @@ export async function startReplayRig(options: ReplayRigOptions): Promise<ReplayR
     frameRecords: join(folder, 'vela', 'frame-records.jsonl'),
     savedImages: join(folder, 'vela', 'saved-images'),
     traces: join(folder, 'vela', 'traces.jsonl'),
-    journal: join(folder, 'vela', 'cria-journal.jsonl'),
+    runLog: join(folder, 'vela', 'run-log'),
     logs: join(folder, 'logs'),
   }
 
@@ -182,7 +182,7 @@ export async function startReplayRig(options: ReplayRigOptions): Promise<ReplayR
         VELA_SURVEY_CACHE_PATH: join(folder, 'vela', 'survey-cache'),
         VELA_TRACE_PATH: paths.traces,
         VELA_FRAME_RECORDS_PATH: paths.frameRecords,
-        VELA_CRIA_JOURNAL_PATH: paths.journal,
+        VELA_RUN_LOG_DIR: paths.runLog,
         VELA_ALERTS_CONFIG_PATH: join(folder, 'vela', 'alerts.json'),
       },
       cwd: folder,

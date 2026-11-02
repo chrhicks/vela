@@ -16,6 +16,8 @@
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "@vela/rig-events": "workspace:*",
+    "@vela/rig-testing": "workspace:*",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"
   }

@@ -17,6 +17,8 @@ The rig is the Cria rig id from `cria.json`, which must be lowercase letters, di
 
 Journals written before this change (`cria-journal*.jsonl` under `traces/`) stay where they are. `createJournalImporter` reads them. Nothing writes that format now.
 
+The offline tools (`tools/rig-session`, and `backfill` and `indi-parity` in `tools/rig-model`) take the run log directory or a file of either format. `createLogReader` in `@vela/rig-events` tells a run-log line from a journal line by the line, so there is no flag.
+
 ## Rotation and retention
 
 A file is closed when the next write would pass 256 MiB, and the next write opens a new part. At most 96 files stay in the directory, this run's included; older run files are deleted. Other files in the directory are never touched. The arithmetic is next to the constants in `apps/server/src/run-log/run-log.ts`:

@@ -3,6 +3,7 @@ import { createReadStream, existsSync } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { journalFiles } from './journal.ts'
 import { findLeaks, PrivacyCheckError } from './package.ts'
 import { Secrets } from './sanitize.ts'
 import { buildSession, type SessionRequest } from './session.ts'
@@ -10,7 +11,7 @@ import { buildSession, type SessionRequest } from './session.ts'
 export type AcceptRequest = Omit<SessionRequest, 'name' | 'root' | 'secrets'> & {
   /** Where the two throwaway builds go. */
   readonly scratch: string
-  /** Count an input that only grew (Vela's live journal) as a warning instead of a failure. */
+  /** Count an input that only grew (Vela's live run log) as a warning instead of a failure. */
   readonly allowGrowth?: boolean
 }
 
@@ -84,16 +85,17 @@ export function describe(error: Error): string {
   return `the build failed: ${error.name}${system.success ? ` ${system.data.code}` : ''}`
 }
 
-/** Every file the packager reads, by the input it belongs to. The recording's `blobs/` and the saved images are never opened. */
+/** Every file the packager reads, by the input it belongs to (a run-log directory is its files). The recording's `blobs/` and the saved images are never opened. */
 async function inputFiles(request: AcceptRequest): Promise<[string, string][]> {
   const single = [
     ['traces', request.tracesFile],
     ['mount-csv', request.mountCsvFile],
     ['frame-records', request.frameRecordsFile],
-    ['cria-journal', request.journalFile],
   ] as const
 
   const files: [string, string][] = single.flatMap(([input, path]) => (path === null ? [] : [[input, path] satisfies [string, string]]))
+
+  if (request.journalFile !== null && existsSync(request.journalFile)) files.push(...(await journalFiles(request.journalFile)).map((file): [string, string] => ['cria-journal', file]))
 
   if (request.recordingDir !== null) files.push(['indi-recording', join(request.recordingDir, 'manifest.json')], ['indi-recording', join(request.recordingDir, 'traffic.jsonl')])
 
