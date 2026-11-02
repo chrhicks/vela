@@ -215,6 +215,7 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
   /** Refuse an uncached request while the upstream is paused or has too many slow fetches; otherwise count it. */
   function admit() {
     const at = now()
+    const pausedBefore = upstream.pausedUntil
 
     if (at < upstream.pausedUntil)
       throw new SurveyUnavailableError('The survey host did not answer. Cached areas stay available; trying again soon.')
@@ -222,7 +223,9 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
     if ([...upstream.started.values()].filter(started => at - started >= SLOW_FETCH_MS).length >= MAX_SLOW_FETCHES)
       throw new SurveyUnavailableError('The survey host is slow. Try again in a moment.')
 
-    if (upstream.pausedUntil !== 0) {
+    const probe = upstream.pausedUntil !== 0
+
+    if (probe) {
       if (upstream.probing) throw new SurveyUnavailableError('Checking whether the survey host is back.')
       upstream.probing = true
     }
@@ -230,7 +233,7 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
     const id = ++upstream.lastId
     upstream.started.set(id, at)
 
-    return id
+    return { id, probe, pausedBefore }
   }
 
   async function load(url: string, contentType: SurveyImage['contentType']): Promise<SurveyImage> {
@@ -272,7 +275,7 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
 
     if (cached) return cached
 
-    const fetchId = admit()
+    const admitted = admit()
     const controller = new AbortController()
     let timedOut = false
 
@@ -320,17 +323,20 @@ export function createSurveyCache(options: SurveyCacheOptions = {}) {
       body = Buffer.concat(chunks)
       validateBody(body, contentType)
     } catch (error) {
-      upstream.pausedUntil = timedOut || !answered ? now() + PAUSE_MS : 0
+      if (timedOut || !answered) upstream.pausedUntil = now() + PAUSE_MS
+      else if (upstream.pausedUntil === admitted.pausedBefore) upstream.pausedUntil = 0
 
       throw error
     } finally {
       clearTimeout(timeout)
       controller.abort()
-      upstream.started.delete(fetchId)
-      upstream.probing = false
+      upstream.started.delete(admitted.id)
+
+      if (admitted.probe) upstream.probing = false
     }
 
-    upstream.pausedUntil = 0
+    // An answer from a request that began before the pause says nothing about the host now; only a probe lifts it.
+    if (upstream.pausedUntil === admitted.pausedBefore) upstream.pausedUntil = 0
 
     await onDisk(async () => {
       const header = JSON.stringify({ key, attribution: SURVEY_ATTRIBUTION }) + '\n'

@@ -257,6 +257,33 @@ describe('DSS2 survey upstream pause', () => {
     expect((await cache.get('Norder0/Dir0/Npix4.jpg')).body).toEqual(jpeg())
   })
 
+  it('keeps the pause when a request that began before it finishes afterwards', async () => {
+    let answerLate!: (response: Response) => void
+
+    const late = new Promise<Response>(resolve => {
+      answerLate = resolve
+    })
+
+
+    const fetch = vi.fn<typeof globalThis.fetch>((url, options) =>
+      String(url).includes('Npix2')
+        ? late
+        : new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+          }),
+    )
+
+    const cache = createSurveyCache({ directory: await directory(), fetch, now: () => 0, timeoutMs: 300 })
+    const early = cache.get('Norder0/Dir0/Npix2.jpg')
+    const stalled = expect(cache.get('Norder0/Dir0/Npix1.jpg')).rejects.toThrow('aborted')
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+    await stalled
+    answerLate(response())
+    await early
+    await expect(cache.get('Norder0/Dir0/Npix3.jpg')).rejects.toBeInstanceOf(SurveyUnavailableError)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('pauses after a failed connection but not after an HTTP error from a host that answered', async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
