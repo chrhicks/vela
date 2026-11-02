@@ -286,6 +286,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
             {view?.phase === 'failed' && !view.active && matching && (
               <p>Choose Check rig state, then Slew & check to try again.</p>
             )}
+            {view?.notice && !view.error && <p>{view.notice}</p>}
             {view?.mountControlReason && !view.active && !view.error && (
               <p>{view.mountControlReason === 'parked'
                 ? 'The mount is parked. Unpark it in Controls before framing.'

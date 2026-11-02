@@ -144,6 +144,7 @@ export function createFramingController(
     | 'preview'
     | 'error'
     | 'errorDetail'
+    | 'notice'
     | 'exposureSeconds'
     | 'pointingSide'
     | 'centering'
@@ -156,6 +157,7 @@ export function createFramingController(
     preview: null,
     error: null,
     errorDetail: null,
+    notice: null,
     exposureSeconds: 2,
     pointingSide: 'unknown',
     centering: null,
@@ -178,10 +180,18 @@ export function createFramingController(
     return mount
   }
 
+  /** Tracking off is a state Vela can fix, so it does, and the view says so. */
+  async function turnTrackingOn(hardware: FramingHardware, signal: AbortSignal) {
+    await hardware.tracking(true, signal)
+    signal.throwIfAborted()
+    state = { ...state, notice: 'Tracking was off. Vela turned it on.' }
+  }
+
   async function settledMount(hardware: FramingHardware, signal: AbortSignal) {
     state = { ...state, phase: 'settling' }
     let previous: FramingMount | undefined
     let stableReads = 0
+    let trackingRequested = false
 
     while (true) {
       signal.throwIfAborted()
@@ -192,10 +202,19 @@ export function createFramingController(
           'The mount is parked. Unpark it in Your Rig, then choose Check current frame.',
         )
 
-      if (!current.tracking)
-        throw new FramingCheckNeeded(
-          'Mount tracking is off. Turn tracking on in Your Rig, then choose Check current frame.',
-        )
+      if (!current.tracking && !current.slewing) {
+        if (trackingRequested)
+          throw new FramingCheckNeeded(
+            'Mount tracking is still off after Vela turned it on. Turn tracking on in Your Rig, then choose Check current frame.',
+          )
+
+        trackingRequested = true
+        await turnTrackingOn(hardware, signal)
+        previous = undefined
+        stableReads = 0
+        await waitForMountObservation(signal)
+        continue
+      }
 
       const stable =
         !current.slewing &&
@@ -427,7 +446,7 @@ export function createFramingController(
       mountSite(mount),
     )
 
-    if (!mount.tracking) await hardware.tracking(true, signal)
+    if (!mount.tracking) await turnTrackingOn(hardware, signal)
     signal.throwIfAborted()
     recordFraming('framing.move.requested', {
       'framing.correction': state.centering?.correction ?? 0,
@@ -513,6 +532,7 @@ export function createFramingController(
       phase: input.action === 'check' ? 'settling' : 'slewing',
       error: null,
       errorDetail: null,
+      notice: null,
       centering: null,
     }
 
