@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp } from '../../testing/temp-dir.mjs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { imageIdOf } from '@vela/rig-testing'

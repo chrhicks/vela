@@ -1,4 +1,5 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp } from '../../testing/temp-dir.mjs'
+import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DuckDBInstance } from '@duckdb/node-api'

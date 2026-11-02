@@ -1,5 +1,6 @@
+import { mkdtemp } from '../../../tools/testing/temp-dir.mjs'
 import { createHash } from 'node:crypto'
-import { appendFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { encodeEvent, epochMs, rigId, seal, sourceId, type AlignmentBody } from '@vela/rig-events'

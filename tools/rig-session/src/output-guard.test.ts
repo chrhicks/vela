@@ -1,5 +1,6 @@
+import { mkdtemp } from '../../testing/temp-dir.mjs'
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
