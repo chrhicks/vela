@@ -46,6 +46,7 @@ services:
       VELA_SURVEY_CACHE_PATH: /data/survey-cache
       VELA_TRACE_PATH: /data/traces/observing.jsonl
       VELA_RUN_LOG_DIR: /data/run-log
+      VELA_SHADOW_MODEL_STATE_DIR: /data/model
       VELA_NATS_URL: nats://nats:4222
       VELA_NATS_CREDENTIALS_FILE: /data/nats/credentials.json
       VELA_ALIGNMENT_DIAGNOSTICS_PATH: /data/alignment-diagnostics/trials
@@ -63,6 +64,12 @@ services:
         source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/astap
         target: /astap
         read_only: true
+      - type: bind
+        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/model
+        target: /data/model
+        read_only: true
+        bind:
+          create_host_path: false
 
   archiver:
     build:

@@ -1,3 +1,5 @@
+import type { RigModelView } from '@vela/model/web'
+import { shadowCheckpoint } from './rig-model/view.js'
 import type { Publisher } from './run-log/publisher.js'
 import { z } from 'zod'
 import { EquipmentError, type EquipmentConnector, type EquipmentInspector } from '@vela/equipment'
@@ -49,7 +51,8 @@ import type { RunLog } from './run-log/run-log.js'
 
 interface BuildAppOptions {
   readonly equipment?: EquipmentComposition
-  readonly models?: Pick<ModelHost, 'get'>
+  readonly models?: Pick<ModelHost, 'get'> & Partial<Pick<ModelHost, 'view'>>
+  readonly shadowStateDirectory?: string
   readonly publisher?: Pick<Publisher, 'health'>
   readonly runLog?: Pick<RunLog, 'health' | 'append'>
   readonly attestation?: Attestation
@@ -88,6 +91,7 @@ export function buildApp({
   runLog,
   publisher,
   models,
+  shadowStateDirectory,
   attestation = noAttestation,
   alpacaDiscovery = equipment.alpacaDiscovery,
   createConnector = equipment.createConnector,
@@ -189,6 +193,21 @@ export function buildApp({
     const assessment = models?.get(request.params.rigId)
 
     return assessment ?? reply.code(503).send({ error: 'rig-model-unavailable' })
+  })
+
+  const readShadow = shadowCheckpoint(shadowStateDirectory)
+
+  app.get<{ Params: { rigId: string } }>('/api/web/rigs/:rigId/model', async (request, reply) => {
+    const rigId = request.params.rigId
+
+    if (!await rigCatalog.get(rigId)) return reply.code(404).send({ error: 'rig-not-found' })
+    const checkedAt = now().getTime()
+    const local = models?.view?.(rigId) ?? null
+    const shadow = await readShadow(rigId, checkedAt)
+
+    if (!local && !shadow.snapshot) return reply.code(503).send({ error: 'rig-model-unavailable' })
+
+    return { rigId, checkedAt, local, shadow } satisfies RigModelView
   })
 
   app.get('/api/health', async () => ({ status: 'ok', runLog: runLog?.health() ?? { state: 'off' }, publisher: publisher?.health() ?? { state: 'off' } }))

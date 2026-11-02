@@ -5,6 +5,8 @@ import { createLogReader, epochMs, rigId, sourceId, type RigEvent, type RigId } 
 import { assess, createModel, defaultConfig, step, type Assessment, type RigModel } from '@vela/rig-model'
 import type { RunLog } from '../run-log/run-log.js'
 
+import { modelSnapshot } from './view.js'
+
 const modelSource = sourceId('vela:model')
 
 export function createModelHost(directory?: string, now = Date.now) {
@@ -81,6 +83,11 @@ export function createModelHost(directory?: string, now = Date.now) {
       const model = models.get(rigId(rig))
 
       return model ? structuredClone(assess(model)) : null
+    },
+    view(rig: string) {
+      const model = models.get(rigId(rig))
+
+      return state === 'ready' && model ? modelSnapshot(model) : null
     },
     onAppend(event: RigEvent) {
       if (state === 'restoring') pending.push(event)
