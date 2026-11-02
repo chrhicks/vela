@@ -64,6 +64,33 @@ services:
         target: /astap
         read_only: true
 
+  archiver:
+    build:
+      context: .
+      target: server
+    image: vela-server:local
+    user: "${VELA_UID:-1000}:${VELA_GID:-1000}"
+    restart: unless-stopped
+    command: ["node", "dist/run-log/archiver-main.js"]
+    healthcheck:
+      disable: true
+    environment:
+      VELA_NATS_URL: nats://nats:4222
+      VELA_NATS_CREDENTIALS_FILE: /credentials.json
+      VELA_ARCHIVE_DIR: /mnt/storage/rig/archive
+    volumes:
+      - type: bind
+        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/nats/credentials.json
+        target: /credentials.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${VELA_ARCHIVE_DIR:-/mnt/storage/rig/archive}
+        target: /mnt/storage/rig/archive
+        bind:
+          create_host_path: false
+
   web:
     build:
       context: .
