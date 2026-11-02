@@ -278,6 +278,7 @@ function TargetComposition({ rigId, targetId }: { rigId: string; targetId: strin
               </p>
             )}
             {view?.error && <p role="alert">{view.error}</p>}
+            {view?.notice && !view.error && <p>{view.notice}</p>}
             {view?.mountControlReason && !view.active && !view.error && (
               <p>{view.mountControlReason === 'parked'
                 ? 'The mount is parked. Unpark it in Controls before framing.'

@@ -187,11 +187,8 @@ export function registerTargets(
       reason = 'Plate solving is not configured. Configure the Vela server’s ASTAP executable and star catalog to check framing.'
     }
 
-    return {
+    const described: FramingView = {
       ...view,
-      ...(ready.mount.parked
-        ? { mountControlReason: 'parked' as const }
-        : !ready.mount.tracking ? { mountControlReason: 'tracking-off' as const } : {}),
       camera: ready.camera,
       enabled: !reason,
       unavailableReason: reason,
@@ -200,6 +197,10 @@ export function registerTargets(
         !reason && (controller?.checkCurrent(ready.mount, ready.configuration) ?? false),
       canCenter: !reason && (controller?.canCenter(ready.mount, ready.configuration) ?? false),
     }
+
+    if (ready.mount.parked) described.mountControlReason = 'parked'
+
+    return described
   }
 
   async function siteView(
