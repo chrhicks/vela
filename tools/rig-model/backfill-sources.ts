@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import {
   createIndiImporter,
-  createJournalImporter,
+  createLogReader,
   decodeManifest,
   decodeRecordingLine,
   epochMs,
@@ -16,6 +16,7 @@ import {
   type RigEvent,
 } from '@vela/rig-events'
 import type { Exposure } from './backfill-analysis.ts'
+import { logLines } from './log-lines.ts'
 
 export interface Window {
   readonly from: EpochMs
@@ -91,18 +92,19 @@ export async function* recordedMount(recordings: readonly Recording[], window: W
   }
 }
 
-/** The mount's snapshots rebuilt from Vela's journal files, given oldest first. A baseline line in the file seeds the cells, so the file is read from its start. */
-export async function* journaledMount(paths: readonly string[], window: Window): AsyncGenerator<RigEvent> {
-  const importer = createJournalImporter({ rig: rigId('backfill'), source: sourceId('import:vela-journal') })
+/**
+ * The mount's snapshots from Vela's Cria logs, given oldest first: run-log files or directories, and old journal
+ * files, which are rebuilt from their cells. A baseline line in a journal seeds the cells, so a file is read from its start.
+ */
+export async function* loggedMount(paths: readonly string[], window: Window): AsyncGenerator<RigEvent> {
+  const reader = createLogReader({ rig: rigId('backfill'), source: sourceId('import:vela-journal') })
 
-  for (const path of paths) {
-    for await (const line of createInterface({ input: createReadStream(path), crlfDelay: Infinity })) {
-      if (timeOf(line) >= window.to) break
+  for await (const line of logLines(paths)) {
+    if (timeOf(line) >= window.to) break
 
-      const result = importer.read(line)
+    const result = reader.read(line)
 
-      if (result.ok && result.event.kind === 'cria.state' && result.event.seenAt >= window.from) yield result.event
-    }
+    if (result.ok && result.event.kind === 'cria.state' && result.event.seenAt >= window.from && result.event.seenAt < window.to) yield result.event
   }
 }
 
