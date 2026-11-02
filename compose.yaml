@@ -9,6 +9,26 @@ x-config-dir: &config-dir ${VELA_CONFIG_DIR:-${XDG_CONFIG_HOME:-${HOME}/.config}
 x-data-dir: &data-dir ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}
 
 services:
+  nats:
+    image: nats:2.15.2-alpine@sha256:823e7f1d6d8ffe3b30dbd73d4a06bbb939acf94929f7fdf224404da7a05bafb5
+    user: "${VELA_UID:-1000}:${VELA_GID:-1000}"
+    restart: unless-stopped
+    command: ["--config", "/etc/nats/server.conf"]
+    ports:
+      - "127.0.0.1:4222:4222"
+    volumes:
+      - type: bind
+        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/nats/server.conf
+        target: /etc/nats/server.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/nats
+        target: /data
+        bind:
+          create_host_path: false
+
   server:
     build:
       context: .
