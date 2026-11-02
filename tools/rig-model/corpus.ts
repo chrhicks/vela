@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -6,7 +7,7 @@ import { promisify } from 'node:util'
 import { astapVersion, readFits } from '@vela/rig-astap'
 import { imageId } from '@vela/rig-events'
 import { pathsIn, scanFrameSources } from '@vela/rig-frames'
-import { caseResults, inventoryOf, type Solve } from './corpus-inventory.ts'
+import { caseResults, inventoryOf, specimens, type Solve } from './corpus-inventory.ts'
 import { reportOf } from './corpus-report.ts'
 import { inParallel, sha256File, solveCache, solveImage } from './backfill-solve.ts'
 
@@ -89,7 +90,11 @@ const lights = sources.savedImages.images.filter(image => image.frameType === 'l
 
 const kept = sources.trials.trials.flatMap(trial => trial.frames.filter(frame => frame.onDisk).map(frame => ({ frame, path: join(trial.directory, frame.filename) })))
 
-const paths = [...lights.map(image => image.fitsPath), ...kept.map(item => item.path)]
+const syntheticDirectory = join(outDirectory, 'synthetic')
+
+const synthetic = specimens.flatMap(specimen => (specimen.file !== null && existsSync(join(syntheticDirectory, specimen.file)) ? [join(syntheticDirectory, specimen.file)] : []))
+
+const paths = [...lights.map(image => image.fitsPath), ...kept.map(item => item.path), ...synthetic]
 
 const hashes = await inParallel(paths, 8, path => sha256File(path))
 
@@ -157,7 +162,7 @@ await inParallel(kept, jobs, async ({ frame, path }) => {
   solvedNow++
 })
 
-const entries = inventoryOf({ trials: sources.trials.trials, images: lights, digests, solves, stars, utcOffsetMinutes })
+const entries = inventoryOf({ trials: sources.trials.trials, images: lights, digests, solves, stars, utcOffsetMinutes, synthetic: syntheticDirectory })
 
 async function replace(path: string, content: string) {
   await mkdir(dirname(path), { recursive: true })
@@ -171,4 +176,4 @@ await replace(given.get('report') ?? join(outDirectory, 'report.md'), reportOf(e
 
 console.log(`${entries.length} entries; ${solvedNow} frames solved now, the rest read from the cache`)
 
-for (const result of caseResults(entries)) console.log(`${result.id}  ${result.status}  ${result.entries} entries, ${result.withPixels} with pixels`)
+for (const result of caseResults(entries)) console.log(`${result.id}  ${result.status}  ${result.entries} entries, ${result.withPixels} with pixels, ${result.lacking} lacking`)

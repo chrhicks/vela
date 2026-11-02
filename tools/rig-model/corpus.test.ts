@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { epochMs, type SolveBody } from '@vela/rig-events'
 import type { SavedImage, Trial, TrialFrame } from '@vela/rig-frames'
 import { imageIdOf } from '@vela/rig-testing'
-import { caseResults, fewStars, inventoryOf, type Facts, type Solve } from './corpus-inventory.ts'
+import { caseResults, cases, fewStars, inventoryOf, noFrame, type Facts, type Solve } from './corpus-inventory.ts'
 import { reportOf } from './corpus-report.ts'
 
 const at = Date.UTC(2026, 9, 20, 3, 0, 0)
@@ -51,7 +51,7 @@ const imageOf = (index: number): SavedImage => ({
 
 const solved = (scale: number): Solve => ({ status: 'solved', solverVersion: 'astap-test', solveMs: 10, hint: null, centre: { raDegrees: 10, decDegrees: 40 }, wcs: wcsWith(scale) }) satisfies Omit<Extract<SolveBody, { status: 'solved' }>, 'imageId'>
 
-const facts = (overrides: Partial<Facts>): Facts => ({ trials: [], images: [], digests: new Map(), solves: new Map(), stars: new Map(), utcOffsetMinutes: 0, ...overrides })
+const facts = (overrides: Partial<Facts>): Facts => ({ trials: [], images: [], digests: new Map(), solves: new Map(), stars: new Map(), utcOffsetMinutes: 0, synthetic: '/synthetic', ...overrides })
 
 const caseOf = (results: ReturnType<typeof caseResults>, id: string) => results.find(result => result.id === id)
 
@@ -73,7 +73,7 @@ describe('solve corpus', () => {
     const optionRun = trialOf('0ded133c-0000-4000-8000-000000000000', [frameOf(2, { onDisk: true, phase: 'baseline', position: 2 })])
     const digests = new Map([...false29.frames, ...optionRun.frames].map(frame => [`${frame === optionRun.frames[0] ? optionRun.directory : false29.directory}/${frame.filename}`, frame.sha256]))
     const entries = inventoryOf(facts({ trials: [false29, optionRun], digests, stars: new Map([['sha-1', 29], ['sha-0', fewStars + 1], ['sha-2', fewStars]]) }))
-    const tagged = (id: string) => entries.filter(entry => entry.cases.includes(id)).map(entry => entry.id)
+    const tagged = (id: string) => entries.filter(entry => entry.source === 'alignment-trial' && entry.cases.includes(id)).map(entry => entry.id)
 
     expect(tagged('PS-001')).toEqual(['trial:eeef34da:1'])
     expect(tagged('PS-003')).toEqual(['trial:eeef34da:1'])
@@ -87,6 +87,23 @@ describe('solve corpus', () => {
 
     expect(caseOf(results, 'PS-006')).toMatchObject({ entries: 1, withPixels: 0, status: 'missing' })
     expect(caseOf(results, 'PS-001')).toMatchObject({ entries: 0, status: 'missing' })
+  })
+
+  it('keeps the audit\'s dim synthetic frame when its file is there, and reports a case served by kept and unkept frames as partial', () => {
+    const real = trialOf('cccccccc-0000-4000-8000-000000000000', [frameOf(0, { onDisk: true })])
+    const entries = inventoryOf(facts({ trials: [real], digests: new Map([['/trials/cccccccc-0000-4000-8000-000000000000/adjusting-0.fits', 'sha-0'], ['/synthetic/dim-s30-14-stars.fits', 'dim-sha']]), stars: new Map([['sha-0', 40]]) }))
+
+    expect(entries.find(entry => entry.id === 'audit:PS-008-dim-s30-14-stars')?.pixels).toEqual({ kind: 'file', path: '/synthetic/dim-s30-14-stars.fits', sha256: 'dim-sha' })
+    expect(entries.find(entry => entry.id === 'audit:PS-008-n85-16-stars')?.pixels).toEqual({ kind: 'missing', reason: 'synthetic-not-kept' })
+    expect(caseOf(caseResults(entries), 'PS-008')).toMatchObject({ entries: 3, withPixels: 2, lacking: 1, status: 'partial' })
+  })
+
+  it('accounts for every case the audit lists: a case with entries, or a reason it has no frame', () => {
+    const accounted = new Set([...cases.map(item => item.id), ...Object.keys(noFrame)])
+    const audited = Array.from({ length: 38 }, (_, index) => `PS-${String(index + 1).padStart(3, '0')}`)
+
+    expect(audited.filter(id => !accounted.has(id))).toEqual([])
+    expect(cases.filter(item => Object.keys(noFrame).includes(item.id))).toEqual([])
   })
 
   it('finds a scale case from a recorded solve even when no pixels were kept', () => {

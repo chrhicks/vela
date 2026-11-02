@@ -1,4 +1,4 @@
-import { caseResults, measuredOf, median, type CorpusEntry } from './corpus-inventory.ts'
+import { caseResults, measuredOf, median, noFrame, type CorpusEntry } from './corpus-inventory.ts'
 
 const tally = (values: readonly string[]) => {
   const counts = new Map<string, number>()
@@ -54,13 +54,17 @@ export function reportOf(entries: readonly CorpusEntry[], options: { readonly so
     '## Audit cases',
     '',
     table(
-      ['Case', 'What it is', 'Entries', 'With pixels', 'Status'],
-      results.map(result => [result.id, result.title, result.entries, result.withPixels, `**${result.status}**`]),
+      ['Case', 'What it is', 'Entries', 'With pixels', 'Lacking', 'Status'],
+      results.map(result => [result.id, result.title, result.entries, result.withPixels, result.lacking, `**${result.status}**`]),
     ),
+    '',
+    'Cases with no frame to keep:',
+    '',
+    ...Object.entries(noFrame).map(([id, reason]) => `- ${id}: ${reason}`),
     '',
     '## Frames the corpus could not keep',
     '',
-    ...entries.flatMap(entry => (entry.note === null ? [] : [`- \`${entry.id}\` (${entry.cases.join(', ')}): ${entry.note}`])),
+    ...entries.flatMap(entry => (entry.note === null ? [] : [`- \`${entry.id}\` (${entry.cases.join(', ')}, ${entry.pixels.kind === 'file' ? 'kept' : 'not kept'}): ${entry.note}`])),
     '',
     '## Plate scale and mirrored frames',
     '',
