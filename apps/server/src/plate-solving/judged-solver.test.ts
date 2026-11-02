@@ -22,12 +22,12 @@ it('returns the position and plate of an accepted solve, stamped with the frame 
 it.each(['framing', 'alignment'] as const)('does not use the audit\'s false solve for %s', async purpose => {
   const result = await solve(falseSolve(claimed, frame), purpose)
 
-  expect(result).toEqual({ status: 'no-solution', reasons: ['scale', 'parity', 'off-hint'], offHintDegrees: expect.closeTo(100.9, 3) })
+  expect(result).toMatchObject({ status: 'no-solution', reasons: ['scale', 'parity', 'off-hint'], offHintDegrees: expect.closeTo(100.9, 3) })
 })
 
 it('turns ASTAP finding nothing into a reason, not an error', async () => {
-  await expect(solve({ status: 'no-solution', reason: 'too-few-stars', radiusDegrees: 10 })).resolves.toEqual({ status: 'no-solution', reasons: ['few-stars'] })
-  await expect(solve({ status: 'no-solution', reason: 'no-match', radiusDegrees: 180 })).resolves.toEqual({ status: 'no-solution', reasons: ['no-match'] })
+  await expect(solve({ status: 'no-solution', reason: 'too-few-stars', radiusDegrees: 10 })).resolves.toEqual({ status: 'no-solution', reasons: ['few-stars'], measured: null })
+  await expect(solve({ status: 'no-solution', reason: 'no-match', radiusDegrees: 180 })).resolves.toEqual({ status: 'no-solution', reasons: ['no-match'], measured: null })
 })
 
 it('says in words why a solve was rejected, and how far off the field was', async () => {
@@ -35,5 +35,5 @@ it('says in words why a solve was rejected, and how far off the field was', asyn
 
   if (rejected.status !== 'no-solution') throw new Error('Expected a rejection')
   expect(describeRejection(rejected)).toBe('the plate scale does not match the optics; the image is mirrored; the field is 100.9 degrees from where the mount points')
-  expect(describeRejection({ status: 'no-solution', reasons: ['few-stars'] })).toBe('too few stars')
+  expect(describeRejection({ status: 'no-solution', reasons: ['few-stars'], measured: null })).toBe('too few stars')
 })

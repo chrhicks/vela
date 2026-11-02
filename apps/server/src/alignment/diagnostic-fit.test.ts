@@ -58,7 +58,7 @@ function sweep(slipDegrees: number) {
   })
 }
 
-async function recordSweep(slipDegrees: number, drop: number) {
+async function recordSweep(slipDegrees: number, drop: number, rejectedAdjustment = false) {
   const root = await mkdtemp(join(tmpdir(), 'vela-diagnostic-fit-test-'))
   roots.push(root)
   const onError = vi.fn()
@@ -121,6 +121,14 @@ async function recordSweep(slipDegrees: number, drop: number) {
   const baseline = fit.verdict.status === 'rigid' ? baselineFromAxis(fit.axis, last, fixture.site.latitudeDegrees) : undefined
 
   if (baseline) await run.recordMeasurement(last, measureAlignment(baseline, last, true))
+
+  if (rejectedAdjustment) {
+    const frame = { width: 2, height: 2, pixels: new Float64Array([1, 2, 3, 4]), capturedAt: last.capturedAt, color: { kind: 'mono' as const } }
+
+    await run.recordRejected(frame, 6, { status: 'no-solution', reasons: ['no-match'] }, { raDegrees: last.raDegrees, decDegrees: last.decDegrees })
+    await run.recordRejected(frame, 6, { status: 'no-solution', reasons: ['no-match'] }, { raDegrees: last.raDegrees, decDegrees: last.decDegrees })
+  }
+
   await run.finish(baseline ? { phase: 'finished', error: null } : { phase: 'failed', error: 'not rigid' })
   expect(onError).not.toHaveBeenCalled()
 
@@ -189,4 +197,11 @@ describe('a run log of five fixes and one dropped position', () => {
     await expect(replayAlignmentDiagnostics(directory, runLog)).rejects.toThrow('disagrees')
   })
 
+})
+
+it('replays repeated rejected adjustments after the baseline fit', async () => {
+  const { directory, runLog } = await recordSweep(0, 4, true)
+  const report = await replayAlignmentDiagnostics(directory, runLog)
+  expect(report.dropped.map(drop => drop.position)).toEqual([4, 6, 6])
+  expect((await readTrials(join(directory, '..'), runLog)).problems).toEqual([])
 })

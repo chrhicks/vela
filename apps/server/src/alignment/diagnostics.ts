@@ -10,6 +10,7 @@ import type {
 import { decodeEvent, epochMs, rigId, seal, type Envelope } from '@vela/rig-events'
 import type { RunLog } from '../run-log/run-log.js'
 import type { PolarFit, Site } from '@vela/rig-sky'
+import type { RejectedSolve } from '../plate-solving/rejected.js'
 import { encodeCaptureFits } from '../imaging/fits.js'
 import type { SkyPosition, SolveResult } from '../plate-solving/judged-solver.js'
 import type { AlignmentMeasurement, AlignmentSample } from './geometry.js'
@@ -48,6 +49,7 @@ export type AlignmentFrameEvidence = {
 
 export interface AlignmentDiagnosticRun {
   recordFrame(frame: Frame, evidence: AlignmentFrameEvidence): Promise<void>
+  recordRejected(frame: Frame, position: number, verdict: RejectedSolve, claimed: SkyPosition): Promise<void>
   /** The polar axis fit over the good fixes of a sweep; `fixes` are their positions and samples. */
   recordFit(
     fixes: readonly { position: number; sample: AlignmentSample }[],
@@ -117,6 +119,24 @@ export function createAlignmentDiagnostics(
       append({ ...run, type: 'run', ...part(), folder: basename(directory) })
 
       return {
+        recordRejected: (frame, position, verdict, claimed) =>
+          record(async () => {
+            let original = null
+
+            try {
+              const fits = await encodeCaptureFits(frame, run)
+              const filename = `rejected-${randomUUID()}.fits`
+              await writeFile(join(directory, filename), fits, { flag: 'wx' })
+              original = { filename, sha256: createHash('sha256').update(fits).digest('hex') }
+            } catch (error) {
+              report(error instanceof Error ? error : new Error('Rejected pixels missing'))
+            }
+
+            append({ type: 'dropped', ...part(), position,
+              reason: verdict.reasons.includes('no-match') ? 'no-solve' : 'rejected',
+              detail: JSON.stringify({ ...verdict, claimed, original, pixels: original ? 'kept' : 'missing' }),
+            })
+          }),
         recordFrame: (frame, evidence) =>
           record(async () => {
             // Bound allocation before scanning pixels, using the larger signed-32

@@ -593,6 +593,7 @@ it.each([
 
 function recording(): AlignmentDiagnosticRun {
   return {
+    recordRejected: vi.fn(async () => {}),
     recordFrame: vi.fn(async () => {}),
     recordFit: vi.fn(async () => {}),
     recordDropped: vi.fn(async () => {}),

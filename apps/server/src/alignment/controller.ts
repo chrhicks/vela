@@ -468,6 +468,8 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       if (!(error instanceof CaptureRetryableError)) throw error
       signal.throwIfAborted()
 
+      await diagnostics?.recordDropped(view.position, 'capture-failed', error.message)
+
       return { dropped: { reason: 'capture-failed', detail: error.message } satisfies Dropped }
     }
 
@@ -530,6 +532,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       }
 
       if (solved.status === 'no-solution') {
+        await diagnostics?.recordRejected(frame, view.position, solved, hint)
         timing.published('no-solution', frameRecord)
 
         return {
@@ -759,8 +762,6 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
       const attempt = await acquire(solver, signal, false)
 
       if (attempt.dropped) {
-        const { reason, detail } = attempt.dropped
-        await diagnostics?.recordDropped(position, reason, detail)
         signal.throwIfAborted()
         dropped.push({ position, detail: describeDropped(attempt.dropped) })
         patch({

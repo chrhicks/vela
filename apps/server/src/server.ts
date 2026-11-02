@@ -1,3 +1,4 @@
+import { createRejectedStore, createFramingRejections } from './plate-solving/rejected.js'
 import { buildApp } from './app.js'
 import { openFileRigCatalog } from './rig/catalog.js'
 import { resolveRigCatalogPath } from './rig/catalog-path.js'
@@ -138,7 +139,15 @@ try {
   })
 
   if (!shutdownTask) {
-    const options = { rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns, targets, surveyCache, equipment, alerts, attestation, ...(runLog && { runLog }) }
+    const recordRejected = runLog && createFramingRejections(
+      createRejectedStore(resolve(dirname(rigCatalogPath), 'rejected')), runLog,
+    )
+
+    const options = { rigCatalog, savedImages, frameRecords, autofocusRecords, captureRuns,
+      targets: { ...targets, ...(recordRejected && { recordRejected }) },
+      surveyCache, equipment, alerts, attestation, ...(runLog && { runLog }),
+    }
+
     app = buildApp(alignment ? { ...options, alignment } : options)
     await app.listen({ port, host })
     void attestation.check()

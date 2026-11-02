@@ -7,6 +7,7 @@ import {
   type PlateWcs,
   type Purpose,
   type Reason,
+  type Measured,
 } from '@vela/rig-astap'
 import type { SkyPosition } from '@vela/rig-events'
 import type { ImageColor } from '../imaging/preview.js'
@@ -27,7 +28,7 @@ export interface MonoFrame {
  * how far the rejected solution lay from where the mount claims to point.
  */
 export type SolveResult =
-  | { status: 'no-solution'; reasons: readonly Reason[]; offHintDegrees?: number }
+  | { status: 'no-solution'; reasons: readonly Reason[]; measured?: Measured | null; offHintDegrees?: number }
   | ({ status: 'solved'; capturedAt: string; wcs: PlateWcs } & SkyPosition)
 
 export interface PlateSolver {
@@ -98,7 +99,7 @@ export function judgedSolver(astap: AstapSolver, fieldHeightDegrees: number, pur
             if (verdict.status === 'rejected') {
               span.setAttribute('astap.rejected.reasons', verdict.reasons.join(','))
 
-              const rejected: SolveResult = { status: 'no-solution', reasons: verdict.reasons }
+              const rejected: SolveResult = { status: 'no-solution', reasons: verdict.reasons, measured: verdict.measured }
               const offHintDegrees = verdict.measured?.hintOffsetDegrees
 
               if (verdict.reasons.includes('off-hint') && offHintDegrees != null) rejected.offHintDegrees = offHintDegrees

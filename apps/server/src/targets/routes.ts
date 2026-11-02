@@ -1,3 +1,4 @@
+import type { createFramingRejections } from '../plate-solving/rejected.js'
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import type { Acquisition, Framing } from '@vela/equipment'
@@ -24,6 +25,7 @@ import { haltBodyError, registerHaltRoutes } from '../http/halt-body.js'
 import type { FrameImaging } from '../imaging/frame-imaging.js'
 
 export interface TargetOptions {
+  recordRejected?: ReturnType<typeof createFramingRejections>
   solver?: { executable: string; catalogPath: string }
   createAdapter: (rig: RigCatalogRecord) => Framing
   createAcquisition: (rig: RigCatalogRecord) => Acquisition
@@ -136,7 +138,7 @@ export function registerTargets(
       telescopeId,
     ])
 
-    return { mount, site, camera: cameraView, expectedCameraName: cameraName, configuration, telescopeId }
+    return { mount, site, camera: cameraView, expectedCameraName: cameraName, configuration, telescopeId, geometry }
   }
 
   async function framingView(rig: RigCatalogRecord): Promise<FramingView> {
@@ -424,7 +426,7 @@ export function registerTargets(
         let controller = controllers.get(rigId)
 
         if (!controller) {
-          controller = createFramingController(now, options.waitForMountObservation, options.images)
+          controller = createFramingController(now, options.waitForMountObservation, options.images, options.recordRejected)
           controllers.set(rigId, controller)
         }
 
@@ -477,6 +479,12 @@ export function registerTargets(
             rigId,
             cameraName: ready.camera.name,
             requestId: request.id,
+            settings: {
+              ...(rig.focalLengthMm && { focalLengthMm: rig.focalLengthMm }),
+              binX: ready.geometry.binX, binY: ready.geometry.binY,
+              pixelWidthMicrons: ready.geometry.pixelWidthMicrons * ready.geometry.binX,
+              pixelHeightMicrons: ready.geometry.pixelHeightMicrons * ready.geometry.binY,
+            },
           },
           hardware,
           solver,

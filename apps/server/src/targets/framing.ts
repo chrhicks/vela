@@ -1,3 +1,5 @@
+import type { createFramingRejections } from '../plate-solving/rejected.js'
+import type { FrameSettings } from '../imaging/fits.js'
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { trace, SpanStatusCode, type Attributes } from '@opentelemetry/api'
@@ -70,6 +72,8 @@ interface FramingExposureContext {
   exposureSeconds: number
   rigId: string
   cameraName: string
+  requestId?: string
+  settings?: FrameSettings
 }
 
 interface FramingCheck {
@@ -119,6 +123,7 @@ export function createFramingController(
   waitForMountObservation: (signal: AbortSignal) => Promise<void> = signal =>
     delay(1000, undefined, { signal }),
   images: Pick<FrameImaging, 'render' | 'analyze'> = frameImaging,
+  recordRejected?: ReturnType<typeof createFramingRejections>,
 ) {
   let state: Pick<
     FramingView,
@@ -314,10 +319,18 @@ export function createFramingController(
         signal,
       )
 
-      if (solved.status !== 'solved')
+      if (solved.status !== 'solved') {
+        await recordRejected?.({
+          frame, verdict: solved, claimed: fixedPointing(landed), rigId: input.rigId, requestId: input.requestId ?? preview.id,
+          metadata: { exposureSeconds: input.exposureSeconds, cameraName: input.cameraName, settings: { ...input.settings,
+            ...(landed.pierSide !== 'unknown' && landed.pierSide && { pierSide: landed.pierSide }),
+            ...((landed.coordinateSystem === 'j2000' || landed.coordinateSystem === 'topocentric') && { mount: { ...landed, coordinateSystem: landed.coordinateSystem, site: mountSite(landed) } }),
+          } },
+        })
         throw new FramingCheckNeeded(
           `This exposure could not be solved (${describeRejection(solved)}). Adjust the test exposure if needed, then choose Check current frame. Your composition is kept.`,
         )
+      }
 
       const actual = {
         checkId: randomUUID(),
@@ -458,6 +471,7 @@ export function createFramingController(
       rigId: string
       cameraName: string
       requestId?: string
+      settings?: FrameSettings
     },
     hardware: FramingHardware,
     solver: PlateSolver,
