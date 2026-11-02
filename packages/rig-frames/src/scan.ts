@@ -1,3 +1,4 @@
+import { access } from 'node:fs/promises'
 import { join } from 'node:path'
 import { readFrameRecords, type FrameRecords } from './frame-records.ts'
 import { joinFrames, type FrameJoin } from './join.ts'
@@ -6,18 +7,30 @@ import { nightOf } from './night.ts'
 import { readSavedImages, type SavedImages } from './saved-images.ts'
 import { readTrials, type Trial, type Trials } from './trials.ts'
 
-/** Vela's data folder (`VELA_DATA_DIR`) and the three places in it that hold frames. */
+/** Vela's data folder (`VELA_DATA_DIR`) and the places in it that hold frames. */
 export interface FrameSourcePaths {
   readonly savedImages: string
+  /** The `frames.jsonl` Vela wrote until plan step 13a. */
   readonly frameRecords: string
+  /** The run log directory (`VELA_RUN_LOG_DIR`), which holds `frame` events since then. */
+  readonly runLog: string
   readonly trials: string
 }
 
-export const pathsIn = (dataDirectory: string): FrameSourcePaths => ({
+export const pathsIn = (dataDirectory: string, runLog = join(dataDirectory, 'run-log')): FrameSourcePaths => ({
   savedImages: join(dataDirectory, 'saved-images'),
   frameRecords: join(dataDirectory, 'traces/frames.jsonl'),
+  runLog,
   trials: join(dataDirectory, 'alignment-diagnostics/trials'),
 })
+
+/** A data folder holds one of the two frame record sources or both, so a missing one is not a problem unless both are. */
+async function frameRecordPaths(paths: FrameSourcePaths): Promise<readonly string[]> {
+  const present = await Promise.all([paths.frameRecords, paths.runLog].map(path => access(path).then(() => [path], () => [])))
+  const found = present.flat()
+
+  return found.length > 0 ? found : [paths.frameRecords]
+}
 
 export interface FrameSources {
   readonly savedImages: SavedImages
@@ -29,7 +42,7 @@ export interface FrameSources {
 
 /** Reads every frame source once. Read-only: it opens nothing for writing. */
 export async function scanFrameSources(paths: FrameSourcePaths): Promise<FrameSources> {
-  const [savedImages, frameRecords, trials] = await Promise.all([readSavedImages(paths.savedImages), readFrameRecords(paths.frameRecords), readTrials(paths.trials)])
+  const [savedImages, frameRecords, trials] = await Promise.all([readSavedImages(paths.savedImages), frameRecordPaths(paths).then(readFrameRecords), readTrials(paths.trials)])
 
   return {
     savedImages,

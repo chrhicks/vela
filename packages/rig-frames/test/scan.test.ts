@@ -1,7 +1,9 @@
+import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { decodeLine, encodeEvent, rigId, seal, sourceId } from '@vela/rig-events'
-import { frameDraft, nightRows, pathsIn, scanFrameSources } from '@vela/rig-frames'
-import { dataDirectory, recordLine, writeImage, writeRecords, writeTrial } from './support.ts'
+import { frameDraft, nightRows, pathsIn, readFrameRecords, scanFrameSources } from '@vela/rig-frames'
+import { dataDirectory, recordLine, rigName, writeImage, writeRecords, writeTrial } from './support.ts'
 
 async function night() {
   const dir = await dataDirectory()
@@ -44,6 +46,25 @@ describe('scanFrameSources', () => {
       ['2026-10-26', 2, 2, 0, 0, 1],
       ['2026-10-27', 2, 1, 0, 1, 0],
     ])
+  })
+})
+
+describe('scanFrameSources with only a run log', () => {
+  it('reads the frame events and reports no missing frames.jsonl', async () => {
+    const dir = await dataDirectory()
+    const spec = { index: 2, capturedAt: '2026-10-26T23:50:00.000Z' }
+
+    await writeImage(dir, spec)
+    const [record] = (await readFrameRecords([await writeRecords(dir, [recordLine(spec)])])).records
+    await rm(join(dir, 'traces'), { recursive: true })
+    await mkdir(join(dir, 'run-log'))
+
+    await writeFile(join(dir, 'run-log', 'run-20261026T200000000Z-00001.jsonl'), `${encodeEvent(seal(frameDraft(record!, undefined, rigId(rigName), sourceId('vela:capture'))))}\n`)
+
+    const sources = await scanFrameSources(pathsIn(dir))
+
+    expect(sources.problems.filter(problem => problem.path.includes('frames.jsonl'))).toEqual([])
+    expect(sources.join.joined.map(joined => joined.image.id)).toEqual([record?.image?.id])
   })
 })
 

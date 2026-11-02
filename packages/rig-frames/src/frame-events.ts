@@ -27,6 +27,8 @@ export function frameDraft(record: FrameRecord, image: SavedImage | undefined, r
       frameType: record.frameType,
       subject: record.subject,
       outcome: record.outcome,
+      message: record.message,
+      provenance: record.provenance,
       image:
         named === null
           ? null

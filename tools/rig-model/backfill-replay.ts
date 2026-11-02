@@ -27,6 +27,8 @@ function recordOf(image: SavedImage): FrameRecord {
     frameType: image.frameType,
     subject: null,
     outcome: 'saved',
+    message: null,
+    provenance: null,
     image: { id: image.id, capturedAt: image.capturedAt, capturedAtSource: image.capturedAtSource ?? 'server-estimate', receivedAt: image.receivedAt, width: image.width, height: image.height },
     statistics: null,
   }

@@ -39,7 +39,7 @@ const utcOffsetMinutes = Number(given.get('utc-offset-minutes') ?? '0')
 
 const auditUntil = given.get('audit-until') ?? '9999-12-31T00:00:00Z'
 
-const sources = await scanFrameSources(pathsIn(given.get('data') ?? process.env.VELA_DATA_DIR ?? share))
+const sources = await scanFrameSources(pathsIn(given.get('data') ?? process.env.VELA_DATA_DIR ?? share, process.env.VELA_RUN_LOG_DIR))
 
 if (sources.problems.length > 0) {
   console.error(`failed: ${sources.problems.length} frame sources could not be read, the first ${sources.problems[0]?.reason}`)
