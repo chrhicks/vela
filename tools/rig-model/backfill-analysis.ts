@@ -218,7 +218,7 @@ export type Outcome = { readonly code: 0 | 1 | 3; readonly word: 'complete' | 'f
 
 /**
  * The tool's one answer. *failed* is a night that contradicts what was asked of it: the event night shows no
- * corroborated change or cannot be tested, or the control night shows a change or cannot be tested. *incomplete* is a change that is found but not as narrow as the pixels could make it.
+ * drift beyond its alignment (with a later alignment reading as large as it needs) or cannot be tested, or the control night shows a change or cannot be tested. *incomplete* is a change that is found but not as narrow as the pixels could make it.
  * Failing outranks incomplete, and neither is *complete*.
  */
 export function outcomeOf(nights: readonly { readonly night: string; readonly finding: Finding }[], expected: { readonly event: string | undefined; readonly control: string | undefined }): Outcome {
@@ -236,7 +236,7 @@ export function outcomeOf(nights: readonly { readonly night: string; readonly fi
   for (const checked of [event, control]) if (checked?.finding.kind === 'no-alignment') failed.push(`the night ${checked.night} has no alignment reading to test against`)
 
   if (event !== undefined && event.finding.kind !== 'no-alignment' && !(event.finding.kind === 'shift' && event.finding.shift.corroboration !== undefined))
-    failed.push(`the event night ${event.night} shows no corroborated change of the polar axis`)
+    failed.push(`the event night ${event.night} shows no drift beyond its alignment that a later alignment reading supports`)
 
   if (control !== undefined && control.finding.kind === 'shift') failed.push(`the control night ${control.night} shows a drift beyond its alignment`)
 
