@@ -1,5 +1,6 @@
 import { assess, createModel, defaultConfig } from '@vela/rig-model'
 import { rigId, sourceId, type RigEvent } from '@vela/rig-events'
+import { CommandNotStartedError, EquipmentError } from '@vela/equipment'
 import { describe, expect, it, vi } from 'vitest'
 import type { TargetPosition } from '@vela/model/web'
 import { judgedSolver, type MonoFrame, type PlateSolver, type SolveResult } from '../plate-solving/judged-solver.js'
@@ -456,7 +457,7 @@ describe('framing controller', () => {
   it('puts a refused goto into plain words, keeps the raw text as detail, and clears it on the next request', async () => {
     const fake = workshop()
     const raw = 'EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert'
-    fake.hardware.slew = vi.fn(async () => { throw new Error(raw) })
+    fake.hardware.slew = vi.fn(async () => { throw new CommandNotStartedError(raw, 'rejected', { reason: 'protocol-error', endpoint: 'Cria' }) })
     await fake.start().finished
     expect(fake.controller.snapshot()).toMatchObject({
       phase: 'failed',
@@ -472,7 +473,7 @@ describe('framing controller', () => {
     const fake = workshop()
     fake.mount.tracking = false
     fake.hardware.slew = vi.fn(async () => {
-      throw new Error('EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert')
+      throw new CommandNotStartedError('EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert', 'rejected', { reason: 'protocol-error', endpoint: 'Cria' })
     })
     await fake.start().finished
     expect(fake.controller.snapshot()).toMatchObject({
@@ -485,7 +486,7 @@ describe('framing controller', () => {
 
   it('leaves a goto failure that may have moved the mount as it is', async () => {
     const fake = workshop()
-    fake.hardware.slew = vi.fn(async () => { throw new Error('EQUATORIAL_EOD_COORD on ZWO AM5: no answer within 10 seconds') })
+    fake.hardware.slew = vi.fn(async () => { throw new EquipmentError('EQUATORIAL_EOD_COORD on ZWO AM5: no answer within 10 seconds', { reason: 'protocol-error', endpoint: 'Cria' }) })
     await fake.start().finished
     expect(fake.controller.snapshot()).toMatchObject({
       phase: 'failed',

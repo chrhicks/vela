@@ -1,7 +1,7 @@
 import { Effect, Exit, Schema } from 'effect'
 import type { Device, ParamsOf } from '@cria/wire'
 import {
-  CaptureStoppedError, CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError, FocuserUncertainError,
+  CaptureStoppedError, CaptureRetryableError, CaptureUncertainError, CommandNotStartedError, EquipmentError, FocuserStoppedError, FocuserUncertainError,
   FrameLostError, FramingStoppedError,
   type Acquisition, type CameraCooling, type CaptureFrameType, type CameraCoolingObservation,
   type ExposureSettings, type Focuser, type Framing, type MountPointing, type TelescopeStatus,
@@ -106,7 +106,7 @@ export function createCriaEquipment(connection: CriaConnection, bindings: Readon
 
         return result.value
       case 'stopped': throw new FramingStoppedError()
-      case 'failed':
+      case 'failed': throw new CommandNotStartedError(result.message, result.reason, { reason: 'protocol-error', endpoint: 'Cria' })
       case 'uncertain': throw failure(result.message)
     }
   }

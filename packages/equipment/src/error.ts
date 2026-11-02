@@ -56,6 +56,27 @@ export class FrameLostError extends Error {
   }
 }
 
+/** Why Cria answered `failed`: the command did not start. */
+export type CommandNotStartedReason =
+  | 'busy'
+  | 'blocked'
+  | 'disconnected'
+  | 'unsupported'
+  | 'rejected'
+  | 'invalid'
+  | 'unavailable'
+
+/** The device answered a command with a refusal or could not take it, so nothing started and nothing moved. */
+export class CommandNotStartedError extends EquipmentError {
+  readonly refusal: CommandNotStartedReason
+
+  constructor(message: string, refusal: CommandNotStartedReason, options: EquipmentErrorOptions) {
+    super(message, options)
+    this.name = 'CommandNotStartedError'
+    this.refusal = refusal
+  }
+}
+
 /** A new exposure is safe to attempt because no exposure started, or cleanup
  * confirmed the acknowledged exposure stopped and the camera is idle. */
 export class CaptureRetryableError extends Error {

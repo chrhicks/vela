@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CaptureRetryableError, CaptureUncertainError, EquipmentError, FocuserStoppedError, type CaptureFrameType, type CaptureProvenance } from '@vela/equipment'
+import { CaptureRetryableError, CaptureUncertainError, CommandNotStartedError, EquipmentError, FocuserStoppedError, type CaptureFrameType, type CaptureProvenance } from '@vela/equipment'
 import { createCriaConnection } from '../src/connection.js'
 import { createCriaEquipment } from '../src/equipment.js'
 import type { Device } from '@cria/wire'
@@ -484,6 +484,35 @@ describe('protocol 5 Promise capabilities', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await rejected
   })
+  describe('a mount command that does not start', () => {
+    async function slewAnswered(outcome: Parameters<typeof cria.settle>[1]) {
+      cria.durationMs['mount-slew'] = 60_000
+      const slewing = equipment.framing.slew({ telescopeId: 'mount', coordinateSystem: 'topocentric', rightAscensionDegrees: 10, declinationDegrees: 20 })
+      const settled = slewing.then(() => undefined, (error: Error) => error)
+      await vi.advanceTimersByTimeAsync(300)
+      const state = await (await cria.fetch(`${cria.origin}/v2/state`)).json()
+
+      cria.settle(state.operations[0].id, outcome)
+      await vi.advanceTimersByTimeAsync(300)
+
+      return settled
+    }
+
+    it('says so with Cria’s reason when the driver refuses the goto', async () => {
+      const error = await slewAnswered({ kind: 'failed', reason: 'rejected', message: 'EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert' })
+
+      expect(error).toBeInstanceOf(CommandNotStartedError)
+      expect(error).toMatchObject({ refusal: 'rejected', message: 'EQUATORIAL_EOD_COORD on ZWO AM5: the driver reported Alert' })
+    })
+
+    it('leaves an outcome Cria could not confirm as a plain error, since the mount may have moved', async () => {
+      const error = await slewAnswered({ kind: 'uncertain', reason: 'not-confirmed', message: 'ON_COORD_SET on ZWO AM5: the driver still shows the old values' })
+
+      expect(error).toBeInstanceOf(EquipmentError)
+      expect(error).not.toBeInstanceOf(CommandNotStartedError)
+    })
+  })
+
   describe('recovering a held device', () => {
     async function holdTheMount() {
       cria.durationMs['mount-slew'] = 60_000
