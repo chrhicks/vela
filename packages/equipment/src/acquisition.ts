@@ -76,6 +76,20 @@ export interface ExposureSettings {
   setpointC?: number
   /** Which side of the pier the mount sits on, when it reports one. */
   pierSide?: 'east' | 'west'
+  /** Where the mount points, when it was readable and stated its frame. */
+  mount?: MountPointing
+}
+
+/** The mount as read right after an exposure. The site is the mount's own configured location. */
+export interface MountPointing {
+  rightAscensionDegrees: number
+  declinationDegrees: number
+  /** The frame the right ascension and declination are in. */
+  coordinateSystem: 'topocentric' | 'j2000'
+  tracking: boolean
+  slewing: boolean
+  /** East-positive longitude, present only with both coordinates. */
+  site?: { latitudeDegrees: number; longitudeDegrees: number; elevationMeters?: number }
 }
 
 export interface Acquisition {
