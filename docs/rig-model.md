@@ -44,7 +44,7 @@ Vela is public. The real site comes from the mount's readings at runtime, and te
 | --- | --- | --- |
 | Saved images | `saved-images/<sha256 of rig id>/<sha256 of image id>/` with `metadata.json` and `original.fits` | `readSavedImages`. The folder names are checked against the metadata, as Vela's own store does. A `.pending-*` folder is an unfinished save and is skipped. |
 | Frame records | `traces/frames.jsonl`, one line per settled exposure attempt | `readFrameRecords`. A last line without a newline is still being written and is left out. |
-| Alignment trials | `alignment-diagnostics/trials/<run id>-<suffix>/journal.jsonl` and its FITS files | `readTrials`, through a schema that names no site field. |
+| Alignment trials | `alignment-diagnostics/trials/<run id>-<suffix>/journal.jsonl` and its FITS files | `readTrials`, through a schema that names no site field. It also reads each baseline and measurement's polar error (`readings`), with the time of its last sample. |
 
 `joinFrames` joins images to records on `image.id` and puts every miss in a named bucket. An image captured before the rig's first record is `predatesRecords` (Vela began writing frame records on 2026-10-19). One captured after is `unexplained`, which the check treats as a failure. A record of a `saved` attempt whose image is gone is `missing`, also a failure. `unsaved` and `save-failed` records name images Vela did not keep, which is by design.
 
@@ -73,3 +73,7 @@ An alignment trial's journal holds the site in `evidence.physical.site` and in o
 | A slewing or older-epoch exposure is rejected | `pointing.test.ts` ("what is rejected"), `motion.test.ts` |
 | Arrival-order shuffles give identical output | `order.test.ts` |
 | Staleness from clock events matches between live-style and replay-style input | `time.test.ts` |
+
+## Backfill
+
+`pnpm rig-model:backfill` (in `tools/rig-model/`) runs the saved light frames through the model: it solves each with the real ASTAP (cached by the file's sha256), stamps the frame with the end of its exposure and the solve with its finish, and feeds a night's frames, solves and mount snapshots to `step` in the order they would have arrived. The mount comes from errai's INDI recordings where one overlaps the night, else from Vela's Cria journal. It reports alignment evidence, pointing residual and drift apart, and exits 3 (incomplete) when a change of the polar axis is bracketed but exposures Cria was told to take inside the bracket have no kept pixels. The command, its options and its exit codes are in [tools/rig-model/README.md](../tools/rig-model/README.md).
