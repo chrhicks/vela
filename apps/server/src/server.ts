@@ -5,7 +5,7 @@ import { alignmentSettings } from './alignment/routes.js'
 import { access } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { openFileSavedImageStore } from './saved-images/store.js'
-import { noFrameRecords, openFrameRecords } from './capture/frame-records.js'
+import { frameRecordsOn, frameRigId, noFrameRecords } from './capture/frame-records.js'
 import { noAutofocusRecords, type AutofocusRecords } from './autofocus/routes.js'
 import { openJsonlRecords } from './records.js'
 import { noCaptureRuns, openFileCaptureRunStore, type CaptureRunStore } from './capture/run-store.js'
@@ -20,15 +20,13 @@ import { openRunLog, type RunLog } from './run-log/run-log.js'
 
 const telemetry = startTelemetry(process.env.VELA_TRACE_PATH)
 
-const frameRecords = process.env.VELA_FRAME_RECORDS_PATH
-  ? openFrameRecords(process.env.VELA_FRAME_RECORDS_PATH)
-  : noFrameRecords
-
 const autofocusRecords: AutofocusRecords = process.env.VELA_AUTOFOCUS_RECORDS_PATH
   ? openJsonlRecords(process.env.VELA_AUTOFOCUS_RECORDS_PATH, { name: 'autofocus records' })
   : noAutofocusRecords
 
 const runLog: RunLog | undefined = process.env.VELA_RUN_LOG_DIR ? openRunLog({ directory: resolve(process.env.VELA_RUN_LOG_DIR) }) : undefined
+
+const frameRecords = runLog ? frameRecordsOn(runLog) : noFrameRecords
 
 let app: ReturnType<typeof buildApp> | undefined
 
@@ -44,7 +42,6 @@ function shutdown() {
     } finally {
       await runLog?.close()
       await captureRuns.close()
-      await frameRecords.close()
       await autofocusRecords.close()
       await telemetry.shutdown()
     }
@@ -77,6 +74,8 @@ try {
   const cria = await loadCriaConfiguration(process.env.VELA_CRIA_CONFIG_PATH, process.env)
 
   await registerConfiguredCriaRigs(rigCatalog, cria)
+
+  if (runLog) for (const rig of await rigCatalog.list()) frameRigId(rig.id)
 
   const alertsConfiguration = await loadAlertsConfiguration(process.env.VELA_ALERTS_CONFIG_PATH)
 

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
-import { criaEvent, encodeEvent, rigId, sourceId } from '@vela/rig-events'
+import { criaEvent, encodeEvent, epochMs, rigId, seal, sourceId } from '@vela/rig-events'
 import { acceptSession, formatAcceptance, type AcceptRequest } from './accept.ts'
 import { PrivacyCheckError } from './package.ts'
 import { jsonLines, msgLine, opLine, writeRecording } from './recording-fixture.ts'
@@ -17,8 +17,8 @@ async function night(): Promise<AcceptRequest> {
   const frameRecordsFile = join(dir, 'frames.jsonl')
 
   await mkdir(frameDir, { recursive: true })
-  await writeFile(join(frameDir, 'metadata.json'), JSON.stringify({ id: 'frame-0', width: 100, height: 80, exposureSeconds: 50, capturedAt: '2030-01-01T01:01:00.000Z', receivedAt: '2030-01-01T01:01:55.000Z', cameraName: 'Test camera', capturedAtSource: 'camera', rigId: 'rig-a' }))
-  await writeFile(frameRecordsFile, `${JSON.stringify({ version: 1, rigId: 'rig-a', runId: 'run-1', attempt: 1, startedAt: '2030-01-01T01:01:00.000Z', settledAt: '2030-01-01T01:01:56.000Z', exposureSeconds: 50, subject: null, outcome: 'saved', message: 'on /dev/ttyUSB0 at LAT=12.5', provenance: { requestId: 'request-0', operationId: 'operation-0', imageId: 'cria-image-0' }, image: { id: 'frame-0', capturedAt: '2030-01-01T01:01:00.000Z', capturedAtSource: 'camera', receivedAt: '2030-01-01T01:01:55.000Z', width: 100, height: 80 }, statistics: null })}\n`)
+  await writeFile(join(frameDir, 'metadata.json'), JSON.stringify({ id: '00000000-0000-4000-8000-000000000000', width: 100, height: 80, exposureSeconds: 50, capturedAt: '2030-01-01T01:01:00.000Z', receivedAt: '2030-01-01T01:01:55.000Z', cameraName: 'Test camera', capturedAtSource: 'camera', rigId: 'rig-a' }))
+  await writeFile(frameRecordsFile, `${JSON.stringify({ version: 1, rigId: 'rig-a', runId: 'run-1', attempt: 1, startedAt: '2030-01-01T01:01:00.000Z', settledAt: '2030-01-01T01:01:56.000Z', exposureSeconds: 50, subject: null, outcome: 'saved', message: 'on /dev/ttyUSB0 at LAT=12.5', provenance: { requestId: 'request-0', operationId: 'operation-0', imageId: 'cria-image-0' }, image: { id: '00000000-0000-4000-8000-000000000000', capturedAt: '2030-01-01T01:01:00.000Z', capturedAtSource: 'camera', receivedAt: '2030-01-01T01:01:55.000Z', width: 100, height: 80 }, statistics: null })}\n`)
 
   const recordingDir = await writeRecording(join(dir, 'recording'), jsonLines(
     opLine({ id: 'operation-0', requestId: 'request-0', acceptedAt: '2030-01-01T01:01:00Z', settledAt: '2030-01-01T01:01:55Z' }),
@@ -47,7 +47,7 @@ test('a synthetic night passes: identical builds, a clean scan, unchanged inputs
 test('the report holds counts and names only: no site, port or message text', async () => {
   const text = formatAcceptance(await acceptSession(await night()))
 
-  for (const value of ['12.5', '345.25', '/dev/', 'ttyUSB0', 'LAT=', 'Test Mount', 'Test camera', 'frame-0', 'request-0']) expect(text).not.toContain(value)
+  for (const value of ['12.5', '345.25', '/dev/', 'ttyUSB0', 'LAT=', 'Test Mount', 'Test camera', '00000000-0000-4000-8000-000000000000', 'request-0']) expect(text).not.toContain(value)
 })
 
 test('a leak found in the package fails the run and names the table and column, never the value', async () => {
@@ -61,6 +61,21 @@ test('a leak found in the package fails the run and names the table and column, 
   expect(result.problems).toEqual(['privacy scan: attempts.message: learned coordinate (the build failed closed, nothing was published)'])
   expect(text).toContain('FAIL: privacy scan: attempts.message: learned coordinate')
   expect(text).not.toContain('PASS')
+})
+
+test('a run log directory of frame events passes as the frame records', async () => {
+  const request = await night()
+  const [line] = (await readFile(request.frameRecordsFile ?? '', 'utf8')).trim().split('\n')
+  const { version: _version, rigId: _rigId, ...body } = JSON.parse(line ?? '')
+  const runLog = join(request.scratch, 'run-log')
+
+  await mkdir(runLog)
+  await writeFile(join(runLog, 'run-20300101T000000000Z-00001.jsonl'), `${encodeEvent(seal({ rig: rigId('rig-a'), source: sourceId('vela:capture'), kind: 'frame', at: epochMs(Date.parse(body.settledAt)), seenAt: epochMs(Date.parse(body.settledAt)), body: { ...body, frameType: 'light', image: { ...body.image, ref: null }, origin: 'capture-run' } }))}\n`)
+
+  const result = await acceptSession({ ...request, frameRecordsFile: runLog })
+
+  expect(result.problems).toEqual([])
+  expect(result.summary?.links.frame_to_operation).toEqual({ exact: 1, inferred: 0, ambiguous: 0, none: 0 })
 })
 
 test('builds that differ fail the run and name the file', async () => {

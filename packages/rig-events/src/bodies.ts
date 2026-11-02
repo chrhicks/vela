@@ -61,6 +61,8 @@ export const FrameBody = Schema.Struct({
   frameType: Schema.Literals(['light', 'dark', 'flat', 'dark-flat', 'bias']),
   subject: Schema.NullOr(Schema.Struct({ targetId: Schema.String, name: Schema.String, catalog: Schema.String })),
   outcome: Schema.Literals(['saved', 'unsaved', 'save-failed', 'lost', 'failed', 'uncertain', 'stopped']),
+  message: Schema.NullOr(Schema.String),
+  provenance: Schema.NullOr(Schema.Struct({ requestId: Schema.String, operationId: Schema.NullOr(Schema.String), imageId: Schema.NullOr(Schema.String) })),
   image: Schema.NullOr(
     Schema.Struct({
       id: ImageId,

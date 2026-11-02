@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises'
+import { readFrameRecords } from '@vela/rig-frames'
 import { z } from 'zod'
 import { startReplayRig, type ReplayRig, type ReplayRigOptions } from './replay-rig.ts'
-import { alertsView, attempt, captureView, savedImagesView, type Attempt, type SavedFrame } from './views.ts'
+import { alertsView, captureView, savedImagesView, type Attempt, type SavedFrame } from './views.ts'
 
 export interface ScenarioOptions extends Omit<ReplayRigOptions, 'recording'> {
   exposureSeconds: number
@@ -17,7 +17,7 @@ export interface ScenarioOptions extends Omit<ReplayRigOptions, 'recording'> {
 export interface ScenarioResult {
   /** The saved frames in the order they were taken, as `GET /api/web/rigs/:id/saved-images` reports them. */
   frames: SavedFrame[]
-  /** One per settled attempt, successful or not, from Vela's frame record file. */
+  /** One per settled attempt, successful or not, from the `frame` events in Vela's run log. */
   attempts: Attempt[]
   /**
    * The alerts Vela's alerts view showed, each time the set of them changed, with how many attempts had
@@ -33,13 +33,13 @@ export interface ScenarioResult {
 
 const pollMs = 250
 
-async function readAttempts(path: string): Promise<Attempt[]> {
-  try {
-    return (await readFile(path, 'utf8')).split('\n').filter(Boolean).map(line => attempt.parse(JSON.parse(line)))
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return []
-    throw error
-  }
+async function readAttempts(runLog: string): Promise<Attempt[]> {
+  const { records, problems } = await readFrameRecords([runLog])
+  const unreadable = problems.filter(problem => problem.reason !== 'ENOENT')
+
+  if (unreadable.length > 0) throw new Error(`The run log has ${unreadable.length} lines or files that could not be read; the first: ${unreadable[0]?.reason}.`)
+
+  return records.map(record => ({ attempt: record.attempt, outcome: record.outcome, message: record.message, statistics: record.statistics }))
 }
 
 /**
@@ -82,14 +82,14 @@ async function capture(rig: ReplayRig, exposureSeconds: number, wanted: number, 
     if (died !== 'waited') throw new Error(`${died} stopped while the scenario ran. See ${rig.paths.logs}.`)
   }
 
-  let attempts = await readAttempts(rig.paths.frameRecords)
+  let attempts = await readAttempts(rig.paths.runLog)
   let current = await get(rig, `${view}/capture`, captureView)
 
   while (current.active && attempts.length < wanted) {
     if (Date.now() > deadline) throw new Error(`The scenario did not finish in ${timeoutMs} ms; ${attempts.length} of ${wanted} attempts had settled.`)
     await pause()
 
-    attempts = await readAttempts(rig.paths.frameRecords)
+    attempts = await readAttempts(rig.paths.runLog)
     current = await get(rig, `${view}/capture`, captureView)
 
     const alerts = (await get(rig, `${view}/alerts`, alertsView)).alerts
@@ -112,5 +112,5 @@ async function capture(rig: ReplayRig, exposureSeconds: number, wanted: number, 
     frames.map(async frame => Buffer.from(await (await fetch(`${rig.urls.vela}${frame.fitsUrl}`)).arrayBuffer())),
   )
 
-  return { frames, attempts: await readAttempts(rig.paths.frameRecords), alertChanges, finalPhase: current.phase, finalError: current.error, fits }
+  return { frames, attempts: await readAttempts(rig.paths.runLog), alertChanges, finalPhase: current.phase, finalError: current.error, fits }
 }

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { expect, test } from 'vitest'
 import { criaEvent, encodeEvent, rigId, sourceId, type CriaEntry } from '@vela/rig-events'
-import { mountState } from '@vela/rig-testing'
+import { imageIdOf, mountState } from '@vela/rig-testing'
 import { publishPackage } from './package.ts'
 import { openPackage } from './query.ts'
 import { Secrets } from './sanitize.ts'
@@ -33,7 +33,7 @@ async function syntheticNight() {
     await writeFile(
       join(frameDir, 'metadata.json'),
       JSON.stringify({
-        id: `frame-${index}`,
+        id: imageIdOf(index),
         width: 100,
         height: 80,
         exposureSeconds: 50,
@@ -91,7 +91,7 @@ async function syntheticNight() {
           outcome: 'saved',
           message: null,
           provenance: { requestId: `request-${index}`, operationId: `operation-${index}`, imageId: `cria-image-${index}` },
-          image: { id: `frame-${index}`, capturedAt: '2030-01-01T01:00:00.000Z', capturedAtSource: 'camera', receivedAt: '2030-01-01T01:00:55.000Z', width: 100, height: 80 },
+          image: { id: imageIdOf(index), capturedAt: '2030-01-01T01:00:00.000Z', capturedAtSource: 'camera', receivedAt: '2030-01-01T01:00:55.000Z', width: 100, height: 80 },
           statistics: null,
         }),
       )
@@ -192,9 +192,9 @@ test('a query joins stars per frame to whether the mount was tracking', async ()
   const session = await openPackage(join(root, 'package'))
 
   expect(await session.rows(starsAndTracking)).toEqual([
-    { frame_id: 'frame-0', detected_stars: '120', tracking: true },
-    { frame_id: 'frame-1', detected_stars: '80', tracking: true },
-    { frame_id: 'frame-2', detected_stars: '0', tracking: false },
+    { frame_id: imageIdOf(0), detected_stars: '120', tracking: true },
+    { frame_id: imageIdOf(1), detected_stars: '80', tracking: true },
+    { frame_id: imageIdOf(2), detected_stars: '0', tracking: false },
   ])
   session.close()
 })
@@ -315,9 +315,9 @@ test('a query names the Cria operation behind each saved frame', async () => {
   const session = await openPackage(join(root, 'package'))
 
   expect(await session.rows('SELECT f.frame_id, a.operation_id, f.attempt_link FROM frames f JOIN attempts a ON a.frame_id = f.frame_id ORDER BY f.frame_id')).toEqual([
-    { frame_id: 'frame-0', operation_id: 'operation-0', attempt_link: 'exact' },
-    { frame_id: 'frame-1', operation_id: 'operation-1', attempt_link: 'exact' },
-    { frame_id: 'frame-2', operation_id: 'operation-2', attempt_link: 'exact' },
+    { frame_id: imageIdOf(0), operation_id: 'operation-0', attempt_link: 'exact' },
+    { frame_id: imageIdOf(1), operation_id: 'operation-1', attempt_link: 'exact' },
+    { frame_id: imageIdOf(2), operation_id: 'operation-2', attempt_link: 'exact' },
   ])
   session.close()
 })
@@ -331,7 +331,7 @@ test('a query lists the operations of the recording around each frame and joins 
   const session = await openPackage(join(root, 'package'))
 
   expect(await session.rows('SELECT f.frame_id, f.operation_link, o.kind, o.outcome, o.image_id FROM frames f JOIN indi_ops o ON o.operation_id = f.operation_id ORDER BY f.frame_id')).toEqual(
-    [0, 1, 2].map(index => ({ frame_id: `frame-${index}`, operation_link: 'exact', kind: 'capture', outcome: 'confirmed', image_id: `image-operation-${index}` })),
+    [0, 1, 2].map(index => ({ frame_id: imageIdOf(index), operation_link: 'exact', kind: 'capture', outcome: 'confirmed', image_id: `image-operation-${index}` })),
   )
   expect(await session.rows("SELECT operation_id, outcome, outcome_reason, outcome_message FROM indi_ops WHERE outcome = 'failed'")).toEqual([
     { operation_id: 'refused', outcome: 'failed', outcome_reason: 'invalid', outcome_message: 'needs a mono frame on [redacted]' },
@@ -413,7 +413,7 @@ test('a query lists the writes and errors during a frame\'s exposure with the op
     await session.rows(`
       SELECT e.kind, e.direction, e.property, e.state, e.operation_id, e.operation_link
       FROM frames f JOIN indi_events e ON e.device = 'Test Camera' AND e.at BETWEEN f.captured_at AND f.captured_at + f.exposure_seconds * INTERVAL 1 SECOND + INTERVAL 5 SECOND
-      WHERE f.frame_id = 'frame-0' ORDER BY e.at`),
+      WHERE f.frame_id = '${imageIdOf(0)}' ORDER BY e.at`),
   ).toEqual([
     { kind: 'write', direction: 'out', property: 'CCD_EXPOSURE', state: null, operation_id: 'operation-0', operation_link: 'inferred' },
     { kind: 'update', direction: 'in', property: 'CCD_EXPOSURE', state: 'Busy', operation_id: 'operation-0', operation_link: 'inferred' },
@@ -453,9 +453,9 @@ test('a query finds the camera image of each frame: one image in the operation w
   const session = await openPackage(join(root, 'package'))
 
   expect(await session.rows('SELECT frame_id, blob_path, blob_link, blob_candidates FROM frames ORDER BY frame_id')).toEqual([
-    { frame_id: 'frame-0', blob_path: 'blobs/1-5-0.blob', blob_link: 'inferred', blob_candidates: null },
-    { frame_id: 'frame-1', blob_path: null, blob_link: 'ambiguous', blob_candidates: '["blobs/1-6-0.blob","blobs/1-7-0.blob"]' },
-    { frame_id: 'frame-2', blob_path: null, blob_link: null, blob_candidates: null },
+    { frame_id: imageIdOf(0), blob_path: 'blobs/1-5-0.blob', blob_link: 'inferred', blob_candidates: null },
+    { frame_id: imageIdOf(1), blob_path: null, blob_link: 'ambiguous', blob_candidates: '["blobs/1-6-0.blob","blobs/1-7-0.blob"]' },
+    { frame_id: imageIdOf(2), blob_path: null, blob_link: null, blob_candidates: null },
   ])
   expect(await session.rows('SELECT blob_path, blob_bytes, operation_id, operation_link, image_id, image_bytes FROM indi_images ORDER BY "at"')).toEqual([
     { blob_path: 'blobs/1-5-0.blob', blob_bytes: '5100', operation_id: 'operation-0', operation_link: 'inferred', image_id: 'image-operation-0', image_bytes: '5000' },
@@ -499,9 +499,9 @@ test('a recording alone fills the mount table, and a frame links to the latest r
     { source: 'indi', tracking: false, slewing: true },
   ])
   expect(await session.rows('SELECT f.frame_id, f.mount_link, f.mount_age_seconds, m.tracking, m.hour_angle_hours IS NOT NULL AS has_hour_angle FROM frames f LEFT JOIN mount m ON m.sampled_at = f.mount_sampled_at ORDER BY f.frame_id')).toEqual([
-    { frame_id: 'frame-0', mount_link: 'inferred', mount_age_seconds: 4, tracking: true, has_hour_angle: true },
-    { frame_id: 'frame-1', mount_link: 'inferred', mount_age_seconds: 0, tracking: false, has_hour_angle: true },
-    { frame_id: 'frame-2', mount_link: 'inferred', mount_age_seconds: 60, tracking: false, has_hour_angle: true },
+    { frame_id: imageIdOf(0), mount_link: 'inferred', mount_age_seconds: 4, tracking: true, has_hour_angle: true },
+    { frame_id: imageIdOf(1), mount_link: 'inferred', mount_age_seconds: 0, tracking: false, has_hour_angle: true },
+    { frame_id: imageIdOf(2), mount_link: 'inferred', mount_age_seconds: 60, tracking: false, has_hour_angle: true },
   ])
   session.close()
 })
@@ -522,9 +522,9 @@ test('a query follows a frame to the request Vela sent for it, and to the check 
       JOIN cria_image_checks c ON c.run_id = f.run_id AND c.attempt = f.attempt
       ORDER BY f.frame_id`),
   ).toEqual([
-    { frame_id: 'frame-0', reply_kind: 'answered', operation_id: 'operation-0', operation_link: 'exact', attempt_link: 'exact', verdict: 'intact', sha_matches_operation: true, check_link: 'exact' },
-    { frame_id: 'frame-1', reply_kind: 'answered', operation_id: 'operation-1', operation_link: 'exact', attempt_link: 'exact', verdict: 'damaged', sha_matches_operation: false, check_link: 'exact' },
-    { frame_id: 'frame-2', reply_kind: 'answered', operation_id: 'operation-2', operation_link: 'exact', attempt_link: 'exact', verdict: 'intact', sha_matches_operation: true, check_link: 'exact' },
+    { frame_id: imageIdOf(0), reply_kind: 'answered', operation_id: 'operation-0', operation_link: 'exact', attempt_link: 'exact', verdict: 'intact', sha_matches_operation: true, check_link: 'exact' },
+    { frame_id: imageIdOf(1), reply_kind: 'answered', operation_id: 'operation-1', operation_link: 'exact', attempt_link: 'exact', verdict: 'damaged', sha_matches_operation: false, check_link: 'exact' },
+    { frame_id: imageIdOf(2), reply_kind: 'answered', operation_id: 'operation-2', operation_link: 'exact', attempt_link: 'exact', verdict: 'intact', sha_matches_operation: true, check_link: 'exact' },
   ])
   expect(await session.rows("SELECT request_id, reply_kind, reply_code, reply_message, attempt_link, operation_link FROM cria_requests WHERE reply_kind = 'refused'")).toEqual([
     { request_id: 'request-unrecorded', reply_kind: 'refused', reply_code: 'busy', reply_message: 'camera busy on [redacted]', attempt_link: null, operation_link: null },
@@ -601,9 +601,9 @@ async function cutShortNight(cut: 'torn tail' | 'damaged middle' | 'no end') {
 test.each(['torn tail', 'damaged middle', 'no end'] as const)('frames after the last line of a recording with a %s get no mount link', async cut => {
   // The frames are at 01:01:00, 01:02:00 and 01:03:00; the last line read is at 01:01:30.
   expect(await cutShortNight(cut)).toEqual([
-    { frame_id: 'frame-0', mount_link: 'inferred' },
-    { frame_id: 'frame-1', mount_link: null },
-    { frame_id: 'frame-2', mount_link: null },
+    { frame_id: imageIdOf(0), mount_link: 'inferred' },
+    { frame_id: imageIdOf(1), mount_link: null },
+    { frame_id: imageIdOf(2), mount_link: null },
   ])
 })
 

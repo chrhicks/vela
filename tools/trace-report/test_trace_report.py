@@ -509,6 +509,56 @@ class CrossCheckTest(TraceCase):
         check = self.report(trace, "--frames", self.journal(records))["framesJournal"]
         self.assertEqual((check["skippedLines"], check["agrees"]), (1, True))
 
+    def run_log_frame(self, run_id, attempt, outcome="saved", started=None):
+        body = {"runId": run_id, "attempt": attempt, "outcome": outcome, "startedAt": stamp(started or at(attempt))}
+        return {"v": 1, "id": f"{run_id}-{attempt}", "rig": "rig-a", "kind": "frame", "at": 0, "seenAt": 0,
+                "source": "vela:server", "body": body}
+
+    def run_log(self, *files):
+        directory = self.dir / "run-log"
+        directory.mkdir()
+        for name, events in files:
+            (directory / name).write_text("".join(json.dumps(e) + "\n" for e in events))
+        return directory
+
+    def other_event(self):
+        return {"v": 1, "id": "s", "rig": "rig-a", "kind": "cria.state", "at": 0, "seenAt": 0,
+                "source": "vela:cria", "body": {"state": {}}}
+
+    def test_run_log_directory_is_read_like_an_old_file(self):
+        trace = self.write("observing.jsonl", night())
+        first = [self.run_log_frame("run-1", i) for i in range(1, 16)]
+        second = [self.run_log_frame("run-1", i) for i in range(16, 31)] + [self.run_log_frame("run-1", 31, "stopped")]
+        directory = self.run_log(("run-b-00002.jsonl", second), ("run-a-00001.jsonl", [self.other_event(), *first, first[0]]))
+        (directory / "notes.txt").write_text("not a run file")
+        check = self.report(trace, "--frames", directory)["framesJournal"]
+        self.assertEqual((check["attemptsInJournal"], check["attemptsInTrace"], check["difference"]), (31, 31, 0))
+        self.assertEqual((check["skippedLines"], check["otherEvents"], check["agrees"]), (0, 1, True))
+        self.assertEqual(check["runs"], [{"runId": "run-1", "trace": 31, "journal": 31, "agrees": True}])
+
+    def test_run_log_and_old_file_give_the_same_comparison(self):
+        trace = self.write("observing.jsonl", night())
+        records = [self.record("run-1", i) for i in range(1, 31)]
+        old = self.report(trace, "--frames", self.journal(records))["framesJournal"]
+        directory = self.run_log(("run-a-00001.jsonl", [self.run_log_frame("run-1", i) for i in range(1, 31)]))
+        new = self.report(trace, "--frames", directory)["framesJournal"]
+        for key in ("attemptsInJournal", "attemptsInTrace", "difference", "agrees", "outcomes", "runs"):
+            self.assertEqual(old[key], new[key], key)
+
+    def test_a_run_log_file_is_read_and_a_frame_event_that_is_not_one_is_skipped(self):
+        trace = self.write("observing.jsonl", night(saved=2, stopped=False))
+        broken = {**self.run_log_frame("run-1", 3), "body": {"runId": "run-1"}}
+        directory = self.run_log(("run-a-00001.jsonl", [self.run_log_frame("run-1", 1), self.run_log_frame("run-1", 2), broken]))
+        check = self.report(trace, "--frames", directory / "run-a-00001.jsonl")["framesJournal"]
+        self.assertEqual((check["attemptsInJournal"], check["skippedLines"], check["agrees"]), (2, 1, True))
+
+    def test_a_directory_without_run_files_is_refused(self):
+        trace = self.write("observing.jsonl", night())
+        empty = self.dir / "run-log"
+        empty.mkdir()
+        document = self.report(trace, "--frames", empty, expect=2)
+        self.assertEqual(document["error"]["code"], "no-readable-frames")
+
     def test_saved_images_count_original_fits_not_files(self):
         root = self.dir / "saved-images"
         inside, outside = datetime(2026, 1, 5, 2, tzinfo=timezone.utc), datetime(2026, 1, 3, tzinfo=timezone.utc)

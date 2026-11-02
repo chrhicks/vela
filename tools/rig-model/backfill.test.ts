@@ -196,6 +196,8 @@ function unrecorded({ capture }: Solved) {
     frameType: image.frameType,
     subject: null,
     outcome: 'saved' as const,
+    message: null,
+    provenance: null,
     image: { id: image.id, capturedAt: image.capturedAt, capturedAtSource: 'camera' as const, receivedAt: image.receivedAt, width: image.width, height: image.height },
     statistics: null,
   }

@@ -91,6 +91,7 @@ interface Attempt {
   exposureSeconds: number
   provenance: CaptureImageProvenance | null
   image: CaptureImage | null
+  fitsBytes: number
 }
 
 export interface CaptureRunOptions {
@@ -336,8 +337,9 @@ export function createCaptureController(
 
       span.end()
 
+      const fitsPath = image && outcome === 'saved' ? savedImages.fitsPath(settings.rigId, image.id) : undefined
+
       frameRecords.append({
-        version: 1,
         rigId: settings.rigId,
         runId,
         attempt: attempt.index,
@@ -357,6 +359,7 @@ export function createCaptureController(
           width: image.width,
           height: image.height,
         },
+        fits: fitsPath === undefined ? null : { path: fitsPath, bytes: attempt.fitsBytes },
         statistics: image?.statistics ?? null,
       })
 
@@ -426,6 +429,7 @@ export function createCaptureController(
           exposureSeconds,
           provenance: null,
           image: null,
+          fitsBytes: 0,
         }
 
         attempt = current
@@ -539,6 +543,7 @@ export function createCaptureController(
           metadata = { ...metadata, capturedAtSource: frame.capturedAtSource }
 
         current.image = metadata
+        current.fitsBytes = fits.byteLength
         images.set(id, { ...previews, fits, metadata, generation: runGeneration })
 
         while (images.size > 3) images.delete(images.keys().next().value!)

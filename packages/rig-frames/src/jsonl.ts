@@ -25,7 +25,8 @@ export function reasonOf(error: unknown): string {
   return Exit.isSuccess(code) ? code.value.code : 'unreadable'
 }
 
-export async function readJsonl<A>(path: string, schema: Schema.Decoder<A>): Promise<JsonlRead<A>> {
+/** `skip` names lines to pass over unparsed, for a file mostly made of lines this reader does not want. */
+export async function readJsonl<A>(path: string, schema: Schema.Decoder<A>, skip: (text: string) => boolean = () => false): Promise<JsonlRead<A>> {
   const decode = Schema.decodeUnknownExit(schema)
   const rows: { line: number; value: A }[] = []
   const problems: SourceProblem[] = []
@@ -41,7 +42,7 @@ export async function readJsonl<A>(path: string, schema: Schema.Decoder<A>): Pro
   const tail = lines.pop() ?? ''
 
   lines.forEach((text, index) => {
-    if (text.trim() === '') return
+    if (text.trim() === '' || skip(text)) return
 
     let raw: unknown
 

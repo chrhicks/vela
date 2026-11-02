@@ -4,7 +4,7 @@ The run log is the one record of what Vela's Cria client saw. The server writes 
 
 ## Format
 
-One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that directory. Each line is one `@vela/rig-events` envelope in canonical JSON, so `decodeLine` reads it. A Cria connection reports four kinds:
+One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that directory. Each line is one `@vela/rig-events` envelope in canonical JSON, so `decodeLine` reads it. A Cria connection reports four kinds, and each capture attempt files a `frame` event:
 
 | Kind | Holds |
 | --- | --- |
@@ -12,12 +12,13 @@ One JSONL file per server run, `run-<start time>-<part>.jsonl`, in that director
 | `cria.exchange` | one request to Cria with its reply. |
 | `cria.image` | whether a fetched original matched its size and SHA-256. The bytes are never kept. |
 | `cria.stream` | the event stream opening and ending. |
+| `frame` | one settled exposure attempt, with why it failed if it did, the ids Cria gave it and the saved FITS (`docs/local-tracing.md`). Its rig is the catalog rig id. |
 
 The rig is the Cria rig id from `cria.json`, which must be lowercase letters, digits and hyphens. The source is `vela:cria`.
 
 Journals written before this change (`cria-journal*.jsonl` under `traces/`) stay where they are. `createJournalImporter` reads them. Nothing writes that format now.
 
-The offline tools (`tools/rig-session`, and `backfill` and `indi-parity` in `tools/rig-model`) take the run log directory or a file of either format. `createLogReader` in `@vela/rig-events` tells a run-log line from a journal line by the line, so there is no flag.
+`readFrameRecords` in `@vela/rig-frames` reads `frame` events and the older `traces/frames.jsonl` alike. The offline tools (`tools/rig-session`, and `backfill` and `indi-parity` in `tools/rig-model`) take the run log directory or a file of either format. `createLogReader` in `@vela/rig-events` tells a run-log line from a journal line by the line, so there is no flag.
 
 ## Rotation and retention
 

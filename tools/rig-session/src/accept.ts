@@ -90,10 +90,11 @@ async function inputFiles(request: AcceptRequest): Promise<[string, string][]> {
   const single = [
     ['traces', request.tracesFile],
     ['mount-csv', request.mountCsvFile],
-    ['frame-records', request.frameRecordsFile],
   ] as const
 
   const files: [string, string][] = single.flatMap(([input, path]) => (path === null ? [] : [[input, path] satisfies [string, string]]))
+
+  if (request.frameRecordsFile !== null && existsSync(request.frameRecordsFile)) files.push(...(await journalFiles(request.frameRecordsFile)).map((file): [string, string] => ['frame-records', file]))
 
   if (request.journalFile !== null && existsSync(request.journalFile)) files.push(...(await journalFiles(request.journalFile)).map((file): [string, string] => ['cria-journal', file]))
 

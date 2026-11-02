@@ -189,6 +189,8 @@ export const frameRecord = (overrides: Partial<FrameRecord> & { readonly attempt
   frameType: 'light',
   subject: null,
   outcome: 'saved',
+  message: null,
+  provenance: null,
   image: { id: imageIdOf(overrides.attempt), capturedAt: epochMs(Date.parse('2026-10-26T20:00:00.000Z')), capturedAtSource: 'camera', receivedAt: epochMs(Date.parse('2026-10-26T20:00:01.500Z')), width: 64, height: 48 },
   statistics: null,
   ...overrides,

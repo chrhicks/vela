@@ -62,7 +62,7 @@ const runLog = process.env.VELA_RUN_LOG_DIR ?? join(dataDirectory, 'run-log')
 
 const journals = given.get('journal') ?? [join(share, 'traces/cria-journal-20261015-20261025.jsonl'), join(share, 'traces/cria-journal.jsonl'), ...(existsSync(runLog) ? [runLog] : [])]
 
-const sources = await scanFrameSources(pathsIn(dataDirectory))
+const sources = await scanFrameSources(pathsIn(dataDirectory, runLog))
 
 if (sources.problems.length > 0) {
   console.error(`failed: ${sources.problems.length} frame sources could not be read, the first ${sources.problems[0]?.reason}`)

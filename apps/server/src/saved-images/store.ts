@@ -25,6 +25,8 @@ export interface SavedImageStore {
   count(rigId: string): Promise<number>
   get(rigId: string, imageId: string): Promise<SavedImage | undefined>
   file(rigId: string, imageId: string, kind: FileKind): Promise<Buffer | undefined>
+  /** Where the saved `original.fits` is (or will be) on disk; undefined for a store that keeps nothing on disk. */
+  fitsPath(rigId: string, imageId: string): string | undefined
   refreshPreview(rigId: string, imageId: string): Promise<SavedImage | undefined>
   previewFile(rigId: string, imageId: string, kind: 'native' | 'fit'): Promise<Buffer | undefined>
 }
@@ -105,6 +107,7 @@ export function createMemorySavedImageStore(): SavedImageStore {
 
       return this.file(rigId, imageId, kind)
     },
+    fitsPath: () => undefined,
     async file(rigId, imageId, kind) {
       const file = rigs.get(rigId)?.get(imageId)?.files[kind]
 
@@ -222,6 +225,7 @@ export async function openFileSavedImageStore(
       return (await completedDirectories(rigId)).length
     },
     get,
+    fitsPath: (rigId, imageId) => join(imagePath(rigId, imageId), filenames.fits),
     async refreshPreview(rigId, imageId) {
       const directory = imagePath(rigId, imageId)
       const image = await readMetadata(directory, rigId, imageId)

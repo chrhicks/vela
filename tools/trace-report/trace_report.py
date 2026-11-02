@@ -2,7 +2,7 @@
 """Count a night from Vela's observing traces and print one JSON report.
 
     python3 -I tools/trace-report/trace_report.py PATH [PATH ...]
-        [--since ISO] [--until ISO] [--frames FRAMES.jsonl] [--saved-images DIR]
+        [--since ISO] [--until ISO] [--frames RUN-LOG-DIR|FRAMES.jsonl] [--saved-images DIR]
 
 A pure log reader: it never imports or calls Vela and opens every input read-only.
 Standard library only. The definitions behind every count are in the `definitions`
@@ -834,31 +834,53 @@ def run_block(run: Run) -> tuple[dict, list[dict]]:
     return block, warnings
 
 
+def journal_files(path: str) -> list[str]:
+    """An old frames.jsonl is one file. A run log is a directory of run-*.jsonl files, which sort in time order."""
+    if not os.path.isdir(path):
+        return [path]
+    return [os.path.join(path, name) for name in sorted(os.listdir(path)) if name.startswith("run-") and name.endswith(".jsonl")]
+
+
+def frame_row(row: dict) -> dict | None:
+    """The fields of one settled attempt from an old frames.jsonl line or a run-log `frame` event, None for another
+    run-log event. Raises ValueError, KeyError or TypeError when the line is neither."""
+    if row.get("kind") == "frame" and row.get("v") == 1:
+        return row["body"]
+    if "kind" in row and "v" in row:
+        return None
+    if row["version"] != 1:
+        raise ValueError("version")
+    return row
+
+
 def read_journal(path: str, window: Window) -> dict:
     per_run: dict[str, Counter] = defaultdict(Counter)
     attempts: set[tuple[str, int]] = set()
-    lines = skipped = 0
-    with open(path, "rb") as stream:
-        for raw in stream:
-            if not raw.strip():
-                continue
-            lines += 1
-            try:
-                row = json.loads(raw)
-                if row["version"] != 1:
-                    raise ValueError("version")
-                run_id, attempt, outcome = row["runId"], row["attempt"], row["outcome"]
-                started = parse_time(row["startedAt"])
-                if not (_text(run_id) and _integer(attempt) and _text(outcome)):
-                    raise ValueError("types")
-            except (ValueError, KeyError, TypeError):
-                skipped += 1
-                continue
-            if (run_id, attempt) in attempts or not window.contains(started):
-                continue
-            attempts.add((run_id, attempt))
-            per_run[run_id][outcome] += 1
-    return {"lines": lines, "skippedLines": skipped, "perRun": per_run}
+    lines = skipped = other = 0
+    for file in journal_files(path):
+        with open(file, "rb") as stream:
+            for raw in stream:
+                if not raw.strip():
+                    continue
+                try:
+                    body = frame_row(json.loads(raw))
+                    if body is None:
+                        other += 1
+                        continue
+                    run_id, attempt, outcome = body["runId"], body["attempt"], body["outcome"]
+                    started = parse_time(body["startedAt"])
+                    if not (_text(run_id) and _integer(attempt) and _text(outcome)):
+                        raise ValueError("types")
+                except (ValueError, KeyError, TypeError, AttributeError):
+                    skipped += 1
+                    lines += 1
+                    continue
+                lines += 1
+                if (run_id, attempt) in attempts or not window.contains(started):
+                    continue
+                attempts.add((run_id, attempt))
+                per_run[run_id][outcome] += 1
+    return {"lines": lines, "skippedLines": skipped, "otherEvents": other, "perRun": per_run}
 
 
 def journal_block(path: str, journal: dict, runs: list[Run]) -> dict:
@@ -879,6 +901,7 @@ def journal_block(path: str, journal: dict, runs: list[Run]) -> dict:
         "path": path,
         "lines": journal["lines"],
         "skippedLines": journal["skippedLines"],
+        "otherEvents": journal["otherEvents"],
         "attemptsInJournal": sum(journal_totals.values()),
         "attemptsInTrace": sum(trace_totals.values()),
         "difference": sum(journal_totals.values()) - sum(trace_totals.values()),
@@ -928,7 +951,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("paths", nargs="+", metavar="PATH")
     parser.add_argument("--since")
     parser.add_argument("--until")
-    parser.add_argument("--frames", metavar="FRAMES.jsonl")
+    parser.add_argument("--frames", metavar="RUN-LOG-DIR|FRAMES.jsonl")
     parser.add_argument("--saved-images", metavar="DIR")
     args = parser.parse_args(argv)
     args.window = Window(
@@ -1176,8 +1199,10 @@ def error_document(code: str, message: str) -> dict:
 
 
 def check_named_inputs(args: argparse.Namespace) -> None:
-    if args.frames and not os.path.isfile(args.frames):
-        raise Refused("no-readable-frames", f"no such frames journal: {args.frames}")
+    if args.frames and not (os.path.isfile(args.frames) or os.path.isdir(args.frames)):
+        raise Refused("no-readable-frames", f"no such frames journal or run log directory: {args.frames}")
+    if args.frames and not journal_files(args.frames):
+        raise Refused("no-readable-frames", f"no run-*.jsonl files in: {args.frames}")
     if args.saved_images and not os.path.isdir(args.saved_images):
         raise Refused("no-readable-saved-images", f"not a directory: {args.saved_images}")
 

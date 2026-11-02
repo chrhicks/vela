@@ -14,7 +14,7 @@ const utcOffsetMinutes = Number(option('--utc-offset-minutes', '0'))
 
 const through = option('--through-night', '')
 
-const sources = await scanFrameSources(pathsIn(dataDirectory))
+const sources = await scanFrameSources(pathsIn(dataDirectory, process.env.VELA_RUN_LOG_DIR))
 
 const rows = nightRows(sources, utcOffsetMinutes).filter(row => through === '' || row.night <= through)
 

@@ -37,7 +37,6 @@ export interface ReplayRig {
   readonly rigName: string
   readonly urls: { readonly vela: string; readonly cria: string; readonly indiReplay: string }
   readonly paths: {
-    readonly frameRecords: string
     readonly savedImages: string
     readonly traces: string
     readonly runLog: string
@@ -75,7 +74,6 @@ export async function startReplayRig(options: ReplayRigOptions): Promise<ReplayR
   const started: Service[] = []
 
   const paths = {
-    frameRecords: join(folder, 'vela', 'frame-records.jsonl'),
     savedImages: join(folder, 'vela', 'saved-images'),
     traces: join(folder, 'vela', 'traces.jsonl'),
     runLog: join(folder, 'vela', 'run-log'),
@@ -181,7 +179,6 @@ export async function startReplayRig(options: ReplayRigOptions): Promise<ReplayR
         VELA_SAVED_IMAGES_PATH: paths.savedImages,
         VELA_SURVEY_CACHE_PATH: join(folder, 'vela', 'survey-cache'),
         VELA_TRACE_PATH: paths.traces,
-        VELA_FRAME_RECORDS_PATH: paths.frameRecords,
         VELA_RUN_LOG_DIR: paths.runLog,
         VELA_ALERTS_CONFIG_PATH: join(folder, 'vela', 'alerts.json'),
       },

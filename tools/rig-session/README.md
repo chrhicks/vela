@@ -9,7 +9,7 @@ pnpm --filter @vela/rig-session rig-session build \
   --saved-images ~/.local/share/vela/saved-images \
   --traces ~/.local/share/vela/traces/observing.jsonl \
   --mount-csv path/to/mount-watch.csv \
-  --frame-records ~/.local/share/vela/traces/frames.jsonl \
+  --frame-records ~/.local/share/vela/run-log \
   --recording ~/recordings/2030-01-01-example \
   --journal ~/.local/share/vela/run-log
 
@@ -36,7 +36,7 @@ The inputs are read-only. Every input is optional; `session.json` in the package
 
 ```sh
 pnpm --silent --filter @vela/rig-session accept \
-  --recording ~/recordings/<name> --frame-records <frames.jsonl> --journal <run-log dir> \
+  --recording ~/recordings/<name> --frame-records <run-log dir or frames.jsonl> --journal <run-log dir> \
   --traces <observing.jsonl> --saved-images <saved-images dir> [--mount-csv <file>] \
   --from 2030-01-01T18:00:00Z --to 2030-01-02T12:00:00Z
 ```
@@ -110,7 +110,7 @@ CRIA_CHECKOUT=~/dev/personal/cria pnpm replay ~/recordings/<night> --from-frame 
 
 A recording can hold frames of more than one size, because someone changed the camera's frame or binning while it ran. Replay does not replay what a client wrote, so it serves a frame only when the camera is set to that frame's size, and otherwise the exposure fails with the two sizes in its message. Start with `--from-frame` at the first frame of the size you want: replay then sets the camera as it was when that frame's exposure began.
 
-Every path the three programs write (Cria's images, Vela's rig catalog, saved images, frame records, journal, traces, survey cache) and `HOME`, `TMPDIR` and the XDG folders are inside one `vela-replay-*` folder in the temporary directory. They inherit nothing else of this process's environment, so no `VELA_*` variable or token leaks in. Their logs are in that folder's `logs/` (use `--keep` to read them after a stop). The Cria config is generated from the recording's `manifest.json`: its devices, none told to connect, no serial port and no site (a recording holds neither). A recorded switch device is left out because a recording does not name its channels.
+Every path the three programs write (Cria's images, Vela's rig catalog, saved images, run log, traces, survey cache) and `HOME`, `TMPDIR` and the XDG folders are inside one `vela-replay-*` folder in the temporary directory. They inherit nothing else of this process's environment, so no `VELA_*` variable or token leaks in. Their logs are in that folder's `logs/` (use `--keep` to read them after a stop). The Cria config is generated from the recording's `manifest.json`: its devices, none told to connect, no serial port and no site (a recording holds neither). A recorded switch device is left out because a recording does not name its channels.
 
 ### Running Cria at a pinned commit
 
@@ -120,7 +120,7 @@ Replay needs the Vela server built (`pnpm replay` does it first with `pnpm --fil
 
 ### Scenarios
 
-`runScenario(recording, options)` (`replay/scenario.ts`) starts the same rig, starts a capture, polls Vela's HTTP API until the attempts have settled, stops the run and tears the rig down. It returns the saved frames and their statistics as the API reports them, each attempt's outcome from the frame record file, the alerts Vela raised and the FITS bytes of each saved frame. A scenario is a `*.scenario.ts` file that asserts literal values; `pnpm scenarios` runs them (they start processes and take about three minutes together, so `pnpm test` does not). `result.alertChanges` lists the alerts Vela's alerts view showed, each time the set changed.
+`runScenario(recording, options)` (`replay/scenario.ts`) starts the same rig, starts a capture, polls Vela's HTTP API until the attempts have settled, stops the run and tears the rig down. It returns the saved frames and their statistics as the API reports them, each attempt's outcome from the `frame` events in its run log, the alerts Vela raised and the FITS bytes of each saved frame. A scenario is a `*.scenario.ts` file that asserts literal values; `pnpm scenarios` runs them (they start processes and take about three minutes together, so `pnpm test` does not). `result.alertChanges` lists the alerts Vela's alerts view showed, each time the set changed.
 
 | Scenario | The fault | What Vela reports |
 | --- | --- | --- |

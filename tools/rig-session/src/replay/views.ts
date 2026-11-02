@@ -34,14 +34,12 @@ export type SavedFrame = z.infer<typeof savedFrame>
 
 export const savedImagesView = z.object({ images: z.array(savedFrame) })
 
-/** A line of Vela's frame record file (`apps/server/src/capture/frame-records.ts`). */
-export const attempt = z.object({
-  attempt: z.number(),
-  outcome: z.string(),
-  message: z.string().nullable(),
-  statistics,
-})
-
-export type Attempt = z.infer<typeof attempt>
+/** One settled attempt, from the `frame` events in the run log. */
+export interface Attempt {
+  readonly attempt: number
+  readonly outcome: string
+  readonly message: string | null
+  readonly statistics: SavedFrame['statistics']
+}
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
