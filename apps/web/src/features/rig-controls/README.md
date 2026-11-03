@@ -10,7 +10,8 @@ page link (`useRigControls().open`, used by the Explore page's mount reminder) o
 `RigControlsPanel` mounts only while the panel is open. It calls `useCapture` for the cooler and the run, so the
 capture poll runs only then, next to the page's own poll. It reads the Shell's rig observation for the mount and
 for holds, and asks it for one fresh read when it opens: polar alignment pauses the periodic read, so what the
-panel would show could be minutes old.
+panel would show could be minutes old. On a paused page the panel also repeats that read every five seconds while
+it is open, so a hold that begins mid-sweep appears without reopening it.
 
 Sections, in this order: Clear hold (only while a device is held, first so it is never off screen; Chris could not find it below the dew heaters on 2026-11-03), Mount, Cooler, Dew heaters, Phone. Each is present only when the rig has what it controls; with none, the panel says so.
 
@@ -94,6 +95,8 @@ run is active the capture page shows the server's value as text only. The switch
 
 One row and one Clear hold button for each device Cria holds (quarantined, or a command whose outcome Vela does not
 know). Your rig still lists the hold reason on the device row and says to clear it in Controls.
+While the mount is held, the Mount section says so above its buttons ("The mount is held: <reason>"), because that is
+where Chris looks first. A hold on another device shows only as its own row here; a held power box also disables the dew controls.
 
 Clear hold opens a confirmation: the hold reason as Cria gave it, then "Clearing the hold tells Cria it is safe to
 command <device> again. Only do this after you have checked the equipment." Only "I have checked it, clear the hold"

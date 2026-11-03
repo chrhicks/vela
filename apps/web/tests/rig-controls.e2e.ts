@@ -281,10 +281,10 @@ test('sections appear in order for what the rig has, and Phone only while a run 
   await openPanel(page)
   const headings = panel(page).getByRole('heading', { level: 3 })
 
-  await expect(headings).toHaveText(['Mount', 'Cooler', 'Phone', 'Clear hold'])
+  await expect(headings).toHaveText(['Clear hold', 'Mount', 'Cooler', 'Phone'])
 
   fixture.setCapture(idle)
-  await expect(headings).toHaveText(['Mount', 'Cooler', 'Clear hold'])
+  await expect(headings).toHaveText(['Clear hold', 'Mount', 'Cooler'])
   expect(fixture.writes).toEqual([])
 })
 
@@ -446,13 +446,13 @@ test('Dew heaters follow Cooler and are offered only for a switch with dew chann
   await controlsScene(page, { dew: dewView() })
   await page.goto('/rigs/fra400')
   await openPanel(page)
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Mount', 'Cooler', 'Dew heaters', 'Clear hold'])
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Clear hold', 'Mount', 'Cooler', 'Dew heaters'])
   await page.keyboard.press('Escape')
 
   await controlsScene(page)
   await page.goto('/rigs/fra400')
   await openPanel(page)
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Mount', 'Cooler', 'Clear hold'])
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Clear hold', 'Mount', 'Cooler'])
 })
 
 test('a fixed duty is sent once and confirmed with what the box holds', async ({ page }) => {

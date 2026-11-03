@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../../lib/api'
 import { loadRigDetail } from './load-rig-detail'
 
-const refreshIntervalMs = 5_000
+export const rigRefreshIntervalMs = 5_000
 
 type InitialError = 'not-found' | 'unavailable'
 
@@ -119,7 +119,7 @@ export function useRigDetail(rigId: string, { paused = false } = {}): RigDetailR
       clearTimer()
 
       if (!state.refreshing && document.visibilityState === 'visible') {
-        timer = setTimeout(() => void refresh(), refreshIntervalMs)
+        timer = setTimeout(() => void refresh(), rigRefreshIntervalMs)
       }
     }
 
