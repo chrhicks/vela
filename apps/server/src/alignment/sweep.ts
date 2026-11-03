@@ -14,6 +14,18 @@ export const SWEEP_MAXIMUM_DEGREES = 24
 /** Cria times a rotate out at 120 s; a leg stays under it. Settable per rig. */
 export const DEFAULT_MAX_LEG_SECONDS = 100
 
+/** Extra legs allowed after the planned ones, for the remaining distance each. */
+export const MAX_CORRECTION_LEGS = 2
+
+/** A correction follows only a leg that moved at least this far west. A mount that did not move, or moved the wrong way, gets no more legs. */
+export const MINIMUM_LEG_PROGRESS_DEGREES = 0.1
+
+/** A correction shorter than this is sent at the slowest move rate, so the stop lead at the sweep rate cannot eat it. */
+export const SLOW_CORRECTION_BELOW_DEGREES = 3
+
+/** Below this a rate is a creep (sidereal or guide speed), not one to move the axis at. */
+const MOVE_RATE_MINIMUM = 0.1
+
 /** Cria and the ASCOM drivers only accept an advertised rate, within this fraction. */
 const RATE_MATCH = 0.01
 
@@ -53,6 +65,13 @@ export function chooseSweepRate(mount: Rates, configured?: number): number {
   const usable = rates.filter(rate => rate <= PREFERRED_RATE * (1 + RATE_MATCH))
 
   return usable.at(-1) ?? rates[0]!
+}
+
+/** The slowest advertised rate that still moves the axis, never faster than the sweep rate. */
+export function slowMoveRate(mount: Rates, sweepRate: number): number {
+  const slowest = advertised(mount)?.find(rate => rate >= MOVE_RATE_MINIMUM)
+
+  return slowest === undefined ? sweepRate : Math.min(slowest, sweepRate)
 }
 
 /** The rate nearest `preferred` among those the mount advertises, for a short direction probe. */

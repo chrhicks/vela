@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chooseSweepRate, legCount, nearestAdvertisedRate } from './sweep.js'
+import { chooseSweepRate, legCount, nearestAdvertisedRate, slowMoveRate } from './sweep.js'
 
 function mount(...rates: number[]) {
   return { primaryAxisRates: rates.map(degreesPerSecond => ({ name: `${degreesPerSecond}`, degreesPerSecond })) }
@@ -49,5 +49,18 @@ describe('legCount', () => {
     expect(legCount(57.25, 0.2507, 50)).toBe(5)
     expect(legCount(57.25, 1, 100)).toBe(1)
     expect(legCount(57.25, 3.008, 100)).toBe(1)
+  })
+})
+
+describe('slowMoveRate', () => {
+  it('is the slowest advertised rate that moves the axis, skipping creep rates', () => {
+    expect(slowMoveRate(mount(0.0042, 0.2507, 3.008), 3.008)).toBe(0.2507)
+    expect(slowMoveRate(mount(0.0042, 0.2507, 3.008), 0.2507)).toBe(0.2507)
+  })
+
+  it('never exceeds the sweep rate and falls back to it without a move rate', () => {
+    expect(slowMoveRate(mount(0.5, 3.008), 0.998)).toBe(0.5)
+    expect(slowMoveRate(mount(0.0042), 1)).toBe(1)
+    expect(slowMoveRate({}, 1)).toBe(1)
   })
 })

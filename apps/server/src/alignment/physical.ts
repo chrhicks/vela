@@ -14,12 +14,16 @@ import {
 } from './physical-coordinates.js'
 import {
   DEFAULT_MAX_LEG_SECONDS,
+  MAX_CORRECTION_LEGS,
+  MINIMUM_LEG_PROGRESS_DEGREES,
+  SLOW_CORRECTION_BELOW_DEGREES,
   SWEEP_MAXIMUM_DEGREES,
   SWEEP_MINIMUM_DEGREES,
   SWEEP_TARGET_DEGREES,
   chooseSweepRate,
   legCount,
   nearestAdvertisedRate,
+  slowMoveRate,
 } from './sweep.js'
 
 export interface PhysicalAlignmentSettings {
@@ -225,7 +229,8 @@ export function createPhysicalAlignment(
     }
   }
 
-  async function move(signal: AbortSignal) {
+  /** `topUp`: told when a correction leg is about to run, for the page. */
+  async function move(signal: AbortSignal, topUp: (message: string) => void = () => {}) {
     const start = await status(signal)
     let current = start
     // Degrees moved westward since `start`, the probe included.
@@ -250,23 +255,38 @@ export function createPhysicalAlignment(
           `RA direction check changed reported DEC by ${(current.declinationDegrees - start.declinationDegrees).toFixed(3)}°`,
         )
       westward = -observed
-      const sweepRate = chooseSweepRate(start, settings.sweepRateDegreesPerSecond)
-      westRate = -Math.sign(observed) * sweepRate
+      westRate = -Math.sign(observed) * chooseSweepRate(start, settings.sweepRateDegreesPerSecond)
     }
 
-    const signedRate = westRate
-    const rate = Math.abs(signedRate)
+    const sweepRate = westRate
     const maxLegSeconds = settings.maxLegSeconds ?? DEFAULT_MAX_LEG_SECONDS
-    let legsLeft = legCount(SWEEP_TARGET_DEGREES - westward, rate, maxLegSeconds)
-    const legs = legsLeft
+    const planned = legCount(SWEEP_TARGET_DEGREES - westward, Math.abs(sweepRate), maxLegSeconds)
+    let corrections = 0
     const travels: number[] = []
 
-    // Consecutive rotates, none past the leg limit. Each leg asks for what is left
-    // divided by the legs still to go, so one leg's stop error is made up by the others.
-    while (legsLeft > 0 && westward < SWEEP_MINIMUM_DEGREES) {
+    // Consecutive rotates, none past the leg limit. Each planned leg asks for what is left
+    // divided by the planned legs still to go, so one leg's stop error is made up by the others.
+    // When they are used up short of the corridor, up to MAX_CORRECTION_LEGS legs ask for what is left.
+    while (westward < SWEEP_MINIMUM_DEGREES) {
       signal.throwIfAborted()
-      const distance = (SWEEP_TARGET_DEGREES - westward) / legsLeft
-      const leg = legs - legsLeft + 1
+      const leg = travels.length + 1
+      const correction = leg > planned
+      const remaining = SWEEP_TARGET_DEGREES - westward
+      let signedRate = sweepRate
+      let distance = remaining / (planned - travels.length)
+
+      if (correction) {
+        if (corrections === MAX_CORRECTION_LEGS || travels.at(-1)! < MINIMUM_LEG_PROGRESS_DEGREES) break
+        corrections++
+
+        if (remaining < SLOW_CORRECTION_BELOW_DEGREES)
+          signedRate = Math.sign(sweepRate) * slowMoveRate(start, Math.abs(sweepRate))
+
+        distance = Math.min(remaining, Math.abs(signedRate) * maxLegSeconds)
+        topUp(`Topping up the sweep by ${distance.toFixed(1)}°`)
+      }
+
+      const legs = planned + corrections
 
       const reported = await tracer.startActiveSpan(
         'alignment.sweep_leg',
@@ -276,6 +296,7 @@ export function createPhysicalAlignment(
             'alignment.sweep.legs': legs,
             'alignment.sweep.rate_degrees_per_second': signedRate,
             'alignment.sweep.asked_degrees': distance,
+            'alignment.sweep.correction': correction,
           },
         },
         async span => {
@@ -325,7 +346,6 @@ export function createPhysicalAlignment(
 
       westward += reported
       travels.push(reported)
-      legsLeft--
     }
 
     if (
