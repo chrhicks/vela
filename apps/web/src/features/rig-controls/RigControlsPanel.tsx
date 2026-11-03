@@ -37,6 +37,24 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
 
   return (
     <div className="rig-controls__sections">
+      {/* First in the panel: a held device blocks everything else, and the page's "Clear the hold in Controls" points here.
+          It sat below the dew heaters, off screen, and Chris could not find it (2026-11-03). */}
+      {held.length > 0 && refreshRig && (
+        <section className="rig-controls__section" aria-label="Held devices">
+          <h3>Clear hold</h3>
+          {held.map(device => device.observation?.hold && (
+            <div className="rig-controls__hold" role="group" aria-label={`${device.name} is held`} key={device.id}>
+              <p>{device.name}: {device.observation.hold.reason}</p>
+              <ClearHold
+                rigId={rigId}
+                deviceName={device.name}
+                hold={device.observation.hold}
+                refresh={() => refreshRig({ force: true })}
+              />
+            </div>
+          ))}
+        </section>
+      )}
       {mount?.mountControl && refreshRig && (
         <section className="rig-controls__section" aria-label="Mount">
           <h3>Mount</h3>
@@ -86,22 +104,6 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
             onChange={event => void capture.setUnattended(event.target.checked)}
           />
           {capture.unattendedError && <p role="alert" className="rig-controls__error">{capture.unattendedError}</p>}
-        </section>
-      )}
-      {held.length > 0 && refreshRig && (
-        <section className="rig-controls__section" aria-label="Held devices">
-          <h3>Clear hold</h3>
-          {held.map(device => device.observation?.hold && (
-            <div className="rig-controls__hold" role="group" aria-label={`${device.name} is held`} key={device.id}>
-              <p>{device.name}: {device.observation.hold.reason}</p>
-              <ClearHold
-                rigId={rigId}
-                deviceName={device.name}
-                hold={device.observation.hold}
-                refresh={() => refreshRig({ force: true })}
-              />
-            </div>
-          ))}
         </section>
       )}
       {warned.map(device => device.observation?.warning && (
