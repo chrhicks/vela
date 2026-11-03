@@ -81,10 +81,21 @@ async function controlsScene(page: Page, options: { mount?: boolean; held?: bool
   let dew = options.dew
   let dewReply: 'answered' | 'lost' = 'answered'
   let warned = options.warned ?? false
+  let heldKind: RigDetailView['devices'][number]['kind'] | undefined = held ? 'focuser' : undefined
 
   const withDew = (rig: RigDetailView): RigDetailView => ({
     ...rig,
     devices: rig.devices.map(device => device.kind === 'switch' && dew ? { ...device, dewControl: dew } : device),
+  })
+
+  const withHold = (rig: RigDetailView): RigDetailView => ({
+    ...rig,
+    devices: rig.devices.map(device => device.kind === heldKind
+      ? {
+        ...device,
+        observation: { state: 'current', commandReady: false, observedAt: scene.time, message: holdReason, hold: { deviceId: `cria:fra400:${device.kind}`, reason: holdReason } },
+      }
+      : device),
   })
 
   const withWarning = (rig: RigDetailView): RigDetailView => ({
@@ -119,20 +130,13 @@ async function controlsScene(page: Page, options: { mount?: boolean; held?: bool
         } satisfies RigTelescopeDeviceView]
       }
 
-      if (device.kind === 'focuser' && held) {
-        return [{
-          ...device,
-          observation: { state: 'current', commandReady: false, observedAt: scene.time, message: holdReason, hold: { deviceId: 'cria:fra400:focuser', reason: holdReason } },
-        }]
-      }
-
       return [device]
     }),
   })
 
   await page.route('**/api/**', route => route.fulfill({ status: 503, json: { error: 'No fixture for this request' } }))
   await page.route('**/api/web/navigation', route => respond(route, { rigs: [], captures: [] }))
-  await page.route('**/api/web/rigs/fra400', route => respond(route, withWarning(withDew(scene.snapshot().rig))))
+  await page.route('**/api/web/rigs/fra400', route => respond(route, withWarning(withHold(withDew(scene.snapshot().rig)))))
   await page.route('**/api/web/rigs/fra400/capture', route => capture ? respond(route, capture) : respond(route, { error: 'No camera' }, 503))
   await page.route('**/api/rigs/fra400/capture/cooling', route => {
     const body = route.request().postDataJSON()
@@ -196,6 +200,7 @@ async function controlsScene(page: Page, options: { mount?: boolean; held?: bool
   return {
     writes,
     setCapture: (value: CaptureView | null) => { capture = value },
+    hold: (kind: NonNullable<typeof heldKind> | undefined) => { heldKind = kind },
     loseDewReply: () => { dewReply = 'lost' },
   }
 }
@@ -276,10 +281,10 @@ test('sections appear in order for what the rig has, and Phone only while a run 
   await openPanel(page)
   const headings = panel(page).getByRole('heading', { level: 3 })
 
-  await expect(headings).toHaveText(['Mount', 'Cooler', 'Phone', 'Clear hold'])
+  await expect(headings).toHaveText(['Clear hold', 'Mount', 'Cooler', 'Phone'])
 
   fixture.setCapture(idle)
-  await expect(headings).toHaveText(['Mount', 'Cooler', 'Clear hold'])
+  await expect(headings).toHaveText(['Clear hold', 'Mount', 'Cooler'])
   expect(fixture.writes).toEqual([])
 })
 
@@ -367,6 +372,41 @@ test('Clear hold lives in the panel: one confirmed request, and the panel stays 
   expect(fixture.writes[0]).toMatchObject({ method: 'POST', path: 'recover' })
 })
 
+test('a mount held after the polar alignment page loaded shows Clear hold when the panel opens', async ({ page }) => {
+  const fixture = await controlsScene(page, { held: false })
+  await page.goto('/rigs/fra400/observe/alignment')
+  await expect(controlsButton(page)).toBeVisible()
+
+  fixture.hold('telescope')
+  await openPanel(page)
+
+  const held = panel(page).getByRole('group', { name: 'ASI Mount is held' })
+
+  await expect(held).toContainText(holdReason)
+  await expect(held.getByRole('button', { name: 'Clear hold' })).toBeVisible()
+})
+
+test('a hold that begins while Controls is open on the polar alignment page appears without reopening', async ({ page }) => {
+  const fixture = await controlsScene(page, { held: false })
+  await page.goto('/rigs/fra400/observe/alignment')
+  await openPanel(page)
+  await expect(panel(page).getByRole('group', { name: 'ASI Mount is held' })).toHaveCount(0)
+
+  fixture.hold('telescope')
+
+  await expect(panel(page).getByRole('group', { name: 'ASI Mount is held' })).toBeVisible({ timeout: 10_000 })
+})
+
+test('a held mount says so in the Mount section, above its buttons', async ({ page }) => {
+  await controlsScene(page, { held: false }).then(fixture => fixture.hold('telescope'))
+  await page.goto('/rigs/fra400')
+  await openPanel(page)
+
+  const mount = panel(page).getByRole('region', { name: 'Mount' })
+
+  await expect(mount.getByText(`The mount is held: ${holdReason}`)).toBeVisible()
+})
+
 test('an uncertain ending on a device that is not held shows a warning with Cria\'s reason, and Dismiss clears it', async ({ page }) => {
   const fixture = await controlsScene(page, { held: false, warned: true })
   await page.goto('/rigs/fra400')
@@ -406,13 +446,13 @@ test('Dew heaters follow Cooler and are offered only for a switch with dew chann
   await controlsScene(page, { dew: dewView() })
   await page.goto('/rigs/fra400')
   await openPanel(page)
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Mount', 'Cooler', 'Dew heaters', 'Clear hold'])
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Clear hold', 'Mount', 'Cooler', 'Dew heaters'])
   await page.keyboard.press('Escape')
 
   await controlsScene(page)
   await page.goto('/rigs/fra400')
   await openPanel(page)
-  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Mount', 'Cooler', 'Clear hold'])
+  await expect(panel(page).getByRole('heading', { level: 3 })).toHaveText(['Clear hold', 'Mount', 'Cooler'])
 })
 
 test('a fixed duty is sent once and confirmed with what the box holds', async ({ page }) => {

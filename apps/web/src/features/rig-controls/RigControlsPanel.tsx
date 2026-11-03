@@ -4,6 +4,7 @@ import { pagingLabel } from '../alerts/presentation'
 import { useCapture } from '../capture/use-capture'
 import { DeviceWarning } from '../rig-detail/DeviceWarning'
 import { useRigObservation } from '../rig-detail/RigContext'
+import { rigRefreshIntervalMs } from '../rig-detail/use-rig-detail'
 import { ClearHold } from './ClearHold'
 import { coolingBlocker } from './cooling-blocker'
 import { CoolerControls } from './CoolerControls'
@@ -12,12 +13,13 @@ import { MountControls } from './MountControls'
 
 /**
  * The sections, in order, each present only when the rig has what it controls:
- * Mount, Cooler, Dew heaters, Phone, Clear hold. A control that cannot run now stays visible and says why.
+ * Clear hold, Mount, Cooler, Dew heaters, Phone. A control that cannot run now stays visible and says why.
  */
 export function RigControlsPanel({ rigId }: { rigId: string }) {
   const rig = useRigObservation()
   const capture = useCapture(rigId)
   const refreshRig = rig?.refresh
+  const paused = rig?.paused
   const view = rig?.view
   const stale = !!rig?.interrupted
   const base = `/rigs/${encodeURIComponent(rigId)}`
@@ -28,10 +30,16 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
   const cooler = !!capture.view?.cooling || !!capture.coolingError
   const phone = !!capture.view?.active
 
-  // Polar alignment pauses the periodic read, so what the panel shows could be minutes old.
+  // Polar alignment pauses the periodic read, so what the panel shows could be minutes old, and a hold that
+  // begins mid-sweep would never appear. While the panel is open the read runs on the page's own pace.
   useEffect(() => {
     void refreshRig?.()
-  }, [refreshRig])
+
+    if (!paused) return
+    const timer = setInterval(() => void refreshRig?.(), rigRefreshIntervalMs)
+
+    return () => clearInterval(timer)
+  }, [refreshRig, paused])
 
   const empty = !mount?.mountControl && !cooler && !power && !phone && held.length === 0 && warned.length === 0
 
@@ -58,6 +66,7 @@ export function RigControlsPanel({ rigId }: { rigId: string }) {
       {mount?.mountControl && refreshRig && (
         <section className="rig-controls__section" aria-label="Mount">
           <h3>Mount</h3>
+          {mount.observation?.hold && <p className="rig-controls__error">The mount is held: {mount.observation.hold.reason}</p>}
           <MountControls
             rigId={rigId}
             device={mount}
