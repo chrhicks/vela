@@ -761,7 +761,7 @@ export function createAlignmentController(options: AlignmentControllerOptions) {
         patch({ activity: 'moving', position, solvedPositions: fixes.length })
 
         if (physical)
-          await step('alignment.move', () => physical.move(signal), {
+          await step('alignment.move', () => physical.move(signal, warning => patch({ warning })), {
             'alignment.position': position,
           })
         else await hardware.move(settings.telescopeId, 1.5, offlineSweep.stepDegrees / 1.5, signal)

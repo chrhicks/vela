@@ -303,6 +303,21 @@ it('uses physical optics, selected Bayer camera, and midpoint geometry while pre
   expect(png[25]).toBe(2) // PNG IHDR color type: RGB, not grayscale Bayer samples.
 })
 
+it('shows a sweep top-up on the page while the mount moves', async () => {
+  const subject = setup()
+  const shown: Array<[string | null | undefined, string | undefined]> = []
+
+  vi.mocked(subject.physical.move).mockImplementation(async (_signal, topUp) => {
+    topUp?.('Topping up the sweep by 1.7°')
+    const { warning, activity } = subject.controller.snapshot()
+    shown.push([warning, activity])
+  })
+  await subject.baseline()
+  await vi.waitFor(() => expect(subject.controller.snapshot().measurement).not.toBeNull())
+  expect(shown[0]).toEqual(['Topping up the sweep by 1.7°', 'moving'])
+  expect(subject.controller.snapshot().warning).toBeNull()
+})
+
 it('requests a chosen exposure and centres every sample on its midpoint', async () => {
   const subject = setup()
   await subject.baseline(undefined, 10)

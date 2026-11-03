@@ -537,9 +537,9 @@ describe('multi-leg sweep', () => {
   it('fails when the sum of the legs is outside the corridor, naming each leg', async () => {
     const fake = am5()
     await fake.alignment.prepare(signal)
-    reportTravel(fake, distance => distance * 0.8)
-    await expect(fake.alignment.move(signal)).rejects.toThrow(/RA sweep expected 21.6–24° westward; mount reported \d+\.\d+° over 3 legs \(/)
-    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(3)
+    reportTravel(fake, distance => distance * 0.5)
+    await expect(fake.alignment.move(signal)).rejects.toThrow(/RA sweep expected 21.6–24° westward; mount reported \d+\.\d+° over 5 legs \(/)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(5)
   })
 
   it('takes a configured advertised rate', async () => {
@@ -615,6 +615,127 @@ describe('multi-leg sweep', () => {
     await fake.alignment.move(signal)
     expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(2)
     expect((startRa - fake.mount.rightAscensionDegrees + 360) % 360).toBeCloseTo(22.8, 0)
+  })
+})
+
+describe('sweep correction legs', () => {
+  /** At 9x with a 12 s leg limit the first 23.05° is one planned leg. */
+  function nineTimes() {
+    const fake = observatory(-1, { sweepRateDegreesPerSecond: 3.008, maxLegSeconds: 12 })
+    fake.mount.primaryAxisRates = am5Rates
+    vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
+
+    return fake
+  }
+
+  const rotations = (fake: ReturnType<typeof observatory>) =>
+    vi.mocked(fake.acquisition.rotateRightAscension).mock.calls.map(([, rate, distance]) => ({ rate, distance }))
+
+  function reportTravel(fake: ReturnType<typeof observatory>, travelled: (asked: number, leg: number) => number) {
+    let leg = 0
+
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async (_id, _rate, distance) => ({
+      travelledDegrees: travelled(distance, leg++),
+    }))
+  }
+
+  // The direction probe leaves the sweep 0.25° behind, so westward starts at -0.25.
+  it('tops up a short sweep at the slow move rate and passes', async () => {
+    const fake = nineTimes()
+    const topUp = vi.fn()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, (distance, leg) => (leg === 0 ? distance * 0.92 : distance))
+    await expect(fake.alignment.move(signal, topUp)).resolves.toBeUndefined()
+    const [first, second, ...more] = rotations(fake)
+    expect(more).toEqual([])
+    expect(first?.rate).toBe(-3.008)
+    expect(second?.rate).toBe(-0.2507)
+    expect(second?.distance).toBeCloseTo(-(22.8 - (-0.25 - first!.distance * 0.92)), 5)
+    expect(topUp).toHaveBeenCalledExactlyOnceWith('Topping up the sweep by 1.8°')
+  })
+
+  it('sends a correction of 3° or more at the sweep rate', async () => {
+    const fake = nineTimes()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, (distance, leg) => (leg === 0 ? distance * 0.5 : distance))
+    await fake.alignment.move(signal)
+    const second = rotations(fake)[1]
+    expect(Math.abs(second!.distance)).toBeGreaterThan(3)
+    expect(second?.rate).toBe(-3.008)
+  })
+
+  it('asks for the whole remaining distance in each correction', async () => {
+    const fake = nineTimes()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, (distance, leg) => distance * [0.5, 0.85, 1][leg]!)
+    await fake.alignment.move(signal)
+    const asked = rotations(fake).map(rotation => -rotation.distance)
+    expect(asked).toHaveLength(3)
+    const [first = NaN, second = NaN, third = NaN] = asked
+    const afterFirst = -0.25 + first * 0.5
+    expect(second).toBeCloseTo(22.8 - afterFirst, 5)
+    expect(third).toBeCloseTo(22.8 - afterFirst - second * 0.85, 5)
+  })
+
+  it('fails with the sweep message when two correction legs are still short', async () => {
+    const fake = nineTimes()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, distance => distance * 0.5)
+    await expect(fake.alignment.move(signal)).rejects.toThrow(/RA sweep expected 21.6–24° westward; mount reported \d+\.\d+° over 3 legs \(/)
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(3)
+  })
+
+  it('adds no leg for a mount that did not move', async () => {
+    const fake = nineTimes()
+    const topUp = vi.fn()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, () => 0)
+    await expect(fake.alignment.move(signal, topUp)).rejects.toThrow('mount reported -0.250° over 1 leg (0.000°)')
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(1)
+    expect(topUp).not.toHaveBeenCalled()
+  })
+
+  it('still fails when the planned legs overshoot the corridor', async () => {
+    const fake = nineTimes()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, distance => distance * 1.2)
+    await expect(fake.alignment.move(signal)).rejects.toThrow('RA sweep expected')
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails when a correction leg overshoots the corridor', async () => {
+    const fake = nineTimes()
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, (distance, leg) => (leg === 0 ? distance * 0.92 : distance * 3))
+    await expect(fake.alignment.move(signal)).rejects.toThrow('RA sweep expected')
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps a correction within the leg time limit', async () => {
+    const fake = observatory(-1, { sweepRateDegreesPerSecond: 0.2507, maxLegSeconds: 35 })
+    fake.mount.primaryAxisRates = am5Rates
+    vi.mocked(fake.acquisition.move).mockImplementation(async () => ({ travelledDegrees: 0.25 }))
+    await fake.alignment.prepare(signal)
+    reportTravel(fake, distance => distance * 0.3)
+    await expect(fake.alignment.move(signal)).rejects.toThrow('RA sweep expected')
+    const [, , , firstCorrection] = rotations(fake)
+    expect(firstCorrection?.distance).toBeCloseTo(-0.2507 * 35, 5)
+
+    for (const { rate, distance } of rotations(fake).slice(3)) expect(Math.abs(distance / rate)).toBeLessThanOrEqual(35 + 1e-9)
+  })
+
+  it('runs no further leg when Cria refuses a correction', async () => {
+    const fake = nineTimes()
+    await fake.alignment.prepare(signal)
+    let leg = 0
+
+    vi.mocked(fake.acquisition.rotateRightAscension).mockImplementation(async (_id, _rate, distance) => {
+      if (leg++ === 1) throw new Error('Cria refused: the rotation would cross the keep-out')
+
+      return { travelledDegrees: distance * 0.9 }
+    })
+    await expect(fake.alignment.move(signal)).rejects.toThrow('Cria refused: the rotation would cross the keep-out')
+    expect(fake.acquisition.rotateRightAscension).toHaveBeenCalledTimes(2)
   })
 })
 
