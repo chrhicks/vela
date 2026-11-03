@@ -12,7 +12,7 @@ capture poll runs only then, next to the page's own poll. It reads the Shell's r
 for holds, and asks it for one fresh read when it opens: polar alignment pauses the periodic read, so what the
 panel would show could be minutes old.
 
-Sections, in this order: Mount, Cooler, Dew heaters, Phone, Clear hold. Each is present only when the rig has what it controls; with none, the panel says so.
+Sections, in this order: Clear hold (only while a device is held, first so it is never off screen; Chris could not find it below the dew heaters on 2026-11-03), Mount, Cooler, Dew heaters, Phone. Each is present only when the rig has what it controls; with none, the panel says so.
 
 ## Mount
 
