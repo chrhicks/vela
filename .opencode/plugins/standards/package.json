@@ -1,9 +1,0 @@
-{
-  "name": "vela-standards-review",
-  "private": true,
-  "type": "module",
-  "exports": {
-    ".": "./index.ts",
-    "./tui": "./tui.tsx"
-  }
-}
