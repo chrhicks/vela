@@ -15,6 +15,7 @@ import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
 import { makePointing } from '../pointing/pointing.ts'
 import { makePrepare } from '../prepare/prepare.ts'
+import { makeFocusDrift } from '../rig/focus.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
@@ -29,6 +30,7 @@ const picture = makePicture()
 const nightSettings = { devices: settings.devices, silenceMs: settings.silenceSeconds * 1000, focuserNudgeSteps: settings.prepare.focuserNudgeSteps }
 
 const devices = settings.devices
+const focusDrift = makeFocusDrift(devices.focuser)
 const activity = makeActivity({
   titles: { [devices.mount]: 'Mount', [devices.primary]: 'Main camera', [devices.guide]: 'Guide camera', [devices.focuser]: 'Focuser', [devices.box]: 'Power box' },
   nightOf: at => nightOf(at, naming),
@@ -71,6 +73,7 @@ const capture = makeCapture({
 })
 const page = makePage({
   night: () => makeNight(picture, nightSettings, Date.now()),
+  focus: () => focusDrift.view(),
   refreshMs: settings.pageRefreshSeconds * 1000,
   frames: () => listNight(frames.keepDir, nightOf(Date.now(), naming)),
   preview: makePreviews(frames.keepDir, frames.preview).get,
@@ -108,6 +111,7 @@ const following = await followRig({
     sender.answered(entry)
     capture.observe(entry)
     pointing.observe(entry)
+    focusDrift.observe(entry)
 
     const item = activity.observe(entry)
 
