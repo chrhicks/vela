@@ -6,7 +6,7 @@ The old Vela (web app, server, solver, archiver, rig model, workshop) was remove
 
 - `src/catalog/`: OpenNGC target data (J2000).
 - `src/sky/`: J2000 to epoch-of-date conversion.
-- `compose.yaml`, `tools/nats/`: the NATS broker for the rig stream.
+- `compose.yaml`, `deploy/nats.conf`: the NATS broker for the rig stream. It has no logins (the home network is trusted, as with indiserver) and nothing to provision: the rig program creates the `RIG_DEV` stream itself. The config is the listen address and JetStream's folder and size limits.
 
 ```sh
 pnpm install

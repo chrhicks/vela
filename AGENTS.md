@@ -8,7 +8,7 @@ Vela is being rebuilt on the rig stream (plan: `bots/observer/specs/vela-next/pl
 
 - `src/catalog/`: OpenNGC target data (J2000) and its row types. See its `README.md` for provenance and the license.
 - `src/sky/coordinates.ts`: J2000 to epoch-of-date conversion (`toMount`, `fromMount`, `angularDistance`) on `astronomy-engine`.
-- `compose.yaml` and `tools/nats/`: the NATS broker that carries the rig stream, and its provisioning. Provisioning is `python3 tools/nats/provision.py`; `tools/nats/verify.py` runs a throwaway broker through every permission.
+- `compose.yaml` and `deploy/nats.conf`: the NATS broker that carries the rig stream. It has no logins and nothing to provision; the rig program creates the `RIG_DEV` stream.
 - `verify.sh`: typecheck and tests.
 
 The broker's data (`~/.local/share/vela/nats`), Vela's saved images and its archives are data on disk. Nothing in this repo deletes them.
