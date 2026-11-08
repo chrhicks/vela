@@ -1,4 +1,6 @@
 import { makePrepareView, type PrepareView } from '../prepare/view.ts'
+import { siteOf } from '../pointing/target.ts'
+import { nightTimes, type NightTimes } from '../sky/darkness.ts'
 import { formatDuration, meridianText, secondsToMeridianLimit } from '../sky/meridian.ts'
 import type { Value } from '../stream/entry.ts'
 import type { Picture, Property } from './picture.ts'
@@ -27,6 +29,7 @@ export interface Night {
   readonly rig: { readonly connectedAt: number | undefined; readonly connection: number | undefined; readonly indiserver: string; readonly silentSeconds: number | undefined }
   readonly devices: ReadonlyArray<DeviceView>
   readonly prepare: PrepareView
+  readonly sky: (NightTimes & { readonly meridianLimitAt: number | undefined }) | undefined
 }
 
 export interface DeviceIds {
@@ -237,6 +240,15 @@ export function makeNight(picture: Picture, settings: NightSettings, now: number
     },
   ]
 
+  const site = siteOf(picture, ids.mount)
+  const tonight = site === undefined ? undefined : nightTimes(site, now)
+  const trackingNow = read(ids.mount, 'TELESCOPE_TRACK_STATE', 'TRACK_ON').value === true
+  const raNow = read(ids.mount, 'EQUATORIAL_EOD_COORD', 'RA').value
+  const limitNow = read(ids.mount, 'MERIDIAN_LIMIT', 'LIMIT').value
+  const meridianLimitAt = site !== undefined && trackingNow && typeof raNow === 'number' && typeof limitNow === 'number'
+    ? now + secondsToMeridianLimit({ raHours: raNow, longitudeDegrees: site.longitudeDegrees, limitDegrees: limitNow, at: now }) * 1000
+    : undefined
+
   return {
     at: now,
     phase,
@@ -248,5 +260,6 @@ export function makeNight(picture: Picture, settings: NightSettings, now: number
     },
     devices,
     prepare: makePrepareView(picture, { focuser: ids.focuser, box: ids.box, focuserNudgeSteps: settings.focuserNudgeSteps }),
+    sky: tonight === undefined ? undefined : { ...tonight, meridianLimitAt },
   }
 }
