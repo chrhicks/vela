@@ -23,7 +23,7 @@ afterEach(async () => {
   await rm(keepDir, { recursive: true, force: true })
 })
 
-function setup(overrides: { attempts?: number } = {}) {
+function setup(overrides: { attempts?: number; labels?: Record<string, { run: string; sequence: string; frame: number }> } = {}) {
   const spool = fakeSpool(spoolDir)
   const kept: KeptFrame[] = []
   const problems: string[] = []
@@ -32,6 +32,7 @@ function setup(overrides: { attempts?: number } = {}) {
   const keeper = makeKeeper({
     ssh: spool.ssh,
     settings: { spoolDir, keepDir, naming, copyAttempts: overrides.attempts ?? 3, copyRetryMs: 5000 },
+    labelOf: file => overrides.labels?.[file],
     now: () => keptAtMs,
     sleep: async ms => void sleeps.push(ms),
     onKept: frame => void kept.push(frame),
@@ -66,6 +67,19 @@ describe('keeper', () => {
       keptAt: new Date(keptAtMs).toISOString(),
     } satisfies Sidecar)
     expect(spool.commands.map(command => command.split(' ')[0])).toEqual(['find', 'cat', 'sha256sum'])
+  })
+
+  it('writes the run, sequence and frame number into the sidecar when the capture labelled the file', async () => {
+    const { spool, keeper } = setup({ labels: { 'test_001.fits': { run: 'run-1', sequence: 'M-31_light', frame: 4 } } })
+
+    spool.files.set('test_001.fits', { content: content('labelled'), modifiedAt: frameTime })
+    spool.files.set('test_002.fits', { content: content('unlabelled'), modifiedAt: frameTime + 1000 })
+    await keeper.requestScan()
+
+    const sidecar = async (file: string) => JSON.parse(await readFile(join(keepDir, '2026-11-07', `${file}.json`), 'utf8')) as Sidecar
+
+    expect(await sidecar('test_001.fits')).toMatchObject({ run: 'run-1', sequence: 'M-31_light', frame: 4 })
+    expect(await sidecar('test_002.fits')).toMatchObject({ run: null, sequence: null, frame: null })
   })
 
   it('copies to a temporary name and renames it, so the frame name never holds a partial file', async () => {
@@ -167,6 +181,7 @@ describe('keeper', () => {
     const failing = makeKeeper({
       ssh: async () => ({ code: 255, stdout: '', stderr: 'no route' }),
       settings: { spoolDir, keepDir, naming, copyAttempts: 1, copyRetryMs: 0 },
+      labelOf: () => undefined,
       now: () => keptAtMs,
       sleep: async () => {},
       onKept: () => {},

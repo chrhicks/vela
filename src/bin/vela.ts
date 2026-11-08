@@ -1,5 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { jetstream } from '@nats-io/jetstream'
+import { runEntry, runSubject } from '../capture/events.ts'
+import { makeRunFile } from '../capture/runfile.ts'
+import { makeCapture } from '../capture/run.ts'
+import { makeSender } from '../commands/sender.ts'
 import { readConfig } from '../config.ts'
 import { announcesFrame } from '../frames/announce.ts'
 import { frameEntry, frameSubject } from '../frames/entry.ts'
@@ -25,15 +30,44 @@ function lost(reason: string): never {
   process.exit(1)
 }
 
+const sender = makeSender({
+  publish: (subject, payload) => following.connection.publish(subject, payload),
+  newId: () => `vela-${randomUUID()}`,
+  answerTimeoutMs: settings.capture.commandAnswerSeconds * 1000,
+  by: 'vela',
+})
+const capture = makeCapture({
+  picture,
+  sender,
+  settings: {
+    device: settings.devices.primary,
+    spoolDir: frames.spoolDir,
+    settleMs: settings.capture.settleSeconds * 1000,
+    exposureSilenceMs: settings.capture.exposureSilenceSeconds * 1000,
+    failuresInRow: settings.capture.failuresInRow,
+    silenceMs: settings.silenceSeconds * 1000,
+  },
+  runFile: makeRunFile(settings.capture.runFile),
+  now: Date.now,
+  newRunId: () => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''),
+  emit: event => {
+    jetstream(following.connection)
+      .publish(runSubject, JSON.stringify(runEntry(event, frames.rig, Date.now())))
+      .catch((error: unknown) => console.error(`vela: could not publish the ${event.kind} entry of run ${event.run}: ${String(error)}`))
+  },
+  onChange: () => page.captureChanged(),
+})
 const page = makePage({
   night: () => makeNight(picture, nightSettings, Date.now()),
   refreshMs: settings.pageRefreshSeconds * 1000,
   frames: () => listNight(frames.keepDir, nightOf(Date.now(), naming)),
   preview: makePreviews(frames.keepDir, frames.preview).get,
+  capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
 })
 
 const keeper = makeKeeper({
   ssh: makeSsh(frames.host, frames.sshTimeoutSeconds * 1000),
+  labelOf: capture.labelOf,
   settings: { spoolDir: frames.spoolDir, keepDir: frames.keepDir, naming, copyAttempts: frames.copyAttempts, copyRetryMs: frames.copyRetrySeconds * 1000 },
   now: Date.now,
   sleep: ms => sleep(ms),
@@ -55,6 +89,8 @@ const following = await followRig({
     if (entry === undefined) return
 
     picture.apply(entry, Date.now())
+    sender.answered(entry)
+    capture.observe(entry)
     if (announcesFrame(entry, settings.devices.primary)) void keeper.requestScan()
   },
   onCaughtUp: () => picture.caughtUp(),

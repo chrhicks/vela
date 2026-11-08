@@ -14,6 +14,9 @@
     "spoolDir": "/home/example/frames",
     "nightZone": "America/Phoenix"
   },
+  "capture": {
+    "runFile": "/home/example/.local/state/vela/run.json"
+  },
   "silenceSeconds": 10,
   "pageRefreshSeconds": 1,
   "historyReadBatch": 2048

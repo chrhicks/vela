@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { createServer, type Server, type ServerResponse } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import type { CaptureView, StartResult } from '../capture/run.ts'
 import type { Frames } from '../frames/library.ts'
 import type { Night } from '../rig/night.ts'
 
@@ -12,9 +13,14 @@ export interface PageOptions {
   readonly refreshMs: number
   readonly frames: () => Promise<Frames>
   readonly preview: (night: string, file: string) => Promise<Buffer | undefined>
+  readonly capture: {
+    readonly view: () => CaptureView
+    readonly start: (request: unknown) => StartResult
+    readonly stop: () => Promise<boolean>
+  }
 }
 
-export function makePage({ night, refreshMs, frames, preview }: PageOptions) {
+export function makePage({ night, refreshMs, frames, preview, capture }: PageOptions) {
   const watching = new Set<ServerResponse>()
 
   function send(response: ServerResponse, event: string, data: unknown) {
@@ -27,6 +33,8 @@ export function makePage({ night, refreshMs, frames, preview }: PageOptions) {
     const snapshot = night()
 
     for (const response of watching) send(response, 'night', snapshot)
+
+    captureChanged()
   }, refreshMs)
 
   timer.unref()
@@ -36,8 +44,73 @@ export function makePage({ night, refreshMs, frames, preview }: PageOptions) {
     response.end(error instanceof Error ? error.message : String(error))
   }
 
+  function captureChanged() {
+    if (watching.size === 0) return
+
+    const view = capture.view()
+
+    for (const response of watching) send(response, 'capture', view)
+  }
+
+  function refuseUnlessJson(request: IncomingMessage, response: ServerResponse) {
+    if (request.headers['content-type']?.split(';')[0]?.trim() === 'application/json') return false
+
+    response.writeHead(415, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'send application/json' }))
+
+    return true
+  }
+
+  async function readBody(request: IncomingMessage) {
+    const chunks: Buffer[] = []
+
+    for await (const chunk of request) chunks.push(chunk as Buffer)
+
+    return Buffer.concat(chunks).toString('utf8')
+  }
+
+  function answer(response: ServerResponse, status: number, body: unknown) {
+    response.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body))
+  }
+
   const server: Server = createServer((request, response) => {
     const path = (request.url ?? '').split('?')[0] ?? ''
+
+    if (path === '/capture.json' && request.method === 'GET') {
+      answer(response, 200, capture.view())
+
+      return
+    }
+
+    if (path === '/capture' && request.method === 'POST') {
+      if (refuseUnlessJson(request, response)) return
+
+      readBody(request).then(text => {
+        let json: unknown
+
+        try {
+          json = JSON.parse(text)
+        } catch {
+          answer(response, 400, { error: 'the body is not JSON' })
+
+          return
+        }
+
+        const started = capture.start(json)
+
+        if (started.ok) answer(response, 202, { run: started.run })
+        else answer(response, 409, { error: started.reason })
+      }, error => fail(response, error))
+
+      return
+    }
+
+    if (path === '/capture/stop' && request.method === 'POST') {
+      if (refuseUnlessJson(request, response)) return
+
+      capture.stop().then(stopped => answer(response, 200, { stopped }), error => fail(response, error))
+
+      return
+    }
 
     if (path === '/') {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
@@ -82,6 +155,7 @@ export function makePage({ night, refreshMs, frames, preview }: PageOptions) {
       watching.add(response)
       response.on('close', () => watching.delete(response))
       send(response, 'night', night())
+      send(response, 'capture', capture.view())
       frames().then(list => send(response, 'frames', list), () => undefined)
 
       return
@@ -103,5 +177,5 @@ export function makePage({ night, refreshMs, frames, preview }: PageOptions) {
     )
   }
 
-  return { server, framesChanged }
+  return { server, framesChanged, captureChanged }
 }

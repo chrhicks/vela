@@ -47,6 +47,32 @@ export const FrameSettings = Schema.Struct({
   ),
 })
 
+export const CaptureSettings = Schema.Struct({
+  runFile: Schema.String.annotate({
+    description: 'A small file naming the run in progress, written when a run starts and removed when it ends. A run found in it at start is marked interrupted: Vela never resumes a run. Put it on this machine\'s state directory, not a temporary one, so a reboot during a run still shows',
+  }),
+  commandAnswerSeconds: described(
+    'How long to wait for the rig program\'s answer to one command before it counts as unknown. Not measured: no command has been sent yet (2026-11-07). The rig program answers every command once, as soon as it has written or refused the property, with no queue, so the wait is one broker round trip plus the write',
+    Schema.Number,
+    10,
+  ),
+  settleSeconds: described(
+    'How long after a command was written its effect may take to show on the stream (a setting, or the camera ending an abort) before the run stops as unknown. Not measured: no capture has run yet (2026-11-07). The driver echoes a changed property on the same INDI connection, so a missing echo after this long means the write did not take, and the command is never sent again',
+    Schema.Number,
+    10,
+  ),
+  exposureSilenceSeconds: described(
+    'How long the camera driver may send no CCD_EXPOSURE update during an exposure before the frame counts as failed and is aborted. While exposing, the driver sent CCD_EXPOSURE Busy with the time left at most 2.4 s apart (median 0.99 s), a retry showed as the time left jumping back up to the full exposure (110 retries), and from the last Busy update to Ok or Alert took at most 1.5 s (Cria wire recording of 2026-11-03, 434 exposures of 10 s and 60 s on the ASI2600MC Pro, indi-asi 2.2.5); 10 s is ten times the normal gap and four times the largest seen, so a driver that is retrying is never cut off and a driver that went quiet is found within 10 s',
+    Schema.Number,
+    10,
+  ),
+  failuresInRow: described(
+    'Exposures in a row that may fail before the run stops. A failed exposure is one the driver gave up on after its own retries, which it reports as CCD_EXPOSURE Alert: 19 of 434 exposures (about 4.4%) on the ASI2600MC Pro (Cria wire recording of 2026-11-03), so 3 in a row happen by chance (0.044^3, if failures were independent) in about 0.0085% of exposures, about 3% of a 375-exposure night; stopping at 3 means a real fault almost every time and wastes at most three exposures on a dead camera',
+    Schema.Number,
+    3,
+  ),
+})
+
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the page is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve' }),
   broker: BrokerSettings,
@@ -72,6 +98,7 @@ export const VelaSettings = Schema.Struct({
     1,
   ),
   frames: FrameSettings,
+  capture: CaptureSettings,
   historyReadBatch: described(
     'Entries asked of the broker at a time when replaying the rig connection. The client library defaults to 100; 2048 read 200,000 entries in 0.8 s on thuban (Cria viewer, 2026-11-06)',
     Schema.Number,

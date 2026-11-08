@@ -9,14 +9,18 @@ const settings = { devices: { mount: 'mount', primary: 'primary', guide: 'guide'
 
 const open: Array<ReturnType<typeof makePage>['server']> = []
 
-async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview'>> = {}) {
+const idleView = { at: 1, run: undefined, last: undefined }
+
+const idleCapture: PageOptions['capture'] = { view: () => idleView, start: () => ({ ok: false, reason: 'not here' }), stop: async () => false }
+
+async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'capture'>> = {}) {
   const picture = makePicture()
 
   picture.apply(connected(startedAt), Date.now())
   picture.apply(wire(startedAt + 1, 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), Date.now())
   picture.caughtUp()
 
-  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, ...frames })
+  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, capture: idleCapture, ...frames })
 
   open.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -115,5 +119,58 @@ describe('page server', () => {
 
   it('answers anything else with 404', async () => {
     expect((await fetch(`${await serve()}/commands`, { method: 'POST' })).status).toBe(404)
+  })
+
+  it('starts a capture run from a json body and says why when it will not start', async () => {
+    const started: unknown[] = []
+    const base = await serve(20, { capture: { ...idleCapture, start: request => (started.push(request), { ok: true, run: 'run-1', done: Promise.resolve() }) } })
+    const post = (body: string) => fetch(`${base}/capture`, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+    const accepted = await post('{"object":"M 31"}')
+
+    expect(accepted.status).toBe(202)
+    expect(await accepted.json()).toEqual({ run: 'run-1' })
+    expect(started).toEqual([{ object: 'M 31' }])
+    expect((await post('not json')).status).toBe(400)
+
+    const refused = await fetch(`${await serve()}/capture`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toEqual({ error: 'not here' })
+  })
+
+  it('refuses to start or stop a run from a request a web page could send without asking the browser first', async () => {
+    const base = await serve()
+
+    expect((await fetch(`${base}/capture`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status).toBe(415)
+    expect((await fetch(`${base}/capture/stop`, { method: 'POST' })).status).toBe(415)
+  })
+
+  it('stops the run and says whether there was one', async () => {
+    const base = await serve(20, { capture: { ...idleCapture, stop: async () => true } })
+    const response = await fetch(`${base}/capture/stop`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+
+    expect(await response.json()).toEqual({ stopped: true })
+  })
+
+  it('serves the capture view as json and sends it over server-sent events', async () => {
+    const base = await serve()
+
+    expect(await (await fetch(`${base}/capture.json`)).json()).toEqual(idleView)
+
+    const response = await fetch(`${base}/events`)
+    const reader = response.body?.getReader()
+    const decoder = new TextDecoder()
+    let text = ''
+
+    while (!text.includes('event: capture')) {
+      const chunk = await reader?.read()
+
+      if (chunk === undefined || chunk.done) break
+      text += decoder.decode(chunk.value)
+    }
+
+    await reader?.cancel()
+
+    expect(text).toContain(`event: capture\ndata: ${JSON.stringify(idleView)}`)
   })
 })
