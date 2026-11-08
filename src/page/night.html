@@ -41,7 +41,9 @@
   .stop:hover { border-color: var(--star); }
   .stop.armed { background: var(--dome-hi); border: 2px solid var(--star); color: var(--star); }
   #strip { display: flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 2px 24px 4px; }
-  #strip svg { display: block; flex: 1; width: 100%; height: 26px; }
+  #strip { flex-direction: column; align-items: stretch; justify-content: center; text-decoration: none; }
+  #strip svg { display: block; width: 100%; height: 26px; }
+  .strip-times { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; line-height: 1.3; }
   #strip[hidden] { display: none; }
   #run-done { transition: width 600ms ease-out; }
   @keyframes arrive { from { opacity: 0; } to { opacity: 1; } }
@@ -231,7 +233,7 @@
   <button type="button" id="dim" aria-pressed="false">Dim</button>
 </div>
 <p class="answer" id="stop-answer" aria-live="polite" hidden></p>
-<a id="strip" href="#/tonight" hidden><svg viewBox="0 0 1000 26" preserveAspectRatio="none" role="img" aria-label="Tonight from dusk to dawn"></svg></a>
+<a id="strip" href="#/tonight" hidden><svg viewBox="0 0 1000 26" preserveAspectRatio="none" role="img" aria-label="Tonight from dusk to dawn"></svg><span class="strip-times" aria-hidden="true"><span id="strip-dusk"></span><span id="strip-dark"></span><span id="strip-dawn"></span></span></a>
 <div id="runbar" hidden><span class="progress" id="progress"></span></div>
 <div id="focusbar" hidden>
   <span class="progress" id="focus-progress"></span>
@@ -846,6 +848,9 @@ function showStrip() {
   if (sky.meridianLimitAt !== undefined && sky.meridianLimitAt > sky.duskAt && sky.meridianLimitAt < sky.dawnAt) above.push('<line x1="' + x(sky.meridianLimitAt) + '" y1="4" x2="' + x(sky.meridianLimitAt) + '" y2="24" stroke="#d9a948" stroke-width="2" stroke-dasharray="3 2"/>')
   if (night.at > sky.duskAt && night.at < sky.dawnAt) above.push('<line x1="' + x(night.at) + '" y1="0" x2="' + x(night.at) + '" y2="26" stroke="#e3dccd" stroke-width="2"/>')
   const svg = strip.querySelector('svg')
+  document.getElementById('strip-dusk').textContent = 'dusk ' + hourMinute(sky.duskAt)
+  document.getElementById('strip-dark').textContent = sky.darkAt === undefined ? 'no full dark' : 'dark ' + hourMinute(sky.darkAt) + ' to ' + hourMinute(sky.darkEndsAt)
+  document.getElementById('strip-dawn').textContent = 'dawn ' + hourMinute(sky.dawnAt)
   svg.innerHTML = parts.join('')
   if (run !== undefined) svg.append(runDone)
   svg.insertAdjacentHTML('beforeend', above.join(''))
