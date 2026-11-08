@@ -14,10 +14,9 @@
   input, select, textarea { caret-color: var(--action); }
   a { color: var(--action); text-underline-offset: 3px; }
   html[data-dim]::after { content: ""; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); pointer-events: none; z-index: 100; }
-  #dim { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; cursor: pointer; margin-left: auto; }
-  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 16px/1.5 "Atkinson Hyperlegible Next", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  #dim { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+  body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 "Atkinson Hyperlegible Next", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
   button, input, select { min-height: 44px; box-sizing: border-box; }
-  header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin-bottom: 12px; }
   h1 { margin: 0; font-size: 20px; }
   .rig { color: var(--muted); font-size: 14px; }
   main { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
@@ -30,18 +29,38 @@
   .stale { color: var(--warn); }
   .unknown { color: var(--muted); }
   .current.ok { color: var(--good); }
-  #stops { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-bottom: 4px; }
-  #mountbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
-  #status { flex: 1 1 240px; font-weight: 600; }
+  #shell { position: sticky; top: 0; z-index: 5; background: var(--dome); }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 24px 6px; }
+  .name { margin: 0; font-size: 20px; font-weight: 700; }
+  .name a { color: var(--fg); text-decoration: none; }
+  #status { flex: 1 1 240px; min-width: 0; font-size: 17px; font-weight: 600; }
   #status.warn { color: var(--warn); }
   #status.bad { color: var(--bad); }
-  #mountbar:has(#status.warn) { border-color: var(--warn); }
-  #mountbar:has(#status.bad) { border-color: var(--bad); }
-  #mount-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #1b0d0c; cursor: pointer; }
-  #runbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--good); border-radius: 8px; background: var(--card); }
+  .stops { display: flex; gap: 8px; }
+  .stop { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 1.5px solid var(--bad); border-radius: 8px; background: transparent; color: var(--bad); cursor: pointer; }
+  .stop.armed { background: var(--bad); color: #1b0d0c; }
+  #runbar { padding: 0 24px 6px; font-variant-numeric: tabular-nums; color: var(--good); }
   #runbar[hidden] { display: none; }
-  #runbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
-  #stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #1b0d0c; cursor: pointer; }
+  #tabs { display: flex; gap: 2px; padding: 0 16px; }
+  #tabs a, #bottom a { color: var(--muted); text-decoration: none; min-height: 44px; display: flex; align-items: center; padding: 0 12px; }
+  #tabs a { border-bottom: 2px solid transparent; }
+  #tabs a.on { color: var(--fg); border-bottom-color: var(--fg); font-weight: 600; }
+  #bottom { display: none; }
+  .view { max-width: 1100px; margin: 0 auto; padding: 20px 24px 40px; }
+  .view[hidden] { display: none; }
+  @media (max-width: 760px) {
+    .bar { padding: 8px 14px 4px; }
+    #status { order: 3; flex: 1 1 200px; font-size: 16px; }
+    #dim { order: 4; }
+    .stops { margin-left: auto; }
+    #runbar { padding: 0 14px 6px; }
+    #tabs { display: none; }
+    #bottom { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--dome); padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); }
+    #bottom a { flex: 1; justify-content: center; font-size: 14px; border-radius: 8px; padding: 0 4px; }
+    #bottom a.on { background: var(--dome-hi); color: var(--fg); font-weight: 600; }
+    body { padding-bottom: 64px; }
+    .view { padding: 16px 14px 32px; }
+  }
   #capture { margin-bottom: 12px; }
   #capture form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; }
   #capture label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--muted); }
@@ -53,10 +72,10 @@
   #last-run { margin: 8px 0 0; color: var(--muted); }
   #last-run.bad { color: var(--bad); }
   #last-run.warn { color: var(--warn); }
-  #focusbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--warn); border-radius: 8px; background: var(--card); }
+  #focusbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 0 24px 6px; }
   #focusbar[hidden] { display: none; }
   #focusbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
-  #focus-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #1b0d0c; cursor: pointer; }
+  #focus-stop { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--bad); color: #1b0d0c; cursor: pointer; }
   #prepare { margin-bottom: 12px; }
   #prepare .group { margin-bottom: 12px; }
   #pointing { margin-bottom: 12px; }
@@ -87,22 +106,22 @@
 </style>
 </head>
 <body>
-<header><h1>Vela</h1><span class="rig" id="rig"></span><button type="button" id="dim" aria-pressed="false">Dim</button></header>
-<div id="stops">
-<div id="mountbar">
+<header id="shell">
+<div class="bar">
+  <h1 class="name"><a href="#/tonight">Vela</a></h1>
   <span id="status" role="status">Reading the rig from the stream</span>
-  <button type="button" id="mount-stop">Stop mount</button>
+  <div class="stops"><button type="button" class="stop" id="stop">Stop capture</button><button type="button" class="stop" id="mount-stop">Stop mount</button></div>
+  <button type="button" id="dim" aria-pressed="false">Dim</button>
 </div>
-<div id="runbar" hidden>
-  <span class="progress" id="progress"></span>
-  <button type="button" id="stop">Stop</button>
-</div>
+<div id="runbar" hidden><span class="progress" id="progress"></span></div>
 <div id="focusbar" hidden>
   <span class="progress" id="focus-progress"></span>
   <button type="button" id="focus-stop">Stop focuser</button>
 </div>
-</div>
-<main id="devices"></main>
+<nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a></nav>
+</header>
+<div class="view" data-view="tonight"><p class="rig" id="rig"></p><main id="devices"></main></div>
+<div class="view" data-view="prepare">
 <section id="prepare">
   <h2><span>Preparation</span></h2>
   <div class="group" id="focuser-controls">
@@ -130,6 +149,8 @@
   </div>
   <p id="prepare-error" hidden></p>
 </section>
+</div>
+<div class="view" data-view="point">
 <section id="pointing">
   <h2><span>Pointing</span></h2>
   <p class="warn">Every motion needs Chris at the rig.</p>
@@ -152,6 +173,8 @@
   <p id="goto-status" hidden></p>
   <p id="pointing-error" hidden></p>
 </section>
+</div>
+<div class="view" data-view="capture">
 <section id="capture">
   <h2><span>Capture</span></h2>
   <form id="capture-form">
@@ -168,12 +191,16 @@
   <p id="capture-error" hidden></p>
   <p id="last-run" hidden></p>
 </section>
+</div>
+<div class="view" data-view="frames">
 <section id="frames" hidden>
   <h2><span id="frames-title"></span></h2>
   <p class="unknown" id="preview-note"></p>
   <img id="preview" alt="Latest frame" hidden>
   <table><tbody id="frame-rows"></tbody></table>
 </section>
+</div>
+<nav id="bottom" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a></nav>
 <script>
 const dimButton = document.getElementById('dim')
 
@@ -186,6 +213,22 @@ function setDim(on) {
 
 dimButton.addEventListener('click', () => setDim(!document.documentElement.hasAttribute('data-dim')))
 try { setDim(localStorage.getItem('vela-dim') === '1') } catch {}
+
+const viewNames = ['tonight', 'prepare', 'point', 'capture', 'frames']
+
+function showView() {
+  const asked = (/^#\/(\w+)/.exec(location.hash) ?? [])[1]
+  const current = viewNames.includes(asked) ? asked : 'tonight'
+  for (const view of document.querySelectorAll('.view')) view.hidden = view.dataset.view !== current
+  for (const link of document.querySelectorAll('[data-to]')) {
+    link.classList.toggle('on', link.dataset.to === current)
+    if (link.dataset.to === current) link.setAttribute('aria-current', 'page')
+    else link.removeAttribute('aria-current')
+  }
+}
+
+addEventListener('hashchange', showView)
+showView()
 
 const statusLine = document.getElementById('status')
 const statusParts = { night: undefined, run: undefined, goto: undefined, lost: false }
@@ -214,6 +257,8 @@ function showStatus() {
   const allWell = level === '' && problem === '' && night?.phase === 'live' && !lost
   statusLine.textContent = [allWell ? 'All connected' : problem, activity].filter(part => part !== '').join('. ')
   statusLine.className = level
+  document.getElementById('stop').classList.toggle('armed', run !== undefined)
+  document.getElementById('mount-stop').classList.toggle('armed', goto !== undefined && gotoActivity[goto.phase] !== undefined)
 }
 const rig = document.getElementById('rig')
 const devices = document.getElementById('devices')
