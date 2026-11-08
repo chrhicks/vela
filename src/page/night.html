@@ -918,11 +918,9 @@ function showTonight() {
     ['Guiding', '#/rig', reading('phd2', 'State')],
     ['Night', undefined, night.sky === undefined ? '<span class="unknown">the mount has not reported the site</span>' : night.sky.darkAt === undefined ? 'no full dark tonight, dawn ' + hourMinute(night.sky.dawnAt) : 'dark ' + hourMinute(night.sky.darkAt) + ' to ' + hourMinute(night.sky.darkEndsAt) + ', dawn ' + hourMinute(night.sky.dawnAt)],
   ].map(([label, home, value]) => '<tr><td>' + label + '</td><td>' + (home === undefined ? value : '<a class="home" href="' + home + '">' + value + '</a>') + '</td></tr>').join('')
-  document.getElementById('tonight-rig').innerHTML = night.phase === 'silent'
-    ? '<span class="stale">No word from the rig for ' + night.rig.silentSeconds + ' s.</span> <a href="#/rig">See the rig</a>'
-    : down.length > 0
-      ? '<span class="bad">' + down.map(device => escapeText(device.title) + ' ' + escapeText(device.connection.text)).join(', ') + '.</span> <a href="#/rig">See the rig</a>'
-      : 'Every device connected and current. <a href="#/rig">See the rig</a>'
+  document.getElementById('tonight-rig').innerHTML = problem === undefined
+    ? 'Every device connected and current. <a href="#/rig">See the rig</a>'
+    : 'Every device and reading is on <a href="#/rig">the rig</a>.'
   const latest = frames?.frames[0]
   const body = document.getElementById('tonight-frame-body')
   if (latest === undefined) {
