@@ -900,7 +900,7 @@ function showTonight() {
   if (run !== undefined) {
     const left = run.phase === 'exposing' && run.secondsLeft !== undefined ? run.secondsLeft + ' s left' : run.phase === 'preparing' ? 'setting up' : 'ending'
     head.innerHTML = alarm + '<h1>' + escapeText(run.object) + ', ' + escapeText(run.frameType) + ' frames</h1>' +
-      '<p class="sub">' + run.count + ' frames of ' + run.exposureSeconds + ' s' + (run.failed > 0 ? ', ' + run.failed + ' failed' : '') + '.</p>' +
+      '<p class="sub">' + run.count + ' frames of ' + run.exposureSeconds + ' s' + (run.failed > 0 ? ', ' + run.failed + ' failed' : '') + '.' + (night.phase === 'live' ? '' : ' <span class="stale">Run numbers' + staleNote(night) + '</span>') + '</p>' +
       '<div class="big"><div>Frame<b>' + run.frame + ' of ' + run.count + '</b></div><div>This frame<b>' + left + '</b></div><div>Run ends<b>' + hourMinute(runEndsAt(capture)) + '</b></div></div>'
   } else if (goto !== undefined && ['sending', 'sent', 'slewing'].includes(goto.phase)) {
     head.innerHTML = alarm + '<h1>Slewing to ' + escapeText(goto.name) + '</h1><p class="sub">Sent ' + hourMinute(goto.sentAt) +
