@@ -144,6 +144,12 @@
   .answer.warn { color: var(--warn); }
   .answer.sending { color: var(--muted); }
   button.sending { cursor: progress; opacity: 0.75; }
+  button:not(:disabled):active { transform: translateY(1px); }
+  #pointing button:not(:disabled):hover, #prepare button:not(:disabled):hover, #dim:hover, .filters button:hover { border-color: var(--haze); color: var(--fg); }
+  #pointing button:not(:disabled):active, #prepare button:not(:disabled):active, #dim:active, .filters button:active { background: var(--dome-hi); }
+  #capture button[type=submit]:hover { filter: brightness(1.08); }
+  .stop:active { background: rgba(232, 116, 106, 0.18); }
+  .stop.armed:active { background: var(--bad); filter: brightness(0.9); }
   #status a { color: inherit; text-decoration-color: currentColor; }
   #last-run { margin: 8px 0 0; color: var(--muted); }
   #last-run.bad { color: var(--bad); }
@@ -769,14 +775,22 @@ captureForm.addEventListener('submit', async event => {
 })
 
 stopButton.addEventListener('click', async () => {
-  stopButton.disabled = true
+  if (stopButton.classList.contains('sending')) return
+  stopButton.classList.add('sending')
+  stopButton.setAttribute('aria-busy', 'true')
   try {
-    await post('/capture/stop', {})
+    const result = await post('/capture/stop', {})
+    if (!result.ok) {
+      statusParts.refusal = { text: 'Stop capture refused: ' + (result.body.error ?? 'no reason given'), at: Date.now() }
+      showStatus()
+    }
   } catch (error) {
     statusParts.refusal = { text: 'Stop capture did not reach Vela: ' + error.message, at: Date.now() }
     showStatus()
+  } finally {
+    stopButton.classList.remove('sending')
+    stopButton.removeAttribute('aria-busy')
   }
-  stopButton.disabled = false
 })
 
 const endings = {
