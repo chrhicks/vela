@@ -19,15 +19,17 @@
   button, input, select { min-height: 44px; box-sizing: border-box; }
   h1 { margin: 0; font-size: 20px; }
   .rig { color: var(--muted); font-size: 14px; }
-  main { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-  section { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--card); }
+  main { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px 32px; }
+  section { border: 0; padding: 0; background: transparent; }
   section h2 { margin: 0 0 4px; font-size: 16px; display: flex; justify-content: space-between; gap: 8px; }
+  #devices section { border-top: 1px solid var(--line); padding: 12px 0 16px; }
+  #devices section h2 { font-size: 18px; }
   .link { font-size: 13px; font-weight: normal; }
   dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; }
   dt { color: var(--muted); }
   dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
   .stale { color: var(--warn); }
-  #devices section.down { border-color: var(--bad); border-left-width: 4px; }
+  #devices section.down { border-top: 3px solid var(--bad); }
   #devices section.down h2, #devices section.down h2 .link { color: var(--bad); }
   .unknown { color: var(--muted); }
   .current.ok { color: var(--good); }
@@ -166,7 +168,7 @@
   #focusbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
   #focus-stop { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 2px solid var(--star); border-radius: 8px; background: var(--dome-hi); color: var(--star); cursor: pointer; }
   #prepare { margin-bottom: 12px; }
-  #prepare .group { margin-bottom: 12px; }
+  #prepare .group { border-top: 1px solid var(--line); padding: 12px 0 16px; }
   #pointing { margin-bottom: 12px; }
   #pointing .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
   #pointing input[type=search] { flex: 1 1 240px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
@@ -175,11 +177,11 @@
   #pointing button.moves, #prepare button.moves { border-width: 2px; border-color: var(--fg); font-weight: 600; }
   #pointing ul { list-style: none; margin: 0 0 8px; padding: 0; }
   #pointing li button { width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
-  #pointing h3 { margin: 0 0 6px; font-size: 15px; }
+  #pointing h3 { margin: 0 0 6px; font-size: 18px; }
   #pointing-error { color: var(--bad); }
   #goto-status.bad { color: var(--bad); }
   #goto-status.warn { color: var(--warn); }
-  #prepare h3 { margin: 0 0 6px; font-size: 15px; }
+  #prepare h3 { margin: 0 0 8px; font-size: 18px; }
   #prepare .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
   #prepare .row > span { min-width: 80px; }
   #prepare .field { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; }
@@ -254,7 +256,7 @@
 <div class="view" data-view="more"><h1 class="view-title">More</h1><div class="more-list"><a href="#/frames">Frames <span>tonight's frames</span></a><a href="#/rig">Rig <span>every reading</span></a><a href="#/activity">Activity <span>what happened tonight</span></a></div></div>
 <div class="view" data-view="prepare">
 <section id="prepare">
-  <h2><span>Preparation</span></h2>
+  <h1 class="view-title">Prepare</h1>
   <div class="group" id="focuser-controls">
     <h3>Focuser</h3>
     <div class="row">
@@ -285,7 +287,7 @@
 </div>
 <div class="view" data-view="point">
 <section id="pointing">
-  <h2><span>Pointing</span></h2>
+  <h1 class="view-title">Point</h1>
   <div class="row">
     <span id="mount-state" class="unknown">Reading the mount</span>
     <button type="button" class="moves" id="mount-unpark">Unpark mount</button>
@@ -310,7 +312,7 @@
 </div>
 <div class="view" data-view="capture">
 <section id="capture">
-  <h2><span>Capture</span></h2>
+  <h1 class="view-title">Capture</h1>
   <form id="capture-form">
     <label>Object<input name="object" required value=""></label>
     <label>Frame type<select name="frameType"><option>light</option><option>dark</option><option>flat</option><option>bias</option></select></label>
