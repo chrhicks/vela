@@ -7,6 +7,7 @@ import type { Frames } from '../frames/library.ts'
 import type { Night } from '../rig/night.ts'
 
 const page = readFileSync(new URL('./night.html', import.meta.url))
+const font = readFileSync(new URL('./fonts/AtkinsonHyperlegibleNext.ttf', import.meta.url))
 
 const previewPath = /^\/frames\/(\d{4}-\d{2}-\d{2})\/([A-Za-z0-9._-]+\.fits)\.png$/
 
@@ -165,6 +166,13 @@ export function makePage({ night, refreshMs, frames, preview, capture, prepare, 
     if (path === '/') {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
       response.end(page)
+
+      return
+    }
+
+    if (path === '/fonts/atkinson-hyperlegible-next.ttf') {
+      response.writeHead(200, { 'content-type': 'font/ttf', 'cache-control': 'max-age=604800' })
+      response.end(font)
 
       return
     }

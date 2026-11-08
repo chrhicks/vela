@@ -5,11 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vela</title>
 <style>
-  :root { color-scheme: light dark; --bg: #fff; --fg: #1b1f24; --muted: #6a737d; --line: #d8dee4; --card: #f6f8fa; --warn: #9a6700; --bad: #b42318; --good: #1a7f37; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --line: #30363d; --card: #161b22; --warn: #d29922; --bad: #f85149; --good: #3fb950; } }
-  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, sans-serif; }
+  @font-face { font-family: "Atkinson Hyperlegible Next"; src: url("/fonts/atkinson-hyperlegible-next.ttf") format("truetype"); font-weight: 200 800; font-display: swap; }
+  :root { color-scheme: dark; --sky: #141b2b; --dome: #1d2a44; --dome-hi: #263759; --rule: #2a3550; --star: #e3dccd; --haze: #98a2b6; --fault: #e2695e; --stale: #d9a948; --clear: #7cc49a; --action: #8fb4ff;
+    --bg: var(--sky); --fg: var(--star); --muted: var(--haze); --line: var(--rule); --card: var(--dome); --warn: var(--stale); --bad: var(--fault); --good: var(--clear); }
+  html { scrollbar-color: var(--rule) var(--sky); accent-color: var(--action); }
+  ::selection { background: var(--dome-hi); color: var(--star); }
+  :focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+  input, select, textarea { caret-color: var(--action); }
+  a { color: var(--action); text-underline-offset: 3px; }
+  html[data-dim]::after { content: ""; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); pointer-events: none; z-index: 100; }
+  #dim { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; cursor: pointer; margin-left: auto; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 16px/1.5 "Atkinson Hyperlegible Next", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
   button, input, select { min-height: 44px; box-sizing: border-box; }
-  header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-bottom: 12px; }
+  header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin-bottom: 12px; }
   h1 { margin: 0; font-size: 20px; }
   .rig { color: var(--muted); font-size: 14px; }
   main { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
@@ -29,17 +37,17 @@
   #status.bad { color: var(--bad); }
   #mountbar:has(#status.warn) { border-color: var(--warn); }
   #mountbar:has(#status.bad) { border-color: var(--bad); }
-  #mount-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
+  #mount-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #1b0d0c; cursor: pointer; }
   #runbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--good); border-radius: 8px; background: var(--card); }
   #runbar[hidden] { display: none; }
   #runbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
-  #stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
+  #stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #1b0d0c; cursor: pointer; }
   #capture { margin-bottom: 12px; }
   #capture form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; }
   #capture label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--muted); }
   #capture input, #capture select { font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   #capture input:disabled { opacity: 0.5; }
-  #capture button[type=submit] { grid-column: 1 / -1; font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--good); color: #fff; cursor: pointer; justify-self: start; }
+  #capture button[type=submit] { grid-column: 1 / -1; font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--action); color: #0d1626; cursor: pointer; justify-self: start; }
   #capture button[disabled] { opacity: 0.5; cursor: default; }
   #capture-error { color: var(--bad); margin: 8px 0 0; }
   #last-run { margin: 8px 0 0; color: var(--muted); }
@@ -48,7 +56,7 @@
   #focusbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--warn); border-radius: 8px; background: var(--card); }
   #focusbar[hidden] { display: none; }
   #focusbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
-  #focus-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
+  #focus-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #1b0d0c; cursor: pointer; }
   #prepare { margin-bottom: 12px; }
   #prepare .group { margin-bottom: 12px; }
   #pointing { margin-bottom: 12px; }
@@ -79,7 +87,7 @@
 </style>
 </head>
 <body>
-<header><h1>Vela</h1><span class="rig" id="rig"></span></header>
+<header><h1>Vela</h1><span class="rig" id="rig"></span><button type="button" id="dim" aria-pressed="false">Dim</button></header>
 <div id="stops">
 <div id="mountbar">
   <span id="status" role="status">Reading the rig from the stream</span>
@@ -167,6 +175,18 @@
   <table><tbody id="frame-rows"></tbody></table>
 </section>
 <script>
+const dimButton = document.getElementById('dim')
+
+function setDim(on) {
+  document.documentElement.toggleAttribute('data-dim', on)
+  dimButton.setAttribute('aria-pressed', String(on))
+  dimButton.textContent = on ? 'Undim' : 'Dim'
+  try { localStorage.setItem('vela-dim', on ? '1' : '') } catch {}
+}
+
+dimButton.addEventListener('click', () => setDim(!document.documentElement.hasAttribute('data-dim')))
+try { setDim(localStorage.getItem('vela-dim') === '1') } catch {}
+
 const statusLine = document.getElementById('status')
 const statusParts = { night: undefined, run: undefined, goto: undefined, lost: false }
 
