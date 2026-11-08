@@ -1,9 +1,7 @@
 {
   "port": 8793,
   "broker": {
-    "servers": "nats://127.0.0.1:4222",
-    "user": "vela",
-    "passFile": "/home/example/.config/vela/broker.pass"
+    "servers": "nats://127.0.0.1:4222"
   },
   "devices": {
     "mount": "mount",

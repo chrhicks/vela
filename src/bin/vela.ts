@@ -3,7 +3,6 @@ import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
 import { VelaSettings } from '../settings.ts'
-import { brokerSettings } from '../stream/broker.ts'
 import { readEntry } from '../stream/entry.ts'
 import { followRig } from '../stream/follow.ts'
 
@@ -16,7 +15,7 @@ function lost(reason: string): never {
 }
 
 const following = await followRig({
-  broker: brokerSettings(settings.broker),
+  broker: settings.broker,
   readBatch: settings.historyReadBatch,
   onMessage: message => {
     const entry = readEntry(message.text)

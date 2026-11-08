@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { decodeConfig } from './config.ts'
 import { VelaSettings } from './settings.ts'
 
-const minimal = { port: 8793, broker: { servers: 'nats://127.0.0.1:4222', user: 'vela', passFile: '/home/example/.config/vela/broker.pass' } }
+const minimal = { port: 8793, broker: { servers: 'nats://127.0.0.1:4222' } }
 
 describe('settings', () => {
   it('fills the described defaults', () => {
