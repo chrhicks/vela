@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { syntheticFits } from '../testing/fits.ts'
-import { readFits } from './fits.ts'
+import { headerCards, readFits } from './fits.ts'
 
 describe('readFits', () => {
   it('reads a camera frame that has EXTEND, COMMENT cards and BZERO 32768', () => {
@@ -28,5 +28,24 @@ describe('readFits', () => {
     const whole = syntheticFits({ width: 2000, height: 2, pixel: () => 0 })
 
     expect(() => readFits(whole.subarray(0, 2880 + 100))).toThrow('ends before')
+  })
+})
+
+describe('headerCards', () => {
+  it('lists every card in order with its value and comment, strings unquoted', () => {
+    const cards = headerCards(syntheticFits({ width: 2, height: 2, pixel: () => 0, extra: { OBJECT: "M 31 / Andromeda''s", FOCALLEN: 400 } }))
+
+    expect(cards?.slice(0, 2)).toEqual([
+      { key: 'SIMPLE', value: 'T', comment: 'test' },
+      { key: 'BITPIX', value: '16', comment: 'test' },
+    ])
+    expect(cards?.find(card => card.key === 'COMMENT')?.value).toContain('Flexible Image Transport System')
+    expect(cards?.find(card => card.key === 'OBJECT')).toEqual({ key: 'OBJECT', value: "M 31 / Andromeda's", comment: 'test' })
+    expect(cards?.find(card => card.key === 'FOCALLEN')).toEqual({ key: 'FOCALLEN', value: '400', comment: 'test' })
+    expect(cards?.at(-1)?.key).toBe('FOCALLEN')
+  })
+
+  it('has no cards until the END card is in what was read', () => {
+    expect(headerCards(syntheticFits({ width: 2, height: 2, pixel: () => 0 }).subarray(0, 160))).toBeUndefined()
   })
 })

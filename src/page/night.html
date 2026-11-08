@@ -125,12 +125,46 @@
   #prepare button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
   #prepare button[disabled], #prepare input:disabled { opacity: 0.5; cursor: default; }
   #prepare-error { color: var(--bad); margin: 8px 0 0; }
-  #frames { margin-top: 12px; }
-  #frames img { display: block; max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 8px; }
-  #frames table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  #frames th, #frames td { text-align: left; padding: 2px 8px 2px 0; }
-  #frames td.size { text-align: right; }
-  #frames a { color: inherit; }
+  #frames, #frame { border: 0; background: transparent; padding: 0; border-radius: 0; }
+  .view .sub { color: var(--muted); margin: 0 0 18px; }
+  #frames details { border-top: 1px solid var(--line); }
+  #frames summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-height: 52px; padding: 12px 0; box-sizing: border-box; cursor: pointer; font-size: 18px; font-weight: 600; list-style: none; }
+  #frames summary::-webkit-details-marker { display: none; }
+  #frames summary::before { content: "▸"; color: var(--muted); width: 12px; }
+  #frames details[open] summary::before { content: "▾"; }
+  #frames summary span { color: var(--muted); font-weight: 400; font-size: 15px; }
+  .frame-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 16px; align-items: center; min-height: 44px; padding: 4px 8px 4px 24px; border-top: 1px solid var(--line); color: var(--fg); text-decoration: none; }
+  .frame-row:hover { background: var(--dome); }
+  .frame-row .file { overflow-wrap: anywhere; }
+  .frame-row span:not(.file) { color: var(--muted); font-size: 15px; }
+  #frames details > div { padding-bottom: 12px; }
+  .back { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 4px; }
+  #frame h2 { font-size: 20px; margin: 32px 0 8px; font-weight: 600; }
+  #frame-title { overflow-wrap: anywhere; }
+  #frame .top { display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: start; }
+  #frame figure { margin: 0; }
+  #frame img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); }
+  #frame img[hidden] { display: none; }
+  #frame figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; }
+  #frame dl { gap: 0; }
+  #frame dt, #frame dd { padding: 8px 0; border-top: 1px solid var(--line); }
+  #frame dt { padding-right: 16px; }
+  #frame-file dd { text-align: left; overflow-wrap: anywhere; }
+  .hash { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 14px; }
+  #header-search { width: 100%; font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); margin-bottom: 8px; }
+  #header-table { width: 100%; border-collapse: collapse; }
+  #header-table td { padding: 8px 16px 8px 0; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  #header-table td:first-child { width: 120px; font-weight: 600; white-space: nowrap; }
+  #header-table .comment { color: var(--muted); font-size: 14px; margin-left: 16px; }
+  #header-table tr[hidden] { display: none; }
+  .pager { display: flex; justify-content: space-between; margin-top: 24px; }
+  .pager a { display: inline-flex; align-items: center; min-height: 44px; }
+  .pager a[hidden] { visibility: hidden; display: inline-flex; }
+  @media (max-width: 760px) {
+    #frame .top { grid-template-columns: 1fr; gap: 16px; }
+    #header-table td:first-child { width: 96px; }
+    #header-table .comment { display: block; margin-left: 0; }
+  }
 </style>
 </head>
 <body>
@@ -227,12 +261,27 @@
 </section>
 </div>
 <div class="view" data-view="frames">
-<section id="frames" hidden>
-  <h2><span id="frames-title"></span></h2>
-  <p class="unknown" id="preview-note"></p>
-  <img id="preview" alt="Latest frame" hidden>
-  <table><tbody id="frame-rows"></tbody></table>
+<section id="frames">
+  <h1 class="view-title">Frames</h1>
+  <p class="sub" id="frames-sub">Reading tonight's frames</p>
+  <div id="frame-groups"></div>
 </section>
+<article id="frame" hidden>
+  <a class="back" href="#/frames">‹ All frames</a>
+  <h1 class="view-title" id="frame-title"></h1>
+  <p class="sub" id="frame-sub"></p>
+  <div class="top">
+    <figure><img id="frame-image" alt=""><figcaption id="frame-note"></figcaption></figure>
+    <dl id="frame-facts"></dl>
+  </div>
+  <h2>File</h2>
+  <dl id="frame-file"></dl>
+  <h2>Header</h2>
+  <input type="search" id="header-search" placeholder="Search the header" aria-label="Search the header" autocomplete="off">
+  <p class="sub" id="header-count"></p>
+  <table id="header-table"><tbody></tbody></table>
+  <nav class="pager" aria-label="Frames"><a id="frame-newer" href="#/frames">‹ Newer</a><a id="frame-older" href="#/frames">Older ›</a></nav>
+</article>
 </div>
 <nav id="bottom" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/more" data-to="more" data-also="frames rig">More</a></nav>
 <script>
@@ -263,7 +312,6 @@ function showView() {
 }
 
 addEventListener('hashchange', showView)
-showView()
 
 const statusLine = document.getElementById('status')
 const statusParts = { night: undefined, run: undefined, goto: undefined, lost: false }
@@ -339,47 +387,179 @@ function show(night) {
 }
 
 const framesSection = document.getElementById('frames')
-const framesTitle = document.getElementById('frames-title')
-const previewImage = document.getElementById('preview')
-const previewNote = document.getElementById('preview-note')
-const frameRows = document.getElementById('frame-rows')
-let previewShown = ''
+const framePage = document.getElementById('frame')
+const openGroups = new Set()
+let groupsSeen = false
 
 function previewUrl(night, file) {
   return '/frames/' + night + '/' + file + '.png'
 }
 
+function frameUrl(night, file) {
+  return '#/frames/' + night + '/' + file
+}
+
+function megabytes(bytes) {
+  return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
 function showFrames(list) {
-  framesSection.hidden = false
-  framesTitle.textContent = 'Frames kept on the night of ' + list.night + ' (' + list.frames.length + ')'
-  const latest = list.frames[0]
-  if (latest === undefined) {
-    previewImage.hidden = true
-    previewNote.textContent = 'No frame kept yet tonight'
-    previewShown = ''
-  } else if (previewShown !== latest.file) {
-    previewShown = latest.file
-    previewNote.textContent = 'Making the preview of ' + latest.file
-    previewImage.hidden = true
-    previewImage.onload = () => {
-      previewNote.textContent = 'Latest: ' + latest.file + ', kept ' + clock(Date.parse(latest.keptAt))
-      previewImage.hidden = false
-    }
-    previewImage.onerror = () => {
-      previewNote.textContent = 'No preview for ' + latest.file
-    }
-    previewImage.src = previewUrl(list.night, latest.file)
+  document.getElementById('frames-sub').textContent = list.frames.length === 0
+    ? 'No frame kept on the night of ' + list.night + ' yet. Frames appear here as the camera saves them; start a run in Capture.'
+    : list.frames.length + (list.frames.length === 1 ? ' frame' : ' frames') + ' kept on the night of ' + list.night + ', newest first.'
+  const groups = []
+  for (const frame of list.frames) {
+    const key = frame.run ?? 'none'
+    let group = groups.find(candidate => candidate.key === key)
+    if (group === undefined) groups.push(group = { key, name: frame.run === null ? 'Frames from no run' : frame.sequence ?? frame.run, frames: [] })
+    group.frames.push(frame)
   }
-  frameRows.replaceChildren(...list.frames.map(frame => {
-    const row = element('tr')
-    const link = element('a', '', frame.file)
-    link.href = previewUrl(list.night, frame.file)
-    link.target = '_blank'
-    const name = element('td')
-    name.append(link)
-    row.append(name, element('td', '', clock(Date.parse(frame.keptAt))), element('td', 'size', (frame.bytes / 1048576).toFixed(1) + ' MB'))
-    return row
+  if (!groupsSeen && groups.length > 0) {
+    openGroups.add(groups[0].key)
+    groupsSeen = true
+  }
+  document.getElementById('frame-groups').replaceChildren(...groups.map(group => {
+    const details = element('details')
+    details.open = openGroups.has(group.key)
+    details.addEventListener('toggle', () => details.open ? openGroups.add(group.key) : openGroups.delete(group.key))
+    const summary = element('summary', '', group.name + ' ')
+    const newest = Date.parse(group.frames[0].keptAt)
+    const oldest = Date.parse(group.frames[group.frames.length - 1].keptAt)
+    summary.append(element('span', '', group.frames.length + (group.frames.length === 1 ? ' frame, ' : ' frames, ') + (oldest === newest ? hourMinute(newest) : hourMinute(oldest) + ' to ' + hourMinute(newest))))
+    const rows = element('div')
+    rows.append(...group.frames.map(frame => {
+      const row = element('a', 'frame-row')
+      row.href = frameUrl(list.night, frame.file)
+      row.append(element('span', 'file', frame.frame === null ? frame.file : 'Frame ' + frame.frame), element('span', '', hourMinute(Date.parse(frame.keptAt))), element('span', '', megabytes(frame.bytes)))
+      return row
+    }))
+    details.append(summary, rows)
+    return details
   }))
+  if (frameShown !== undefined) showPager()
+}
+
+const framePath = /^#\/frames\/(\d{4}-\d{2}-\d{2})\/([A-Za-z0-9._-]+\.fits)$/
+const headerSearch = document.getElementById('header-search')
+const headerBody = document.querySelector('#header-table tbody')
+let frameShown
+
+function number(text, digits) {
+  const value = Number(text)
+  return Number.isFinite(value) ? String(Number(value.toFixed(digits))) : text
+}
+
+function frameFacts(cards) {
+  const card = key => cards.find(each => each.key === key)?.value
+  const facts = []
+  const add = (label, text) => { if (text !== undefined && text !== '') facts.push([label, text]) }
+  add('Object', card('OBJECT'))
+  add('Type', card('IMAGETYP'))
+  add('Exposure', card('EXPTIME') && number(card('EXPTIME'), 3) + ' s')
+  const taken = Date.parse((card('DATE-OBS') ?? '') + 'Z')
+  add('Taken', Number.isFinite(taken) ? new Date(taken).toLocaleTimeString([], { hour12: false }) : undefined)
+  add('Telescope', card('TELESCOP'))
+  add('Camera', card('INSTRUME'))
+  add('Focal length', card('FOCALLEN') && number(card('FOCALLEN'), 1) + ' mm')
+  add('Filter', card('FILTER'))
+  add('Gain', card('GAIN') && number(card('GAIN'), 1))
+  add('Offset', card('OFFSET') && number(card('OFFSET'), 1))
+  add('Sensor', card('CCD-TEMP') && number(card('CCD-TEMP'), 1) + ' °C' + (card('SET-TEMP') ? ', set to ' + number(card('SET-TEMP'), 1) + ' °C' : ''))
+  add('Size', card('NAXIS1') && card('NAXIS1') + ' × ' + card('NAXIS2') + ' px' + (card('XBINNING') && card('XBINNING') !== '1' ? ', binned ' + card('XBINNING') + '×' + card('YBINNING') : ''))
+  add('Pointing', card('OBJCTRA') && 'RA ' + card('OBJCTRA') + ', Dec ' + card('OBJCTDEC'))
+  add('Altitude', card('OBJCTALT') && number(card('OBJCTALT'), 1) + '°' + (card('AIRMASS') ? ', airmass ' + number(card('AIRMASS'), 2) : ''))
+  add('Pier side', card('PIERSIDE') && card('PIERSIDE').charAt(0) + card('PIERSIDE').slice(1).toLowerCase())
+  add('Focuser', card('FOCUSPOS') && card('FOCUSPOS') + (card('FOCUSTEM') ? ' at ' + number(card('FOCUSTEM'), 1) + ' °C' : ''))
+  add('Scale', card('SCALE') && number(card('SCALE'), 2) + '″ per px')
+  return facts
+}
+
+function definitions(target, pairs) {
+  target.replaceChildren(...pairs.flatMap(([label, text, className]) => [element('dt', '', label), element('dd', className ?? '', text)]))
+}
+
+function filterHeader() {
+  const words = headerSearch.value.trim().toLowerCase()
+  let shown = 0
+  for (const row of headerBody.children) {
+    row.hidden = words !== '' && !row.textContent.toLowerCase().includes(words)
+    if (!row.hidden) shown += 1
+  }
+  const total = headerBody.children.length
+  document.getElementById('header-count').textContent = words === '' ? total + ' cards' : shown + ' of ' + total + ' cards match "' + headerSearch.value.trim() + '"'
+}
+
+headerSearch.addEventListener('input', filterHeader)
+
+function showPager() {
+  const list = tonightState.frames
+  const index = list === undefined || list.night !== frameShown.night ? -1 : list.frames.findIndex(frame => frame.file === frameShown.file)
+  const newer = index > 0 ? list.frames[index - 1] : undefined
+  const older = index === -1 ? undefined : list.frames[index + 1]
+  const newerLink = document.getElementById('frame-newer')
+  const olderLink = document.getElementById('frame-older')
+  newerLink.hidden = newer === undefined
+  olderLink.hidden = older === undefined
+  if (newer !== undefined) newerLink.href = frameUrl(list.night, newer.file)
+  if (older !== undefined) olderLink.href = frameUrl(list.night, older.file)
+}
+
+function showFramePage() {
+  const asked = framePath.exec(location.hash)
+  framesSection.hidden = asked !== null
+  framePage.hidden = asked === null
+  if (asked === null) {
+    frameShown = undefined
+    return
+  }
+  const [, night, file] = asked
+  if (frameShown?.night === night && frameShown?.file === file) return
+  frameShown = { night, file }
+  scrollTo(0, 0)
+  document.getElementById('frame-title').textContent = file
+  document.getElementById('frame-sub').textContent = 'Reading the header'
+  const image = document.getElementById('frame-image')
+  const note = document.getElementById('frame-note')
+  image.hidden = true
+  image.alt = 'Preview of ' + file
+  note.textContent = 'Making the preview'
+  image.onload = () => { image.hidden = false; note.textContent = 'Stretched preview; the file keeps every pixel.' }
+  image.onerror = () => { note.textContent = 'No preview could be made of this frame.' }
+  image.src = previewUrl(night, file)
+  definitions(document.getElementById('frame-facts'), [])
+  definitions(document.getElementById('frame-file'), [])
+  headerBody.replaceChildren()
+  document.getElementById('header-count').textContent = ''
+  showPager()
+  fetch('/frames/' + night + '/' + file + '.json').then(response => {
+    if (response.status === 404) throw new Error('Vela has no frame called ' + file + ' on the night of ' + night + '.')
+    if (!response.ok) return response.text().then(text => { throw new Error('Vela could not read this frame: ' + text) })
+    return response.json()
+  }).then(detail => {
+    if (frameShown?.file !== file || frameShown?.night !== night) return
+    const object = detail.cards.find(card => card.key === 'OBJECT')?.value
+    document.getElementById('frame-title').textContent = object ? object + (detail.frame === null ? '' : ', frame ' + detail.frame) : file
+    document.getElementById('frame-sub').textContent = (detail.sequence ?? 'No run') + ', kept ' + hourMinute(Date.parse(detail.keptAt)) + ' on the night of ' + night
+    definitions(document.getElementById('frame-facts'), frameFacts(detail.cards))
+    definitions(document.getElementById('frame-file'), [
+      ['Name', detail.file],
+      ['Path', detail.path, 'hash'],
+      ['Size', megabytes(detail.bytes)],
+      ['SHA-256', detail.sha256, 'hash'],
+      ['Check', 'Matched the copy on the rig when Vela kept it, ' + hourMinute(Date.parse(detail.keptAt))],
+    ])
+    headerBody.replaceChildren(...detail.cards.map(card => {
+      const row = element('tr')
+      const value = element('td', '', card.value)
+      if (card.comment !== '') value.append(element('span', 'comment', card.comment))
+      row.append(element('td', '', card.key), value)
+      return row
+    }))
+    filterHeader()
+  }, error => {
+    if (frameShown?.file !== file || frameShown?.night !== night) return
+    document.getElementById('frame-sub').innerHTML = '<span class="bad">' + escapeText(error.message) + '</span> <a href="#/frames">All frames</a>'
+  })
 }
 
 const runbar = document.getElementById('runbar')
@@ -545,7 +725,7 @@ function showTonight() {
     tonightFrameShown = 'none'
   } else if (tonightFrameShown !== latest.file) {
     tonightFrameShown = latest.file
-    body.innerHTML = '<a href="#/frames"><img alt="' + escapeText(latest.file) + '" src="' + previewUrl(frames.night, latest.file) + '"></a><p class="cap">' + escapeText(latest.file) + ', kept ' + hourMinute(Date.parse(latest.keptAt)) + '. <a href="#/frames">All frames</a></p>'
+    body.innerHTML = '<a href="' + frameUrl(frames.night, latest.file) + '"><img alt="' + escapeText(latest.file) + '" src="' + previewUrl(frames.night, latest.file) + '"></a><p class="cap">' + escapeText(latest.file) + ', kept ' + hourMinute(Date.parse(latest.keptAt)) + '. <a href="#/frames">All frames</a></p>'
   }
 }
 
@@ -829,6 +1009,9 @@ events.onopen = () => {
   statusParts.lost = false
   showStatus()
 }
+addEventListener('hashchange', showFramePage)
+showView()
+showFramePage()
 </script>
 </body>
 </html>

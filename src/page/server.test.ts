@@ -24,14 +24,14 @@ const idlePointing: PageOptions['pointing'] = {
 
 const idleCapture: PageOptions['capture'] = { view: () => idleView, start: () => ({ ok: false, reason: 'not here' }), stop: async () => false }
 
-async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'capture' | 'prepare' | 'pointing'>> = {}) {
+async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'frame' | 'capture' | 'prepare' | 'pointing'>> = {}) {
   const picture = makePicture()
 
   picture.apply(connected(startedAt), Date.now())
   picture.apply(wire(startedAt + 1, 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), Date.now())
   picture.caughtUp()
 
-  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, ...frames })
+  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, ...frames })
 
   open.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -85,7 +85,7 @@ describe('page server', () => {
   })
 
   it('lists the night\'s kept frames as json', async () => {
-    const frames = { night: '2026-11-07', frames: [{ file: 'a_001.fits', bytes: 5, keptAt: '2026-11-08T03:00:00.000Z' }] }
+    const frames = { night: '2026-11-07', frames: [{ file: 'a_001.fits', bytes: 5, keptAt: '2026-11-08T03:00:00.000Z', run: null, sequence: null, frame: null }] }
     const response = await fetch(`${await serve(20, { frames: async () => frames })}/frames.json`)
 
     expect(await response.json()).toEqual(frames)
@@ -119,6 +119,17 @@ describe('page server', () => {
     expect(Buffer.from(await found.arrayBuffer())).toEqual(png)
     expect((await fetch(`${base}/frames/2026-11-07/b_001.fits.png`)).status).toBe(404)
     expect((await fetch(`${base}/frames/2026-11-07/..%2Fx.png`)).status).toBe(404)
+  })
+
+  it('serves a frame\'s header and file facts as json, and 404 for a frame it does not have', async () => {
+    const detail = { night: '2026-11-07', file: 'a_001.fits', path: '/keep/2026-11-07/a_001.fits', sha256: 'ab', bytes: 5, keptAt: '2026-11-08T03:00:00.000Z', run: 'r1', sequence: 'm31_light', frame: 1, cards: [{ key: 'OBJECT', value: 'M 31', comment: '' }] }
+    const base = await serve(20, { frame: async (night, file) => (night === '2026-11-07' && file === 'a_001.fits' ? detail : undefined) })
+    const found = await fetch(`${base}/frames/2026-11-07/a_001.fits.json`)
+
+    expect(found.headers.get('content-type')).toBe('application/json')
+    expect(await found.json()).toEqual(detail)
+    expect((await fetch(`${base}/frames/2026-11-07/b_001.fits.json`)).status).toBe(404)
+    expect((await fetch(`${base}/frames/2026-11-07/..%2Fx.fits.json`)).status).toBe(404)
   })
 
   it('says why a preview could not be made', async () => {

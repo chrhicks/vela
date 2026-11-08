@@ -3,6 +3,12 @@ const cardBytes = 80
 
 export type HeaderValue = string | number | boolean
 
+export interface Card {
+  readonly key: string
+  readonly value: string
+  readonly comment: string
+}
+
 export interface Fits {
   readonly header: ReadonlyMap<string, HeaderValue>
   readonly width: number
@@ -37,6 +43,43 @@ function parseValue(text: string): HeaderValue {
   const number = Number(bare)
 
   return bare !== '' && Number.isFinite(number) ? number : bare
+}
+
+function splitValue(text: string) {
+  const trimmed = text.trimStart()
+
+  if (!trimmed.startsWith("'")) {
+    const slash = trimmed.indexOf('/')
+
+    return slash === -1 ? { value: trimmed.trim(), comment: '' } : { value: trimmed.slice(0, slash).trim(), comment: trimmed.slice(slash + 1).trim() }
+  }
+
+  let index = 1
+
+  while (index < trimmed.length) {
+    if (trimmed[index] === "'" && trimmed[index + 1] !== "'") break
+    index += trimmed[index] === "'" ? 2 : 1
+  }
+
+  const rest = trimmed.slice(index + 1)
+  const slash = rest.indexOf('/')
+
+  return { value: String(parseValue(trimmed.slice(0, index + 1))), comment: slash === -1 ? '' : rest.slice(slash + 1).trim() }
+}
+
+export function headerCards(bytes: Buffer): ReadonlyArray<Card> | undefined {
+  const cards: Card[] = []
+
+  for (let offset = 0; offset + cardBytes <= bytes.length; offset += cardBytes) {
+    const card = bytes.toString('latin1', offset, offset + cardBytes)
+    const key = card.slice(0, 8).trim()
+
+    if (key === 'END') return cards
+    if (card.slice(8, 10) === '= ') cards.push({ key, ...splitValue(card.slice(10)) })
+    else if (key !== '' || card.trim() !== '') cards.push({ key, value: card.slice(8).trim(), comment: '' })
+  }
+
+  return undefined
 }
 
 function readHeader(bytes: Buffer) {
