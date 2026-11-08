@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { CaptureView, StartResult } from '../capture/run.ts'
+import type { PrepareResult } from '../prepare/prepare.ts'
 import type { Frames } from '../frames/library.ts'
 import type { Night } from '../rig/night.ts'
 
@@ -18,9 +19,10 @@ export interface PageOptions {
     readonly start: (request: unknown) => StartResult
     readonly stop: () => Promise<boolean>
   }
+  readonly prepare: (request: unknown) => Promise<PrepareResult>
 }
 
-export function makePage({ night, refreshMs, frames, preview, capture }: PageOptions) {
+export function makePage({ night, refreshMs, frames, preview, capture, prepare }: PageOptions) {
   const watching = new Set<ServerResponse>()
 
   function send(response: ServerResponse, event: string, data: unknown) {
@@ -99,6 +101,29 @@ export function makePage({ night, refreshMs, frames, preview, capture }: PageOpt
 
         if (started.ok) answer(response, 202, { run: started.run })
         else answer(response, 409, { error: started.reason })
+      }, error => fail(response, error))
+
+      return
+    }
+
+    if (path === '/prepare' && request.method === 'POST') {
+      if (refuseUnlessJson(request, response)) return
+
+      readBody(request).then(async text => {
+        let json: unknown
+
+        try {
+          json = JSON.parse(text)
+        } catch {
+          answer(response, 400, { error: 'the body is not JSON' })
+
+          return
+        }
+
+        const result = await prepare(json)
+
+        if (result.ok) answer(response, 200, { ok: true })
+        else answer(response, 409, { error: result.reason })
       }, error => fail(response, error))
 
       return

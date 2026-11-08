@@ -15,6 +15,12 @@ export interface WireBody {
   readonly property: string | undefined
   readonly state: string | undefined
   readonly elements: Readonly<Record<string, Value>>
+  readonly limits: Readonly<Record<string, Limits>>
+}
+
+export interface Limits {
+  readonly min: number
+  readonly max: number
 }
 
 type JsonRecord = Readonly<Record<string, unknown>>
@@ -50,7 +56,7 @@ export function readWireBody(body: unknown): WireBody | undefined {
 
   if (record === undefined) return undefined
 
-  const { dir, device, type, property, state, elements } = record
+  const { dir, device, type, property, state, elements, numbers } = record
 
   if ((dir !== 'in' && dir !== 'out') || typeof device !== 'string' || typeof type !== 'string') return undefined
 
@@ -60,5 +66,13 @@ export function readWireBody(body: unknown): WireBody | undefined {
     if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string') values[name] = value
   }
 
-  return { dir, device, type, property: typeof property === 'string' ? property : undefined, state: typeof state === 'string' ? state : undefined, elements: values }
+  const limits: Record<string, Limits> = {}
+
+  for (const [name, number] of Object.entries(recordOf(numbers) ?? {})) {
+    const range = recordOf(number)
+
+    if (typeof range?.['min'] === 'number' && typeof range['max'] === 'number') limits[name] = { min: range['min'], max: range['max'] }
+  }
+
+  return { dir, device, type, property: typeof property === 'string' ? property : undefined, state: typeof state === 'string' ? state : undefined, elements: values, limits }
 }

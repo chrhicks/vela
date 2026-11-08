@@ -12,11 +12,11 @@ describe('picture', () => {
     picture.apply(wire(t(1), 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), 0)
     picture.apply(wire(t(5), 'set', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), 0)
 
-    expect(picture.property('focuser', 'ABS_FOCUS_POSITION')).toEqual({ state: 'Ok', values: { FOCUS_ABSOLUTE_POSITION: 1200 }, changedAt: t(1), confirmedAt: t(5) })
+    expect(picture.property('focuser', 'ABS_FOCUS_POSITION')).toEqual({ state: 'Ok', values: { FOCUS_ABSOLUTE_POSITION: 1200 }, limits: {}, changedAt: t(1), confirmedAt: t(5) })
 
     picture.apply(wire(t(9), 'set', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1500 }, 'Busy'), 0)
 
-    expect(picture.property('focuser', 'ABS_FOCUS_POSITION')).toEqual({ state: 'Busy', values: { FOCUS_ABSOLUTE_POSITION: 1500 }, changedAt: t(9), confirmedAt: t(9) })
+    expect(picture.property('focuser', 'ABS_FOCUS_POSITION')).toEqual({ state: 'Busy', values: { FOCUS_ABSOLUTE_POSITION: 1500 }, limits: {}, changedAt: t(9), confirmedAt: t(9) })
   })
 
   it('merges a partial update into the last values and keeps the state when the update has none', () => {
@@ -96,15 +96,32 @@ describe('picture', () => {
     picture.apply(phd2(t(2), { Event: 'AppState', State: 'Stopped' }), 0)
     picture.apply(phd2(t(3), { Event: 'StartGuiding' }), 0)
 
-    expect(picture.phd2()).toEqual({ link: 'connected', state: 'Guiding', changedAt: t(3) })
+    expect(picture.phd2()).toEqual({ link: 'connected', state: 'Guiding', changedAt: t(3), lastStepAt: undefined })
 
     picture.apply(phd2(t(4), { Event: 'GuideStep', Frame: 4 }), 0)
 
-    expect(picture.phd2().changedAt).toBe(t(3))
+    expect(picture.phd2()).toMatchObject({ changedAt: t(3), lastStepAt: t(4) })
 
-    picture.apply(phd2Link(t(5), 'closed'), 0)
+    picture.apply(phd2(t(5), { Event: 'GuidingDithered' }), 0)
 
-    expect(picture.phd2()).toEqual({ link: 'closed', state: undefined, changedAt: t(5) })
+    expect(picture.phd2().lastStepAt).toBe(t(4))
+
+    picture.apply(phd2Link(t(6), 'closed'), 0)
+
+    expect(picture.phd2()).toEqual({ link: 'closed', state: undefined, changedAt: t(6), lastStepAt: undefined })
+  })
+
+  it('keeps the number limits of a definition through later updates, and drops them with the property', () => {
+    const picture = makePicture()
+
+    picture.apply(wire(t(1), 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 100 }, 'Ok', 'in', { FOCUS_ABSOLUTE_POSITION: { min: 0, max: 60000 } }), 0)
+    picture.apply(wire(t(2), 'set', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 200 }, 'Busy'), 0)
+
+    expect(picture.property('focuser', 'ABS_FOCUS_POSITION')?.limits).toEqual({ FOCUS_ABSOLUTE_POSITION: { min: 0, max: 60000 } })
+
+    picture.apply(wire(t(3), 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 200 }, 'Ok'), 0)
+
+    expect(picture.property('focuser', 'ABS_FOCUS_POSITION')?.limits).toEqual({})
   })
 
   it('notes when the rig was last heard from', () => {

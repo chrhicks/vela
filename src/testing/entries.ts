@@ -24,8 +24,8 @@ export function phd2Link(at: number, status: 'connected' | 'closed' | 'failed'):
   return entry('client.connection', at, { target: 'phd2', status })
 }
 
-export function wire(at: number, type: 'def' | 'set' | 'new' | 'del', device: string, property: string | undefined, elements: Elements, state?: string, dir: 'in' | 'out' = type === 'new' ? 'out' : 'in'): Entry {
-  return entry('wire', at, { dir, n: 1, xml: '', device, type, indiDevice: `${device} (indi)`, ...(property === undefined ? {} : { property }), ...(state === undefined ? {} : { state }), elements })
+export function wire(at: number, type: 'def' | 'set' | 'new' | 'del', device: string, property: string | undefined, elements: Elements, state?: string, dir: 'in' | 'out' = type === 'new' ? 'out' : 'in', limits: Readonly<Record<string, { min: number; max: number }>> = {}): Entry {
+  return entry('wire', at, { dir, n: 1, xml: '', device, type, indiDevice: `${device} (indi)`, ...(property === undefined ? {} : { property }), ...(state === undefined ? {} : { state }), elements, ...(Object.keys(limits).length === 0 ? {} : { numbers: Object.fromEntries(Object.entries(limits).map(([name, range]) => [name, { ...range, step: 1, format: '%g' }])) }) })
 }
 
 export function olderWire(at: number, type: 'def' | 'set', device: string, property: string, elements: Elements, state: string): Entry {

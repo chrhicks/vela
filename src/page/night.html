@@ -40,6 +40,19 @@
   #last-run { margin: 8px 0 0; color: var(--muted); }
   #last-run.bad { color: var(--bad); }
   #last-run.warn { color: var(--warn); }
+  #focusbar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--warn); border-radius: 8px; background: var(--card); }
+  #focusbar[hidden] { display: none; }
+  #focusbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
+  #focus-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
+  #prepare { margin-bottom: 12px; }
+  #prepare .group { margin-bottom: 12px; }
+  #prepare h3 { margin: 0 0 6px; font-size: 15px; }
+  #prepare .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
+  #prepare .row > span { min-width: 80px; }
+  #prepare input[type=number] { width: 110px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+  #prepare button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
+  #prepare button[disabled], #prepare input:disabled { opacity: 0.5; cursor: default; }
+  #prepare-error { color: var(--bad); margin: 8px 0 0; }
   #frames { margin-top: 12px; }
   #frames img { display: block; max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 8px; }
   #frames table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
@@ -55,7 +68,38 @@
   <span class="progress" id="progress"></span>
   <button type="button" id="stop">Stop</button>
 </div>
+<div id="focusbar" hidden>
+  <span class="progress" id="focus-progress"></span>
+  <button type="button" id="focus-stop">Stop focuser</button>
+</div>
 <main id="devices"></main>
+<section id="prepare">
+  <h2><span>Preparation</span></h2>
+  <div class="group" id="focuser-controls">
+    <h3>Focuser</h3>
+    <div class="row">
+      <span id="focus-where" class="unknown"></span>
+    </div>
+    <div class="row">
+      <input type="number" step="1" id="focus-target" aria-label="Target position">
+      <button type="button" id="focus-move">Move to position</button>
+      <button type="button" id="focus-in"></button>
+      <button type="button" id="focus-out"></button>
+    </div>
+  </div>
+  <div class="group" id="dew-controls">
+    <h3>Dew heaters</h3>
+    <div class="row" id="dew-auto-row">
+      <span>Automatic</span>
+      <button type="button" id="dew-auto-on">On</button>
+      <button type="button" id="dew-auto-off">Off</button>
+      <span id="dew-auto-state" class="unknown"></span>
+    </div>
+    <div id="dew-channels"></div>
+    <p class="unknown" id="dew-none">The power box has not reported its dew outputs</p>
+  </div>
+  <p id="prepare-error" hidden></p>
+</section>
 <section id="capture">
   <h2><span>Capture</span></h2>
   <form id="capture-form">
@@ -255,9 +299,102 @@ function showCapture(view) {
   }
 }
 
+const focusbar = document.getElementById('focusbar')
+const focusProgress = document.getElementById('focus-progress')
+const focusWhere = document.getElementById('focus-where')
+const focusTarget = document.getElementById('focus-target')
+const focusButtons = ['focus-move', 'focus-in', 'focus-out'].map(id => document.getElementById(id))
+const [focusMove, focusIn, focusOut] = focusButtons
+const dewAutoState = document.getElementById('dew-auto-state')
+const dewAutoButtons = [document.getElementById('dew-auto-on'), document.getElementById('dew-auto-off')]
+const dewChannels = document.getElementById('dew-channels')
+const dewNone = document.getElementById('dew-none')
+const prepareError = document.getElementById('prepare-error')
+const dewRows = new Map()
+let prepareLive = false
+
+async function prepareAction(request) {
+  prepareError.hidden = true
+  try {
+    const result = await post('/prepare', request)
+    if (!result.ok) {
+      prepareError.hidden = false
+      prepareError.textContent = result.body.error
+    }
+  } catch (error) {
+    prepareError.hidden = false
+    prepareError.textContent = 'Could not reach Vela: ' + error
+  }
+}
+
+document.getElementById('focus-stop').addEventListener('click', () => prepareAction({ action: 'focuser-stop' }))
+focusMove.addEventListener('click', () => prepareAction({ action: 'focuser-move', position: Number(focusTarget.value) }))
+focusIn.addEventListener('click', () => prepareAction({ action: 'focuser-nudge', direction: 'in' }))
+focusOut.addEventListener('click', () => prepareAction({ action: 'focuser-nudge', direction: 'out' }))
+dewAutoButtons[0].addEventListener('click', () => prepareAction({ action: 'dew-auto', on: true }))
+dewAutoButtons[1].addEventListener('click', () => prepareAction({ action: 'dew-auto', on: false }))
+
+function dewRow(channel) {
+  const row = element('div', 'row')
+  const name = element('span', '', channel.label)
+  const on = element('button', '', 'On')
+  const off = element('button', '', 'Off')
+  const state = element('span', 'unknown')
+  const duty = element('input')
+  duty.type = 'number'
+  duty.step = 'any'
+  duty.setAttribute('aria-label', channel.label + ' duty (%)')
+  const set = element('button', '', 'Set duty')
+  on.addEventListener('click', () => prepareAction({ action: 'dew-channel', channel: channel.id, on: true }))
+  off.addEventListener('click', () => prepareAction({ action: 'dew-channel', channel: channel.id, on: false }))
+  set.addEventListener('click', () => prepareAction({ action: 'dew-duty', channel: channel.id, percent: Number(duty.value) }))
+  row.append(name, on, off, state, duty, set)
+  return { row, state, duty, buttons: [on, off, set] }
+}
+
+function showPrepare(night) {
+  const { focuser, dew } = night.prepare
+  prepareLive = night.phase === 'live'
+  focusbar.hidden = !focuser.moving
+  if (focuser.moving) focusProgress.textContent = 'Focuser moving' + (focuser.position === undefined ? '' : ', at ' + focuser.position + ' steps')
+  const range = focuser.min === undefined ? 'limits not on the stream' : 'limits ' + focuser.min + ' to ' + focuser.max
+  focusWhere.textContent = !focuser.known ? 'Focuser not on the stream' : (focuser.position === undefined ? 'position unknown' : focuser.position + ' steps') + ', ' + range + (focuser.moving ? ', moving' : '')
+  if (focuser.min !== undefined) {
+    focusTarget.min = focuser.min
+    focusTarget.max = focuser.max
+  }
+  focusIn.textContent = 'In ' + focuser.nudgeSteps
+  focusOut.textContent = 'Out ' + focuser.nudgeSteps
+  for (const button of focusButtons) button.disabled = !prepareLive || !focuser.known
+  focusTarget.disabled = !prepareLive || !focuser.known
+
+  dewNone.hidden = dew.channels.length > 0
+  dewAutoState.textContent = dew.auto === undefined ? '' : dew.auto ? 'on' : 'off'
+  for (const button of dewAutoButtons) button.disabled = !prepareLive || dew.auto === undefined
+  for (const channel of dew.channels) {
+    let parts = dewRows.get(channel.id)
+    if (parts === undefined) {
+      parts = dewRow(channel)
+      dewRows.set(channel.id, parts)
+      dewChannels.append(parts.row)
+    }
+    parts.state.textContent = (channel.on === undefined ? 'unknown' : channel.on ? 'on' : 'off') + (channel.duty === undefined ? '' : ', ' + channel.duty + ' %')
+    if (channel.min !== undefined) {
+      parts.duty.min = channel.min
+      parts.duty.max = channel.max
+    }
+    for (const button of parts.buttons) button.disabled = !prepareLive
+    parts.duty.disabled = !prepareLive
+  }
+}
+
 const events = new EventSource('/events')
 events.addEventListener('capture', event => showCapture(JSON.parse(event.data)))
-events.addEventListener('night', event => show(JSON.parse(event.data)))
+events.addEventListener('night', event => {
+  const night = JSON.parse(event.data)
+  show(night)
+  showPrepare(night)
+})
 events.addEventListener('frames', event => showFrames(JSON.parse(event.data)))
 events.onerror = () => {
   banner.hidden = false

@@ -73,6 +73,14 @@ export const CaptureSettings = Schema.Struct({
   ),
 })
 
+export const PrepareSettings = Schema.Struct({
+  focuserNudgeSteps: described(
+    'Steps one press of the focuser\'s in or out button moves it. Not measured: no nudge has been made yet (2026-11-07). The driver reports a travel of 60000 steps (ABS_FOCUS_POSITION, stream, 2026-11-07), so 100 steps is a small move that is still far larger than the 1 step the driver counts; a display choice, change it to what a focus step needs',
+    Schema.Number,
+    100,
+  ),
+})
+
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the page is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve' }),
   broker: BrokerLogin,
@@ -99,6 +107,7 @@ export const VelaSettings = Schema.Struct({
   ),
   frames: FrameSettings,
   capture: CaptureSettings,
+  prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),
   historyReadBatch: described(
     'Entries asked of the broker at a time when replaying the rig connection. The client library defaults to 100; 2048 read 200,000 entries in 0.8 s on thuban (Cria viewer, 2026-11-06)',
     Schema.Number,
