@@ -23,7 +23,7 @@ describe('readWireBody', () => {
   it('keeps the elements that are numbers, switches or text and drops the rest', () => {
     const wire = readWireBody({ dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x', D: null, E: { nested: 1 } }, perm: 'rw', numbers: { A: { min: 0, max: 1, step: 1, format: '%g' } } })
 
-    expect(wire).toEqual({ dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x' } })
+    expect(wire).toEqual({ dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x' }, limits: { A: { min: 0, max: 1 } } })
   })
 
   it('refuses a body without a direction or device', () => {

@@ -5,22 +5,24 @@ import { makePicture } from '../rig/picture.ts'
 import { connected, startedAt, wire } from '../testing/entries.ts'
 import { makePage, type PageOptions } from './server.ts'
 
-const settings = { devices: { mount: 'mount', primary: 'primary', guide: 'guide', focuser: 'focuser', box: 'box' }, silenceMs: 10_000 }
+const settings = { devices: { mount: 'mount', primary: 'primary', guide: 'guide', focuser: 'focuser', box: 'box' }, silenceMs: 10_000, focuserNudgeSteps: 100 }
 
 const open: Array<ReturnType<typeof makePage>['server']> = []
 
 const idleView = { at: 1, run: undefined, last: undefined }
 
+const idlePrepare: PageOptions['prepare'] = async () => ({ ok: false, reason: 'not here' })
+
 const idleCapture: PageOptions['capture'] = { view: () => idleView, start: () => ({ ok: false, reason: 'not here' }), stop: async () => false }
 
-async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'capture'>> = {}) {
+async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'capture' | 'prepare'>> = {}) {
   const picture = makePicture()
 
   picture.apply(connected(startedAt), Date.now())
   picture.apply(wire(startedAt + 1, 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), Date.now())
   picture.caughtUp()
 
-  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, capture: idleCapture, ...frames })
+  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, capture: idleCapture, prepare: idlePrepare, ...frames })
 
   open.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -143,6 +145,25 @@ describe('page server', () => {
 
     expect((await fetch(`${base}/capture`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status).toBe(415)
     expect((await fetch(`${base}/capture/stop`, { method: 'POST' })).status).toBe(415)
+  })
+
+  it('passes a preparation request on and says why it was refused', async () => {
+    const received: unknown[] = []
+    const base = await serve(20, { prepare: async request => (received.push(request), request === 'ok' ? { ok: true } : { ok: false, reason: 'position 70000 is outside the limits' }) })
+    const post = (body: string) => fetch(`${base}/prepare`, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+    const accepted = await post('"ok"')
+    const refused = await post('{"action":"focuser-move"}')
+
+    expect(accepted.status).toBe(200)
+    expect(await accepted.json()).toEqual({ ok: true })
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toEqual({ error: 'position 70000 is outside the limits' })
+    expect((await post('not json')).status).toBe(400)
+    expect(received).toEqual(['ok', { action: 'focuser-move' }])
+  })
+
+  it('refuses a preparation request a web page could send without asking the browser first', async () => {
+    expect((await fetch(`${await serve()}/prepare`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status).toBe(415)
   })
 
   it('stops the run and says whether there was one', async () => {

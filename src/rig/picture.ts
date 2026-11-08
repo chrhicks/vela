@@ -1,8 +1,9 @@
-import { readWireBody, recordOf, type Entry, type Value } from '../stream/entry.ts'
+import { readWireBody, recordOf, type Entry, type Limits, type Value } from '../stream/entry.ts'
 
 export interface Property {
   readonly state: string | undefined
   readonly values: Readonly<Record<string, Value>>
+  readonly limits: Readonly<Record<string, Limits>>
   readonly changedAt: number
   readonly confirmedAt: number
 }
@@ -25,6 +26,7 @@ export interface Phd2 {
   readonly link: Phd2Link
   readonly state: string | undefined
   readonly changedAt: number | undefined
+  readonly lastStepAt: number | undefined
 }
 
 export type IndiLink = 'unknown' | 'connected' | 'closed'
@@ -56,7 +58,7 @@ export function makePicture() {
   const writes = new Map<string, Written>()
   let rig: RigConnection | undefined
   let indi: IndiLink = 'unknown'
-  let phd2: Phd2 = { link: 'unknown', state: undefined, changedAt: undefined }
+  let phd2: Phd2 = { link: 'unknown', state: undefined, changedAt: undefined, lastStepAt: undefined }
   let heardAt: number | undefined
   let ready = false
 
@@ -92,7 +94,7 @@ export function makePicture() {
     const state = wire.state ?? before?.state
     const changed = before === undefined || before.state !== state || !sameValues(before.values, values)
 
-    properties.set(key, { state, values, changedAt: changed ? entry.at : before.changedAt, confirmedAt: entry.at })
+    properties.set(key, { state, values, limits: wire.type === 'def' ? wire.limits : (before?.limits ?? {}), changedAt: changed ? entry.at : before.changedAt, confirmedAt: entry.at })
   }
 
   function applyClient(entry: Entry) {
@@ -103,7 +105,7 @@ export function makePicture() {
     if (entry.kind === 'client.connected') {
       forgetDevices()
       indi = 'unknown'
-      phd2 = { link: 'unknown', state: undefined, changedAt: undefined }
+      phd2 = { link: 'unknown', state: undefined, changedAt: undefined, lastStepAt: undefined }
       rig = {
         at: entry.at,
         run: typeof body['run'] === 'string' ? body['run'] : entry.run,
@@ -128,7 +130,7 @@ export function makePicture() {
     }
 
     if (body['target'] === 'phd2' && (status === 'connected' || status === 'closed' || status === 'failed')) {
-      phd2 = status === 'connected' ? { ...phd2, link: status } : { link: status, state: undefined, changedAt: entry.at }
+      phd2 = status === 'connected' ? { ...phd2, link: status } : { link: status, state: undefined, changedAt: entry.at, lastStepAt: undefined }
     }
   }
 
@@ -146,7 +148,7 @@ export function makePicture() {
       return
     }
 
-    phd2 = { link: 'connected', state, changedAt: phd2.state === state ? phd2.changedAt : entry.at }
+    phd2 = { link: 'connected', state, changedAt: phd2.state === state ? phd2.changedAt : entry.at, lastStepAt: event === 'GuideStep' ? entry.at : phd2.lastStepAt }
   }
 
   return {

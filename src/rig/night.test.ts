@@ -6,7 +6,7 @@ import { makePicture, type Picture } from './picture.ts'
 
 const t = (seconds: number) => startedAt + seconds * 1000
 
-const settings = { devices: { mount: 'mount', primary: 'primary', guide: 'guide', focuser: 'focuser', box: 'box' }, silenceMs: 10_000 }
+const settings = { devices: { mount: 'mount', primary: 'primary', guide: 'guide', focuser: 'focuser', box: 'box' }, silenceMs: 10_000, focuserNudgeSteps: 100 }
 
 function define(picture: Picture, at: number, device: string, property: string, elements: Readonly<Record<string, number | boolean | string>>, state = 'Ok') {
   picture.apply(wire(at, 'def', device, property, elements, state), at)
@@ -36,6 +36,7 @@ function rigWithAll(): Picture {
   define(picture, t(1), 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 21450 })
   define(picture, t(1), 'focuser', 'FOCUS_TEMPERATURE', { TEMPERATURE: 8.46 })
   define(picture, t(1), 'box', 'POWER_SENSORS', { SENSOR_VOLTAGE: 12.9, SENSOR_CURRENT: 0.785, SENSOR_POWER: 10.1 })
+  define(picture, t(1), 'box', 'DEW_CHANNELS', { DEW_CHANNEL_1: true, DEW_CHANNEL_2: false })
   define(picture, t(1), 'box', 'DEW_DUTY_CYCLES', { DEW_CHANNEL_1: 40, DEW_CHANNEL_2: 0 })
   define(picture, t(1), 'box', 'DEW_LABELS', { DEW_CHANNEL_1: 'Dew A', DEW_CHANNEL_2: 'Dew B' })
   picture.apply(wire(t(2), 'new', 'primary', 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: -10 }), t(2))
@@ -78,7 +79,7 @@ describe('night', () => {
     expect(texts(deviceOf(night, 'guide'))).toEqual({ Exposing: 'no' })
     expect(texts(deviceOf(night, 'focuser'))).toEqual({ Position: '21450 steps', Temperature: '8.5 °C', Moving: 'no' })
     expect(texts(deviceOf(night, 'box'))).toEqual({ 'Input voltage': '12.9 V', Current: '0.79 A', 'Dew heater Dew A': '40 %', 'Dew heater Dew B': '0 %' })
-    expect(texts(deviceOf(night, 'phd2'))).toEqual({ State: 'Guiding' })
+    expect(texts(deviceOf(night, 'phd2'))).toEqual({ State: 'Guiding', 'Last guide step': '—' })
     expect(deviceOf(night, 'mount').fields.every(field => field.status === 'current')).toBe(true)
   })
 
@@ -174,6 +175,25 @@ describe('night', () => {
 
     expect(night.phase).toBe('no-connection')
     expect(night.devices.flatMap(device => device.fields).every(field => field.status === 'unknown')).toBe(true)
+  })
+
+  it('shows how long ago PHD2 made its last guide step', () => {
+    const picture = rigWithAll()
+
+    picture.apply(phd2(t(10), { Event: 'GuideStep', Frame: 7 }), t(10))
+
+    const field = deviceOf(makeNight(picture, settings, t(15)), 'phd2').fields[1]
+
+    expect(field).toEqual({ label: 'Last guide step', text: '0 min ago', status: 'current', changedAt: t(10) })
+    expect(deviceOf(makeNight(picture, settings, t(10 + 3 * 3600)), 'phd2').fields[1]?.text).toBe('3 h 00 min ago')
+  })
+
+  it('carries the focuser and dew controls the page needs', () => {
+    const picture = rigWithAll()
+    const night = makeNight(picture, settings, t(5))
+
+    expect(night.prepare.focuser).toMatchObject({ known: true, position: 21450, moving: false, nudgeSteps: 100 })
+    expect(night.prepare.dew.channels.map(channel => channel.label)).toEqual(['Dew A', 'Dew B'])
   })
 
   it('marks PHD2 not reachable when its link is down', () => {

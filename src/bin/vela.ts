@@ -12,6 +12,7 @@ import { makeKeeper } from '../frames/keeper.ts'
 import { listNight, makePreviews } from '../frames/library.ts'
 import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
+import { makePrepare } from '../prepare/prepare.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
@@ -23,7 +24,7 @@ const settings = readConfig(VelaSettings, process.argv[2])
 const frames = settings.frames
 const naming = { zone: frames.nightZone, changesAtHour: frames.nightChangesAtHour }
 const picture = makePicture()
-const nightSettings = { devices: settings.devices, silenceMs: settings.silenceSeconds * 1000 }
+const nightSettings = { devices: settings.devices, silenceMs: settings.silenceSeconds * 1000, focuserNudgeSteps: settings.prepare.focuserNudgeSteps }
 
 function lost(reason: string): never {
   console.error(`vela: ${reason}`)
@@ -36,6 +37,7 @@ const sender = makeSender({
   answerTimeoutMs: settings.capture.commandAnswerSeconds * 1000,
   by: 'vela',
 })
+const prepare = makePrepare({ picture, sender, settings: { focuser: settings.devices.focuser, box: settings.devices.box, focuserNudgeSteps: settings.prepare.focuserNudgeSteps } })
 const capture = makeCapture({
   picture,
   sender,
@@ -63,6 +65,7 @@ const page = makePage({
   frames: () => listNight(frames.keepDir, nightOf(Date.now(), naming)),
   preview: makePreviews(frames.keepDir, frames.preview).get,
   capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
+  prepare: request => prepare.act(request),
 })
 
 const keeper = makeKeeper({

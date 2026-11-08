@@ -1,4 +1,5 @@
 import { SiderealTime } from 'astronomy-engine'
+import { makePrepareView, type PrepareView } from '../prepare/view.ts'
 import type { Value } from '../stream/entry.ts'
 import type { Picture, Property } from './picture.ts'
 
@@ -25,6 +26,7 @@ export interface Night {
   readonly phase: Phase
   readonly rig: { readonly connectedAt: number | undefined; readonly connection: number | undefined; readonly indiserver: string; readonly silentSeconds: number | undefined }
   readonly devices: ReadonlyArray<DeviceView>
+  readonly prepare: PrepareView
 }
 
 export interface DeviceIds {
@@ -38,6 +40,7 @@ export interface DeviceIds {
 export interface NightSettings {
   readonly devices: DeviceIds
   readonly silenceMs: number
+  readonly focuserNudgeSteps: number
 }
 
 interface Reading {
@@ -240,7 +243,15 @@ export function makeNight(picture: Picture, settings: NightSettings, now: number
         text: phd2.link === 'unknown' ? unknownText : phd2.link === 'connected' ? 'connected' : 'not reachable',
         status: phd2.link === 'unknown' ? 'unknown' : phase === 'live' ? 'current' : 'stale',
       },
-      fields: [{ label: 'State', text: phd2.state ?? unknownText, status: phd2Status, changedAt: phd2.changedAt }],
+      fields: [
+        { label: 'State', text: phd2.state ?? unknownText, status: phd2Status, changedAt: phd2.changedAt },
+        {
+          label: 'Last guide step',
+          text: phd2.lastStepAt === undefined ? unknownText : `${formatDuration((now - phd2.lastStepAt) / 1000)} ago`,
+          status: phd2.lastStepAt === undefined ? 'unknown' : phd2Status === 'unknown' ? 'stale' : phd2Status,
+          changedAt: phd2.lastStepAt,
+        },
+      ],
     },
   ]
 
@@ -254,5 +265,6 @@ export function makeNight(picture: Picture, settings: NightSettings, now: number
       silentSeconds: silentMs === undefined ? undefined : Math.floor(silentMs / 1000),
     },
     devices,
+    prepare: makePrepareView(picture, { focuser: ids.focuser, box: ids.box, focuserNudgeSteps: settings.focuserNudgeSteps }),
   }
 }
