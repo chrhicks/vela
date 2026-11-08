@@ -343,12 +343,24 @@ const endings = {
   unknown: ['stopped: a command could not be confirmed', 'bad'],
 }
 
+let captureRunning = false
+
+function enableCapture() {
+  for (const control of captureForm.elements) control.disabled = captureRunning || !lastLive || (control.name === 'setpoint' && captureForm.elements.cooler.value !== 'on')
+}
+
+function asOf(node, text, live) {
+  node.textContent = live ? text : text + ' (stale)'
+  node.className = live ? 'unknown' : 'stale'
+}
+
 function showCapture(view) {
   const run = view.run
   statusParts.run = run
   showStatus()
   runbar.hidden = run === undefined
-  for (const control of captureForm.elements) control.disabled = run !== undefined || (control.name === 'setpoint' && captureForm.elements.cooler.value !== 'on')
+  captureRunning = run !== undefined
+  enableCapture()
   if (run !== undefined) {
     const phase = run.phase === 'exposing' ? (run.secondsLeft === undefined ? 'starting the exposure' : 'exposing, ' + run.secondsLeft + ' s left') : run.phase === 'preparing' ? 'setting the camera' : 'ending'
     progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + ' of ' + run.count + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '')
@@ -421,7 +433,7 @@ function showPrepare(night) {
   focusbar.hidden = !focuser.moving
   if (focuser.moving) focusProgress.textContent = 'Focuser moving' + (focuser.position === undefined ? '' : ', at ' + focuser.position + ' steps')
   const range = focuser.min === undefined ? 'limits not on the stream' : 'limits ' + focuser.min + ' to ' + focuser.max
-  focusWhere.textContent = !focuser.known ? 'Focuser not on the stream' : (focuser.position === undefined ? 'position unknown' : focuser.position + ' steps') + ', ' + range + (focuser.moving ? ', moving' : '')
+  asOf(focusWhere, !focuser.known ? 'Focuser not on the stream' : (focuser.position === undefined ? 'position unknown' : focuser.position + ' steps') + ', ' + range + (focuser.moving ? ', moving' : ''), prepareLive || !focuser.known)
   if (focuser.min !== undefined) {
     focusTarget.min = focuser.min
     focusTarget.max = focuser.max
@@ -432,7 +444,7 @@ function showPrepare(night) {
   focusTarget.disabled = !prepareLive || !focuser.known
 
   dewNone.hidden = dew.channels.length > 0
-  dewAutoState.textContent = dew.auto === undefined ? '' : dew.auto ? 'on' : 'off'
+  asOf(dewAutoState, dew.auto === undefined ? '' : dew.auto ? 'on' : 'off', prepareLive || dew.auto === undefined)
   for (const button of dewAutoButtons) button.disabled = !prepareLive || dew.auto === undefined
   for (const channel of dew.channels) {
     let parts = dewRows.get(channel.id)
@@ -441,7 +453,7 @@ function showPrepare(night) {
       dewRows.set(channel.id, parts)
       dewChannels.append(parts.row)
     }
-    parts.state.textContent = (channel.on === undefined ? 'unknown' : channel.on ? 'on' : 'off') + (channel.duty === undefined ? '' : ', ' + channel.duty + ' %')
+    asOf(parts.state, (channel.on === undefined ? 'unknown' : channel.on ? 'on' : 'off') + (channel.duty === undefined ? '' : ', ' + channel.duty + ' %'), prepareLive || channel.on === undefined)
     if (channel.min !== undefined) {
       parts.duty.min = channel.min
       parts.duty.max = channel.max
@@ -563,7 +575,7 @@ const gotoPhases = {
 }
 
 function showPointing(view, live) {
-  mountState.textContent = (view.parked === undefined ? 'park state unknown' : view.parked ? 'parked' : 'unparked') + ', tracking ' + (view.tracking === undefined ? 'unknown' : view.tracking ? 'on' : 'off')
+  asOf(mountState, (view.parked === undefined ? 'park state unknown' : view.parked ? 'parked' : 'unparked') + ', tracking ' + (view.tracking === undefined ? 'unknown' : view.tracking ? 'on' : 'off'), live)
   for (const button of pointingButtons) button.disabled = !live
   gotoButton.disabled = !live || chosen === undefined
   const goto = view.goto
@@ -595,6 +607,7 @@ events.addEventListener('night', event => {
   show(night)
   showPrepare(night)
   lastLive = night.phase === 'live'
+  enableCapture()
   currentMeridian = night.devices.find(device => device.id === 'mount').fields.find(field => field.label === 'Meridian limit').text
   if (lastPointing !== undefined) showPointing(lastPointing, lastLive)
 })
