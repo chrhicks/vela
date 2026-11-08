@@ -46,6 +46,28 @@
   #tabs a { border-bottom: 2px solid transparent; }
   #tabs a.on { color: var(--fg); border-bottom-color: var(--fg); font-weight: 600; }
   #bottom { display: none; }
+  body[data-view="tonight"] #runbar { display: none; }
+  .view-title { font-size: 26px; margin: 0 0 4px; }
+  #tonight { display: grid; grid-template-columns: 1.4fr 1fr; gap: 40px; }
+  #tonight h1 { font-size: 30px; line-height: 1.15; margin: 0 0 4px; letter-spacing: -0.015em; }
+  #tonight h2 { font-size: 20px; margin: 0 0 10px; font-weight: 600; }
+  #tonight h2 + p, #tonight-frame p { margin-top: 0; }
+  #tonight .sub { color: var(--muted); margin: 0 0 18px; }
+  #tonight .big { display: flex; flex-wrap: wrap; gap: 12px 36px; margin: 0 0 18px; }
+  #tonight .big div { font-size: 15px; color: var(--muted); }
+  #tonight .big b { display: block; font-size: 30px; color: var(--fg); font-weight: 600; line-height: 1.15; }
+  #tonight table { width: 100%; border-collapse: collapse; }
+  #tonight td { padding: 9px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  #tonight td:first-child { color: var(--muted); width: 38%; }
+  #tonight td:last-child { text-align: right; }
+  #tonight section { border: 0; background: transparent; padding: 0; border-radius: 0; }
+  #tonight { align-items: start; }
+  #tonight aside > section { margin-bottom: 28px; }
+  #tonight-frame img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); }
+  #tonight-frame .cap { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+  .bad { color: var(--bad); }
+  .more-list a { display: flex; justify-content: space-between; align-items: center; min-height: 56px; border-top: 1px solid var(--line); color: var(--fg); text-decoration: none; font-size: 18px; }
+  .more-list a span { color: var(--muted); font-size: 15px; }
   .view { max-width: 1100px; margin: 0 auto; padding: 20px 24px 40px; }
   .view[hidden] { display: none; }
   @media (max-width: 760px) {
@@ -60,6 +82,8 @@
     #bottom a.on { background: var(--dome-hi); color: var(--fg); font-weight: 600; }
     body { padding-bottom: 64px; }
     .view { padding: 16px 14px 32px; }
+    #tonight { grid-template-columns: 1fr; gap: 8px; }
+    #tonight h1 { font-size: 26px; }
   }
   #capture { margin-bottom: 12px; }
   #capture form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; }
@@ -118,9 +142,14 @@
   <span class="progress" id="focus-progress"></span>
   <button type="button" id="focus-stop">Stop focuser</button>
 </div>
-<nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a></nav>
+<nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a><a href="#/rig" data-to="rig">Rig</a></nav>
 </header>
-<div class="view" data-view="tonight"><p class="rig" id="rig"></p><main id="devices"></main></div>
+<div class="view" data-view="tonight"><div id="tonight">
+  <section><div id="tonight-head"><p class="unknown">Reading the rig from the stream</p></div><table id="tonight-readings"></table></section>
+  <aside><section><h2>Rig</h2><p id="tonight-rig"></p></section><section id="tonight-frame"><h2>Latest frame</h2><div id="tonight-frame-body"></div></section></aside>
+</div></div>
+<div class="view" data-view="rig"><h1 class="view-title">Rig</h1><p class="rig" id="rig"></p><main id="devices"></main></div>
+<div class="view" data-view="more"><h1 class="view-title">More</h1><div class="more-list"><a href="#/frames">Frames <span>tonight's frames</span></a><a href="#/rig">Rig <span>every reading</span></a></div></div>
 <div class="view" data-view="prepare">
 <section id="prepare">
   <h2><span>Preparation</span></h2>
@@ -200,7 +229,7 @@
   <table><tbody id="frame-rows"></tbody></table>
 </section>
 </div>
-<nav id="bottom" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a></nav>
+<nav id="bottom" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/more" data-to="more" data-also="frames rig">More</a></nav>
 <script>
 const dimButton = document.getElementById('dim')
 
@@ -214,14 +243,15 @@ function setDim(on) {
 dimButton.addEventListener('click', () => setDim(!document.documentElement.hasAttribute('data-dim')))
 try { setDim(localStorage.getItem('vela-dim') === '1') } catch {}
 
-const viewNames = ['tonight', 'prepare', 'point', 'capture', 'frames']
+const viewNames = ['tonight', 'prepare', 'point', 'capture', 'frames', 'rig', 'more']
 
 function showView() {
   const asked = (/^#\/(\w+)/.exec(location.hash) ?? [])[1]
   const current = viewNames.includes(asked) ? asked : 'tonight'
   for (const view of document.querySelectorAll('.view')) view.hidden = view.dataset.view !== current
+  document.body.dataset.view = current
   for (const link of document.querySelectorAll('[data-to]')) {
-    link.classList.toggle('on', link.dataset.to === current)
+    link.classList.toggle('on', link.dataset.to === current || (link.dataset.also ?? '').split(' ').includes(current))
     if (link.dataset.to === current) link.setAttribute('aria-current', 'page')
     else link.removeAttribute('aria-current')
   }
@@ -421,7 +451,77 @@ function asOf(node, text, live) {
   node.className = live ? 'unknown' : 'stale'
 }
 
+function runEndsAt(view) {
+  const run = view.run
+  const exposing = run.phase === 'exposing' && run.secondsLeft !== undefined
+  const framesAfter = run.count - run.frame + (exposing ? 0 : 1)
+  return view.at + ((exposing ? run.secondsLeft : 0) + framesAfter * run.exposureSeconds) * 1000
+}
+
+function hourMinute(ms) {
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function escapeText(text) {
+  return String(text).replace(/[&<>"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[character])
+}
+
+const tonightState = { night: undefined, capture: undefined, pointing: undefined, frames: undefined }
+let tonightFrameShown = ''
+
+function reading(device, label) {
+  const field = tonightState.night?.devices.find(candidate => candidate.id === device)?.fields.find(candidate => candidate.label === label)
+  if (field === undefined) return '<span class="unknown">not reported</span>'
+  return '<span class="' + field.status + '">' + escapeText(field.text) + (field.status === 'stale' ? ' (stale)' : '') + '</span>'
+}
+
+function fieldText(device, label) {
+  return tonightState.night?.devices.find(candidate => candidate.id === device)?.fields.find(candidate => candidate.label === label)?.text
+}
+
+function showTonight() {
+  const { night, capture, pointing, frames } = tonightState
+  if (night === undefined) return
+  const run = capture?.run
+  const goto = pointing?.goto
+  const head = document.getElementById('tonight-head')
+  if (run !== undefined) {
+    const left = run.phase === 'exposing' && run.secondsLeft !== undefined ? run.secondsLeft + ' s left' : run.phase === 'preparing' ? 'setting up' : 'ending'
+    head.innerHTML = '<h1>' + escapeText(run.object) + ', ' + escapeText(run.frameType) + ' frames</h1>' +
+      '<p class="sub">' + run.count + ' frames of ' + run.exposureSeconds + ' s' + (run.failed > 0 ? ', ' + run.failed + ' failed' : '') + '.</p>' +
+      '<div class="big"><div>Frame<b>' + run.frame + ' of ' + run.count + '</b></div><div>This frame<b>' + left + '</b></div><div>Run ends<b>' + hourMinute(runEndsAt(capture)) + '</b></div></div>'
+  } else if (goto !== undefined && ['sending', 'sent', 'slewing'].includes(goto.phase)) {
+    head.innerHTML = '<h1>Slewing to ' + escapeText(goto.name) + '</h1><p class="sub">Sent ' + hourMinute(goto.sentAt) +
+      (goto.separationDegrees === undefined ? '' : '. The mount is ' + goto.separationDegrees.toFixed(1) + '° from the target.') + '</p>'
+  } else {
+    head.innerHTML = '<h1>Nothing running</h1><p class="sub"><a href="#/point">Choose a target</a> or <a href="#/capture">start a run</a>.</p>'
+  }
+  document.getElementById('tonight-readings').innerHTML = [
+    ['Sensor', reading('primary', 'Sensor temperature') + ', cooler ' + reading('primary', 'Cooler') + (fieldText('primary', 'Cooler') === 'on' ? ' at ' + reading('primary', 'Cooler power') : '')],
+    ['Tracking', reading('mount', 'Tracking')],
+    ['Meridian limit', reading('mount', 'Meridian limit')],
+    ['Guiding', reading('phd2', 'State')],
+  ].map(([label, value]) => '<tr><td>' + label + '</td><td>' + value + '</td></tr>').join('')
+  const down = night.devices.filter(device => device.connection.text !== 'connected' && device.connection.status !== 'unknown')
+  document.getElementById('tonight-rig').innerHTML = night.phase === 'silent'
+    ? '<span class="stale">No word from the rig for ' + night.rig.silentSeconds + ' s.</span> <a href="#/rig">See the rig</a>'
+    : down.length > 0
+      ? '<span class="bad">' + down.map(device => escapeText(device.title) + ' ' + escapeText(device.connection.text)).join(', ') + '.</span> <a href="#/rig">See the rig</a>'
+      : 'Every device connected and current. <a href="#/rig">See the rig</a>'
+  const latest = frames?.frames[0]
+  const body = document.getElementById('tonight-frame-body')
+  if (latest === undefined) {
+    if (tonightFrameShown !== 'none') body.innerHTML = '<p class="cap">No frame kept tonight yet. Frames appear here as the camera saves them.</p>'
+    tonightFrameShown = 'none'
+  } else if (tonightFrameShown !== latest.file) {
+    tonightFrameShown = latest.file
+    body.innerHTML = '<a href="#/frames"><img alt="' + escapeText(latest.file) + '" src="' + previewUrl(frames.night, latest.file) + '"></a><p class="cap">' + escapeText(latest.file) + ', kept ' + hourMinute(Date.parse(latest.keptAt)) + '. <a href="#/frames">All frames</a></p>'
+  }
+}
+
 function showCapture(view) {
+  tonightState.capture = view
+  showTonight()
   const run = view.run
   statusParts.run = run
   showStatus()
@@ -668,20 +768,29 @@ let lastLive = false
 const events = new EventSource('/events')
 events.addEventListener('pointing', event => {
   lastPointing = JSON.parse(event.data)
+  tonightState.pointing = lastPointing
+  showTonight()
   showPointing(lastPointing, lastLive)
   showTarget()
 })
 events.addEventListener('capture', event => showCapture(JSON.parse(event.data)))
 events.addEventListener('night', event => {
   const night = JSON.parse(event.data)
+  tonightState.night = night
   show(night)
+  showTonight()
   showPrepare(night)
   lastLive = night.phase === 'live'
   enableCapture()
   currentMeridian = night.devices.find(device => device.id === 'mount').fields.find(field => field.label === 'Meridian limit').text
   if (lastPointing !== undefined) showPointing(lastPointing, lastLive)
 })
-events.addEventListener('frames', event => showFrames(JSON.parse(event.data)))
+events.addEventListener('frames', event => {
+  const list = JSON.parse(event.data)
+  tonightState.frames = list
+  showFrames(list)
+  showTonight()
+})
 events.onerror = () => {
   statusParts.lost = true
   showStatus()
