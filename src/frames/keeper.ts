@@ -113,6 +113,25 @@ export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProbl
     return { remote, sha256 }
   }
 
+  async function removeOriginal(remote: string) {
+    const removed = await ssh(`rm -- ${quote(remote)}`)
+
+    if (removed.code !== 0) onProblem(`kept ${remote} but could not remove it from the rig computer (exit ${removed.code}): ${removed.stderr.trim()}`)
+  }
+
+  async function removeIfKept(file: Spooled, kept: Sidecar) {
+    const remote = `${settings.spoolDir}/${file.name}`
+    const remoteSum = await ssh(`sha256sum -- ${quote(remote)}`)
+
+    if (remoteSum.code !== 0 || remoteSum.stdout.slice(0, 64) !== kept.sha256) {
+      onProblem(`${file.name} on the rig computer does not hash to the kept frame of that name: left in place`)
+
+      return
+    }
+
+    await removeOriginal(remote)
+  }
+
   async function keep(file: Spooled, night: string) {
     const directory = join(settings.keepDir, night)
 
@@ -124,6 +143,7 @@ export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProbl
 
         await writeAtomically(join(directory, sidecarName(file.name)), JSON.stringify(sidecar, null, 2))
         onKept({ file: file.name, night, bytes: file.bytes, sha256 })
+        await removeOriginal(remote)
 
         return
       } catch (error) {
@@ -148,6 +168,7 @@ export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProbl
 
       if (kept === undefined) await keep(file, night)
       else if (kept.bytes !== file.bytes) onProblem(`${file.name} on the rig computer is ${file.bytes} bytes but the kept frame of that name is ${kept.bytes}: not copied`)
+      else await removeIfKept(file, kept)
     }
   }
 

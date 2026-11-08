@@ -66,7 +66,8 @@ describe('keeper', () => {
       bytes: bytes.length,
       keptAt: new Date(keptAtMs).toISOString(),
     } satisfies Sidecar)
-    expect(spool.commands.map(command => command.split(' ')[0])).toEqual(['find', 'cat', 'sha256sum'])
+    expect(spool.commands.map(command => command.split(' ')[0])).toEqual(['find', 'cat', 'sha256sum', 'rm'])
+    expect(spool.files.has('test_001.fits')).toBe(false)
   })
 
   it('writes the run, sequence and frame number into the sidecar when the capture labelled the file', async () => {
@@ -199,5 +200,40 @@ describe('keeper', () => {
     await Promise.all([keeper.requestScan(), keeper.requestScan(), keeper.requestScan()])
 
     expect(spool.commands.filter(command => command.startsWith('find '))).toHaveLength(2)
+  })
+  it('removes an original that was kept earlier once its hash matches the kept frame, without copying it again', async () => {
+    const { spool, keeper, kept, problems } = setup()
+    const bytes = content('kept before ')
+
+    spool.files.set('test_001.fits', { content: bytes, modifiedAt: frameTime })
+    spool.failNextRemoves = 1
+    await keeper.requestScan()
+
+    expect(kept.map(frame => frame.file)).toEqual(['test_001.fits'])
+    expect(spool.files.has('test_001.fits')).toBe(true)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('could not remove')
+
+    spool.commands.length = 0
+    await keeper.requestScan()
+
+    expect(spool.commands.map(command => command.split(' ')[0])).toEqual(['find', 'sha256sum', 'rm'])
+    expect(spool.files.has('test_001.fits')).toBe(false)
+    expect(kept).toHaveLength(1)
+  })
+
+  it('leaves a spool file in place when its hash differs from the kept frame of that name', async () => {
+    const { spool, keeper, problems } = setup()
+
+    spool.files.set('test_001.fits', { content: content('aaaa'), modifiedAt: frameTime })
+    spool.failNextRemoves = 1
+    await keeper.requestScan()
+    spool.files.set('test_001.fits', { content: content('bbbb'), modifiedAt: frameTime })
+    problems.length = 0
+    await keeper.requestScan()
+
+    expect(spool.files.has('test_001.fits')).toBe(true)
+    expect(problems).toEqual(['test_001.fits on the rig computer does not hash to the kept frame of that name: left in place'])
+    expect(spool.commands.filter(command => command.startsWith('rm ')).length).toBe(1)
   })
 })

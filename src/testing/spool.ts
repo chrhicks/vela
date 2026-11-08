@@ -13,6 +13,7 @@ export interface FakeSpool {
   readonly ssh: Ssh
   corruptNextCopies: number
   failNextCopies: number
+  failNextRemoves: number
   onCopy: (name: string) => void
 }
 
@@ -29,6 +30,7 @@ export function fakeSpool(spoolDir: string): FakeSpool {
     commands,
     corruptNextCopies: 0,
     failNextCopies: 0,
+    failNextRemoves: 0,
     onCopy: () => {},
     ssh: async (command: string, sink?: Writable) => {
       commands.push(command)
@@ -58,6 +60,18 @@ export function fakeSpool(spoolDir: string): FakeSpool {
 
         if (spool.corruptNextCopies > 0) spool.corruptNextCopies -= 1
         await new Promise<void>(resolve => sink?.end(bytes, resolve))
+
+        return done(0)
+      }
+
+      if (command.startsWith('rm ')) {
+        if (spool.failNextRemoves > 0) {
+          spool.failNextRemoves -= 1
+
+          return done(1, '', 'Permission denied')
+        }
+
+        files.delete(name)
 
         return done(0)
       }
