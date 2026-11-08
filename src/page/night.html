@@ -431,8 +431,11 @@ function showStatus() {
     link.href = '#/activity'
     statusLine.prepend(link, activity === '' ? '' : '. ')
   }
+  const wasArmed = document.querySelector('.stop.armed') !== null
   document.getElementById('stop').classList.toggle('armed', run !== undefined)
   document.getElementById('mount-stop').classList.toggle('armed', goto !== undefined && gotoActivity[goto.phase] !== undefined)
+  const stopAnswerNode = document.getElementById('stop-answer')
+  if (!wasArmed && document.querySelector('.stop.armed') !== null && !stopAnswerNode.classList.contains('sending')) say(stopAnswerNode, '')
 }
 const rig = document.getElementById('rig')
 const devices = document.getElementById('devices')
@@ -789,7 +792,7 @@ captureForm.addEventListener('submit', async event => {
   await act(startButton, captureAnswer, '/capture', request, 'Start the run', 'Run started: ' + request.count + ' × ' + request.exposureSeconds + ' s of ' + request.object + '.')
 })
 
-stopButton.addEventListener('click', () => act(stopButton, stopAnswer, '/capture/stop', {}, 'Stop capture', ''))
+stopButton.addEventListener('click', () => act(stopButton, stopAnswer, '/capture/stop', {}, 'Stop capture'))
 
 const endings = {
   done: ['finished', ''],
@@ -983,7 +986,7 @@ function prepareAction(button, answer, request, name) {
 }
 
 const focusStop = document.getElementById('focus-stop')
-focusStop.addEventListener('click', () => act(focusStop, stopAnswer, '/prepare', { action: 'focuser-stop' }, 'Stop focuser', ''))
+focusStop.addEventListener('click', () => act(focusStop, stopAnswer, '/prepare', { action: 'focuser-stop' }, 'Stop focuser'))
 focusMove.addEventListener('click', () => prepareAction(focusMove, focusAnswer, { action: 'focuser-move', position: Number(focusTarget.value) }, 'Move focuser to ' + focusTarget.value))
 focusIn.addEventListener('click', () => prepareAction(focusIn, focusAnswer, { action: 'focuser-nudge', direction: 'in' }))
 focusOut.addEventListener('click', () => prepareAction(focusOut, focusAnswer, { action: 'focuser-nudge', direction: 'out' }))
@@ -1064,7 +1067,7 @@ function pointingAction(button, answer, request) {
 }
 
 const mountStop = document.getElementById('mount-stop')
-mountStop.addEventListener('click', () => act(mountStop, stopAnswer, '/pointing', { action: 'stop' }, 'Stop mount', ''))
+mountStop.addEventListener('click', () => act(mountStop, stopAnswer, '/pointing', { action: 'stop' }, 'Stop mount'))
 for (const [id, request] of [['mount-unpark', { action: 'unpark' }], ['mount-home', { action: 'home' }], ['tracking-on', { action: 'tracking', on: true }], ['tracking-off', { action: 'tracking', on: false }]]) {
   const button = document.getElementById(id)
   button.addEventListener('click', () => pointingAction(button, mountAnswer, request))
