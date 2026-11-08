@@ -42,6 +42,10 @@
   #strip { display: block; padding: 2px 24px 4px; }
   #strip svg { display: block; width: 100%; height: 26px; }
   #strip[hidden] { display: none; }
+  #run-done { transition: width 600ms ease-out; }
+  @keyframes arrive { from { opacity: 0; } to { opacity: 1; } }
+  .arrive { animation: arrive 600ms ease-out; }
+  @media (prefers-reduced-motion: reduce) { #run-done { transition: none; } .arrive { animation: none; } }
   #runbar { padding: 0 24px 6px; font-variant-numeric: tabular-nums; color: var(--good); }
   #runbar[hidden] { display: none; }
   #tabs { display: flex; gap: 2px; padding: 0 16px; }
@@ -804,6 +808,12 @@ function reading(device, label) {
   return '<span class="' + field.status + '">' + escapeText(field.text) + (field.status === 'stale' ? ' (stale)' : '') + '</span>'
 }
 
+const runDone = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+runDone.id = 'run-done'
+runDone.setAttribute('y', '8')
+runDone.setAttribute('height', '12')
+runDone.setAttribute('fill', '#7cc49a')
+
 function showStrip() {
   const { night, capture } = tonightState
   const strip = document.getElementById('strip')
@@ -815,15 +825,21 @@ function showStrip() {
   const parts = ['<rect x="0" y="8" width="1000" height="12" rx="3" fill="#2b3a5a"/>']
   if (sky.darkAt !== undefined && sky.darkEndsAt !== undefined) parts.push('<rect x="' + x(sky.darkAt) + '" y="8" width="' + (x(sky.darkEndsAt) - x(sky.darkAt)) + '" height="12" fill="#121a2e"/>')
   const run = capture?.run
+  const above = []
   if (run !== undefined) {
     const endsAt = runEndsAt(capture)
     const startsAt = endsAt - run.count * run.exposureSeconds * 1000
-    parts.push('<rect x="' + x(startsAt) + '" y="8" width="' + Math.max(3, x(endsAt) - x(startsAt)) + '" height="12" fill="#7cc49a"/>')
+    parts.push('<rect x="' + x(startsAt) + '" y="8" width="' + Math.max(3, x(endsAt) - x(startsAt)) + '" height="12" fill="#7cc49a" fill-opacity="0.35"/>')
+    const kept = tonightState.frames?.frames.filter(frame => frame.run === run.id).length ?? run.counted
+    runDone.setAttribute('x', x(startsAt))
+    runDone.style.width = Math.max(0, x(startsAt + kept * run.exposureSeconds * 1000) - x(startsAt)) + 'px'
   }
-  if (sky.meridianLimitAt !== undefined && sky.meridianLimitAt > sky.duskAt && sky.meridianLimitAt < sky.dawnAt) parts.push('<line x1="' + x(sky.meridianLimitAt) + '" y1="4" x2="' + x(sky.meridianLimitAt) + '" y2="24" stroke="#d9a948" stroke-width="2" stroke-dasharray="3 2"/>')
-  if (night.at > sky.duskAt && night.at < sky.dawnAt) parts.push('<line x1="' + x(night.at) + '" y1="0" x2="' + x(night.at) + '" y2="26" stroke="#e3dccd" stroke-width="2"/>')
+  if (sky.meridianLimitAt !== undefined && sky.meridianLimitAt > sky.duskAt && sky.meridianLimitAt < sky.dawnAt) above.push('<line x1="' + x(sky.meridianLimitAt) + '" y1="4" x2="' + x(sky.meridianLimitAt) + '" y2="24" stroke="#d9a948" stroke-width="2" stroke-dasharray="3 2"/>')
+  if (night.at > sky.duskAt && night.at < sky.dawnAt) above.push('<line x1="' + x(night.at) + '" y1="0" x2="' + x(night.at) + '" y2="26" stroke="#e3dccd" stroke-width="2"/>')
   const svg = strip.querySelector('svg')
   svg.innerHTML = parts.join('')
+  if (run !== undefined) svg.append(runDone)
+  svg.insertAdjacentHTML('beforeend', above.join(''))
   svg.setAttribute('aria-label', 'Tonight: dusk ' + hourMinute(sky.duskAt) + (sky.darkAt === undefined ? ', no full dark' : ', dark ' + hourMinute(sky.darkAt) + ' to ' + hourMinute(sky.darkEndsAt)) + ', dawn ' + hourMinute(sky.dawnAt) + (sky.meridianLimitAt === undefined ? '' : ', meridian limit ' + hourMinute(sky.meridianLimitAt)))
 }
 
@@ -884,8 +900,9 @@ function showTonight() {
     if (tonightFrameShown !== 'none') body.innerHTML = '<p class="cap">No frame kept tonight yet. Frames appear here as the camera saves them.</p>'
     tonightFrameShown = 'none'
   } else if (tonightFrameShown !== latest.file) {
+    const arriving = tonightFrameShown !== '' && tonightFrameShown !== 'none'
     tonightFrameShown = latest.file
-    body.innerHTML = '<a href="' + frameUrl(frames.night, latest.file) + '"><img alt="' + escapeText(latest.file) + '" src="' + previewUrl(frames.night, latest.file) + '"></a><p class="cap">' + escapeText(latest.file) + ', kept ' + hourMinute(Date.parse(latest.keptAt)) + '. <a href="#/frames">All frames</a></p>'
+    body.innerHTML = '<a href="' + frameUrl(frames.night, latest.file) + '"><img' + (arriving ? ' class="arrive"' : '') + ' alt="' + escapeText(latest.file) + '" src="' + previewUrl(frames.night, latest.file) + '"></a><p class="cap">' + escapeText(latest.file) + ', kept ' + hourMinute(Date.parse(latest.keptAt)) + '. <a href="#/frames">All frames</a></p>'
   }
 }
 
