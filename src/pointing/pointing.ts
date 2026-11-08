@@ -70,8 +70,8 @@ export function makePointing({ picture, sender, settings, now }: PointingOptions
 
   const read = (property: string) => picture.property(mount, property)
 
-  async function write(property: string, values: Readonly<Record<string, number | boolean>>, stop = false): Promise<PrepareResult> {
-    const outcome = await sender.send({ device: mount, property, values }, stop)
+  async function write(property: string, values: Readonly<Record<string, number | boolean>>): Promise<PrepareResult> {
+    const outcome = await sender.send({ device: mount, property, values })
 
     return outcome.result === 'written' ? { ok: true } : refuse(`${property}: ${outcome.reason}`)
   }
@@ -161,7 +161,7 @@ export function makePointing({ picture, sender, settings, now }: PointingOptions
   }
 
   async function stop(): Promise<PrepareResult> {
-    const result = await write('TELESCOPE_ABORT_MOTION', { ABORT: true }, true)
+    const result = await write('TELESCOPE_ABORT_MOTION', { ABORT: true })
 
     if (pending !== undefined && (pending.phase === 'sending' || pending.phase === 'sent' || pending.phase === 'slewing')) {
       pending.phase = 'stopped'

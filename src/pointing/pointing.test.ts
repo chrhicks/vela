@@ -29,7 +29,7 @@ function mountRig(options: { parked?: boolean; connected?: boolean; site?: boole
 }
 
 function setup(options: { outcomes?: ReadonlyArray<Outcome>; picture?: ReturnType<typeof makePicture>; at?: number } = {}) {
-  const sent: Array<{ command: Command; stop: boolean }> = []
+  const sent: Command[] = []
   let index = 0
   let clock = options.at ?? t(100)
   const picture = options.picture ?? mountRig()
@@ -37,8 +37,8 @@ function setup(options: { outcomes?: ReadonlyArray<Outcome>; picture?: ReturnTyp
   const pointing = makePointing({
     picture,
     sender: {
-      send: async (command, stop = false) => {
-        sent.push({ command, stop })
+      send: async command => {
+        sent.push(command)
 
         return options.outcomes?.[index++] ?? { result: 'written' }
       },
@@ -60,9 +60,9 @@ describe('goto', () => {
     const expected = targetOf(m31, t(100))
 
     expect(await pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: true })
-    expect(sent.map(each => [each.command.device, each.command.property, each.command.values, each.stop])).toEqual([
-      ['mount', 'ON_COORD_SET', { TRACK: true, SLEW: false, SYNC: false }, false],
-      ['mount', 'EQUATORIAL_EOD_COORD', { RA: expected.raHours, DEC: expected.decDegrees }, false],
+    expect(sent.map(each => [each.device, each.property, each.values])).toEqual([
+      ['mount', 'ON_COORD_SET', { TRACK: true, SLEW: false, SYNC: false }],
+      ['mount', 'EQUATORIAL_EOD_COORD', { RA: expected.raHours, DEC: expected.decDegrees }],
     ])
     expect(expected.raHours).not.toBeCloseTo(m31[4] / 15, 3)
   })
@@ -134,7 +134,7 @@ describe('goto', () => {
 })
 
 describe('stop', () => {
-  it('writes the abort as a stop command while a slew is in progress and marks the goto stopped', async () => {
+  it('writes the abort while a slew is in progress and marks the goto stopped', async () => {
     const { pointing, sent, slewState } = setup()
 
     await pointing.act({ action: 'goto', id: 'ngc0224' })
@@ -142,7 +142,7 @@ describe('stop', () => {
 
     expect(pointing.view().goto?.phase).toBe('slewing')
     expect(await pointing.act({ action: 'stop' })).toEqual({ ok: true })
-    expect(sent.at(-1)).toEqual({ command: { device: 'mount', property: 'TELESCOPE_ABORT_MOTION', values: { ABORT: true } }, stop: true })
+    expect(sent.at(-1)).toEqual({ device: 'mount', property: 'TELESCOPE_ABORT_MOTION', values: { ABORT: true } })
     expect(pointing.view().goto).toMatchObject({ phase: 'stopped', detail: 'Stop pressed, abort written' })
 
     slewState('Ok')
@@ -154,7 +154,7 @@ describe('stop', () => {
     const empty = setup({ picture: makePicture() })
 
     expect(await empty.pointing.act({ action: 'stop' })).toEqual({ ok: true })
-    expect(empty.sent).toEqual([{ command: { device: 'mount', property: 'TELESCOPE_ABORT_MOTION', values: { ABORT: true } }, stop: true }])
+    expect(empty.sent).toEqual([{ device: 'mount', property: 'TELESCOPE_ABORT_MOTION', values: { ABORT: true } }])
   })
 
   it('says when the abort was not written', async () => {
@@ -173,7 +173,7 @@ describe('the other mount controls', () => {
     await pointing.act({ action: 'tracking', on: true })
     await pointing.act({ action: 'tracking', on: false })
 
-    expect(sent.map(each => [each.command.property, each.command.values])).toEqual([
+    expect(sent.map(each => [each.property, each.values])).toEqual([
       ['TELESCOPE_PARK', { UNPARK: true }],
       ['TELESCOPE_HOME', { GO: true }],
       ['TELESCOPE_TRACK_STATE', { TRACK_ON: true, TRACK_OFF: false }],
@@ -208,7 +208,7 @@ describe('no Park', () => {
     await pointing.act({ action: 'goto', id: 'ngc0224' })
     await pointing.act({ action: 'stop' })
 
-    for (const { command } of sent) {
+    for (const command of sent) {
       expect(command.property).not.toBe('TELESCOPE_PARK_OPTION')
       expect(command.values['PARK']).toBeUndefined()
     }
