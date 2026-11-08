@@ -10,10 +10,6 @@
   body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, sans-serif; }
   header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-bottom: 12px; }
   h1 { margin: 0; font-size: 20px; }
-  #banner { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid var(--line); background: var(--card); }
-  #banner.bad { border-color: var(--bad); color: var(--bad); }
-  #banner.warn { border-color: var(--warn); color: var(--warn); }
-  #banner[hidden] { display: none; }
   .rig { color: var(--muted); font-size: 14px; }
   main { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
   section { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--card); }
@@ -27,7 +23,11 @@
   .current.ok { color: var(--good); }
   #stops { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-bottom: 4px; }
   #mountbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
-  #mountbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
+  #status { flex: 1 1 240px; font-weight: 600; }
+  #status.warn { color: var(--warn); }
+  #status.bad { color: var(--bad); }
+  #mountbar:has(#status.warn) { border-color: var(--warn); }
+  #mountbar:has(#status.bad) { border-color: var(--bad); }
   #mount-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
   #runbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--good); border-radius: 8px; background: var(--card); }
   #runbar[hidden] { display: none; }
@@ -78,10 +78,9 @@
 </head>
 <body>
 <header><h1>Vela</h1><span class="rig" id="rig"></span></header>
-<div id="banner" hidden></div>
 <div id="stops">
 <div id="mountbar">
-  <span class="progress" id="mount-progress">Mount</span>
+  <span id="status" role="status">Reading the rig from the stream</span>
   <button type="button" id="mount-stop">Stop mount</button>
 </div>
 <div id="runbar" hidden>
@@ -166,7 +165,34 @@
   <table><tbody id="frame-rows"></tbody></table>
 </section>
 <script>
-const banner = document.getElementById('banner')
+const statusLine = document.getElementById('status')
+const statusParts = { night: undefined, run: undefined, goto: undefined, lost: false }
+
+const gotoActivity = { sending: 'Sending a goto to ', sent: 'Goto sent to ', slewing: 'Slewing to ' }
+
+function showStatus() {
+  const { night, run, goto, lost } = statusParts
+  let problem = ''
+  let level = ''
+  if (lost) [problem, level] = ['Lost the connection to Vela: values on this page are old', 'bad']
+  else if (night === undefined || night.phase === 'loading') problem = 'Reading the rig from the stream'
+  else if (night.phase === 'no-connection') [problem, level] = ['The stream holds no rig connection: nothing is known', 'bad']
+  else if (night.phase === 'silent') [problem, level] = ['Rig silent for ' + night.rig.silentSeconds + ' s: every value is stale', 'warn']
+  else {
+    const down = night.devices.filter(device => device.connection.text !== 'connected' && device.connection.status !== 'unknown')
+    if (down.length > 0) [problem, level] = [down.map(device => device.title + ' ' + device.connection.text).join(', '), 'bad']
+  }
+  const activities = []
+  if (night?.phase === 'live' && !lost) {
+    if (run !== undefined) activities.push('Capturing ' + run.object)
+    if (goto !== undefined && gotoActivity[goto.phase] !== undefined) activities.push(gotoActivity[goto.phase] + goto.name)
+    if (night.prepare?.focuser.moving) activities.push('Focuser moving')
+  }
+  const activity = activities.length > 0 ? activities.join(', ') : night?.phase === 'live' && !lost ? 'Idle' : ''
+  const allWell = level === '' && problem === '' && night?.phase === 'live' && !lost
+  statusLine.textContent = [allWell ? 'All connected' : problem, activity].filter(part => part !== '').join('. ')
+  statusLine.className = level
+}
 const rig = document.getElementById('rig')
 const devices = document.getElementById('devices')
 
@@ -189,16 +215,8 @@ function element(tag, className, text) {
 }
 
 function show(night) {
-  const messages = {
-    loading: ['Reading the rig connection from the stream', ''],
-    'no-connection': ['The stream holds no rig connection: nothing is known', 'bad'],
-    silent: ['The rig program has been silent for ' + night.rig.silentSeconds + ' s: every value is stale', 'warn'],
-    live: ['', ''],
-  }
-  const [text, level] = messages[night.phase]
-  banner.hidden = text === ''
-  banner.textContent = text
-  banner.className = level
+  statusParts.night = night
+  showStatus()
   rig.textContent = night.rig.connectedAt === undefined
     ? 'no rig connection'
     : 'rig connected ' + clock(night.rig.connectedAt) + ' (' + ago(night.rig.connectedAt, night.at) + '), connection ' + (night.rig.connection ?? '?') + (night.rig.indiserver === 'closed' ? ', indiserver lost' : '')
@@ -327,6 +345,8 @@ const endings = {
 
 function showCapture(view) {
   const run = view.run
+  statusParts.run = run
+  showStatus()
   runbar.hidden = run === undefined
   for (const control of captureForm.elements) control.disabled = run !== undefined || (control.name === 'setpoint' && captureForm.elements.cooler.value !== 'on')
   if (run !== undefined) {
@@ -547,6 +567,8 @@ function showPointing(view, live) {
   for (const button of pointingButtons) button.disabled = !live
   gotoButton.disabled = !live || chosen === undefined
   const goto = view.goto
+  statusParts.goto = goto
+  showStatus()
   gotoStatus.hidden = goto === undefined
   if (goto !== undefined) {
     const [text, level] = gotoPhases[goto.phase]
@@ -578,9 +600,12 @@ events.addEventListener('night', event => {
 })
 events.addEventListener('frames', event => showFrames(JSON.parse(event.data)))
 events.onerror = () => {
-  banner.hidden = false
-  banner.className = 'bad'
-  banner.textContent = 'Lost the connection to Vela: values on this page are old'
+  statusParts.lost = true
+  showStatus()
+}
+events.onopen = () => {
+  statusParts.lost = false
+  showStatus()
 }
 </script>
 </body>
