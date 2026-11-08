@@ -24,14 +24,14 @@ const idlePointing: PageOptions['pointing'] = {
 
 const idleCapture: PageOptions['capture'] = { view: () => idleView, start: () => ({ ok: false, reason: 'not here' }), stop: async () => false }
 
-async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'frame' | 'capture' | 'prepare' | 'pointing'>> = {}) {
+async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'frame' | 'activity' | 'capture' | 'prepare' | 'pointing'>> = {}) {
   const picture = makePicture()
 
   picture.apply(connected(startedAt), Date.now())
   picture.apply(wire(startedAt + 1, 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), Date.now())
   picture.caughtUp()
 
-  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, ...frames })
+  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, activity: () => ({ night: '2026-11-07', items: [], viewer: undefined }), capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, ...frames })
 
   open.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))

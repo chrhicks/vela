@@ -123,6 +123,11 @@ export const VelaSettings = Schema.Struct({
   capture: CaptureSettings,
   prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),
   pointing: described('Settings for choosing a target and pointing the mount', PointingSettings, {}),
+  streamViewer: Schema.optionalKey(
+    Schema.NonEmptyString.annotate({
+      description: "The address of Cria's stream viewer, which shows the raw INDI wire. The Activity view links to it; without it, there is no link",
+    }),
+  ),
   historyReadBatch: described(
     'Entries asked of the broker at a time when replaying the rig connection. The client library defaults to 100; 2048 read 200,000 entries in 0.8 s on thuban (Cria viewer, 2026-11-06)',
     Schema.Number,

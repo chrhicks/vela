@@ -6,6 +6,7 @@ import { makeRunFile } from '../capture/runfile.ts'
 import { makeCapture } from '../capture/run.ts'
 import { makeSender } from '../commands/sender.ts'
 import { readConfig } from '../config.ts'
+import { makeActivity } from '../activity/activity.ts'
 import { announcesFrame } from '../frames/announce.ts'
 import { frameEntry, frameSubject } from '../frames/entry.ts'
 import { makeKeeper } from '../frames/keeper.ts'
@@ -26,6 +27,12 @@ const frames = settings.frames
 const naming = { zone: frames.nightZone, changesAtHour: frames.nightChangesAtHour }
 const picture = makePicture()
 const nightSettings = { devices: settings.devices, silenceMs: settings.silenceSeconds * 1000, focuserNudgeSteps: settings.prepare.focuserNudgeSteps }
+
+const devices = settings.devices
+const activity = makeActivity({
+  titles: { [devices.mount]: 'Mount', [devices.primary]: 'Main camera', [devices.guide]: 'Guide camera', [devices.focuser]: 'Focuser', [devices.box]: 'Power box' },
+  nightOf: at => nightOf(at, naming),
+})
 
 function lost(reason: string): never {
   console.error(`vela: ${reason}`)
@@ -68,6 +75,7 @@ const page = makePage({
   frames: () => listNight(frames.keepDir, nightOf(Date.now(), naming)),
   preview: makePreviews(frames.keepDir, frames.preview).get,
   frame: (night, file) => frameDetail(frames.keepDir, night, file),
+  activity: () => ({ ...activity.view(Date.now()), viewer: settings.streamViewer }),
   capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
   prepare: request => prepare.act(request),
   pointing,
@@ -100,6 +108,10 @@ const following = await followRig({
     sender.answered(entry)
     capture.observe(entry)
     pointing.observe(entry)
+
+    const item = activity.observe(entry)
+
+    if (item !== undefined) page.activityAdded(item)
     if (announcesFrame(entry, settings.devices.primary)) void keeper.requestScan()
   },
   onCaughtUp: () => picture.caughtUp(),

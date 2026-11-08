@@ -4,7 +4,7 @@ export const streamName = 'RIG_DEV'
 
 export const clientSubject = 'rig-dev.client'
 
-export const followedSubjects = ['rig-dev.wire.>', clientSubject, 'rig-dev.phd2']
+export const followedSubjects = ['rig-dev.wire.>', clientSubject, 'rig-dev.phd2', 'rig-dev.vela.>']
 
 export function makeConnectionFinder() {
   let start: number | undefined

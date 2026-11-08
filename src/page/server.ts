@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import type { Activity, Item } from '../activity/activity.ts'
 import type { CaptureView, StartResult } from '../capture/run.ts'
 import type { Pointing } from '../pointing/pointing.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
@@ -18,6 +19,7 @@ export interface PageOptions {
   readonly frames: () => Promise<Frames>
   readonly preview: (night: string, file: string) => Promise<Buffer | undefined>
   readonly frame: (night: string, file: string) => Promise<FrameDetail | undefined>
+  readonly activity: () => Activity & { readonly viewer: string | undefined }
   readonly capture: {
     readonly view: () => CaptureView
     readonly start: (request: unknown) => StartResult
@@ -27,7 +29,7 @@ export interface PageOptions {
   readonly pointing: Pick<Pointing, 'view' | 'search' | 'preview'> & { readonly act: (request: unknown) => Promise<PrepareResult> }
 }
 
-export function makePage({ night, refreshMs, frames, preview, frame, capture, prepare, pointing }: PageOptions) {
+export function makePage({ night, refreshMs, frames, preview, frame, activity, capture, prepare, pointing }: PageOptions) {
   const watching = new Set<ServerResponse>()
 
   function send(response: ServerResponse, event: string, data: unknown) {
@@ -186,6 +188,13 @@ export function makePage({ night, refreshMs, frames, preview, frame, capture, pr
       return
     }
 
+    if (path === '/activity.json') {
+      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+      response.end(JSON.stringify(activity()))
+
+      return
+    }
+
     if (path === '/frames.json') {
       frames().then(list => {
         response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
@@ -231,6 +240,7 @@ export function makePage({ night, refreshMs, frames, preview, frame, capture, pr
       send(response, 'night', night())
       send(response, 'capture', capture.view())
       send(response, 'pointing', pointing.view())
+      send(response, 'activity', activity())
       frames().then(list => send(response, 'frames', list), () => undefined)
 
       return
@@ -252,5 +262,9 @@ export function makePage({ night, refreshMs, frames, preview, frame, capture, pr
     )
   }
 
-  return { server, framesChanged, captureChanged }
+  function activityAdded(item: Item) {
+    for (const response of watching) send(response, 'activity-item', item)
+  }
+
+  return { server, framesChanged, captureChanged, activityAdded }
 }
