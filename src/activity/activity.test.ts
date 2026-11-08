@@ -16,11 +16,11 @@ describe('the night\'s activity', () => {
   it('says what a command asked for and how the rig answered', () => {
     const activity = makeActivity({ titles, nightOf })
 
-    expect(activity.observe(entry('client.command', { id: 'a', by: 'vela', device: 'primary', property: 'CCD_EXPOSURE', result: 'written' }))).toMatchObject({ topic: 'command', tone: 'plain', text: 'Vela asked the main camera to start an exposure: done.' })
-    expect(activity.observe(entry('client.command', { id: 'h', by: 'vela', device: 'mount', property: 'TELESCOPE_HOME', result: 'refused', reason: 'ZWO AM5 is parked: Unpark first' }))?.text).toBe('Vela asked the mount to go Home: refused, ZWO AM5 is parked: Unpark first.')
+    expect(activity.observe(entry('client.command', { id: 'a', by: 'vela', device: 'primary', property: 'CCD_EXPOSURE', result: 'written' }))).toMatchObject({ topic: 'command', tone: 'plain', text: 'Start an exposure (Vela): done.' })
+    expect(activity.observe(entry('client.command', { id: 'h', by: 'vela', device: 'mount', property: 'TELESCOPE_HOME', result: 'refused', reason: 'ZWO AM5 is parked: Unpark first' }))?.text).toBe('Mount to Home (Vela): refused, ZWO AM5 is parked: Unpark first.')
     expect(activity.observe(entry('client.command', { id: 'b', by: 'cria', device: 'mount', property: 'GEOGRAPHIC_COORD', result: 'refused', reason: 'the rig file owns GEOGRAPHIC_COORD' }))).toMatchObject({
       tone: 'bad',
-      text: 'Cria asked the mount to write GEOGRAPHIC_COORD: refused, the rig file owns GEOGRAPHIC_COORD.',
+      text: 'Write GEOGRAPHIC_COORD to the mount (Cria): refused, the rig file owns GEOGRAPHIC_COORD.',
     })
   })
 
