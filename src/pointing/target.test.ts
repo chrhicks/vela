@@ -5,33 +5,31 @@ import { makePicture } from '../rig/picture.ts'
 import { connected, phoenixLongitude, startedAt, wire } from '../testing/entries.ts'
 import { meridianLimitAt, siteOf, targetOf } from './target.ts'
 
-const phoenix = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
-
 const madeUp = (raDegrees: number, decDegrees: number): CatalogRow => ['made-up', 'X 1', null, ['X 1'], raDegrees, decDegrees, 'Galaxy', null, null, null]
 
 const arcseconds = (degrees: number) => degrees * 3600
 
 describe('epoch of date', () => {
-  it('moves the J2000 origin by the precession of 26.85 years, to within the nutation and aberration', () => {
+  it('moves the J2000 origin by the precession of 26.85 years, to within the nutation', () => {
     const at = Date.UTC(2026, 10, 8, 3, 0, 0)
-    const target = targetOf(madeUp(0, 0), phoenix, at)
+    const target = targetOf(madeUp(0, 0), at)
     const precessionRaArcseconds = 46.124 * 26.85
     const precessionDecArcseconds = 20.043 * 26.85
-    const nutationAndAberrationArcseconds = 60
+    const nutationArcseconds = 20
 
-    expect(Math.abs(arcseconds(target.raHours * 15) - precessionRaArcseconds)).toBeLessThan(nutationAndAberrationArcseconds)
-    expect(Math.abs(arcseconds(target.decDegrees) - precessionDecArcseconds)).toBeLessThan(nutationAndAberrationArcseconds)
+    expect(Math.abs(arcseconds(target.raHours * 15) - precessionRaArcseconds)).toBeLessThan(nutationArcseconds)
+    expect(Math.abs(arcseconds(target.decDegrees) - precessionDecArcseconds)).toBeLessThan(nutationArcseconds)
   })
 
   it('keeps the J2000 position beside the one of date, and the catalog names', () => {
-    const target = targetOf(madeUp(90, 45), phoenix, startedAt)
+    const target = targetOf(madeUp(90, 45), startedAt)
 
     expect(target).toMatchObject({ id: 'made-up', name: 'X 1', commonName: null, type: 'Galaxy', raJ2000Hours: 6, decJ2000Degrees: 45 })
     expect(target.raHours).not.toBe(6)
   })
 
   it('gives right ascension in hours inside 0 to 24', () => {
-    const near = targetOf(madeUp(359.99, 10), phoenix, startedAt)
+    const near = targetOf(madeUp(359.99, 10), startedAt)
 
     expect(near.raHours).toBeGreaterThanOrEqual(0)
     expect(near.raHours).toBeLessThan(24)

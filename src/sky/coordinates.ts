@@ -13,12 +13,6 @@ export interface EquatorialPosition {
   decDegrees: number
 }
 
-export interface Site {
-  latitudeDegrees: number
-  longitudeDegrees: number
-  elevationMeters?: number
-}
-
 const radians = Math.PI / 180
 
 const wrap = (degrees: number) => ((degrees % 360) + 360) % 360

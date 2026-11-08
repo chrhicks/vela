@@ -1,4 +1,4 @@
-import { toMount, type Site } from '../sky/coordinates.ts'
+import { toMount } from '../sky/coordinates.ts'
 import type { CatalogRow } from '../catalog/types.ts'
 import type { Picture } from '../rig/picture.ts'
 import { secondsToMeridianLimit } from '../sky/meridian.ts'
@@ -15,6 +15,12 @@ export interface Target {
   readonly decDegrees: number
 }
 
+export interface Site {
+  latitudeDegrees: number
+  longitudeDegrees: number
+  elevationMeters: number
+}
+
 export function siteOf(picture: Pick<Picture, 'property'>, mount: string): Site | undefined {
   const values = picture.property(mount, 'GEOGRAPHIC_COORD')?.values
   const latitude = values?.['LAT']
@@ -26,8 +32,8 @@ export function siteOf(picture: Pick<Picture, 'property'>, mount: string): Site 
   return { latitudeDegrees: latitude, longitudeDegrees: longitude > 180 ? longitude - 360 : longitude, elevationMeters: typeof elevation === 'number' ? elevation : 0 }
 }
 
-export function targetOf(row: CatalogRow, site: Site, at: number): Target {
-  const ofDate = toMount({ raDegrees: row[4], decDegrees: row[5] }, 'topocentric', new Date(at), site)
+export function targetOf(row: CatalogRow, at: number): Target {
+  const ofDate = toMount({ raDegrees: row[4], decDegrees: row[5] }, new Date(at))
 
   return {
     id: row[0],

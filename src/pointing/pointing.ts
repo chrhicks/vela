@@ -6,7 +6,7 @@ import type { PrepareResult } from '../prepare/prepare.ts'
 import type { Picture } from '../rig/picture.ts'
 import { angularDistance } from '../sky/coordinates.ts'
 import { readWireBody, type Entry } from '../stream/entry.ts'
-import { meridianLimitAt, siteOf, targetOf, type Target } from './target.ts'
+import { meridianLimitAt, targetOf, type Target } from './target.ts'
 
 const Request = Schema.Union([
   Schema.Struct({ action: Schema.Literal('goto'), id: Schema.String }),
@@ -88,12 +88,8 @@ export function makePointing({ picture, sender, settings, now }: PointingOptions
 
     if (row === undefined) return { ok: false, reason: `no catalog target ${id}` }
 
-    const site = siteOf(picture, mount)
-
-    if (site === undefined) return { ok: false, reason: `${mount} has not reported its site (GEOGRAPHIC_COORD), which the conversion to epoch of date needs` }
-
     const at = now()
-    const target = targetOf(row, site, at)
+    const target = targetOf(row, at)
 
     return { ok: true, target, meridianLimitAt: meridianLimitAt(picture, mount, target.raHours, at) }
   }

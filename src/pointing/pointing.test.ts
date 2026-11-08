@@ -7,7 +7,6 @@ import { connected, phoenixLongitude, startedAt, wire } from '../testing/entries
 import { makePointing } from './pointing.ts'
 import { targetOf } from './target.ts'
 
-const phoenix = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
 const t = (seconds: number) => startedAt + seconds * 1000
 
 function mountRig(options: { parked?: boolean; connected?: boolean; site?: boolean } = {}) {
@@ -58,7 +57,7 @@ const m31 = findRow('ngc0224')!
 describe('goto', () => {
   it('sets the coordinate mode to track, then writes the target in coordinates of date', async () => {
     const { pointing, sent } = setup()
-    const expected = targetOf(m31, phoenix, t(100))
+    const expected = targetOf(m31, t(100))
 
     expect(await pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: true })
     expect(sent.map(each => [each.command.device, each.command.property, each.command.values, each.stop])).toEqual([
@@ -122,17 +121,15 @@ describe('goto', () => {
     expect(pointing.view().goto).toMatchObject({ phase: 'failed', detail: 'the mount answered the slew with an alert' })
   })
 
-  it('refuses a parked mount, a disconnected one, an unknown target, and a mount without a site', async () => {
+  it('refuses a parked mount, a disconnected one, and an unknown target', async () => {
     const parked = setup({ picture: mountRig({ parked: true }) })
     const away = setup({ picture: mountRig({ connected: false }) })
-    const nowhere = setup({ picture: mountRig({ site: false }) })
     const known = setup()
 
     expect(await parked.pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: false, reason: 'mount is parked: Unpark first' })
     expect(await away.pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: false, reason: 'mount is not connected' })
-    expect(await nowhere.pointing.act({ action: 'goto', id: 'ngc0224' })).toMatchObject({ ok: false })
     expect(await known.pointing.act({ action: 'goto', id: 'nope' })).toEqual({ ok: false, reason: 'no catalog target nope' })
-    expect([parked, away, nowhere, known].flatMap(each => each.sent)).toEqual([])
+    expect([parked, away, known].flatMap(each => each.sent)).toEqual([])
   })
 })
 
@@ -238,7 +235,15 @@ describe('the preview before the goto', () => {
 
   it('says why there is none', () => {
     expect(setup().pointing.preview('nope')).toEqual({ ok: false, reason: 'no catalog target nope' })
-    expect(setup({ picture: mountRig({ site: false }) }).pointing.preview('ngc0224')).toMatchObject({ ok: false })
+  })
+
+  it('goes without the mount reporting its site, with no meridian limit time', async () => {
+    const { pointing, sent } = setup({ picture: mountRig({ site: false }) })
+    const preview = pointing.preview('ngc0224')
+
+    expect(preview.ok && preview.meridianLimitAt).toBeUndefined()
+    expect(await pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: true })
+    expect(sent).toHaveLength(2)
   })
 
   it('lists catalog matches up to the setting', () => {
