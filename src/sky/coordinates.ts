@@ -1,11 +1,5 @@
 import {
-  BaryState,
-  Body,
-  C_AUDAY,
   EquatorFromVector,
-  MakeTime,
-  Observer,
-  ObserverState,
   RotateVector,
   Rotation_EQD_EQJ,
   Rotation_EQJ_EQD,
@@ -39,59 +33,12 @@ function position(value: Vector): EquatorialPosition {
   return { raDegrees: wrap(equatorial.ra * 15), decDegrees: equatorial.dec }
 }
 
-function aberration(value: Vector, date: Date, site: Site, direction: 1 | -1) {
-  const earth = BaryState(Body.Earth, date)
-
-  const observer = ObserverState(
-    date,
-    new Observer(site.latitudeDegrees, site.longitudeDegrees, site.elevationMeters ?? 0),
-    false,
-  )
-
-  const velocity = [earth.vx + observer.vx, earth.vy + observer.vy, earth.vz + observer.vz]
-  const length = Math.hypot(value.x, value.y, value.z)
-  const unit = [value.x / length, value.y / length, value.z / length]
-  const beta = velocity.map(v => (v / C_AUDAY) * direction)
-  const dot = unit.reduce((sum, component, index) => sum + component * beta[index]!, 0)
-
-  return new Vector(
-    unit[0]! + beta[0]! - dot * unit[0]!,
-    unit[1]! + beta[1]! - dot * unit[1]!,
-    unit[2]! + beta[2]! - dot * unit[2]!,
-    MakeTime(date),
-  )
+export function toMount(positionJ2000: EquatorialPosition, date: Date): EquatorialPosition {
+  return position(RotateVector(Rotation_EQJ_EQD(date), vector(positionJ2000, date)))
 }
 
-export function toMount(
-  positionJ2000: EquatorialPosition,
-  frame: string,
-  date: Date,
-  site: Site,
-): EquatorialPosition {
-  if (frame === 'j2000') return { ...positionJ2000 }
-
-  if (frame !== 'topocentric')
-    throw new Error(`Mount coordinate frame ${frame} is not supported for framing`)
-
-  return position(
-    RotateVector(Rotation_EQJ_EQD(date), aberration(vector(positionJ2000, date), date, site, 1)),
-  )
-}
-
-export function fromMount(
-  mountPosition: EquatorialPosition,
-  frame: string,
-  date: Date,
-  site: Site,
-): EquatorialPosition {
-  if (frame === 'j2000') return { ...mountPosition }
-
-  if (frame !== 'topocentric')
-    throw new Error(`Mount coordinate frame ${frame} is not supported for framing`)
-
-  return position(
-    aberration(RotateVector(Rotation_EQD_EQJ(date), vector(mountPosition, date)), date, site, -1),
-  )
+export function fromMount(mountPosition: EquatorialPosition, date: Date): EquatorialPosition {
+  return position(RotateVector(Rotation_EQD_EQJ(date), vector(mountPosition, date)))
 }
 
 export function angularDistance(a: EquatorialPosition, b: EquatorialPosition): number {

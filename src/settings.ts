@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { described } from './config.ts'
-import { BrokerLogin } from './stream/broker.ts'
+import { BrokerSettings } from './stream/broker.ts'
 
 export const FrameSettings = Schema.Struct({
   rig: described('The rig id on the entries Vela publishes: the id Cria\'s stream settings give the rig, which the entries from the rig program carry', Schema.String, 'fra-cria'),
@@ -91,7 +91,7 @@ export const PointingSettings = Schema.Struct({
 
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the page is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve' }),
-  broker: BrokerLogin,
+  broker: BrokerSettings,
   devices: described(
     "The rig file's ids for the devices the page shows (the `id` of each entry in the rig program's devices). The names come from the rig file on errai, read on 2026-11-07",
     Schema.Struct({
