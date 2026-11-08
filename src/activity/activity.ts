@@ -178,7 +178,9 @@ export function makeActivity({ titles, nightOf }: ActivityOptions) {
       const detail = text(body['detail'])
       const reason = text(body['reason'])
 
-      if (reason === 'done') return add(entry.at, 'run', 'good', `Run finished${detail ? `: ${detail}` : ''}.`, '#/capture')
+      const counted = body['counted']
+
+      if (reason === 'done') return add(entry.at, 'run', 'good', typeof counted === 'number' ? `Run finished: ${counted} ${counted === 1 ? 'frame' : 'frames'}.` : 'Run finished.', '#/capture')
       if (reason === 'stopped') return add(entry.at, 'run', 'plain', `Run stopped${detail ? `: ${detail}` : ''}.`, '#/capture')
 
       return add(entry.at, 'run', 'bad', `Run ended early${detail ? `: ${detail}` : reason ? `: ${reason}` : ''}.`, '#/capture')

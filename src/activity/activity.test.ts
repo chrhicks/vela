@@ -50,6 +50,7 @@ describe('the night\'s activity', () => {
       link: '#/frames/2026-11-08/m31_light_001.fits',
     })
     expect(activity.observe(entry('vela.run.failed', { run: 'r', attempt: 2, why: 'the camera reported an alert' }, 2003))).toMatchObject({ tone: 'warn', text: 'An exposure failed: the camera reported an alert.' })
+    expect(activity.observe(entry('vela.run.ended', { run: 'r', reason: 'done', detail: '1 frames', counted: 1 }, 2004))?.text).toBe('Run finished: 1 frame.')
     expect(activity.observe(entry('vela.run.ended', { run: 'r', reason: 'failures', detail: '3 exposures in a row failed' }, 2004))).toMatchObject({ tone: 'bad', text: 'Run ended early: 3 exposures in a row failed.' })
   })
 
