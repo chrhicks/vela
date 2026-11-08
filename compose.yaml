@@ -8,11 +8,9 @@ services:
       - "127.0.0.1:4222:4222"
     volumes:
       - type: bind
-        source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/nats/server.conf
+        source: ./deploy/nats.conf
         target: /etc/nats/server.conf
         read_only: true
-        bind:
-          create_host_path: false
       - type: bind
         source: ${VELA_DATA_DIR:-${XDG_DATA_HOME:-${HOME}/.local/share}/vela}/nats
         target: /data

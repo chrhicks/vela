@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { angularDistance, fromMount, toMount, type EquatorialPosition } from './coordinates.ts'
-const syntheticSite = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
 
 function random(seed: number) {
   let state = seed
@@ -26,32 +25,20 @@ describe('sky coordinates', () => {
     expect(new Set(cases.map(item => `${item.position.raDegrees}:${item.at.getTime()}`)).size).toBe(1000)
   })
 
-  it('treats the j2000 frame as no conversion', () => {
-    const { position, at } = cases[0]!
-
-    expect(toMount(position, 'j2000', at, syntheticSite)).toEqual(position)
-  })
-
-  it('refuses a frame it does not know', () => {
-    const { position, at } = cases[0]!
-
-    expect(() => toMount(position, 'galactic', at, syntheticSite)).toThrow(/not supported/)
-  })
-
   it('goes there and back to within a tenth of an arcsecond', () => {
     for (const { position, at } of cases.slice(0, 200)) {
-      const there = toMount(position, 'topocentric', at, syntheticSite)
-
-      expect(angularDistance(fromMount(there, 'topocentric', at, syntheticSite), position)).toBeLessThan(0.1 / 3600)
+      expect(angularDistance(fromMount(toMount(position, at), at), position)).toBeLessThan(0.1 / 3600)
     }
   })
 
-  it('moves a position by roughly twenty arcminutes in 2026, which is why pointing compares in one frame', () => {
-    const at = new Date(Date.UTC(2026, 9, 26, 23, 45))
-    const position = { raDegrees: 280, decDegrees: -5 }
-    const shift = angularDistance(position, toMount(position, 'topocentric', at, syntheticSite))
+  it('precesses a made-up target by the standard rate, about twenty arcminutes since 2000', () => {
+    const target = { raDegrees: 0, decDegrees: 0 }
+    const at = new Date(Date.UTC(2026, 10, 8))
+    const years = 26.86
+    const shift = angularDistance(target, toMount(target, at))
+    const expectedArcminutes = (years * 50.29) / 60
 
-    expect(shift * 60).toBeGreaterThan(15)
-    expect(shift * 60).toBeLessThan(25)
+    expect(expectedArcminutes).toBeGreaterThan(20)
+    expect(Math.abs(shift * 60 - expectedArcminutes)).toBeLessThan(1)
   })
 })
