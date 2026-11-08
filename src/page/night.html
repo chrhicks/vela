@@ -428,7 +428,7 @@ function shown(text) {
 }
 
 function clock(ms) {
-  return new Date(ms).toLocaleString([], { hour12: false })
+  return new Date(ms).toLocaleTimeString([], { hour12: false })
 }
 
 function ago(from, now) {
@@ -941,7 +941,7 @@ function showCapture(view) {
   if (last !== undefined) {
     const [text, level] = endings[last.reason] ?? [last.reason, 'bad']
     lastRun.className = level
-    lastRun.textContent = 'Last run ' + last.run + ' ' + text + ' at ' + clock(last.at) + ': ' + last.counted + ' frames kept' + (last.failed > 0 ? ', ' + last.failed + ' failed' : '') + (last.reason === 'done' ? '' : '. ' + last.detail)
+    lastRun.textContent = 'Last run ' + text + ' at ' + hourMinute(last.at) + ': ' + last.counted + (last.counted === 1 ? ' frame' : ' frames') + ' kept' + (last.failed > 0 ? ', ' + last.failed + ' failed' : '') + (last.reason === 'done' ? '.' : '. ' + last.detail)
   }
 }
 
