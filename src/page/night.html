@@ -364,7 +364,10 @@ function showCapture(view) {
   enableCapture()
   if (run !== undefined) {
     const phase = run.phase === 'exposing' ? (run.secondsLeft === undefined ? 'starting the exposure' : 'exposing, ' + run.secondsLeft + ' s left') : run.phase === 'preparing' ? 'setting the camera' : 'ending'
-    progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + ' of ' + run.count + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '')
+    const exposing = run.phase === 'exposing' && run.secondsLeft !== undefined
+    const framesAfter = run.count - run.frame + (exposing ? 0 : 1)
+    const endsAt = view.at + ((exposing ? run.secondsLeft : 0) + framesAfter * run.exposureSeconds) * 1000
+    progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + ' of ' + run.count + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '') + '. Run ends about ' + new Date(endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
   }
   const last = view.last
   lastRun.hidden = last === undefined
