@@ -89,6 +89,29 @@
     #tonight { grid-template-columns: 1fr; gap: 8px; }
     #tonight h1 { font-size: 26px; }
   }
+  #activity { border: 0; background: transparent; padding: 0; border-radius: 0; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .filters button { font: inherit; font-size: 15px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 22px; background: transparent; color: var(--muted); cursor: pointer; }
+  .filters button:hover { color: var(--fg); border-color: var(--muted); }
+  .filters button[aria-pressed="true"] { background: var(--dome-hi); color: var(--fg); border-color: var(--dome-hi); font-weight: 600; }
+  #activity-list { list-style: none; margin: 0; padding: 0; }
+  #activity-list li { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+  #activity-list time { color: var(--muted); font-size: 15px; padding-top: 1px; }
+  #activity-list li[data-topic="driver"] span { color: var(--muted); }
+  #activity-list li.warn span, #activity-list li.warn a { color: var(--warn); }
+  #activity-list li.bad span, #activity-list li.bad a { color: var(--bad); }
+  #activity-list a { color: var(--fg); text-decoration: none; }
+  #activity-list a:hover span { text-decoration: underline; text-underline-offset: 3px; }
+  #activity-list a::after { content: " ›"; color: var(--muted); }
+  #activity-sub { margin-bottom: 4px; }
+  #activity-list[data-filter="problems"] li:not(.warn):not(.bad),
+  #activity-list[data-filter="command"] li:not([data-topic="command"]),
+  #activity-list[data-filter="run"] li:not([data-topic="run"]),
+  #activity-list[data-filter="device"] li:not([data-topic="device"]),
+  #activity-list[data-filter="driver"] li:not([data-topic="driver"]) { display: none; }
+  @media (max-width: 760px) {
+    #activity-list li { grid-template-columns: 1fr; gap: 0; }
+  }
   #capture { margin-bottom: 12px; }
   #capture form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; }
   #capture label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--muted); }
@@ -181,14 +204,14 @@
   <span class="progress" id="focus-progress"></span>
   <button type="button" id="focus-stop">Stop focuser</button>
 </div>
-<nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a><a href="#/rig" data-to="rig">Rig</a></nav>
+<nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a><a href="#/rig" data-to="rig">Rig</a><a href="#/activity" data-to="activity">Activity</a></nav>
 </header>
 <div class="view" data-view="tonight"><div id="tonight">
   <section><div id="tonight-head"><p class="unknown">Reading the rig from the stream</p></div><table id="tonight-readings"></table></section>
   <aside><section><h2>Rig</h2><p id="tonight-rig"></p></section><section id="tonight-frame"><h2>Latest frame</h2><div id="tonight-frame-body"></div></section></aside>
 </div></div>
 <div class="view" data-view="rig"><h1 class="view-title">Rig</h1><p class="rig" id="rig"></p><main id="devices"></main></div>
-<div class="view" data-view="more"><h1 class="view-title">More</h1><div class="more-list"><a href="#/frames">Frames <span>tonight's frames</span></a><a href="#/rig">Rig <span>every reading</span></a></div></div>
+<div class="view" data-view="more"><h1 class="view-title">More</h1><div class="more-list"><a href="#/frames">Frames <span>tonight's frames</span></a><a href="#/rig">Rig <span>every reading</span></a><a href="#/activity">Activity <span>what happened tonight</span></a></div></div>
 <div class="view" data-view="prepare">
 <section id="prepare">
   <h2><span>Preparation</span></h2>
@@ -283,7 +306,19 @@
   <nav class="pager" aria-label="Frames"><a id="frame-newer" href="#/frames">‹ Newer</a><a id="frame-older" href="#/frames">Older ›</a></nav>
 </article>
 </div>
-<nav id="bottom" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/more" data-to="more" data-also="frames rig">More</a></nav>
+<div class="view" data-view="activity">
+<section id="activity">
+  <h1 class="view-title">Activity</h1>
+  <p class="sub" id="activity-sub">Reading tonight's activity</p>
+  <p class="sub" id="activity-viewer" hidden>The raw INDI wire is in <a id="activity-viewer-link" target="_blank" rel="noopener">Cria's stream viewer</a>.</p>
+  <div class="filters" role="group" aria-label="Show">
+    <button type="button" data-filter="all" aria-pressed="true">All</button><button type="button" data-filter="problems" aria-pressed="false">Problems</button><button type="button" data-filter="command" aria-pressed="false">Commands</button><button type="button" data-filter="run" aria-pressed="false">Runs and frames</button><button type="button" data-filter="device" aria-pressed="false">Devices</button><button type="button" data-filter="driver" aria-pressed="false">Driver messages</button>
+  </div>
+  <p class="sub" id="activity-empty" hidden></p>
+  <ol id="activity-list" data-filter="all"></ol>
+</section>
+</div>
+<nav id="bottom" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/more" data-to="more" data-also="frames rig activity">More</a></nav>
 <script>
 const dimButton = document.getElementById('dim')
 
@@ -297,7 +332,7 @@ function setDim(on) {
 dimButton.addEventListener('click', () => setDim(!document.documentElement.hasAttribute('data-dim')))
 try { setDim(localStorage.getItem('vela-dim') === '1') } catch {}
 
-const viewNames = ['tonight', 'prepare', 'point', 'capture', 'frames', 'rig', 'more']
+const viewNames = ['tonight', 'prepare', 'point', 'capture', 'frames', 'rig', 'activity', 'more']
 
 function showView() {
   const asked = (/^#\/(\w+)/.exec(location.hash) ?? [])[1]
@@ -560,6 +595,65 @@ function showFramePage() {
     if (frameShown?.file !== file || frameShown?.night !== night) return
     document.getElementById('frame-sub').innerHTML = '<span class="bad">' + escapeText(error.message) + '</span> <a href="#/frames">All frames</a>'
   })
+}
+
+const activityList = document.getElementById('activity-list')
+const activityEmpty = document.getElementById('activity-empty')
+const activityFilters = document.querySelectorAll('.filters button')
+const filterNames = { all: 'entries', problems: 'problems', command: 'commands', run: 'run or frame entries', device: 'device entries', driver: 'driver messages' }
+let activityNight
+
+function activityRow(item) {
+  const row = element('li', item.tone === 'warn' || item.tone === 'bad' ? item.tone : '')
+  row.dataset.topic = item.topic
+  const time = element('time', '', new Date(item.at).toLocaleTimeString([], { hour12: false }))
+  time.dateTime = new Date(item.at).toISOString()
+  let words = element('span', '', item.text)
+  if (item.link) {
+    const link = element('a')
+    link.href = item.link
+    link.append(words)
+    words = link
+  }
+  row.append(time, words)
+  return row
+}
+
+function showActivityCount() {
+  const filter = activityList.dataset.filter
+  const matches = row => filter === 'all' || (filter === 'problems' ? row.classList.contains('warn') || row.classList.contains('bad') : row.dataset.topic === filter)
+  const shown = [...activityList.children].filter(matches).length
+  document.getElementById('activity-sub').textContent = activityList.children.length === 0
+    ? 'Nothing has happened on the night of ' + activityNight + ' yet. Commands, runs, frames kept, devices coming and going and driver messages appear here as they happen.'
+    : activityList.children.length + ' entries on the night of ' + activityNight + ', newest first.'
+  activityEmpty.hidden = shown > 0 || activityList.children.length === 0
+  activityEmpty.textContent = 'No ' + filterNames[filter] + ' tonight.'
+}
+
+for (const button of activityFilters) {
+  button.addEventListener('click', () => {
+    activityList.dataset.filter = button.dataset.filter
+    for (const other of activityFilters) other.setAttribute('aria-pressed', String(other === button))
+    showActivityCount()
+  })
+}
+
+function showActivity(activity) {
+  activityNight = activity.night
+  activityList.replaceChildren(...activity.items.slice().reverse().map(activityRow))
+  const viewer = document.getElementById('activity-viewer')
+  viewer.hidden = !activity.viewer
+  if (activity.viewer) document.getElementById('activity-viewer-link').href = activity.viewer
+  showActivityCount()
+}
+
+function addActivity(item) {
+  if (item.night !== activityNight) {
+    activityNight = item.night
+    activityList.replaceChildren()
+  }
+  activityList.prepend(activityRow(item))
+  showActivityCount()
 }
 
 const runbar = document.getElementById('runbar')
@@ -995,6 +1089,8 @@ events.addEventListener('night', event => {
   currentMeridian = night.devices.find(device => device.id === 'mount').fields.find(field => field.label === 'Meridian limit').text
   if (lastPointing !== undefined) showPointing(lastPointing, lastLive)
 })
+events.addEventListener('activity', event => showActivity(JSON.parse(event.data)))
+events.addEventListener('activity-item', event => addActivity(JSON.parse(event.data)))
 events.addEventListener('frames', event => {
   const list = JSON.parse(event.data)
   tonightState.frames = list
