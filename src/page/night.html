@@ -470,7 +470,7 @@ function show(night) {
     title.append(element('span', '', device.title), element('span', 'link ' + device.connection.status, device.connection.text))
     const list = element('dl')
     for (const field of device.fields) {
-      const value = element('dd', field.status, shown(field.text) + (field.status === 'stale' ? staleNote(night) : ''))
+      const value = element('dd', field.status, shown(field.text) + (field.status === 'stale' || (field.status === 'unknown' && night.phase === 'silent') ? staleNote(night) : ''))
       if (field.changedAt !== undefined) value.title = 'changed ' + clock(field.changedAt)
       list.append(element('dt', '', field.label), value)
     }
@@ -819,7 +819,8 @@ let tonightFrameShown = ''
 function reading(device, label) {
   const field = tonightState.night?.devices.find(candidate => candidate.id === device)?.fields.find(candidate => candidate.label === label)
   if (field === undefined) return '<span class="unknown">not reported</span>'
-  return '<span class="' + field.status + '">' + escapeText(shown(field.text)) + (field.status === 'stale' ? staleNote(tonightState.night) : '') + '</span>'
+  const silent = field.status === 'stale' || (field.status === 'unknown' && tonightState.night?.phase === 'silent')
+  return '<span class="' + field.status + '">' + escapeText(shown(field.text)) + (silent ? staleNote(tonightState.night) : '') + '</span>'
 }
 
 const runDone = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
@@ -871,7 +872,7 @@ function celsius(value) {
 function focusDriftText(night) {
   const focus = night.focus
   const stale = night.phase === 'live' ? '' : ' <span class="stale">' + staleNote(night).trim() + '</span>'
-  if (focus === undefined || focus.now === undefined) return '<span class="unknown">no focuser temperature yet</span>'
+  if (focus === undefined || focus.now === undefined) return '<span class="unknown">no focuser temperature yet</span>' + stale
   if (focus.focused === undefined || focus.focused.celsius === undefined) return 'now ' + celsius(focus.now.celsius) + ', not focused since the rig started' + stale
   const change = focus.now.celsius - focus.focused.celsius
   const drift = Math.abs(change) < 0.05 ? 'no change' : celsius(Math.abs(change)) + (change < 0 ? ' colder' : ' warmer')
