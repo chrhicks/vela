@@ -38,8 +38,8 @@
   #status.bad { color: var(--bad); }
   .stops { display: flex; gap: 8px; }
   .stop { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 1.5px solid var(--muted); border-radius: 8px; background: transparent; color: var(--fg); cursor: pointer; }
-  .stop:hover { border-color: var(--bad); }
-  .stop.armed { background: var(--bad); color: #1b0d0c; }
+  .stop:hover { border-color: var(--star); }
+  .stop.armed { background: var(--dome-hi); border: 2px solid var(--star); color: var(--star); }
   #strip { display: flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 2px 24px 4px; }
   #strip svg { display: block; flex: 1; width: 100%; height: 26px; }
   #strip[hidden] { display: none; }
@@ -148,8 +148,7 @@
   #pointing button:not(:disabled):hover, #prepare button:not(:disabled):hover, #dim:hover, .filters button:hover { border-color: var(--haze); color: var(--fg); }
   #pointing button:not(:disabled):active, #prepare button:not(:disabled):active, #dim:active, .filters button:active { background: var(--dome-hi); }
   #capture button[type=submit]:hover { filter: brightness(1.08); }
-  .stop:active { background: rgba(232, 116, 106, 0.18); }
-  .stop.armed:active { background: var(--bad); filter: brightness(0.9); }
+  .stop:active, .stop.armed:active { background: var(--rule); }
   #status a { color: inherit; text-decoration-color: currentColor; }
   #last-run { margin: 8px 0 0; color: var(--muted); }
   #last-run.bad { color: var(--bad); }
@@ -157,7 +156,7 @@
   #focusbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 0 24px 6px; }
   #focusbar[hidden] { display: none; }
   #focusbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
-  #focus-stop { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--bad); color: #1b0d0c; cursor: pointer; }
+  #focus-stop { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 2px solid var(--star); border-radius: 8px; background: var(--dome-hi); color: var(--star); cursor: pointer; }
   #prepare { margin-bottom: 12px; }
   #prepare .group { margin-bottom: 12px; }
   #pointing { margin-bottom: 12px; }
