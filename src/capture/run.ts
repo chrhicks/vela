@@ -24,7 +24,7 @@ export interface CaptureSettings {
   readonly device: string
   readonly spoolDir: string
   readonly settleMs: number
-  readonly exposureMarginMs: number
+  readonly exposureSilenceMs: number
   readonly failuresInRow: number
   readonly silenceMs: number
 }
@@ -80,7 +80,7 @@ interface Active {
   phase: 'preparing' | 'exposing' | 'ending'
   exposureEndsAt: number | undefined
   stopping: Promise<string> | undefined
-  watch: { alerted: boolean; file: string | undefined; previous: string | undefined } | undefined
+  watch: { alerted: boolean; file: string | undefined; previous: string | undefined; exposureHeardAt: number } | undefined
 }
 
 type Stop = { readonly reason: EndReason; readonly detail: string }
@@ -168,10 +168,10 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
     return undefined
   }
 
-  type Frame = { readonly frame: 'file'; readonly path: string } | { readonly frame: 'failed'; readonly why: 'alert' | 'no-file' } | { readonly frame: 'stop'; readonly stop: Stop }
+  type Frame = { readonly frame: 'file'; readonly path: string } | { readonly frame: 'failed'; readonly why: 'alert' | 'silent' } | { readonly frame: 'stop'; readonly stop: Stop }
 
   async function expose(run: Active): Promise<Frame> {
-    const watch = { alerted: false, file: undefined as string | undefined, previous: read('CCD_FILE_PATH')?.values['FILE_PATH'] as string | undefined }
+    const watch = { alerted: false, file: undefined as string | undefined, previous: read('CCD_FILE_PATH')?.values['FILE_PATH'] as string | undefined, exposureHeardAt: now() }
     const exposureMs = run.request.exposureSeconds * 1000
 
     run.watch = watch
@@ -182,7 +182,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
     if (outcome.result !== 'written') {
       run.watch = undefined
 
-      if (outcome.result === 'unknown') await sender.send(abortCommand(settings.device), true)
+      if (outcome.result === 'unknown') await sender.send(abortCommand(settings.device))
 
       return { frame: 'stop', stop: stoppedOr(run, { reason: outcome.result, detail: `CCD_EXPOSURE: ${outcome.reason}` }) }
     }
@@ -190,17 +190,25 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
     run.exposureEndsAt = now() + exposureMs
     onChange()
 
-    await changes.until(() => watch.file !== undefined || watch.alerted, exposureMs + settings.exposureMarginMs, run.abort.signal)
+    const finished = () => watch.file !== undefined || watch.alerted
+
+    while (!finished() && !run.abort.signal.aborted) {
+      const remainingMs = watch.exposureHeardAt + settings.exposureSilenceMs - now()
+
+      if (remainingMs <= 0) break
+
+      await changes.until(finished, remainingMs, run.abort.signal)
+    }
 
     run.watch = undefined
     run.exposureEndsAt = undefined
 
     if (watch.file !== undefined) return { frame: 'file', path: watch.file }
-    await sender.send(abortCommand(settings.device), true)
+    await sender.send(abortCommand(settings.device))
 
     if (run.abort.signal.aborted) return { frame: 'stop', stop: { reason: 'stopped', detail: 'Stop pressed' } }
 
-    return { frame: 'failed', why: watch.alerted ? 'alert' : 'no-file' }
+    return { frame: 'failed', why: watch.alerted ? 'alert' : 'silent' }
   }
 
   async function execute(run: Active) {
@@ -294,7 +302,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
 
       if (run === undefined) return false
 
-      run.stopping ??= sender.send(abortCommand(settings.device), true).then(outcome => (outcome.result === 'written' ? 'Stop pressed, abort written' : `Stop pressed, abort ${outcome.result}: ${outcome.reason}`))
+      run.stopping ??= sender.send(abortCommand(settings.device)).then(outcome => (outcome.result === 'written' ? 'Stop pressed, abort written' : `Stop pressed, abort ${outcome.result}: ${outcome.reason}`))
       run.abort.abort()
       await run.stopping
 
@@ -309,7 +317,10 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
         const wire = readWireBody(entry.body)
 
         if (entry.kind === 'wire' && wire?.dir === 'in' && wire.device === settings.device) {
-          if (wire.property === 'CCD_EXPOSURE' && wire.state === 'Alert') watch.alerted = true
+          if (wire.property === 'CCD_EXPOSURE') {
+            watch.exposureHeardAt = now()
+            if (wire.state === 'Alert') watch.alerted = true
+          }
 
           const path = wire.elements['FILE_PATH']
 

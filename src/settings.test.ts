@@ -16,7 +16,7 @@ describe('settings', () => {
       pageRefreshSeconds: 1,
       historyReadBatch: 2048,
       devices: { mount: 'mount', primary: 'primary' },
-      capture: { commandAnswerSeconds: 10, settleSeconds: 10, exposureMarginSeconds: 30, failuresInRow: 6 },
+      capture: { commandAnswerSeconds: 10, settleSeconds: 10, exposureSilenceSeconds: 10, failuresInRow: 3 },
       frames: { host: 'errai', keepDir: '/mnt/storage/rig/frames', nightChangesAtHour: 12, copyAttempts: 3, preview: { bin: 2, blackSigmas: 2.8, targetMedian: 0.25 } },
     })
   })

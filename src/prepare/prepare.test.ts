@@ -25,14 +25,14 @@ function rig(options: { limits?: boolean; position?: number } = {}) {
 }
 
 function setup(outcomes: ReadonlyArray<Outcome> = [], picture = rig()) {
-  const sent: Array<{ command: Command; stop: boolean }> = []
+  const sent: Command[] = []
   let index = 0
 
   const prepare = makePrepare({
     picture,
     sender: {
-      send: async (command, stop = false) => {
-        sent.push({ command, stop })
+      send: async command => {
+        sent.push(command)
 
         return outcomes[index++] ?? { result: 'written' }
       },
@@ -48,7 +48,7 @@ describe('focuser', () => {
     const { prepare, sent } = setup()
 
     expect(await prepare.act({ action: 'focuser-move', position: 30000 })).toEqual({ ok: true })
-    expect(sent).toEqual([{ command: { device: 'focuser', property: 'ABS_FOCUS_POSITION', values: { FOCUS_ABSOLUTE_POSITION: 30000 } }, stop: false }])
+    expect(sent).toEqual([{ device: 'focuser', property: 'ABS_FOCUS_POSITION', values: { FOCUS_ABSOLUTE_POSITION: 30000 } }])
   })
 
   it.each([60001, -1])('refuses position %i outside the limits without sending anything', async position => {
@@ -91,7 +91,7 @@ describe('focuser', () => {
     const { prepare, sent } = setup()
 
     expect(await prepare.act({ action: 'focuser-nudge', direction: 'in' })).toEqual({ ok: true })
-    expect(sent.map(each => [each.command.property, each.command.values])).toEqual([
+    expect(sent.map(each => [each.property, each.values])).toEqual([
       ['FOCUS_MOTION', { FOCUS_INWARD: true, FOCUS_OUTWARD: false }],
       ['REL_FOCUS_POSITION', { FOCUS_RELATIVE_POSITION: 100 }],
     ])
@@ -102,7 +102,7 @@ describe('focuser', () => {
 
     await prepare.act({ action: 'focuser-nudge', direction: 'out' })
 
-    expect(sent[0]?.command.values).toEqual({ FOCUS_INWARD: false, FOCUS_OUTWARD: true })
+    expect(sent[0]?.values).toEqual({ FOCUS_INWARD: false, FOCUS_OUTWARD: true })
   })
 
   it('does not move when the direction was refused', async () => {
@@ -126,7 +126,7 @@ describe('focuser', () => {
     const { prepare, sent } = setup([], makePicture())
 
     expect(await prepare.act({ action: 'focuser-stop' })).toEqual({ ok: true })
-    expect(sent).toEqual([{ command: { device: 'focuser', property: 'FOCUS_ABORT_MOTION', values: { ABORT: true } }, stop: true }])
+    expect(sent).toEqual([{ device: 'focuser', property: 'FOCUS_ABORT_MOTION', values: { ABORT: true } }])
   })
 
   it('reports what the rig program did with the command', async () => {
@@ -143,7 +143,7 @@ describe('dew heaters', () => {
     const { prepare, sent } = setup()
 
     expect(await prepare.act({ action: 'dew-channel', channel: 'DEW_CHANNEL_2', on: true })).toEqual({ ok: true })
-    expect(sent).toEqual([{ command: { device: 'box', property: 'DEW_CHANNELS', values: { DEW_CHANNEL_2: true } }, stop: false }])
+    expect(sent).toEqual([{ device: 'box', property: 'DEW_CHANNELS', values: { DEW_CHANNEL_2: true } }])
   })
 
   it('sets a duty within the limits and refuses one outside', async () => {
@@ -151,14 +151,14 @@ describe('dew heaters', () => {
 
     expect(await prepare.act({ action: 'dew-duty', channel: 'DEW_CHANNEL_1', percent: 60 })).toEqual({ ok: true })
     expect(await prepare.act({ action: 'dew-duty', channel: 'DEW_CHANNEL_1', percent: 101 })).toEqual({ ok: false, reason: 'duty 101 is outside the limits the driver gives, 0 to 100' })
-    expect(sent.map(each => each.command.values)).toEqual([{ DEW_CHANNEL_1: 60 }])
+    expect(sent.map(each => each.values)).toEqual([{ DEW_CHANNEL_1: 60 }])
   })
 
   it('sets automatic dew on every element of its property', async () => {
     const { prepare, sent } = setup()
 
     expect(await prepare.act({ action: 'dew-auto', on: true })).toEqual({ ok: true })
-    expect(sent).toEqual([{ command: { device: 'box', property: 'AUTO_DEW_CONTROL', values: { DEW_CHANNEL_1: true } }, stop: false }])
+    expect(sent).toEqual([{ device: 'box', property: 'AUTO_DEW_CONTROL', values: { DEW_CHANNEL_1: true } }])
   })
 
   it('refuses an output the box does not have', async () => {

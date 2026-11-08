@@ -34,8 +34,6 @@ function lost(reason: string): never {
 
 const sender = makeSender({
   publish: (subject, payload) => following.connection.publish(subject, payload),
-  rigRun: () => picture.rig()?.run,
-  now: Date.now,
   newId: () => `vela-${randomUUID()}`,
   answerTimeoutMs: settings.capture.commandAnswerSeconds * 1000,
   by: 'vela',
@@ -49,7 +47,7 @@ const capture = makeCapture({
     device: settings.devices.primary,
     spoolDir: frames.spoolDir,
     settleMs: settings.capture.settleSeconds * 1000,
-    exposureMarginMs: settings.capture.exposureMarginSeconds * 1000,
+    exposureSilenceMs: settings.capture.exposureSilenceSeconds * 1000,
     failuresInRow: settings.capture.failuresInRow,
     silenceMs: settings.silenceSeconds * 1000,
   },
