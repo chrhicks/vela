@@ -34,6 +34,7 @@ interface Spooled {
 export interface KeeperOptions {
   readonly ssh: Ssh
   readonly settings: KeeperSettings
+  readonly labelOf: (file: string) => { readonly run: string; readonly sequence: string; readonly frame: number } | undefined
   readonly now: () => number
   readonly sleep: (ms: number) => Promise<void>
   readonly onKept: (frame: KeptFrame) => void
@@ -82,7 +83,7 @@ async function writeAtomically(path: string, content: string) {
   await rename(`${path}.part`, path)
 }
 
-export function makeKeeper({ ssh, settings, now, sleep, onKept, onProblem }: KeeperOptions) {
+export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProblem }: KeeperOptions) {
   async function copyAndCheck(file: Spooled, directory: string) {
     const remote = `${settings.spoolDir}/${file.name}`
     const target = join(directory, file.name)
@@ -118,7 +119,8 @@ export function makeKeeper({ ssh, settings, now, sleep, onKept, onProblem }: Kee
     for (let attempt = 1; attempt <= settings.copyAttempts; attempt += 1) {
       try {
         const { remote, sha256 } = await copyAndCheck(file, directory)
-        const sidecar: Sidecar = { run: null, sequence: null, frame: null, original: remote, sha256, bytes: file.bytes, keptAt: new Date(now()).toISOString() }
+        const label = labelOf(file.name)
+        const sidecar: Sidecar = { run: label?.run ?? null, sequence: label?.sequence ?? null, frame: label?.frame ?? null, original: remote, sha256, bytes: file.bytes, keptAt: new Date(now()).toISOString() }
 
         await writeAtomically(join(directory, sidecarName(file.name)), JSON.stringify(sidecar, null, 2))
         onKept({ file: file.name, night, bytes: file.bytes, sha256 })

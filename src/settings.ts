@@ -47,6 +47,32 @@ export const FrameSettings = Schema.Struct({
   ),
 })
 
+export const CaptureSettings = Schema.Struct({
+  runFile: Schema.String.annotate({
+    description: 'A small file naming the run in progress, written when a run starts and removed when it ends. A run found in it at start is marked interrupted: Vela never resumes a run. Put it on this machine\'s state directory, not a temporary one, so a reboot during a run still shows',
+  }),
+  commandAnswerSeconds: described(
+    'How long to wait for the rig program\'s answer to one command before it counts as unknown. Not measured: no command has been sent yet (2026-11-07). The rig program answers as soon as it has written or refused the property, one local broker round trip, but it carries out commands one at a time in arrival order, so the answer to one can queue behind the write before it',
+    Schema.Number,
+    10,
+  ),
+  settleSeconds: described(
+    'How long after a command was written its effect may take to show on the stream (a setting, or the camera ending an abort) before the run stops as unknown. Not measured: no capture has run yet (2026-11-07). The driver echoes a changed property on the same INDI connection, so a missing echo after this long means the write did not take, and the command is never sent again',
+    Schema.Number,
+    10,
+  ),
+  exposureMarginSeconds: described(
+    'How long past the exposure a frame may take to name its saved file before it counts as failed and is aborted. Not measured: no capture has run yet (2026-11-07). Reading 52 MB off the sensor over USB 2 at 30 to 35 MB/s (external: USB 2 allows 60 MB/s at best) takes about 2 s and the driver then writes it to disk; 30 s is more than ten times that and short enough that a frame that is not coming does not hold up the night',
+    Schema.Number,
+    30,
+  ),
+  failuresInRow: described(
+    'Exposures in a row that may fail before the run stops. On USB 2, 89 of 375 exposures failed (24%) on the night of 11-02, so a run of 6 happens by chance (0.24^6, if failures were independent) in about 0.02% of exposures, 7% of a 375-exposure night; stopping at 6 means a real fault almost every time and wastes at most six exposures on a dead camera',
+    Schema.Number,
+    6,
+  ),
+})
+
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the page is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve' }),
   broker: BrokerLogin,
@@ -72,6 +98,7 @@ export const VelaSettings = Schema.Struct({
     1,
   ),
   frames: FrameSettings,
+  capture: CaptureSettings,
   historyReadBatch: described(
     'Entries asked of the broker at a time when replaying the rig connection. The client library defaults to 100; 2048 read 200,000 entries in 0.8 s on thuban (Cria viewer, 2026-11-06)',
     Schema.Number,
