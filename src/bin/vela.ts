@@ -12,6 +12,7 @@ import { makeKeeper } from '../frames/keeper.ts'
 import { listNight, makePreviews } from '../frames/library.ts'
 import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
+import { makePointing } from '../pointing/pointing.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
@@ -38,6 +39,7 @@ const sender = makeSender({
   by: 'vela',
 })
 const prepare = makePrepare({ picture, sender, settings: { focuser: settings.devices.focuser, box: settings.devices.box, focuserNudgeSteps: settings.prepare.focuserNudgeSteps } })
+const pointing = makePointing({ picture, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
 const capture = makeCapture({
   picture,
   sender,
@@ -66,6 +68,7 @@ const page = makePage({
   preview: makePreviews(frames.keepDir, frames.preview).get,
   capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
   prepare: request => prepare.act(request),
+  pointing,
 })
 
 const keeper = makeKeeper({
@@ -94,6 +97,7 @@ const following = await followRig({
     picture.apply(entry, Date.now())
     sender.answered(entry)
     capture.observe(entry)
+    pointing.observe(entry)
     if (announcesFrame(entry, settings.devices.primary)) void keeper.requestScan()
   },
   onCaughtUp: () => picture.caughtUp(),

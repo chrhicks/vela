@@ -25,7 +25,11 @@
   .stale { color: var(--warn); }
   .unknown { color: var(--muted); }
   .current.ok { color: var(--good); }
-  #runbar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--good); border-radius: 8px; background: var(--card); }
+  #stops { position: sticky; top: 0; z-index: 2; background: var(--bg); padding-bottom: 4px; }
+  #mountbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  #mountbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
+  #mount-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
+  #runbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--good); border-radius: 8px; background: var(--card); }
   #runbar[hidden] { display: none; }
   #runbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
   #stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
@@ -40,12 +44,23 @@
   #last-run { margin: 8px 0 0; color: var(--muted); }
   #last-run.bad { color: var(--bad); }
   #last-run.warn { color: var(--warn); }
-  #focusbar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--warn); border-radius: 8px; background: var(--card); }
+  #focusbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--warn); border-radius: 8px; background: var(--card); }
   #focusbar[hidden] { display: none; }
   #focusbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
   #focus-stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
   #prepare { margin-bottom: 12px; }
   #prepare .group { margin-bottom: 12px; }
+  #pointing { margin-bottom: 12px; }
+  #pointing .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  #pointing input[type=search] { flex: 1 1 240px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+  #pointing button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
+  #pointing button[disabled] { opacity: 0.5; cursor: default; }
+  #pointing ul { list-style: none; margin: 0 0 8px; padding: 0; }
+  #pointing li button { width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+  #pointing h3 { margin: 0 0 6px; font-size: 15px; }
+  #pointing-error { color: var(--bad); }
+  #goto-status.bad { color: var(--bad); }
+  #goto-status.warn { color: var(--warn); }
   #prepare h3 { margin: 0 0 6px; font-size: 15px; }
   #prepare .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
   #prepare .row > span { min-width: 80px; }
@@ -64,6 +79,11 @@
 <body>
 <header><h1>Vela</h1><span class="rig" id="rig"></span></header>
 <div id="banner" hidden></div>
+<div id="stops">
+<div id="mountbar">
+  <span class="progress" id="mount-progress">Mount</span>
+  <button type="button" id="mount-stop">Stop mount</button>
+</div>
 <div id="runbar" hidden>
   <span class="progress" id="progress"></span>
   <button type="button" id="stop">Stop</button>
@@ -71,6 +91,7 @@
 <div id="focusbar" hidden>
   <span class="progress" id="focus-progress"></span>
   <button type="button" id="focus-stop">Stop focuser</button>
+</div>
 </div>
 <main id="devices"></main>
 <section id="prepare">
@@ -99,6 +120,28 @@
     <p class="unknown" id="dew-none">The power box has not reported its dew outputs</p>
   </div>
   <p id="prepare-error" hidden></p>
+</section>
+<section id="pointing">
+  <h2><span>Pointing</span></h2>
+  <p class="warn">Every motion needs Chris at the rig.</p>
+  <div class="row">
+    <span id="mount-state" class="unknown"></span>
+    <button type="button" id="mount-unpark">Unpark</button>
+    <button type="button" id="mount-home">Home</button>
+    <button type="button" id="tracking-on">Tracking on</button>
+    <button type="button" id="tracking-off">Tracking off</button>
+  </div>
+  <div class="row">
+    <input type="search" id="target-search" placeholder="Target: M 31, NGC 7000, Orion" aria-label="Search the catalog">
+  </div>
+  <ul id="target-results"></ul>
+  <div id="target-panel" hidden>
+    <h3 id="target-title"></h3>
+    <dl id="target-facts"></dl>
+    <div class="row"><button type="button" id="goto">Go to target</button></div>
+  </div>
+  <p id="goto-status" hidden></p>
+  <p id="pointing-error" hidden></p>
 </section>
 <section id="capture">
   <h2><span>Capture</span></h2>
@@ -388,12 +431,150 @@ function showPrepare(night) {
   }
 }
 
+const mountState = document.getElementById('mount-state')
+const searchBox = document.getElementById('target-search')
+const targetResults = document.getElementById('target-results')
+const targetPanel = document.getElementById('target-panel')
+const targetTitle = document.getElementById('target-title')
+const targetFacts = document.getElementById('target-facts')
+const gotoButton = document.getElementById('goto')
+const gotoStatus = document.getElementById('goto-status')
+const pointingError = document.getElementById('pointing-error')
+const pointingButtons = ['mount-unpark', 'mount-home', 'tracking-on', 'tracking-off'].map(id => document.getElementById(id))
+let chosen
+let chosenId = ''
+let currentMeridian = ''
+
+async function pointingAction(request) {
+  pointingError.hidden = true
+  try {
+    const result = await post('/pointing', request)
+    if (!result.ok) {
+      pointingError.hidden = false
+      pointingError.textContent = result.body.error
+    }
+  } catch (error) {
+    pointingError.hidden = false
+    pointingError.textContent = 'Could not reach Vela: ' + error
+  }
+}
+
+document.getElementById('mount-stop').addEventListener('click', () => pointingAction({ action: 'stop' }))
+document.getElementById('mount-unpark').addEventListener('click', () => pointingAction({ action: 'unpark' }))
+document.getElementById('mount-home').addEventListener('click', () => pointingAction({ action: 'home' }))
+document.getElementById('tracking-on').addEventListener('click', () => pointingAction({ action: 'tracking', on: true }))
+document.getElementById('tracking-off').addEventListener('click', () => pointingAction({ action: 'tracking', on: false }))
+gotoButton.addEventListener('click', () => pointingAction({ action: 'goto', id: chosenId }))
+
+function duration(seconds) {
+  const total = Math.round(Math.abs(seconds) / 60)
+  const hoursPart = Math.floor(total / 60)
+  const minutes = total % 60
+  return hoursPart === 0 ? minutes + ' min' : hoursPart + ' h ' + String(minutes).padStart(2, '0') + ' min'
+}
+
+function hms(hoursValue) {
+  const total = Math.round(((hoursValue % 24) + 24) % 24 * 3600) % 86400
+  return String(Math.floor(total / 3600)).padStart(2, '0') + 'h ' + String(Math.floor(total % 3600 / 60)).padStart(2, '0') + 'm ' + String(total % 60).padStart(2, '0') + 's'
+}
+
+function dms(degrees) {
+  const total = Math.round(Math.abs(degrees) * 3600)
+  return (degrees < 0 ? '-' : '+') + String(Math.floor(total / 3600)).padStart(2, '0') + '° ' + String(Math.floor(total % 3600 / 60)).padStart(2, '0') + '′ ' + String(total % 60).padStart(2, '0') + '″'
+}
+
+function showTarget() {
+  if (chosen === undefined) return
+  const { target, meridianLimitAt } = chosen
+  targetPanel.hidden = false
+  targetTitle.textContent = (target.commonName ? target.commonName + ' (' + target.name + ')' : target.name) + ', ' + target.type + (target.constellation ? ' in ' + target.constellation : '')
+  const meridian = meridianLimitAt === undefined ? 'unknown' : meridianLimitAt >= Date.now() ? 'in ' + duration((meridianLimitAt - Date.now()) / 1000) : 'reached, ' + duration((Date.now() - meridianLimitAt) / 1000) + ' past'
+  const rows = [
+    ['J2000', hms(target.raJ2000Hours) + '  ' + dms(target.decJ2000Degrees)],
+    ['Of date (sent to the mount)', hms(target.raHours) + '  ' + dms(target.decDegrees)],
+    ['Meridian limit, this target', meridian],
+    ['Meridian limit, where the mount points now', currentMeridian],
+  ]
+  targetFacts.replaceChildren(...rows.flatMap(([label, text]) => [element('dt', '', label), element('dd', '', text)]))
+}
+
+async function choose(id) {
+  chosenId = id
+  const response = await fetch('/target?id=' + encodeURIComponent(id))
+  const result = await response.json()
+  if (!result.ok) {
+    chosen = undefined
+    targetPanel.hidden = true
+    pointingError.hidden = false
+    pointingError.textContent = result.reason
+    return
+  }
+  pointingError.hidden = true
+  chosen = result
+  showTarget()
+}
+
+searchBox.addEventListener('input', async () => {
+  const text = searchBox.value.trim()
+  if (text === '') {
+    targetResults.replaceChildren()
+    return
+  }
+  const response = await fetch('/targets?q=' + encodeURIComponent(text))
+  const list = await response.json()
+  if (searchBox.value.trim() !== text) return
+  targetResults.replaceChildren(...list.map(found => {
+    const item = element('li')
+    const button = element('button', '', found.name + (found.commonName ? ' ' + found.commonName : '') + ' (' + found.type + ')')
+    button.type = 'button'
+    button.addEventListener('click', () => choose(found.id))
+    item.append(button)
+    return item
+  }))
+})
+
+const gotoPhases = {
+  sending: ['sending the goto', ''],
+  sent: ['goto written, waiting for the mount to start slewing', ''],
+  slewing: ['slewing', ''],
+  arrived: ['arrived', ''],
+  failed: ['failed', 'bad'],
+  stopped: ['stopped', 'warn'],
+}
+
+function showPointing(view, live) {
+  mountState.textContent = (view.parked === undefined ? 'park state unknown' : view.parked ? 'parked' : 'unparked') + ', tracking ' + (view.tracking === undefined ? 'unknown' : view.tracking ? 'on' : 'off')
+  for (const button of pointingButtons) button.disabled = !live
+  gotoButton.disabled = !live || chosen === undefined
+  const goto = view.goto
+  gotoStatus.hidden = goto === undefined
+  if (goto !== undefined) {
+    const [text, level] = gotoPhases[goto.phase]
+    gotoStatus.className = level
+    gotoStatus.textContent = 'Target ' + goto.name + ' (' + hms(goto.raHours) + ' ' + dms(goto.decDegrees) + ' of date), sent ' + clock(goto.sentAt) + ': ' + text +
+      (goto.arrivedAt === undefined ? '' : ' at ' + clock(goto.arrivedAt)) +
+      (goto.separationDegrees === undefined ? '' : ', mount ' + (goto.separationDegrees * 60).toFixed(1) + '′ from it') +
+      (goto.detail === undefined ? '' : '. ' + goto.detail)
+  }
+}
+
+let lastPointing
+let lastLive = false
+
 const events = new EventSource('/events')
+events.addEventListener('pointing', event => {
+  lastPointing = JSON.parse(event.data)
+  showPointing(lastPointing, lastLive)
+  showTarget()
+})
 events.addEventListener('capture', event => showCapture(JSON.parse(event.data)))
 events.addEventListener('night', event => {
   const night = JSON.parse(event.data)
   show(night)
   showPrepare(night)
+  lastLive = night.phase === 'live'
+  currentMeridian = night.devices.find(device => device.id === 'mount').fields.find(field => field.label === 'Meridian limit').text
+  if (lastPointing !== undefined) showPointing(lastPointing, lastLive)
 })
 events.addEventListener('frames', event => showFrames(JSON.parse(event.data)))
 events.onerror = () => {

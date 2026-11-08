@@ -11,6 +11,7 @@ Vela is being rebuilt on the rig stream (plan: `bots/observer/specs/vela-next/pl
 - `src/bin/vela.ts`: the night page and capture controls, a Node service on thuban. `src/stream/` follows the stream, `src/rig/` holds the picture (`picture.ts`) and what the page shows (`night.ts`), `src/page/` serves it. Deploy files in `deploy/`.
 - `src/commands/`: the command sender (publish `rig-dev.command.<device>`, wait for the `client.command` answer). `src/capture/`: the capture run, the settings comparison, the run file and the `vela.run` entries. See the README.
 - `src/prepare/`: the focuser and dew controls (`prepare.ts` checks a request against the limits on the stream and sends the commands) and the view the page draws them from (`view.ts`). PHD2's state and the time of its last guide step are on the page.
+- `src/pointing/`: catalog lookup to goto: `target.ts` converts a catalog row to epoch of date (precession and nutation, no site), `pointing.ts` sends goto, Unpark, Home, tracking and Stop and follows a goto from the stream. There is no Park (parking turns the rig sideways). `src/catalog/search.ts` is the lookup, `src/sky/meridian.ts` the time to the meridian limit.
 - `src/frames/`: the frames: copy from the rig computer with a check, the sidecar, the stream entry, the FITS reader and the preview. See the README.
 - `compose.yaml` and `deploy/nats.conf`: the NATS broker that carries the rig stream. It has no logins and nothing to provision; the rig program creates the `RIG_DEV` stream.
 - `verify.sh`: typecheck and tests.

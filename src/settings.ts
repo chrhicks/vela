@@ -81,6 +81,14 @@ export const PrepareSettings = Schema.Struct({
   ),
 })
 
+export const PointingSettings = Schema.Struct({
+  searchResults: described(
+    'Targets listed for one search. A display choice, not a limit of the catalog (13,000 rows): the list is a picker for one target, and ten rows fit a phone screen without scrolling the controls away',
+    Schema.Number,
+    10,
+  ),
+})
+
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the page is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve' }),
   broker: BrokerSettings,
@@ -108,6 +116,7 @@ export const VelaSettings = Schema.Struct({
   frames: FrameSettings,
   capture: CaptureSettings,
   prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),
+  pointing: described('Settings for choosing a target and pointing the mount', PointingSettings, {}),
   historyReadBatch: described(
     'Entries asked of the broker at a time when replaying the rig connection. The client library defaults to 100; 2048 read 200,000 entries in 0.8 s on thuban (Cria viewer, 2026-11-06)',
     Schema.Number,

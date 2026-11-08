@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { CaptureView, StartResult } from '../capture/run.ts'
+import type { Pointing } from '../pointing/pointing.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
 import type { Frames } from '../frames/library.ts'
 import type { Night } from '../rig/night.ts'
@@ -20,9 +21,10 @@ export interface PageOptions {
     readonly stop: () => Promise<boolean>
   }
   readonly prepare: (request: unknown) => Promise<PrepareResult>
+  readonly pointing: Pick<Pointing, 'view' | 'search' | 'preview'> & { readonly act: (request: unknown) => Promise<PrepareResult> }
 }
 
-export function makePage({ night, refreshMs, frames, preview, capture, prepare }: PageOptions) {
+export function makePage({ night, refreshMs, frames, preview, capture, prepare, pointing }: PageOptions) {
   const watching = new Set<ServerResponse>()
 
   function send(response: ServerResponse, event: string, data: unknown) {
@@ -37,6 +39,7 @@ export function makePage({ night, refreshMs, frames, preview, capture, prepare }
     for (const response of watching) send(response, 'night', snapshot)
 
     captureChanged()
+    pointingChanged()
   }, refreshMs)
 
   timer.unref()
@@ -52,6 +55,14 @@ export function makePage({ night, refreshMs, frames, preview, capture, prepare }
     const view = capture.view()
 
     for (const response of watching) send(response, 'capture', view)
+  }
+
+  function pointingChanged() {
+    if (watching.size === 0) return
+
+    const view = pointing.view()
+
+    for (const response of watching) send(response, 'pointing', view)
   }
 
   function refuseUnlessJson(request: IncomingMessage, response: ServerResponse) {
@@ -106,7 +117,9 @@ export function makePage({ night, refreshMs, frames, preview, capture, prepare }
       return
     }
 
-    if (path === '/prepare' && request.method === 'POST') {
+    const acts = path === '/prepare' ? prepare : path === '/pointing' ? pointing.act : undefined
+
+    if (acts !== undefined && request.method === 'POST') {
       if (refuseUnlessJson(request, response)) return
 
       readBody(request).then(async text => {
@@ -120,11 +133,23 @@ export function makePage({ night, refreshMs, frames, preview, capture, prepare }
           return
         }
 
-        const result = await prepare(json)
+        const result = await acts(json)
 
         if (result.ok) answer(response, 200, { ok: true })
         else answer(response, 409, { error: result.reason })
       }, error => fail(response, error))
+
+      return
+    }
+
+    if (path === '/targets' && request.method === 'GET') {
+      answer(response, 200, pointing.search(new URL(request.url ?? '', 'http://localhost').searchParams.get('q') ?? ''))
+
+      return
+    }
+
+    if (path === '/target' && request.method === 'GET') {
+      answer(response, 200, pointing.preview(new URL(request.url ?? '', 'http://localhost').searchParams.get('id') ?? ''))
 
       return
     }
@@ -181,6 +206,7 @@ export function makePage({ night, refreshMs, frames, preview, capture, prepare }
       response.on('close', () => watching.delete(response))
       send(response, 'night', night())
       send(response, 'capture', capture.view())
+      send(response, 'pointing', pointing.view())
       frames().then(list => send(response, 'frames', list), () => undefined)
 
       return

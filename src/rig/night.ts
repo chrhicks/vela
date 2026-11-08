@@ -1,5 +1,5 @@
-import { SiderealTime } from 'astronomy-engine'
 import { makePrepareView, type PrepareView } from '../prepare/view.ts'
+import { formatDuration, meridianText, secondsToMeridianLimit } from '../sky/meridian.ts'
 import type { Value } from '../stream/entry.ts'
 import type { Picture, Property } from './picture.ts'
 
@@ -49,15 +49,7 @@ interface Reading {
   readonly changedAt: number | undefined
 }
 
-const siderealSecondsPerSecond = 1.0027379093
 const unknownText = '—'
-
-function hours(value: number) {
-  const whole = Math.floor(value)
-  const minutes = Math.round((value - whole) * 60)
-
-  return minutes === 60 ? { whole: whole + 1, minutes: 0 } : { whole, minutes }
-}
 
 export function formatRa(raHours: number) {
   const total = Math.round((((raHours % 24) + 24) % 24) * 3600) % 86400
@@ -75,12 +67,6 @@ export function formatDec(degrees: number) {
   const s = total % 60
 
   return `${degrees < 0 ? '-' : '+'}${String(d).padStart(2, '0')}° ${String(m).padStart(2, '0')}′ ${String(s).padStart(2, '0')}″`
-}
-
-export function formatDuration(seconds: number) {
-  const { whole, minutes } = hours(Math.abs(seconds) / 3600)
-
-  return whole === 0 ? `${minutes} min` : `${whole} h ${String(minutes).padStart(2, '0')} min`
 }
 
 function worst(statuses: ReadonlyArray<Status>): Status {
@@ -157,11 +143,7 @@ export function makeNight(picture: Picture, settings: NightSettings, now: number
       if (tracking.value !== true) return 'not tracking'
       if (typeof ra.value !== 'number' || typeof longitude.value !== 'number' || typeof limit.value !== 'number') return unknownText
 
-      const localSiderealHours = SiderealTime(new Date(now)) + longitude.value / 15
-      const hourAngle = ((((localSiderealHours - ra.value) % 24) + 36) % 24) - 12
-      const secondsLeft = ((limit.value / 15 - hourAngle) * 3600) / siderealSecondsPerSecond
-
-      return secondsLeft >= 0 ? `in ${formatDuration(secondsLeft)}` : `reached, ${formatDuration(secondsLeft)} past`
+      return meridianText(secondsToMeridianLimit({ raHours: ra.value, longitudeDegrees: longitude.value, limitDegrees: limit.value, at: now }))
     })
   }
 
