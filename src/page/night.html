@@ -72,6 +72,9 @@
   #tonight td { padding: 9px 0; border-top: 1px solid var(--line); vertical-align: top; }
   #tonight td:first-child { color: var(--muted); width: 38%; }
   #tonight td:last-child { text-align: right; }
+  #tonight a.home { color: var(--fg); text-decoration: none; }
+  #tonight a.home:hover { text-decoration: underline; text-underline-offset: 3px; }
+  #tonight a.home::after { content: " ›"; color: var(--muted); }
   #tonight section { border: 0; background: transparent; padding: 0; border-radius: 0; }
   #tonight { align-items: start; }
   #tonight aside > section { margin-bottom: 28px; }
@@ -902,13 +905,13 @@ function showTonight() {
     head.innerHTML = '<h1>Nothing running</h1><p class="sub"><a href="#/point">Choose a target</a> or <a href="#/capture">start a run</a>.</p>'
   }
   document.getElementById('tonight-readings').innerHTML = [
-    ['Sensor', reading('primary', 'Sensor temperature') + (fieldText('primary', 'Cooler') === 'on' && /°C/.test(fieldText('primary', 'Setpoint (last written)')) ? ', set to ' + reading('primary', 'Setpoint (last written)') + ', cooler at ' + reading('primary', 'Cooler power') : ', cooler ' + reading('primary', 'Cooler'))],
-    ['Focus', '<a href="#/prepare">' + focusDriftText(night) + '</a>'],
-    ['Tracking', reading('mount', 'Tracking')],
-    ['Meridian limit', reading('mount', 'Meridian limit')],
-    ['Guiding', reading('phd2', 'State')],
-    ['Night', night.sky === undefined ? '<span class="unknown">the mount has not reported the site</span>' : night.sky.darkAt === undefined ? 'no full dark tonight, dawn ' + hourMinute(night.sky.dawnAt) : 'dark ' + hourMinute(night.sky.darkAt) + ' to ' + hourMinute(night.sky.darkEndsAt) + ', dawn ' + hourMinute(night.sky.dawnAt)],
-  ].map(([label, value]) => '<tr><td>' + label + '</td><td>' + value + '</td></tr>').join('')
+    ['Sensor', '#/rig', reading('primary', 'Sensor temperature') + (fieldText('primary', 'Cooler') === 'on' && /°C/.test(fieldText('primary', 'Setpoint (last written)')) ? ', set to ' + reading('primary', 'Setpoint (last written)') + ', cooler at ' + reading('primary', 'Cooler power') : ', cooler ' + reading('primary', 'Cooler'))],
+    ['Focus', '#/prepare', focusDriftText(night)],
+    ['Tracking', '#/rig', reading('mount', 'Tracking')],
+    ['Meridian limit', '#/rig', reading('mount', 'Meridian limit')],
+    ['Guiding', '#/rig', reading('phd2', 'State')],
+    ['Night', undefined, night.sky === undefined ? '<span class="unknown">the mount has not reported the site</span>' : night.sky.darkAt === undefined ? 'no full dark tonight, dawn ' + hourMinute(night.sky.dawnAt) : 'dark ' + hourMinute(night.sky.darkAt) + ' to ' + hourMinute(night.sky.darkEndsAt) + ', dawn ' + hourMinute(night.sky.dawnAt)],
+  ].map(([label, home, value]) => '<tr><td>' + label + '</td><td>' + (home === undefined ? value : '<a class="home" href="' + home + '">' + value + '</a>') + '</td></tr>').join('')
   document.getElementById('tonight-rig').innerHTML = night.phase === 'silent'
     ? '<span class="stale">No word from the rig for ' + night.rig.silentSeconds + ' s.</span> <a href="#/rig">See the rig</a>'
     : down.length > 0
