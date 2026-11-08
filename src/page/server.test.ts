@@ -13,16 +13,25 @@ const idleView = { at: 1, run: undefined, last: undefined }
 
 const idlePrepare: PageOptions['prepare'] = async () => ({ ok: false, reason: 'not here' })
 
+const idlePointingView = { at: 1, parked: undefined, tracking: undefined, goto: undefined }
+
+const idlePointing: PageOptions['pointing'] = {
+  view: () => idlePointingView,
+  search: () => [],
+  preview: id => ({ ok: false, reason: `no catalog target ${id}` }),
+  act: async () => ({ ok: false, reason: 'not here' }),
+}
+
 const idleCapture: PageOptions['capture'] = { view: () => idleView, start: () => ({ ok: false, reason: 'not here' }), stop: async () => false }
 
-async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'capture' | 'prepare'>> = {}) {
+async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'capture' | 'prepare' | 'pointing'>> = {}) {
   const picture = makePicture()
 
   picture.apply(connected(startedAt), Date.now())
   picture.apply(wire(startedAt + 1, 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), Date.now())
   picture.caughtUp()
 
-  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, capture: idleCapture, prepare: idlePrepare, ...frames })
+  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, ...frames })
 
   open.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -164,6 +173,24 @@ describe('page server', () => {
 
   it('refuses a preparation request a web page could send without asking the browser first', async () => {
     expect((await fetch(`${await serve()}/prepare`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status).toBe(415)
+  })
+
+  it('passes a pointing request on, searches the catalog and previews a target', async () => {
+    const received: unknown[] = []
+    const base = await serve(20, {
+      pointing: {
+        ...idlePointing,
+        act: async request => (received.push(request), { ok: true }),
+        search: text => [{ id: 'ngc0224', name: text, commonName: null, type: 'Galaxy', constellation: null }],
+      },
+    })
+    const response = await fetch(`${base}/pointing`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"action":"stop"}' })
+
+    expect(response.status).toBe(200)
+    expect(received).toEqual([{ action: 'stop' }])
+    expect((await fetch(`${base}/pointing`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status).toBe(415)
+    expect(await (await fetch(`${base}/targets?q=m31`)).json()).toEqual([{ id: 'ngc0224', name: 'm31', commonName: null, type: 'Galaxy', constellation: null }])
+    expect(await (await fetch(`${base}/target?id=x`)).json()).toEqual({ ok: false, reason: 'no catalog target x' })
   })
 
   it('stops the run and says whether there was one', async () => {
