@@ -250,7 +250,7 @@
 <nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a><a href="#/rig" data-to="rig">Rig</a><a href="#/activity" data-to="activity">Activity</a></nav>
 </header>
 <div class="view" data-view="tonight"><div id="tonight">
-  <section><div id="tonight-head" class="shape"><h1>Reading the rig</h1><p class="sub">Vela is reading tonight from the stream.</p></div><table id="tonight-readings" class="shape"><tr><td>Sensor</td><td>…</td></tr><tr><td>Focus</td><td>…</td></tr><tr><td>Tracking</td><td>…</td></tr><tr><td>Meridian limit</td><td>…</td></tr><tr><td>Guiding</td><td>…</td></tr><tr><td>Night</td><td>…</td></tr></table></section>
+  <section><div id="tonight-head" class="shape"><h1>Reading the rig</h1><p class="sub">Vela is reading tonight from the stream.</p></div><table id="tonight-readings" class="shape"><tr><td>Sensor</td><td>…</td></tr><tr><td>Focus</td><td>…</td></tr><tr><td>Tracking</td><td>…</td></tr><tr><td>Meridian limit</td><td>…</td></tr><tr><td>Guiding</td><td>…</td></tr></table></section>
   <aside><section><h2>Rig</h2><p id="tonight-rig" class="shape">…</p></section><section id="tonight-frame"><h2>Latest frame</h2><div id="tonight-frame-body"><p class="cap shape">…</p></div></section></aside>
 </div></div>
 <div class="view" data-view="rig"><h1 class="view-title">Rig</h1><p class="rig" id="rig">Reading the rig from the stream</p><main id="devices"></main></div>
@@ -922,7 +922,6 @@ function showTonight() {
     ['Tracking', '#/rig', reading('mount', 'Tracking')],
     ['Meridian limit', '#/rig', reading('mount', 'Meridian limit')],
     ['Guiding', '#/rig', reading('phd2', 'State')],
-    ['Night', undefined, night.sky === undefined ? '<span class="unknown">the mount has not reported the site</span>' : night.sky.darkAt === undefined ? 'no full dark tonight, dawn ' + hourMinute(night.sky.dawnAt) : 'dark ' + hourMinute(night.sky.darkAt) + ' to ' + hourMinute(night.sky.darkEndsAt) + ', dawn ' + hourMinute(night.sky.dawnAt)],
   ].map(([label, home, value]) => '<tr><td>' + label + '</td><td>' + (home === undefined ? value : '<a class="home" href="' + home + '">' + value + '</a>') + '</td></tr>').join('')
   document.getElementById('tonight-rig').innerHTML = problem === undefined
     ? 'Every device connected and current. <a href="#/rig">See the rig</a>'
