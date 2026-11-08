@@ -139,6 +139,7 @@
   #capture button[type=submit] { grid-column: 1 / -1; font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--action); color: #0d1626; cursor: pointer; justify-self: start; }
   #capture button[disabled] { opacity: 0.5; cursor: default; }
   .answer { margin: 8px 0 12px; }
+  #stop-answer { margin: 0; padding: 0 max(24px, env(safe-area-inset-right)) 6px max(24px, env(safe-area-inset-left)); text-align: right; }
   .drift { margin: 0 0 8px; }
   .answer.bad { color: var(--bad); }
   .answer.warn { color: var(--warn); }
@@ -229,6 +230,7 @@
   <div class="stops"><button type="button" class="stop" id="stop">Stop capture</button><button type="button" class="stop" id="mount-stop">Stop mount</button></div>
   <button type="button" id="dim" aria-pressed="false">Dim</button>
 </div>
+<p class="answer" id="stop-answer" aria-live="polite" hidden></p>
 <a id="strip" href="#/tonight" hidden><svg viewBox="0 0 1000 26" preserveAspectRatio="none" role="img" aria-label="Tonight from dusk to dawn"></svg></a>
 <div id="runbar" hidden><span class="progress" id="progress"></span></div>
 <div id="focusbar" hidden>
@@ -722,6 +724,7 @@ const stopButton = document.getElementById('stop')
 const captureForm = document.getElementById('capture-form')
 const startButton = document.getElementById('start')
 const captureAnswer = document.getElementById('capture-answer')
+const stopAnswer = document.getElementById('stop-answer')
 const lastRun = document.getElementById('last-run')
 
 async function post(path, body) {
@@ -742,7 +745,7 @@ async function act(button, answer, path, request, name, done) {
   say(answer, name + ': sending', 'sending')
   try {
     const result = await post(path, request)
-    if (result.ok) say(answer, done ?? name + ': done.', '')
+    if (result.ok) say(answer, done ?? name + ': done.', done === '' ? undefined : '')
     else {
       const unanswered = /no answer/.test(result.body.error)
       say(answer, name + (unanswered ? ': no answer. ' : ': refused. ') + result.body.error, unanswered ? 'warn' : 'bad')
@@ -773,24 +776,7 @@ captureForm.addEventListener('submit', async event => {
   await act(startButton, captureAnswer, '/capture', request, 'Start the run', 'Run started: ' + request.count + ' × ' + request.exposureSeconds + ' s of ' + request.object + '.')
 })
 
-stopButton.addEventListener('click', async () => {
-  if (stopButton.classList.contains('sending')) return
-  stopButton.classList.add('sending')
-  stopButton.setAttribute('aria-busy', 'true')
-  try {
-    const result = await post('/capture/stop', {})
-    if (!result.ok) {
-      statusParts.refusal = { text: 'Stop capture refused: ' + (result.body.error ?? 'no reason given'), at: Date.now() }
-      showStatus()
-    }
-  } catch (error) {
-    statusParts.refusal = { text: 'Stop capture did not reach Vela: ' + error.message, at: Date.now() }
-    showStatus()
-  } finally {
-    stopButton.classList.remove('sending')
-    stopButton.removeAttribute('aria-busy')
-  }
-})
+stopButton.addEventListener('click', () => act(stopButton, stopAnswer, '/capture/stop', {}, 'Stop capture', ''))
 
 const endings = {
   done: ['finished', ''],
@@ -976,7 +962,7 @@ function prepareAction(button, answer, request, name) {
 }
 
 const focusStop = document.getElementById('focus-stop')
-focusStop.addEventListener('click', () => prepareAction(focusStop, focusAnswer, { action: 'focuser-stop' }, 'Stop focuser'))
+focusStop.addEventListener('click', () => act(focusStop, stopAnswer, '/prepare', { action: 'focuser-stop' }, 'Stop focuser', ''))
 focusMove.addEventListener('click', () => prepareAction(focusMove, focusAnswer, { action: 'focuser-move', position: Number(focusTarget.value) }, 'Move focuser to ' + focusTarget.value))
 focusIn.addEventListener('click', () => prepareAction(focusIn, focusAnswer, { action: 'focuser-nudge', direction: 'in' }))
 focusOut.addEventListener('click', () => prepareAction(focusOut, focusAnswer, { action: 'focuser-nudge', direction: 'out' }))
@@ -1057,7 +1043,7 @@ function pointingAction(button, answer, request) {
 }
 
 const mountStop = document.getElementById('mount-stop')
-mountStop.addEventListener('click', () => pointingAction(mountStop, mountAnswer, { action: 'stop' }))
+mountStop.addEventListener('click', () => act(mountStop, stopAnswer, '/pointing', { action: 'stop' }, 'Stop mount', ''))
 for (const [id, request] of [['mount-unpark', { action: 'unpark' }], ['mount-home', { action: 'home' }], ['tracking-on', { action: 'tracking', on: true }], ['tracking-off', { action: 'tracking', on: false }]]) {
   const button = document.getElementById(id)
   button.addEventListener('click', () => pointingAction(button, mountAnswer, request))
