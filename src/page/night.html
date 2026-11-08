@@ -12,7 +12,8 @@
   ::selection { background: var(--dome-hi); color: var(--star); }
   :focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
   input, select, textarea { caret-color: var(--action); }
-  a { color: var(--action); text-underline-offset: 3px; }
+  a { color: var(--fg); text-decoration-color: var(--action); text-underline-offset: 3px; }
+  a:hover { color: var(--action); }
   html[data-dim]::after { content: ""; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); pointer-events: none; z-index: 100; }
   #dim { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
   body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 "Atkinson Hyperlegible Next", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
