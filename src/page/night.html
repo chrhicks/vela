@@ -73,6 +73,7 @@
   #tonight .alarm a { color: inherit; font-size: 16px; font-weight: 400; }
   #tonight .big { display: flex; flex-wrap: wrap; gap: 12px 36px; margin: 0 0 18px; }
   #tonight .big div { font-size: 15px; color: var(--muted); }
+  #tonight .big .left { display: block; font-size: 15px; }
   #tonight .big b { display: block; font-size: 40px; color: var(--fg); font-weight: 600; line-height: 1.1; white-space: nowrap; }
   #tonight table { width: 100%; border-collapse: collapse; }
   #tonight td { padding: 9px 0; border-top: 1px solid var(--line); vertical-align: top; }
@@ -884,6 +885,11 @@ function focusDriftText(night) {
   return 'focused at ' + celsius(focus.focused.celsius) + ' (' + hourMinute(focus.focused.at) + '), now ' + celsius(focus.now.celsius) + ': ' + drift + stale
 }
 
+function timeLeft(ms) {
+  const minutes = Math.max(0, Math.round(ms / 60000))
+  return minutes < 60 ? 'in ' + minutes + ' min' : 'in ' + Math.floor(minutes / 60) + ' h ' + String(minutes % 60).padStart(2, '0') + ' min'
+}
+
 function showTonight() {
   const { night, capture, pointing, frames } = tonightState
   if (night === undefined) return
@@ -901,7 +907,7 @@ function showTonight() {
     const left = run.phase === 'exposing' && run.secondsLeft !== undefined ? run.secondsLeft + ' s left' : run.phase === 'preparing' ? 'setting up' : 'ending'
     head.innerHTML = alarm + '<h1>' + escapeText(run.object) + ', ' + escapeText(run.frameType) + ' frames</h1>' +
       '<p class="sub">' + run.count + ' frames of ' + run.exposureSeconds + ' s' + (run.failed > 0 ? ', ' + run.failed + ' failed' : '') + '.' + (night.phase === 'live' ? '' : ' <span class="stale">Run numbers' + staleNote(night) + '</span>') + '</p>' +
-      '<div class="big"><div>Frame<b>' + run.frame + ' of ' + run.count + '</b></div><div>This frame<b>' + left + '</b></div><div>Run ends<b>' + hourMinute(runEndsAt(capture)) + '</b></div></div>'
+      '<div class="big"><div>Frame<b>' + run.frame + ' of ' + run.count + '</b></div><div>This frame<b>' + left + '</b></div><div>Run ends<b>' + hourMinute(runEndsAt(capture)) + '</b><span class="left">' + timeLeft(runEndsAt(capture) - capture.at) + '</span></div></div>'
   } else if (goto !== undefined && ['sending', 'sent', 'slewing'].includes(goto.phase)) {
     head.innerHTML = alarm + '<h1>Slewing to ' + escapeText(goto.name) + '</h1><p class="sub">Sent ' + hourMinute(goto.sentAt) +
       (goto.separationDegrees === undefined ? '' : '. The mount is ' + goto.separationDegrees.toFixed(1) + '° from the target.') + '</p>'
