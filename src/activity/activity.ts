@@ -25,31 +25,31 @@ export interface ActivityOptions {
 }
 
 const actions: Readonly<Record<string, string>> = {
-  CCD_EXPOSURE: 'start an exposure',
-  CCD_ABORT_EXPOSURE: 'stop the exposure',
-  CCD_FRAME_TYPE: 'set the frame type',
-  CCD_CONTROLS: 'set gain and offset',
-  CCD_GAIN: 'set the gain',
-  CCD_OFFSET: 'set the offset',
-  CCD_BINNING: 'set the binning',
-  CCD_COOLER: 'turn the cooler on or off',
-  CCD_TEMPERATURE: 'set the sensor temperature',
-  UPLOAD_MODE: 'set where frames go',
-  UPLOAD_SETTINGS: 'set the frame folder and name',
-  FITS_HEADER: 'write header keys',
-  ABS_FOCUS_POSITION: 'move the focuser',
-  REL_FOCUS_POSITION: 'move the focuser',
-  FOCUS_MOTION: 'set the focus direction',
-  FOCUS_ABORT_MOTION: 'stop the focuser',
-  EQUATORIAL_EOD_COORD: 'go to a target',
-  ON_COORD_SET: 'set what a goto does',
-  TELESCOPE_ABORT_MOTION: 'stop the mount',
-  TELESCOPE_PARK: 'park or unpark',
-  TELESCOPE_HOME: 'go Home',
-  TELESCOPE_TRACK_STATE: 'turn tracking on or off',
-  TELESCOPE_MOTION_NS: 'move north or south',
-  TELESCOPE_MOTION_WE: 'move west or east',
-  TELESCOPE_SLEW_RATE: 'set the move speed',
+  CCD_EXPOSURE: 'Start an exposure',
+  CCD_ABORT_EXPOSURE: 'Stop the exposure',
+  CCD_FRAME_TYPE: 'Set the frame type',
+  CCD_CONTROLS: 'Set gain and offset',
+  CCD_GAIN: 'Set the gain',
+  CCD_OFFSET: 'Set the offset',
+  CCD_BINNING: 'Set the binning',
+  CCD_COOLER: 'Cooler on or off',
+  CCD_TEMPERATURE: 'Set the sensor temperature',
+  UPLOAD_MODE: 'Set where frames go',
+  UPLOAD_SETTINGS: 'Set the frame folder and name',
+  FITS_HEADER: 'Write header keys',
+  ABS_FOCUS_POSITION: 'Move focuser',
+  REL_FOCUS_POSITION: 'Focuser in or out',
+  FOCUS_MOTION: 'Set the focus direction',
+  FOCUS_ABORT_MOTION: 'Stop focuser',
+  EQUATORIAL_EOD_COORD: 'Slew mount to target',
+  ON_COORD_SET: 'Set what a slew does',
+  TELESCOPE_ABORT_MOTION: 'Stop mount',
+  TELESCOPE_PARK: 'Park or unpark mount',
+  TELESCOPE_HOME: 'Mount to Home',
+  TELESCOPE_TRACK_STATE: 'Start or stop tracking',
+  TELESCOPE_MOTION_NS: 'Move mount north or south',
+  TELESCOPE_MOTION_WE: 'Move mount west or east',
+  TELESCOPE_SLEW_RATE: 'Set the move speed',
 }
 
 const guiding: Readonly<Record<string, { readonly text: string; readonly tone: Tone }>> = {
@@ -105,7 +105,7 @@ export function makeActivity({ titles, nightOf }: ActivityOptions) {
     if (body === undefined || (body['result'] !== 'written' && body['result'] !== 'refused')) return undefined
 
     const property = text(body['property']) ?? 'a property'
-    const asked = `${named(body['by'])} asked the ${title(body['device']).toLowerCase()} to ${actions[property] ?? `write ${property}`}`
+    const asked = `${actions[property] ?? `Write ${property} to the ${title(body['device']).toLowerCase()}`} (${named(body['by'])})`
 
     return body['result'] === 'written'
       ? add(entry.at, 'command', 'plain', `${asked}: done.`)
