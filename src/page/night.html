@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vela</title>
 <style>
   @font-face { font-family: "Atkinson Hyperlegible Next"; src: url("/fonts/atkinson-hyperlegible-next.ttf") format("truetype"); font-weight: 200 800; font-display: swap; }
@@ -69,12 +69,19 @@
   #tonight-frame img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); }
   #tonight-frame .cap { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
   .bad { color: var(--bad); }
+  .shape, .shape h1, .shape td { color: var(--muted); }
+  html[data-lost] .view { opacity: 0.6; }
+  #tonight h1, #status, .view-title, #target-title, #frames summary { overflow-wrap: anywhere; }
+  #shell { padding-top: env(safe-area-inset-top); }
+  .bar, #strip, #runbar, #focusbar { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
+  #tabs { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  .view { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
   .more-list a { display: flex; justify-content: space-between; align-items: center; min-height: 56px; border-top: 1px solid var(--line); color: var(--fg); text-decoration: none; font-size: 18px; }
   .more-list a span { color: var(--muted); font-size: 15px; }
   .view { max-width: 1100px; margin: 0 auto; padding: 20px 24px 40px; }
   .view[hidden] { display: none; }
   @media (max-width: 760px) {
-    .bar { padding: 8px 14px 4px; }
+    .bar { padding: 8px max(14px, env(safe-area-inset-right)) 4px max(14px, env(safe-area-inset-left)); }
     #status { order: 3; flex: 1 1 200px; font-size: 16px; }
     #dim { order: 4; }
     .stops { margin-left: auto; }
@@ -85,7 +92,7 @@
     #bottom a { flex: 1; justify-content: center; font-size: 14px; border-radius: 8px; padding: 0 4px; }
     #bottom a.on { background: var(--dome-hi); color: var(--fg); font-weight: 600; }
     body { padding-bottom: 64px; }
-    .view { padding: 16px 14px 32px; }
+    .view { padding: 16px max(14px, env(safe-area-inset-right)) 32px max(14px, env(safe-area-inset-left)); }
     #tonight { grid-template-columns: 1fr; gap: 8px; }
     #tonight h1 { font-size: 26px; }
   }
@@ -211,10 +218,10 @@
 <nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a><a href="#/rig" data-to="rig">Rig</a><a href="#/activity" data-to="activity">Activity</a></nav>
 </header>
 <div class="view" data-view="tonight"><div id="tonight">
-  <section><div id="tonight-head"><p class="unknown">Reading the rig from the stream</p></div><table id="tonight-readings"></table></section>
-  <aside><section><h2>Rig</h2><p id="tonight-rig"></p></section><section id="tonight-frame"><h2>Latest frame</h2><div id="tonight-frame-body"></div></section></aside>
+  <section><div id="tonight-head" class="shape"><h1>Reading the rig</h1><p class="sub">Vela is reading tonight from the stream.</p></div><table id="tonight-readings" class="shape"><tr><td>Sensor</td><td>…</td></tr><tr><td>Tracking</td><td>…</td></tr><tr><td>Meridian limit</td><td>…</td></tr><tr><td>Guiding</td><td>…</td></tr><tr><td>Night</td><td>…</td></tr></table></section>
+  <aside><section><h2>Rig</h2><p id="tonight-rig" class="shape">…</p></section><section id="tonight-frame"><h2>Latest frame</h2><div id="tonight-frame-body"><p class="cap shape">…</p></div></section></aside>
 </div></div>
-<div class="view" data-view="rig"><h1 class="view-title">Rig</h1><p class="rig" id="rig"></p><main id="devices"></main></div>
+<div class="view" data-view="rig"><h1 class="view-title">Rig</h1><p class="rig" id="rig">Reading the rig from the stream</p><main id="devices"></main></div>
 <div class="view" data-view="more"><h1 class="view-title">More</h1><div class="more-list"><a href="#/frames">Frames <span>tonight's frames</span></a><a href="#/rig">Rig <span>every reading</span></a><a href="#/activity">Activity <span>what happened tonight</span></a></div></div>
 <div class="view" data-view="prepare">
 <section id="prepare">
@@ -222,7 +229,7 @@
   <div class="group" id="focuser-controls">
     <h3>Focuser</h3>
     <div class="row">
-      <span id="focus-where" class="unknown"></span>
+      <span id="focus-where" class="unknown">Reading the focuser</span>
     </div>
     <div class="row">
       <input type="number" step="1" id="focus-target" aria-label="Target position">
@@ -250,7 +257,7 @@
 <section id="pointing">
   <h2><span>Pointing</span></h2>
   <div class="row">
-    <span id="mount-state" class="unknown"></span>
+    <span id="mount-state" class="unknown">Reading the mount</span>
     <button type="button" class="moves" id="mount-unpark">Unpark mount</button>
     <button type="button" class="moves" id="mount-home">Mount to Home</button>
     <button type="button" class="moves" id="tracking-on">Start tracking</button>
@@ -363,7 +370,7 @@ function showStatus() {
   const { night, run, goto, lost } = statusParts
   let problem = ''
   let level = ''
-  if (lost) [problem, level] = ['Lost the connection to Vela: values on this page are old', 'bad']
+  if (lost) [problem, level] = [night === undefined ? 'Cannot reach Vela, trying again' : 'Lost the connection to Vela, trying again: values on this page are old', 'bad']
   else if (night === undefined || night.phase === 'loading') problem = 'Reading the rig from the stream'
   else if (night.phase === 'no-connection') [problem, level] = ['The stream holds no rig connection: nothing is known', 'bad']
   else if (night.phase === 'silent') [problem, level] = ['Rig silent for ' + night.rig.silentSeconds + ' s: every value is stale', 'warn']
@@ -383,6 +390,7 @@ function showStatus() {
   const allWell = level === '' && problem === '' && night?.phase === 'live' && !lost
   statusLine.textContent = [allWell && !refused ? 'All connected' : problem, activity].filter(part => part !== '').join('. ')
   statusLine.className = refused ? 'bad' : level
+  document.documentElement.toggleAttribute('data-lost', lost)
   if (refused) {
     const link = element('a', '', hourMinute(refusal.at) + ' ' + refusal.text.replace(/\.$/, ''))
     link.href = '#/activity'
@@ -824,6 +832,7 @@ function fieldText(device, label) {
 function showTonight() {
   const { night, capture, pointing, frames } = tonightState
   if (night === undefined) return
+  for (const node of document.querySelectorAll('#tonight .shape')) node.classList.remove('shape')
   showStrip()
   const run = capture?.run
   const goto = pointing?.goto
@@ -1049,6 +1058,10 @@ searchBox.addEventListener('input', async () => {
   const response = await fetch('/targets?q=' + encodeURIComponent(text))
   const list = await response.json()
   if (searchBox.value.trim() !== text) return
+  if (list.length === 0) {
+    targetResults.replaceChildren(element('li', 'unknown', 'No target matches "' + text + '". Try a catalog name such as M 31 or NGC 7000, or a common name such as Orion.'))
+    return
+  }
   targetResults.replaceChildren(...list.map(found => {
     const item = element('li')
     const button = element('button', '', found.name + (found.commonName ? ' ' + found.commonName : '') + ' (' + found.type + ')')
@@ -1088,42 +1101,49 @@ function showPointing(view, live) {
 let lastPointing
 let lastLive = false
 
-const events = new EventSource('/events')
-events.addEventListener('pointing', event => {
-  lastPointing = JSON.parse(event.data)
-  tonightState.pointing = lastPointing
-  showTonight()
-  showPointing(lastPointing, lastLive)
-  showTarget()
-})
-events.addEventListener('capture', event => showCapture(JSON.parse(event.data)))
-events.addEventListener('night', event => {
-  const night = JSON.parse(event.data)
-  tonightState.night = night
-  show(night)
-  showTonight()
-  showPrepare(night)
-  lastLive = night.phase === 'live'
-  enableCapture()
-  currentMeridian = night.devices.find(device => device.id === 'mount').fields.find(field => field.label === 'Meridian limit').text
-  if (lastPointing !== undefined) showPointing(lastPointing, lastLive)
-})
-events.addEventListener('activity', event => showActivity(JSON.parse(event.data)))
-events.addEventListener('activity-item', event => addActivity(JSON.parse(event.data)))
-events.addEventListener('frames', event => {
-  const list = JSON.parse(event.data)
-  tonightState.frames = list
-  showFrames(list)
-  showTonight()
-})
-events.onerror = () => {
-  statusParts.lost = true
-  showStatus()
+const reconnectMs = 3000
+
+function listen() {
+  const events = new EventSource('/events')
+  events.addEventListener('pointing', event => {
+    lastPointing = JSON.parse(event.data)
+    tonightState.pointing = lastPointing
+    showTonight()
+    showPointing(lastPointing, lastLive)
+    showTarget()
+  })
+  events.addEventListener('capture', event => showCapture(JSON.parse(event.data)))
+  events.addEventListener('night', event => {
+    const night = JSON.parse(event.data)
+    tonightState.night = night
+    show(night)
+    showTonight()
+    showPrepare(night)
+    lastLive = night.phase === 'live'
+    enableCapture()
+    currentMeridian = night.devices.find(device => device.id === 'mount').fields.find(field => field.label === 'Meridian limit').text
+    if (lastPointing !== undefined) showPointing(lastPointing, lastLive)
+  })
+  events.addEventListener('activity', event => showActivity(JSON.parse(event.data)))
+  events.addEventListener('activity-item', event => addActivity(JSON.parse(event.data)))
+  events.addEventListener('frames', event => {
+    const list = JSON.parse(event.data)
+    tonightState.frames = list
+    showFrames(list)
+    showTonight()
+  })
+  events.onerror = () => {
+    statusParts.lost = true
+    showStatus()
+    if (events.readyState === EventSource.CLOSED) setTimeout(listen, reconnectMs)
+  }
+  events.onopen = () => {
+    statusParts.lost = false
+    showStatus()
+  }
 }
-events.onopen = () => {
-  statusParts.lost = false
-  showStatus()
-}
+
+listen()
 addEventListener('hashchange', showFramePage)
 showView()
 showFramePage()
