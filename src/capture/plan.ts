@@ -12,6 +12,7 @@ export interface Wanted {
   readonly setpoint: number | undefined
   readonly uploadDir: string
   readonly uploadPrefix: string
+  readonly object: string | undefined
 }
 
 export interface Step {
@@ -31,6 +32,7 @@ export function wantedOf(request: CaptureRequest, sequence: string, uploadDir: s
     setpoint: request.setpoint,
     uploadDir,
     uploadPrefix: `${sequence}_XXX`,
+    object: request.frameType === 'light' ? request.object : undefined,
   }
 }
 
@@ -42,8 +44,12 @@ const showing = (property: string, values: Readonly<Record<string, Value>>) => (
 
 const step = (property: string, values: Readonly<Record<string, Value>>, visible = true): Step => ({ property, values, shows: visible ? showing(property, values) : undefined })
 
-export function stepsFor(read: Read, wanted: Wanted, setpointDue: boolean): Plan {
+export function stepsFor(read: Read, wanted: Wanted, first: boolean): Plan {
   const steps: Step[] = []
+
+  if (read('FITS_HEADER') === undefined) return { missing: 'FITS_HEADER' }
+  if (first) steps.push(step('FITS_HEADER', { KEYWORD_NAME: 'INDI_CLEAR', KEYWORD_VALUE: '', KEYWORD_COMMENT: '' }, false))
+  if (wanted.object !== undefined) steps.push(step('FITS_HEADER', { KEYWORD_NAME: 'OBJECT', KEYWORD_VALUE: wanted.object, KEYWORD_COMMENT: '' }, false))
 
   if (wanted.cooler !== 'keep') {
     const cooler = read('CCD_COOLER')
@@ -54,7 +60,7 @@ export function stepsFor(read: Read, wanted: Wanted, setpointDue: boolean): Plan
 
     if (wanted.cooler === 'on' && wanted.setpoint !== undefined) {
       if (read('CCD_TEMPERATURE') === undefined) return { missing: 'CCD_TEMPERATURE' }
-      if (setpointDue || !on) steps.push(step('CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: wanted.setpoint }, false))
+      if (first || !on) steps.push(step('CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: wanted.setpoint }, false))
       if (!on) steps.push(step('CCD_COOLER', { COOLER_ON: true, COOLER_OFF: false }))
     } else if (wanted.cooler === 'off' && on) steps.push(step('CCD_COOLER', { COOLER_ON: false, COOLER_OFF: true }))
   }
