@@ -11,7 +11,7 @@ Vela is being rebuilt on the rig stream (plan: `bots/observer/specs/vela-next/pl
 - `src/bin/vela.ts`: the night page and capture controls, a Node service on thuban. `src/stream/` follows the stream, `src/rig/` holds the picture (`picture.ts`) and what the page shows (`night.ts`), `src/page/` serves it. Deploy files in `deploy/`.
 - `src/commands/`: the command sender (publish `rig-dev.command.<device>`, wait for the `client.command` answer). `src/capture/`: the capture run, the settings comparison, the run file and the `vela.run` entries. See the README.
 - `src/frames/`: the frames: copy from the rig computer with a check, the sidecar, the stream entry, the FITS reader and the preview. See the README.
-- `compose.yaml` and `tools/nats/`: the NATS broker that carries the rig stream, and its provisioning. Provisioning is `python3 tools/nats/provision.py`; `tools/nats/verify.py` runs a throwaway broker through every permission.
+- `compose.yaml` and `deploy/nats.conf`: the NATS broker that carries the rig stream. It has no logins and nothing to provision; the rig program creates the `RIG_DEV` stream.
 - `verify.sh`: typecheck and tests.
 
 The broker's data (`~/.local/share/vela/nats`), Vela's saved images and its archives are data on disk. Nothing in this repo deletes them.
