@@ -27,6 +27,8 @@
   dt { color: var(--muted); }
   dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
   .stale { color: var(--warn); }
+  #devices section.down { border-color: var(--bad); border-left-width: 4px; }
+  #devices section.down h2, #devices section.down h2 .link { color: var(--bad); }
   .unknown { color: var(--muted); }
   .current.ok { color: var(--good); }
   #shell { position: sticky; top: 0; z-index: 5; background: var(--dome); }
@@ -461,8 +463,9 @@ function show(night) {
     ? 'no rig connection'
     : 'rig connected ' + clock(night.rig.connectedAt) + ' (' + ago(night.rig.connectedAt, night.at) + '), connection ' + (night.rig.connection ?? '?') + (night.rig.indiserver === 'closed' ? ', indiserver lost' : '')
 
-  devices.replaceChildren(...night.devices.map(device => {
-    const card = element('section')
+  const isDown = device => device.connection.text !== 'connected' && device.connection.status !== 'unknown'
+  devices.replaceChildren(...[...night.devices].sort((a, b) => Number(isDown(b)) - Number(isDown(a))).map(device => {
+    const card = element('section', isDown(device) ? 'down' : '')
     const title = element('h2')
     title.append(element('span', '', device.title), element('span', 'link ' + device.connection.status, device.connection.text))
     const list = element('dl')
