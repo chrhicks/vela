@@ -128,7 +128,8 @@
   #activity-list li { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
   #activity-list time { color: var(--muted); font-size: 15px; padding-top: 1px; }
   #activity-list li[data-topic="driver"] span { color: var(--muted); }
-  #activity-list li.warn span, #activity-list li.warn a { color: var(--warn); }
+  #activity-list li.warn span { color: var(--fg); }
+  #activity-list li.warn > span::before, #activity-list li.warn > a > span::before { content: "Warning: "; font-weight: 700; }
   #activity-list li.bad span, #activity-list li.bad a { color: var(--bad); }
   #activity-list a { color: var(--fg); text-decoration: none; display: flex; align-items: center; min-height: 44px; margin: -10px 0; }
   #activity-list a:hover span { text-decoration: underline; text-underline-offset: 3px; }
