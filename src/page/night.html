@@ -169,6 +169,8 @@
   #prepare h3 { margin: 0 0 6px; font-size: 15px; }
   #prepare .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
   #prepare .row > span { min-width: 80px; }
+  #prepare .field { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; }
+  #prepare .group-inline { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
   #prepare input[type=number] { width: 110px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   #prepare button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
   #prepare button[disabled], #prepare input:disabled { opacity: 0.5; cursor: default; }
@@ -246,7 +248,7 @@
     </div>
     <p id="focus-drift" class="drift"></p>
     <div class="row">
-      <input type="number" step="1" id="focus-target" aria-label="Target position">
+      <label class="field">Position (steps)<input type="number" step="1" id="focus-target"></label>
       <button type="button" class="moves" id="focus-move">Move focuser</button>
       <button type="button" class="moves" id="focus-in"></button>
       <button type="button" class="moves" id="focus-out"></button>
@@ -979,12 +981,15 @@ function dewRow(channel) {
   const duty = element('input')
   duty.type = 'number'
   duty.step = 'any'
-  duty.setAttribute('aria-label', channel.label + ' duty (%)')
   const set = element('button', '', 'Set duty')
+  const dutyField = element('label', 'field', 'Duty (%)')
+  dutyField.append(duty)
+  const dutyGroup = element('span', 'group-inline')
+  dutyGroup.append(dutyField, set)
   on.addEventListener('click', () => prepareAction(on, dewAnswer, { action: 'dew-channel', channel: channel.id, on: true }, channel.label + ' on'))
   off.addEventListener('click', () => prepareAction(off, dewAnswer, { action: 'dew-channel', channel: channel.id, on: false }, channel.label + ' off'))
   set.addEventListener('click', () => prepareAction(set, dewAnswer, { action: 'dew-duty', channel: channel.id, percent: Number(duty.value) }, channel.label + ' duty ' + duty.value + ' %'))
-  row.append(name, on, off, state, duty, set)
+  row.append(name, on, off, state, dutyGroup)
   return { row, state, duty, buttons: [on, off, set] }
 }
 
