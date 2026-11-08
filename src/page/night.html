@@ -61,6 +61,10 @@
   #tonight h2 { font-size: 20px; margin: 0 0 10px; font-weight: 600; }
   #tonight h2 + p, #tonight-frame p { margin-top: 0; }
   #tonight .sub { color: var(--muted); margin: 0 0 18px; }
+  #tonight h1.bad, #tonight .alarm.bad { color: var(--bad); }
+  #tonight h1.stale, #tonight .alarm.stale { color: var(--warn); }
+  #tonight .alarm { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+  #tonight .alarm a { color: inherit; font-size: 16px; font-weight: 400; }
   #tonight .big { display: flex; flex-wrap: wrap; gap: 12px 36px; margin: 0 0 18px; }
   #tonight .big div { font-size: 15px; color: var(--muted); }
   #tonight .big b { display: block; font-size: 30px; color: var(--fg); font-weight: 600; line-height: 1.15; }
@@ -870,14 +874,21 @@ function showTonight() {
   const run = capture?.run
   const goto = pointing?.goto
   const head = document.getElementById('tonight-head')
+  const down = night.devices.filter(device => device.connection.text !== 'connected' && device.connection.status !== 'unknown')
+  const problem = night.phase === 'silent'
+    ? { text: 'No word from the rig for ' + night.rig.silentSeconds + ' s', tone: 'stale' }
+    : down.length > 0 ? { text: down.map(device => device.title + ' ' + device.connection.text).join(', '), tone: 'bad' } : undefined
+  const alarm = problem === undefined ? '' : '<p class="alarm ' + problem.tone + '">' + escapeText(problem.text) + '. <a href="#/rig">See the rig</a></p>'
   if (run !== undefined) {
     const left = run.phase === 'exposing' && run.secondsLeft !== undefined ? run.secondsLeft + ' s left' : run.phase === 'preparing' ? 'setting up' : 'ending'
-    head.innerHTML = '<h1>' + escapeText(run.object) + ', ' + escapeText(run.frameType) + ' frames</h1>' +
+    head.innerHTML = alarm + '<h1>' + escapeText(run.object) + ', ' + escapeText(run.frameType) + ' frames</h1>' +
       '<p class="sub">' + run.count + ' frames of ' + run.exposureSeconds + ' s' + (run.failed > 0 ? ', ' + run.failed + ' failed' : '') + '.</p>' +
       '<div class="big"><div>Frame<b>' + run.frame + ' of ' + run.count + '</b></div><div>This frame<b>' + left + '</b></div><div>Run ends<b>' + hourMinute(runEndsAt(capture)) + '</b></div></div>'
   } else if (goto !== undefined && ['sending', 'sent', 'slewing'].includes(goto.phase)) {
-    head.innerHTML = '<h1>Slewing to ' + escapeText(goto.name) + '</h1><p class="sub">Sent ' + hourMinute(goto.sentAt) +
+    head.innerHTML = alarm + '<h1>Slewing to ' + escapeText(goto.name) + '</h1><p class="sub">Sent ' + hourMinute(goto.sentAt) +
       (goto.separationDegrees === undefined ? '' : '. The mount is ' + goto.separationDegrees.toFixed(1) + '° from the target.') + '</p>'
+  } else if (problem !== undefined) {
+    head.innerHTML = '<h1 class="' + problem.tone + '">' + escapeText(problem.text) + '</h1><p class="sub"><a href="#/rig">See the rig</a>. Nothing running.</p>'
   } else {
     head.innerHTML = '<h1>Nothing running</h1><p class="sub"><a href="#/point">Choose a target</a> or <a href="#/capture">start a run</a>.</p>'
   }
@@ -889,7 +900,6 @@ function showTonight() {
     ['Guiding', reading('phd2', 'State')],
     ['Night', night.sky === undefined ? '<span class="unknown">the mount has not reported the site</span>' : night.sky.darkAt === undefined ? 'no full dark tonight, dawn ' + hourMinute(night.sky.dawnAt) : 'dark ' + hourMinute(night.sky.darkAt) + ' to ' + hourMinute(night.sky.darkEndsAt) + ', dawn ' + hourMinute(night.sky.dawnAt)],
   ].map(([label, value]) => '<tr><td>' + label + '</td><td>' + value + '</td></tr>').join('')
-  const down = night.devices.filter(device => device.connection.text !== 'connected' && device.connection.status !== 'unknown')
   document.getElementById('tonight-rig').innerHTML = night.phase === 'silent'
     ? '<span class="stale">No word from the rig for ' + night.rig.silentSeconds + ' s.</span> <a href="#/rig">See the rig</a>'
     : down.length > 0
