@@ -147,9 +147,7 @@
   #capture form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; }
   #capture label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--muted); }
   #capture input, #capture select { font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
-  #capture input:disabled { opacity: 0.5; }
   #capture button[type=submit] { grid-column: 1 / -1; font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--action); color: #0d1626; cursor: pointer; justify-self: start; }
-  #capture button[disabled] { opacity: 0.5; cursor: default; }
   .answer { margin: 8px 0 12px; }
   #stop-answer { margin: 0; padding: 0 max(24px, env(safe-area-inset-right)) 6px max(24px, env(safe-area-inset-left)); text-align: right; }
   .drift { margin: 0 0 8px; }
@@ -157,9 +155,9 @@
   .answer.warn { color: var(--warn); }
   .answer.sending { color: var(--muted); }
   button.sending { cursor: progress; opacity: 0.75; }
-  button:not(:disabled):active { transform: translateY(1px); }
-  #pointing button:not(:disabled):hover, #prepare button:not(:disabled):hover, #dim:hover, .filters button:hover { border-color: var(--haze); color: var(--fg); }
-  #pointing button:not(:disabled):active, #prepare button:not(:disabled):active, #dim:active, .filters button:active { background: var(--dome-hi); }
+  button:active { transform: translateY(1px); }
+  #pointing button:hover, #prepare button:hover, #dim:hover, .filters button:hover { border-color: var(--haze); color: var(--fg); }
+  #pointing button:active, #prepare button:active, #dim:active, .filters button:active { background: var(--dome-hi); }
   #capture button[type=submit]:hover { filter: brightness(1.08); }
   .stop:active, .stop.armed:active { background: var(--rule); }
   #status a { color: inherit; text-decoration-color: currentColor; }
@@ -176,7 +174,6 @@
   #pointing .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
   #pointing input[type=search] { flex: 1 1 240px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   #pointing button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
-  #pointing button[disabled] { opacity: 0.5; cursor: default; }
   #pointing button.moves, #prepare button.moves { border-width: 2px; border-color: var(--fg); font-weight: 600; }
   #pointing ul { list-style: none; margin: 0 0 8px; padding: 0; }
   #pointing li button { width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
@@ -191,7 +188,6 @@
   #prepare .group-inline { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
   #prepare input[type=number] { width: 110px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   #prepare button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
-  #prepare button[disabled], #prepare input:disabled { opacity: 0.5; cursor: default; }
   #frames, #frame { border: 0; background: transparent; padding: 0; border-radius: 0; }
   .view .sub { color: var(--muted); margin: 0 0 18px; }
   #frames details { border-top: 1px solid var(--line); }
