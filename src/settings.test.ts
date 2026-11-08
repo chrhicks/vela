@@ -4,7 +4,7 @@ import { VelaSettings } from './settings.ts'
 
 const minimal = {
   port: 8793,
-  broker: { servers: 'nats://127.0.0.1:4222', user: 'vela', passFile: '/home/example/.config/vela/broker.pass' },
+  broker: { servers: 'nats://127.0.0.1:4222' },
   frames: { spoolDir: '/home/example/frames', nightZone: 'America/Phoenix' },
 }
 
