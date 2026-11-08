@@ -31,7 +31,7 @@ async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' 
   picture.apply(wire(startedAt + 1, 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), Date.now())
   picture.caughtUp()
 
-  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, activity: () => ({ night: '2026-11-07', items: [], viewer: undefined }), capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, ...frames })
+  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), focus: () => ({ now: undefined, focused: undefined }), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, activity: () => ({ night: '2026-11-07', items: [], viewer: undefined }), capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, ...frames })
 
   open.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))

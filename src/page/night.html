@@ -127,6 +127,7 @@
   #capture button[type=submit] { grid-column: 1 / -1; font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--action); color: #0d1626; cursor: pointer; justify-self: start; }
   #capture button[disabled] { opacity: 0.5; cursor: default; }
   .answer { margin: 8px 0 12px; }
+  .drift { margin: 0 0 8px; }
   .answer.bad { color: var(--bad); }
   .answer.warn { color: var(--warn); }
   .answer.sending { color: var(--muted); }
@@ -218,7 +219,7 @@
 <nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a><a href="#/rig" data-to="rig">Rig</a><a href="#/activity" data-to="activity">Activity</a></nav>
 </header>
 <div class="view" data-view="tonight"><div id="tonight">
-  <section><div id="tonight-head" class="shape"><h1>Reading the rig</h1><p class="sub">Vela is reading tonight from the stream.</p></div><table id="tonight-readings" class="shape"><tr><td>Sensor</td><td>…</td></tr><tr><td>Tracking</td><td>…</td></tr><tr><td>Meridian limit</td><td>…</td></tr><tr><td>Guiding</td><td>…</td></tr><tr><td>Night</td><td>…</td></tr></table></section>
+  <section><div id="tonight-head" class="shape"><h1>Reading the rig</h1><p class="sub">Vela is reading tonight from the stream.</p></div><table id="tonight-readings" class="shape"><tr><td>Sensor</td><td>…</td></tr><tr><td>Focus</td><td>…</td></tr><tr><td>Tracking</td><td>…</td></tr><tr><td>Meridian limit</td><td>…</td></tr><tr><td>Guiding</td><td>…</td></tr><tr><td>Night</td><td>…</td></tr></table></section>
   <aside><section><h2>Rig</h2><p id="tonight-rig" class="shape">…</p></section><section id="tonight-frame"><h2>Latest frame</h2><div id="tonight-frame-body"><p class="cap shape">…</p></div></section></aside>
 </div></div>
 <div class="view" data-view="rig"><h1 class="view-title">Rig</h1><p class="rig" id="rig">Reading the rig from the stream</p><main id="devices"></main></div>
@@ -231,6 +232,7 @@
     <div class="row">
       <span id="focus-where" class="unknown">Reading the focuser</span>
     </div>
+    <p id="focus-drift" class="drift"></p>
     <div class="row">
       <input type="number" step="1" id="focus-target" aria-label="Target position">
       <button type="button" class="moves" id="focus-move">Move focuser</button>
@@ -829,6 +831,20 @@ function fieldText(device, label) {
   return tonightState.night?.devices.find(candidate => candidate.id === device)?.fields.find(candidate => candidate.label === label)?.text
 }
 
+function celsius(value) {
+  return value.toFixed(1).replace('-', '−') + ' °C'
+}
+
+function focusDriftText(night) {
+  const focus = night.focus
+  const stale = night.phase === 'live' ? '' : ' <span class="stale">(stale)</span>'
+  if (focus === undefined || focus.now === undefined) return '<span class="unknown">no focuser temperature yet</span>'
+  if (focus.focused === undefined || focus.focused.celsius === undefined) return 'now ' + celsius(focus.now.celsius) + ', not focused since the rig started' + stale
+  const change = focus.now.celsius - focus.focused.celsius
+  const drift = Math.abs(change) < 0.05 ? 'no change' : celsius(Math.abs(change)) + (change < 0 ? ' colder' : ' warmer')
+  return 'focused at ' + celsius(focus.focused.celsius) + ' (' + hourMinute(focus.focused.at) + '), now ' + celsius(focus.now.celsius) + ': ' + drift + stale
+}
+
 function showTonight() {
   const { night, capture, pointing, frames } = tonightState
   if (night === undefined) return
@@ -849,7 +865,8 @@ function showTonight() {
     head.innerHTML = '<h1>Nothing running</h1><p class="sub"><a href="#/point">Choose a target</a> or <a href="#/capture">start a run</a>.</p>'
   }
   document.getElementById('tonight-readings').innerHTML = [
-    ['Sensor', reading('primary', 'Sensor temperature') + ', cooler ' + reading('primary', 'Cooler') + (fieldText('primary', 'Cooler') === 'on' ? ' at ' + reading('primary', 'Cooler power') : '')],
+    ['Sensor', reading('primary', 'Sensor temperature') + (fieldText('primary', 'Cooler') === 'on' && /°C/.test(fieldText('primary', 'Setpoint (last written)')) ? ', set to ' + reading('primary', 'Setpoint (last written)') + ', cooler at ' + reading('primary', 'Cooler power') : ', cooler ' + reading('primary', 'Cooler'))],
+    ['Focus', '<a href="#/prepare">' + focusDriftText(night) + '</a>'],
     ['Tracking', reading('mount', 'Tracking')],
     ['Meridian limit', reading('mount', 'Meridian limit')],
     ['Guiding', reading('phd2', 'State')],
@@ -948,6 +965,7 @@ function showPrepare(night) {
   focusbar.hidden = !focuser.moving
   if (focuser.moving) focusProgress.textContent = 'Focuser moving' + (focuser.position === undefined ? '' : ', at ' + focuser.position + ' steps')
   const range = focuser.min === undefined ? 'limits not on the stream' : 'limits ' + focuser.min + ' to ' + focuser.max
+  document.getElementById('focus-drift').innerHTML = 'Focus temperature: ' + focusDriftText(night)
   asOf(focusWhere, !focuser.known ? 'Focuser not on the stream' : (focuser.position === undefined ? 'position unknown' : focuser.position + ' steps') + ', ' + range + (focuser.moving ? ', moving' : ''), prepareLive || !focuser.known)
   if (focuser.min !== undefined) {
     focusTarget.min = focuser.min

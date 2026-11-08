@@ -5,6 +5,7 @@ import type { CaptureView, StartResult } from '../capture/run.ts'
 import type { Pointing } from '../pointing/pointing.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
 import type { FrameDetail, Frames } from '../frames/library.ts'
+import type { FocusDrift } from '../rig/focus.ts'
 import type { Night } from '../rig/night.ts'
 
 const page = readFileSync(new URL('./night.html', import.meta.url))
@@ -15,6 +16,7 @@ const detailPath = /^\/frames\/(\d{4}-\d{2}-\d{2})\/([A-Za-z0-9._-]+\.fits)\.jso
 
 export interface PageOptions {
   readonly night: () => Night
+  readonly focus: () => FocusDrift
   readonly refreshMs: number
   readonly frames: () => Promise<Frames>
   readonly preview: (night: string, file: string) => Promise<Buffer | undefined>
@@ -29,8 +31,9 @@ export interface PageOptions {
   readonly pointing: Pick<Pointing, 'view' | 'search' | 'preview'> & { readonly act: (request: unknown) => Promise<PrepareResult> }
 }
 
-export function makePage({ night, refreshMs, frames, preview, frame, activity, capture, prepare, pointing }: PageOptions) {
+export function makePage({ night: nightAlone, focus, refreshMs, frames, preview, frame, activity, capture, prepare, pointing }: PageOptions) {
   const watching = new Set<ServerResponse>()
+  const night = () => ({ ...nightAlone(), focus: focus() })
 
   function send(response: ServerResponse, event: string, data: unknown) {
     response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
