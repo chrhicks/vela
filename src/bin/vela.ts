@@ -16,7 +16,6 @@ function lost(reason: string): never {
 
 const following = await followRig({
   broker: settings.broker,
-  broker: settings.broker,
   readBatch: settings.historyReadBatch,
   onMessage: message => {
     const entry = readEntry(message.text)
