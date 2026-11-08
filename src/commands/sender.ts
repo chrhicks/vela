@@ -17,8 +17,6 @@ export interface Command {
 
 export interface SenderOptions {
   readonly publish: (subject: string, payload: string) => void
-  readonly rigRun: () => string | undefined
-  readonly now: () => number
   readonly newId: () => string
   readonly answerTimeoutMs: number
   readonly by: string
@@ -41,7 +39,7 @@ export function readAnswer(entry: Entry): Answer | undefined {
   return { id: body['id'], result, reason: typeof body['reason'] === 'string' ? body['reason'] : undefined }
 }
 
-export function makeSender({ publish, rigRun, now, newId, answerTimeoutMs, by }: SenderOptions) {
+export function makeSender({ publish, newId, answerTimeoutMs, by }: SenderOptions) {
   const waiting = new Map<string, (answer: Answer) => void>()
 
   return {
@@ -51,11 +49,7 @@ export function makeSender({ publish, rigRun, now, newId, answerTimeoutMs, by }:
       if (answer !== undefined) waiting.get(answer.id)?.(answer)
     },
 
-    async send(command: Command, stop = false): Promise<Outcome> {
-      const run = rigRun()
-
-      if (run === undefined && !stop) return { result: 'refused', reason: 'the stream shows no rig connection to send to' }
-
+    async send(command: Command): Promise<Outcome> {
       const id = newId()
       const answer = new Promise<Answer | undefined>(resolve => {
         const timer = setTimeout(() => resolve(undefined), answerTimeoutMs)
@@ -67,7 +61,7 @@ export function makeSender({ publish, rigRun, now, newId, answerTimeoutMs, by }:
       })
 
       try {
-        publish(commandSubject(command.device), JSON.stringify({ id, run: run ?? '', at: now(), property: command.property, values: command.values, by }))
+        publish(commandSubject(command.device), JSON.stringify({ id, property: command.property, values: command.values, by }))
       } catch (error) {
         waiting.delete(id)
 
