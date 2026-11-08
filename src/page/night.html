@@ -25,6 +25,21 @@
   .stale { color: var(--warn); }
   .unknown { color: var(--muted); }
   .current.ok { color: var(--good); }
+  #runbar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--good); border-radius: 8px; background: var(--card); }
+  #runbar[hidden] { display: none; }
+  #runbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
+  #stop { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--bad); color: #fff; cursor: pointer; }
+  #capture { margin-bottom: 12px; }
+  #capture form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; }
+  #capture label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--muted); }
+  #capture input, #capture select { font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+  #capture input:disabled { opacity: 0.5; }
+  #capture button[type=submit] { grid-column: 1 / -1; font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--good); color: #fff; cursor: pointer; justify-self: start; }
+  #capture button[disabled] { opacity: 0.5; cursor: default; }
+  #capture-error { color: var(--bad); margin: 8px 0 0; }
+  #last-run { margin: 8px 0 0; color: var(--muted); }
+  #last-run.bad { color: var(--bad); }
+  #last-run.warn { color: var(--warn); }
   #frames { margin-top: 12px; }
   #frames img { display: block; max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 8px; }
   #frames table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
@@ -36,7 +51,27 @@
 <body>
 <header><h1>Vela</h1><span class="rig" id="rig"></span></header>
 <div id="banner" hidden></div>
+<div id="runbar" hidden>
+  <span class="progress" id="progress"></span>
+  <button type="button" id="stop">Stop</button>
+</div>
 <main id="devices"></main>
+<section id="capture">
+  <h2><span>Capture</span></h2>
+  <form id="capture-form">
+    <label>Object<input name="object" required value=""></label>
+    <label>Frame type<select name="frameType"><option>light</option><option>dark</option><option>flat</option><option>bias</option></select></label>
+    <label>Exposure (s)<input name="exposureSeconds" type="number" min="0" step="any" required value="120"></label>
+    <label>Frames<input name="count" type="number" min="1" step="1" required value="10"></label>
+    <label>Gain<input name="gain" type="number" min="0" step="any" required value="100"></label>
+    <label>Offset<input name="offset" type="number" min="0" step="any" required value="50"></label>
+    <label>Cooler<select name="cooler"><option value="keep">leave as it is</option><option value="on">on</option><option value="off">off</option></select></label>
+    <label>Setpoint (&deg;C)<input name="setpoint" type="number" step="any" value="-10" disabled></label>
+    <button type="submit" id="start">Start</button>
+  </form>
+  <p id="capture-error" hidden></p>
+  <p id="last-run" hidden></p>
+</section>
 <section id="frames" hidden>
   <h2><span id="frames-title"></span></h2>
   <p class="unknown" id="preview-note"></p>
@@ -140,7 +175,88 @@ function showFrames(list) {
   }))
 }
 
+const runbar = document.getElementById('runbar')
+const progress = document.getElementById('progress')
+const stopButton = document.getElementById('stop')
+const captureForm = document.getElementById('capture-form')
+const startButton = document.getElementById('start')
+const captureError = document.getElementById('capture-error')
+const lastRun = document.getElementById('last-run')
+
+captureForm.elements.cooler.addEventListener('change', () => {
+  captureForm.elements.setpoint.disabled = captureForm.elements.cooler.value !== 'on'
+})
+
+function showError(text) {
+  captureError.hidden = text === ''
+  captureError.textContent = text
+}
+
+async function post(path, body) {
+  const response = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  return { ok: response.ok, body: await response.json() }
+}
+
+captureForm.addEventListener('submit', async event => {
+  event.preventDefault()
+  const data = new FormData(captureForm)
+  const request = {
+    object: data.get('object'),
+    frameType: data.get('frameType'),
+    exposureSeconds: Number(data.get('exposureSeconds')),
+    count: Number(data.get('count')),
+    gain: Number(data.get('gain')),
+    offset: Number(data.get('offset')),
+    cooler: data.get('cooler'),
+  }
+  if (request.cooler === 'on') request.setpoint = Number(data.get('setpoint'))
+  showError('')
+  try {
+    const result = await post('/capture', request)
+    if (!result.ok) showError(result.body.error)
+  } catch (error) {
+    showError('Could not reach Vela: ' + error)
+  }
+})
+
+stopButton.addEventListener('click', async () => {
+  stopButton.disabled = true
+  try {
+    await post('/capture/stop', {})
+  } catch (error) {
+    showError('Stop did not reach Vela: ' + error)
+  }
+  stopButton.disabled = false
+})
+
+const endings = {
+  done: ['finished', ''],
+  stopped: ['stopped', 'warn'],
+  failures: ['stopped after failures', 'bad'],
+  interrupted: ['interrupted', 'bad'],
+  refused: ['stopped: a command was refused', 'bad'],
+  unknown: ['stopped: a command could not be confirmed', 'bad'],
+}
+
+function showCapture(view) {
+  const run = view.run
+  runbar.hidden = run === undefined
+  for (const control of captureForm.elements) control.disabled = run !== undefined || (control.name === 'setpoint' && captureForm.elements.cooler.value !== 'on')
+  if (run !== undefined) {
+    const phase = run.phase === 'exposing' ? (run.secondsLeft === undefined ? 'starting the exposure' : 'exposing, ' + run.secondsLeft + ' s left') : run.phase === 'preparing' ? 'setting the camera' : 'ending'
+    progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + ' of ' + run.count + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '')
+  }
+  const last = view.last
+  lastRun.hidden = last === undefined
+  if (last !== undefined) {
+    const [text, level] = endings[last.reason] ?? [last.reason, 'bad']
+    lastRun.className = level
+    lastRun.textContent = 'Last run ' + last.run + ' ' + text + ' at ' + clock(last.at) + ': ' + last.counted + ' frames kept' + (last.failed > 0 ? ', ' + last.failed + ' failed' : '') + (last.reason === 'done' ? '' : '. ' + last.detail)
+  }
+}
+
 const events = new EventSource('/events')
+events.addEventListener('capture', event => showCapture(JSON.parse(event.data)))
 events.addEventListener('night', event => show(JSON.parse(event.data)))
 events.addEventListener('frames', event => showFrames(JSON.parse(event.data)))
 events.onerror = () => {
