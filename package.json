@@ -1,35 +1,23 @@
 {
   "name": "vela",
   "private": true,
-  "version": "0.0.0",
-  "packageManager": "pnpm@11.22.0",
-  "engines": {
-    "node": ">=20.19.0 || >=22.12.0"
-  },
+  "type": "module",
+  "description": "Vela: the observing program that reads the rig from its stream",
   "scripts": {
-    "dev": "pnpm --filter @vela/model build && pnpm --filter @vela/equipment build && pnpm --filter @vela/alpaca build && pnpm --filter @vela/cria build && pnpm --parallel --filter @vela/model --filter @vela/equipment --filter @vela/alpaca --filter @vela/cria --filter @vela/web --filter @vela/server dev",
-    "dev:workshop": "pnpm --filter @vela/workshop dev",
-    "dev:observing": "node scripts/dev-observing.mjs",
-    "build": "pnpm -r --if-present run build",
-    "dev:web": "pnpm --filter @vela/web dev",
-    "dev:server": "pnpm --filter @vela/server dev",
-    "test": "pnpm --filter @vela/model --filter @vela/cria --filter @vela/rig-session --filter @vela/star-bench --filter @vela/horizon-import --filter '@vela/rig-*' test:types && vitest run apps packages tools/oxlint tools/rig-session tools/star-bench tools/horizon-import tools/rig-model",
-    "start": "pnpm --filter @vela/server start",
-    "lint": "oxlint --ignore-pattern 'tools/rig-model/guards/fixtures/**'",
-    "check": "pnpm lint && pnpm rig-model:guards && pnpm rig-model:no-real-site && pnpm build && pnpm test",
-    "rig-model:guards": "pnpm --filter @vela/rig-model-tools guards",
-    "rig-model:no-real-site": "pnpm --filter @vela/rig-model-tools no-real-site",
-    "rig-model:decode-journals": "pnpm --filter @vela/rig-model-tools decode-journals",
-    "rig-model:resolve-trial": "pnpm --filter @vela/rig-model-tools resolve-trial",
-    "rig-model:frame-sources": "pnpm --filter @vela/rig-model-tools frame-sources",
-    "rig-model:am5-profile": "pnpm --filter @vela/rig-model-tools am5-profile",
-    "rig-model:backfill": "pnpm --filter @vela/rig-model-tools backfill",
-    "replay": "pnpm --filter @vela/server... build && pnpm --filter @vela/rig-session replay",
-    "scenarios": "vitest run --config tools/rig-session/vitest.scenarios.mts"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "verify": "./verify.sh"
+  },
+  "dependencies": {
+    "astronomy-engine": "2.1.19"
   },
   "devDependencies": {
-    "@oxlint/plugins": "1.82.0",
-    "oxlint": "1.82.0",
-    "vitest": "^4.1.11"
-  }
+    "@types/node": "24.19.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "packageManager": "pnpm@11.22.0"
 }

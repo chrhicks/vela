@@ -1,5 +1,22 @@
-import { kinds } from '../../packages/rig-events/src/registry.ts'
-import { subjectOf } from '../../packages/rig-events/src/ids.ts'
+const kinds = {
+  'cria.state': { branch: 'fact', producers: ['vela'] },
+  'cria.exchange': { branch: 'fact', producers: ['vela'] },
+  'cria.image': { branch: 'fact', producers: ['vela'] },
+  'cria.stream': { branch: 'fact', producers: ['vela'] },
+  frame: { branch: 'fact', producers: ['vela'] },
+  autofocus: { branch: 'fact', producers: ['vela'] },
+  attestation: { branch: 'fact', producers: ['vela'] },
+  aim: { branch: 'assess', producers: ['vela'] },
+  alignment: { branch: 'fact', producers: ['vela'] },
+  solve: { branch: 'fact', producers: ['solver'] },
+  'solve-result': { branch: 'fact', producers: ['solver'] },
+  session: { branch: 'fact', producers: ['operator'] },
+  gap: { branch: 'fact', producers: ['vela', 'cria', 'solver'] },
+  'mount-position': { branch: 'assess', producers: ['model'] },
+  'pointing-fix': { branch: 'assess', producers: ['model'] },
+}
+
+const subjectOf = (rig, kind) => `rig.v1.${rig}.${kinds[kind].branch}.${kind}`
 
 const entries = Object.entries(kinds)
 
