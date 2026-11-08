@@ -61,15 +61,15 @@ export const CaptureSettings = Schema.Struct({
     Schema.Number,
     10,
   ),
-  exposureMarginSeconds: described(
-    'How long past the exposure a frame may take to name its saved file before it counts as failed and is aborted. Not measured: no capture has run yet (2026-11-07). Reading 52 MB off the sensor over USB 2 at 30 to 35 MB/s (external: USB 2 allows 60 MB/s at best) takes about 2 s and the driver then writes it to disk; 30 s is more than ten times that and short enough that a frame that is not coming does not hold up the night',
+  exposureSilenceSeconds: described(
+    'How long the camera driver may send no CCD_EXPOSURE update during an exposure before the frame counts as failed and is aborted. While exposing, the driver sent CCD_EXPOSURE Busy with the time left at most 2.4 s apart (median 0.99 s), a retry showed as the time left jumping back up to the full exposure (110 retries), and from the last Busy update to Ok or Alert took at most 1.5 s (Cria wire recording of 2026-11-03, 434 exposures of 10 s and 60 s on the ASI2600MC Pro, indi-asi 2.2.5); 10 s is ten times the normal gap and four times the largest seen, so a driver that is retrying is never cut off and a driver that went quiet is found within 10 s',
     Schema.Number,
-    30,
+    10,
   ),
   failuresInRow: described(
-    'Exposures in a row that may fail before the run stops. On USB 2, 89 of 375 exposures failed (24%) on the night of 11-02, so a run of 6 happens by chance (0.24^6, if failures were independent) in about 0.02% of exposures, 7% of a 375-exposure night; stopping at 6 means a real fault almost every time and wastes at most six exposures on a dead camera',
+    'Exposures in a row that may fail before the run stops. A failed exposure is one the driver gave up on after its own retries, which it reports as CCD_EXPOSURE Alert: 19 of 434 exposures (about 4.4%) on the ASI2600MC Pro (Cria wire recording of 2026-11-03), so 3 in a row happen by chance (0.044^3, if failures were independent) in about 0.0085% of exposures, about 3% of a 375-exposure night; stopping at 3 means a real fault almost every time and wastes at most three exposures on a dead camera',
     Schema.Number,
-    6,
+    3,
   ),
 })
 

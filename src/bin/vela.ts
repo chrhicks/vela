@@ -43,7 +43,7 @@ const capture = makeCapture({
     device: settings.devices.primary,
     spoolDir: frames.spoolDir,
     settleMs: settings.capture.settleSeconds * 1000,
-    exposureMarginMs: settings.capture.exposureMarginSeconds * 1000,
+    exposureSilenceMs: settings.capture.exposureSilenceSeconds * 1000,
     failuresInRow: settings.capture.failuresInRow,
     silenceMs: settings.silenceSeconds * 1000,
   },

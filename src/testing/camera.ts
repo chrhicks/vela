@@ -6,7 +6,7 @@ import { makePicture } from '../rig/picture.ts'
 import type { Entry, Value } from '../stream/entry.ts'
 import { connected, indiserver, startedAt, wire } from './entries.ts'
 
-export type Exposure = 'file' | 'alert' | 'nothing'
+export type Exposure = 'file' | 'alert' | 'nothing' | 'retry'
 
 export interface Sent {
   readonly property: string
@@ -34,7 +34,7 @@ const baseline: ReadonlyArray<readonly [string, Readonly<Record<string, Value>>,
 
 export const spoolDir = '/spool'
 
-export const fastSettings: CaptureSettings = { device: 'primary', spoolDir, settleMs: 60, exposureMarginMs: 40, failuresInRow: 3, silenceMs: 60_000 }
+export const fastSettings: CaptureSettings = { device: 'primary', spoolDir, settleMs: 60, exposureSilenceMs: 40, failuresInRow: 3, silenceMs: 60_000 }
 
 export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial<CaptureSettings>; omit?: string[] } = {}) {
   const picture = makePicture()
@@ -74,6 +74,12 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
 
     set('CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 1 }, 'Busy')
 
+    if (behaviour === 'retry') {
+      const timeLeft = [0.5, 1, 0.5]
+
+      timeLeft.forEach((left, index) => setTimeout(() => set('CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: left }, 'Busy'), 20 * (index + 1)))
+    }
+
     setTimeout(() => {
       if (behaviour === 'alert') {
         set('CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 0 }, 'Alert')
@@ -87,7 +93,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
       files.add(path)
       set('CCD_FILE_PATH', { FILE_PATH: path }, 'Ok')
       set('CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 0 }, 'Ok')
-    }, 2)
+    }, behaviour === 'retry' ? 80 : 2)
   }
 
   function handle(payload: string) {

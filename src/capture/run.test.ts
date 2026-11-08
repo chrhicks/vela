@@ -55,12 +55,20 @@ describe('a capture run on a scripted camera', () => {
     expect(camera.capture.labelOf('M-31_dark_003.fits')).toMatchObject({ frame: 3 })
   })
 
-  it('fails a frame that shows no new file within the exposure and the margin', async () => {
+  it('waits out a retry, where the time left jumps back up, and counts the frame', async () => {
+    const camera = fakeCamera({ exposures: ['retry'] })
+    const ending = await runToEnd(camera, { ...request, count: 1 })
+
+    expect(ending).toMatchObject({ reason: 'done', counted: 1, failed: 0 })
+    expect(camera.script.sent.some(sent => sent.property === 'CCD_ABORT_EXPOSURE')).toBe(false)
+  })
+
+  it('fails a frame when the camera sends no CCD_EXPOSURE update for the silence setting', async () => {
     const camera = fakeCamera({ exposures: ['nothing', 'file'] })
     const ending = await runToEnd(camera, { ...request, count: 1 })
 
     expect(ending).toMatchObject({ reason: 'done', counted: 1, failed: 1 })
-    expect(camera.events.filter(event => event.kind === 'failed')).toMatchObject([{ body: { why: 'no-file' } }])
+    expect(camera.events.filter(event => event.kind === 'failed')).toMatchObject([{ body: { why: 'silent' } }])
   })
 
   it('stops after the failure limit in a row and keeps what was counted', async () => {
