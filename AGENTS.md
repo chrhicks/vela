@@ -9,6 +9,7 @@ Vela is being rebuilt on the rig stream (plan: `bots/observer/specs/vela-next/pl
 - `src/catalog/`: OpenNGC target data (J2000) and its row types. See its `README.md` for provenance and the license.
 - `src/sky/coordinates.ts`: J2000 to epoch-of-date conversion (`toMount`, `fromMount`, `angularDistance`) on `astronomy-engine`.
 - `src/bin/vela.ts`: the night page (read-only), a Node service on thuban. `src/stream/` follows the stream, `src/rig/` holds the picture (`picture.ts`) and what the page shows (`night.ts`), `src/page/` serves it. Deploy files in `deploy/`.
+- `src/frames/`: the frames: copy from the rig computer with a check, the sidecar, the stream entry, the FITS reader and the preview. See the README.
 - `compose.yaml` and `tools/nats/`: the NATS broker that carries the rig stream, and its provisioning. Provisioning is `python3 tools/nats/provision.py`; `tools/nats/verify.py` runs a throwaway broker through every permission.
 - `verify.sh`: typecheck and tests.
 
