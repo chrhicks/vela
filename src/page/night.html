@@ -63,7 +63,7 @@
   body[data-view="tonight"] #runbar { display: none; }
   .view-title { font-size: 26px; margin: 0 0 4px; }
   #tonight { display: grid; grid-template-columns: 1.4fr 1fr; gap: 40px; }
-  #tonight h1 { font-size: 30px; line-height: 1.15; margin: 0 0 4px; letter-spacing: -0.015em; }
+  #tonight h1 { font-size: 26px; line-height: 1.2; margin: 0 0 4px; letter-spacing: -0.01em; }
   #tonight h2 { font-size: 20px; margin: 0 0 10px; font-weight: 600; }
   #tonight h2 + p, #tonight-frame p { margin-top: 0; }
   #tonight .sub { color: var(--muted); margin: 0 0 18px; }
@@ -73,7 +73,7 @@
   #tonight .alarm a { color: inherit; font-size: 16px; font-weight: 400; }
   #tonight .big { display: flex; flex-wrap: wrap; gap: 12px 36px; margin: 0 0 18px; }
   #tonight .big div { font-size: 15px; color: var(--muted); }
-  #tonight .big b { display: block; font-size: 30px; color: var(--fg); font-weight: 600; line-height: 1.15; }
+  #tonight .big b { display: block; font-size: 40px; color: var(--fg); font-weight: 600; line-height: 1.1; white-space: nowrap; }
   #tonight table { width: 100%; border-collapse: collapse; }
   #tonight td { padding: 9px 0; border-top: 1px solid var(--line); vertical-align: top; }
   #tonight td:first-child { color: var(--muted); width: 38%; }
@@ -112,10 +112,10 @@
     body { padding-bottom: 64px; }
     .view { padding: 16px max(14px, env(safe-area-inset-right)) 32px max(14px, env(safe-area-inset-left)); }
     #tonight { grid-template-columns: 1fr; gap: 8px; }
-    #tonight h1 { font-size: 26px; }
+    #tonight h1 { font-size: 22px; }
     #tonight .big { display: grid; grid-template-columns: repeat(3, auto); justify-content: space-between; gap: 12px; }
     #tonight .big div { font-size: 14px; }
-    #tonight .big b { font-size: 26px; }
+    #tonight .big b { font-size: 30px; }
   }
   #activity { border: 0; background: transparent; padding: 0; border-radius: 0; }
   .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
