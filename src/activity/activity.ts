@@ -45,6 +45,7 @@ const actions: Readonly<Record<string, string>> = {
   ON_COORD_SET: 'set what a goto does',
   TELESCOPE_ABORT_MOTION: 'stop the mount',
   TELESCOPE_PARK: 'park or unpark',
+  TELESCOPE_HOME: 'go Home',
   TELESCOPE_TRACK_STATE: 'turn tracking on or off',
   TELESCOPE_MOTION_NS: 'move north or south',
   TELESCOPE_MOTION_WE: 'move west or east',
