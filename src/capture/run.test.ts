@@ -21,7 +21,8 @@ describe('a capture run on a scripted camera', () => {
     const ending = await runToEnd(camera)
 
     expect(ending).toMatchObject({ reason: 'done', counted: 3, failed: 0 })
-    expect(camera.script.sent.slice(0, 7)).toEqual([
+    expect(camera.script.sent.slice(0, 8)).toEqual([
+      { property: 'FITS_HEADER', values: { KEYWORD_NAME: 'INDI_CLEAR', KEYWORD_VALUE: '', KEYWORD_COMMENT: '' } },
       { property: 'CCD_TEMPERATURE', values: { CCD_TEMPERATURE_VALUE: -10 } },
       { property: 'CCD_COOLER', values: { COOLER_ON: true, COOLER_OFF: false } },
       { property: 'CCD_FRAME_TYPE', values: { FRAME_DARK: true } },
@@ -30,9 +31,20 @@ describe('a capture run on a scripted camera', () => {
       { property: 'CCD_EXPOSURE', values: { CCD_EXPOSURE_VALUE: 0.01 } },
       { property: 'CCD_EXPOSURE', values: { CCD_EXPOSURE_VALUE: 0.01 } },
     ])
-    expect(camera.script.sent).toHaveLength(8)
+    expect(camera.script.sent).toHaveLength(9)
     expect(kinds(camera.events)).toEqual(['started', 'exposed', 'exposed', 'exposed', 'ended'])
     expect(camera.runFile.read()).toBeUndefined()
+  })
+
+  it('names the object in every light frame and clears custom header keys at the start of a run', async () => {
+    const camera = fakeCamera()
+
+    await runToEnd(camera, { ...request, frameType: 'light', object: 'M 31' })
+
+    const headers = camera.script.sent.filter(sent => sent.property === 'FITS_HEADER').map(sent => sent.values['KEYWORD_NAME'])
+
+    expect(headers).toEqual(['INDI_CLEAR', 'OBJECT', 'OBJECT', 'OBJECT'])
+    expect(camera.script.sent.find(sent => sent.values['KEYWORD_NAME'] === 'OBJECT')?.values['KEYWORD_VALUE']).toBe('M 31')
   })
 
   it('labels each saved file with the run, the sequence and the frame number', async () => {
