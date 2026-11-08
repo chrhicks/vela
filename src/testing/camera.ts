@@ -112,7 +112,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
     }, 1)
   }
 
-  const sender = makeSender({ publish: (_subject, payload) => handle(payload), rigRun: () => picture.rig()?.run, now: Date.now, newId: () => `vela-${(ids += 1)}`, answerTimeoutMs: 30, by: 'vela' })
+  const sender = makeSender({ publish: (_subject, payload) => handle(payload), newId: () => `vela-${(ids += 1)}`, answerTimeoutMs: 30, by: 'vela' })
 
   const capture = makeCapture({
     picture,

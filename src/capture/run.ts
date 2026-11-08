@@ -182,7 +182,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
     if (outcome.result !== 'written') {
       run.watch = undefined
 
-      if (outcome.result === 'unknown') await sender.send(abortCommand(settings.device), true)
+      if (outcome.result === 'unknown') await sender.send(abortCommand(settings.device))
 
       return { frame: 'stop', stop: stoppedOr(run, { reason: outcome.result, detail: `CCD_EXPOSURE: ${outcome.reason}` }) }
     }
@@ -196,7 +196,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
     run.exposureEndsAt = undefined
 
     if (watch.file !== undefined) return { frame: 'file', path: watch.file }
-    await sender.send(abortCommand(settings.device), true)
+    await sender.send(abortCommand(settings.device))
 
     if (run.abort.signal.aborted) return { frame: 'stop', stop: { reason: 'stopped', detail: 'Stop pressed' } }
 
@@ -294,7 +294,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
 
       if (run === undefined) return false
 
-      run.stopping ??= sender.send(abortCommand(settings.device), true).then(outcome => (outcome.result === 'written' ? 'Stop pressed, abort written' : `Stop pressed, abort ${outcome.result}: ${outcome.reason}`))
+      run.stopping ??= sender.send(abortCommand(settings.device)).then(outcome => (outcome.result === 'written' ? 'Stop pressed, abort written' : `Stop pressed, abort ${outcome.result}: ${outcome.reason}`))
       run.abort.abort()
       await run.stopping
 

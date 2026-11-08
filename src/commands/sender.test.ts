@@ -4,14 +4,12 @@ import { makeSender, readAnswer } from './sender.ts'
 
 const answer = (body: unknown): Entry => ({ id: 'client:1', kind: 'client.command', at: 1, run: 'rig-run', body })
 
-function setup(options: { rigRun?: string | undefined; timeoutMs?: number; publish?: (subject: string, payload: string) => void } = {}) {
+function setup(options: { timeoutMs?: number; publish?: (subject: string, payload: string) => void } = {}) {
   const published: Array<{ subject: string; payload: Record<string, unknown> }> = []
   let count = 0
 
   const sender = makeSender({
     publish: options.publish ?? ((subject, payload) => void published.push({ subject, payload: JSON.parse(payload) as Record<string, unknown> })),
-    rigRun: () => ('rigRun' in options ? options.rigRun : 'rig-run'),
-    now: () => 1000,
     newId: () => `vela-${(count += 1)}`,
     answerTimeoutMs: options.timeoutMs ?? 50,
     by: 'vela',
@@ -23,11 +21,11 @@ function setup(options: { rigRun?: string | undefined; timeoutMs?: number; publi
 const command = { device: 'primary', property: 'CCD_FRAME_TYPE', values: { FRAME_DARK: true } }
 
 describe('the command sender', () => {
-  it('publishes the command with the rig run and reports written when the rig program says so', async () => {
+  it('publishes the command by id and reports written when the rig program says so', async () => {
     const { sender, published } = setup()
     const outcome = sender.send(command)
 
-    expect(published).toEqual([{ subject: 'rig-dev.command.primary', payload: { id: 'vela-1', run: 'rig-run', at: 1000, property: 'CCD_FRAME_TYPE', values: { FRAME_DARK: true }, by: 'vela' } }])
+    expect(published).toEqual([{ subject: 'rig-dev.command.primary', payload: { id: 'vela-1', property: 'CCD_FRAME_TYPE', values: { FRAME_DARK: true }, by: 'vela' } }])
     sender.answered(answer({ id: 'vela-1', by: 'vela', device: 'primary', property: 'CCD_FRAME_TYPE', result: 'written' }))
 
     expect(await outcome).toEqual({ result: 'written' })
@@ -56,17 +54,6 @@ describe('the command sender', () => {
     sender.answered(answer({ id: 'someone-else', result: 'written' }))
 
     expect(await outcome).toMatchObject({ result: 'unknown' })
-  })
-
-  it('does not send when the stream shows no rig connection, except a stop', async () => {
-    const { sender, published } = setup({ rigRun: undefined, timeoutMs: 5 })
-
-    expect(await sender.send(command)).toEqual({ result: 'refused', reason: 'the stream shows no rig connection to send to' })
-    expect(published).toHaveLength(0)
-
-    await sender.send({ device: 'primary', property: 'CCD_ABORT_EXPOSURE', values: { ABORT: true } }, true)
-
-    expect(published).toMatchObject([{ payload: { run: '', property: 'CCD_ABORT_EXPOSURE' } }])
   })
 
   it('refuses when the publish itself throws', async () => {

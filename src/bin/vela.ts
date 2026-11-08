@@ -32,8 +32,6 @@ function lost(reason: string): never {
 
 const sender = makeSender({
   publish: (subject, payload) => following.connection.publish(subject, payload),
-  rigRun: () => picture.rig()?.run,
-  now: Date.now,
   newId: () => `vela-${randomUUID()}`,
   answerTimeoutMs: settings.capture.commandAnswerSeconds * 1000,
   by: 'vela',
