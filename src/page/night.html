@@ -56,6 +56,7 @@
   #pointing input[type=search] { flex: 1 1 240px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   #pointing button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
   #pointing button[disabled] { opacity: 0.5; cursor: default; }
+  #pointing button.moves, #prepare button.moves { border-width: 2px; border-color: var(--fg); font-weight: 600; }
   #pointing ul { list-style: none; margin: 0 0 8px; padding: 0; }
   #pointing li button { width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
   #pointing h3 { margin: 0 0 6px; font-size: 15px; }
@@ -103,9 +104,9 @@
     </div>
     <div class="row">
       <input type="number" step="1" id="focus-target" aria-label="Target position">
-      <button type="button" id="focus-move">Move to position</button>
-      <button type="button" id="focus-in"></button>
-      <button type="button" id="focus-out"></button>
+      <button type="button" class="moves" id="focus-move">Move focuser</button>
+      <button type="button" class="moves" id="focus-in"></button>
+      <button type="button" class="moves" id="focus-out"></button>
     </div>
   </div>
   <div class="group" id="dew-controls">
@@ -126,10 +127,10 @@
   <p class="warn">Every motion needs Chris at the rig.</p>
   <div class="row">
     <span id="mount-state" class="unknown"></span>
-    <button type="button" id="mount-unpark">Unpark</button>
-    <button type="button" id="mount-home">Home</button>
-    <button type="button" id="tracking-on">Tracking on</button>
-    <button type="button" id="tracking-off">Tracking off</button>
+    <button type="button" class="moves" id="mount-unpark">Unpark mount</button>
+    <button type="button" class="moves" id="mount-home">Mount to Home</button>
+    <button type="button" class="moves" id="tracking-on">Start tracking</button>
+    <button type="button" id="tracking-off">Stop tracking</button>
   </div>
   <div class="row">
     <input type="search" id="target-search" placeholder="Target: M 31, NGC 7000, Orion" aria-label="Search the catalog">
@@ -138,7 +139,7 @@
   <div id="target-panel" hidden>
     <h3 id="target-title"></h3>
     <dl id="target-facts"></dl>
-    <div class="row"><button type="button" id="goto">Go to target</button></div>
+    <div class="row"><button type="button" class="moves" id="goto">Slew mount to target</button></div>
   </div>
   <p id="goto-status" hidden></p>
   <p id="pointing-error" hidden></p>
@@ -442,8 +443,8 @@ function showPrepare(night) {
     focusTarget.min = focuser.min
     focusTarget.max = focuser.max
   }
-  focusIn.textContent = 'In ' + focuser.nudgeSteps
-  focusOut.textContent = 'Out ' + focuser.nudgeSteps
+  focusIn.textContent = 'Focuser in ' + focuser.nudgeSteps + ' steps'
+  focusOut.textContent = 'Focuser out ' + focuser.nudgeSteps + ' steps'
   for (const button of focusButtons) button.disabled = !prepareLive || !focuser.known
   focusTarget.disabled = !prepareLive || !focuser.known
 
