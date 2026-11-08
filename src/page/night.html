@@ -25,12 +25,24 @@
   .stale { color: var(--warn); }
   .unknown { color: var(--muted); }
   .current.ok { color: var(--good); }
+  #frames { margin-top: 12px; }
+  #frames img { display: block; max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 8px; }
+  #frames table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  #frames th, #frames td { text-align: left; padding: 2px 8px 2px 0; }
+  #frames td.size { text-align: right; }
+  #frames a { color: inherit; }
 </style>
 </head>
 <body>
 <header><h1>Vela</h1><span class="rig" id="rig"></span></header>
 <div id="banner" hidden></div>
 <main id="devices"></main>
+<section id="frames" hidden>
+  <h2><span id="frames-title"></span></h2>
+  <p class="unknown" id="preview-note"></p>
+  <img id="preview" alt="Latest frame" hidden>
+  <table><tbody id="frame-rows"></tbody></table>
+</section>
 <script>
 const banner = document.getElementById('banner')
 const rig = document.getElementById('rig')
@@ -84,8 +96,53 @@ function show(night) {
   }))
 }
 
+const framesSection = document.getElementById('frames')
+const framesTitle = document.getElementById('frames-title')
+const previewImage = document.getElementById('preview')
+const previewNote = document.getElementById('preview-note')
+const frameRows = document.getElementById('frame-rows')
+let previewShown = ''
+
+function previewUrl(night, file) {
+  return '/frames/' + night + '/' + file + '.png'
+}
+
+function showFrames(list) {
+  framesSection.hidden = false
+  framesTitle.textContent = 'Frames kept on the night of ' + list.night + ' (' + list.frames.length + ')'
+  const latest = list.frames[0]
+  if (latest === undefined) {
+    previewImage.hidden = true
+    previewNote.textContent = 'No frame kept yet tonight'
+    previewShown = ''
+  } else if (previewShown !== latest.file) {
+    previewShown = latest.file
+    previewNote.textContent = 'Making the preview of ' + latest.file
+    previewImage.hidden = true
+    previewImage.onload = () => {
+      previewNote.textContent = 'Latest: ' + latest.file + ', kept ' + clock(Date.parse(latest.keptAt))
+      previewImage.hidden = false
+    }
+    previewImage.onerror = () => {
+      previewNote.textContent = 'No preview for ' + latest.file
+    }
+    previewImage.src = previewUrl(list.night, latest.file)
+  }
+  frameRows.replaceChildren(...list.frames.map(frame => {
+    const row = element('tr')
+    const link = element('a', '', frame.file)
+    link.href = previewUrl(list.night, frame.file)
+    link.target = '_blank'
+    const name = element('td')
+    name.append(link)
+    row.append(name, element('td', '', clock(Date.parse(frame.keptAt))), element('td', 'size', (frame.bytes / 1048576).toFixed(1) + ' MB'))
+    return row
+  }))
+}
+
 const events = new EventSource('/events')
 events.addEventListener('night', event => show(JSON.parse(event.data)))
+events.addEventListener('frames', event => showFrames(JSON.parse(event.data)))
 events.onerror = () => {
   banner.hidden = false
   banner.className = 'bad'

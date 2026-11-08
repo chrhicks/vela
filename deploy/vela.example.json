@@ -10,6 +10,10 @@
     "focuser": "focuser",
     "box": "box"
   },
+  "frames": {
+    "spoolDir": "/home/example/frames",
+    "nightZone": "America/Phoenix"
+  },
   "silenceSeconds": 10,
   "pageRefreshSeconds": 1,
   "historyReadBatch": 2048
