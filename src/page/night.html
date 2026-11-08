@@ -40,8 +40,8 @@
   .stop { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 1.5px solid var(--muted); border-radius: 8px; background: transparent; color: var(--fg); cursor: pointer; }
   .stop:hover { border-color: var(--bad); }
   .stop.armed { background: var(--bad); color: #1b0d0c; }
-  #strip { display: block; padding: 2px 24px 4px; }
-  #strip svg { display: block; width: 100%; height: 26px; }
+  #strip { display: flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 2px 24px 4px; }
+  #strip svg { display: block; flex: 1; width: 100%; height: 26px; }
   #strip[hidden] { display: none; }
   #run-done { transition: width 600ms ease-out; }
   @keyframes arrive { from { opacity: 0; } to { opacity: 1; } }
@@ -119,7 +119,7 @@
   #activity-list li[data-topic="driver"] span { color: var(--muted); }
   #activity-list li.warn span, #activity-list li.warn a { color: var(--warn); }
   #activity-list li.bad span, #activity-list li.bad a { color: var(--bad); }
-  #activity-list a { color: var(--fg); text-decoration: none; }
+  #activity-list a { color: var(--fg); text-decoration: none; display: flex; align-items: center; min-height: 44px; margin: -10px 0; }
   #activity-list a:hover span { text-decoration: underline; text-underline-offset: 3px; }
   #activity-list a::after { content: " ›"; color: var(--muted); }
   #activity-sub { margin-bottom: 4px; }
