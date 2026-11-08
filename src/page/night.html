@@ -8,6 +8,7 @@
   :root { color-scheme: light dark; --bg: #fff; --fg: #1b1f24; --muted: #6a737d; --line: #d8dee4; --card: #f6f8fa; --warn: #9a6700; --bad: #b42318; --good: #1a7f37; }
   @media (prefers-color-scheme: dark) { :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --line: #30363d; --card: #161b22; --warn: #d29922; --bad: #f85149; --good: #3fb950; } }
   body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, sans-serif; }
+  button, input, select { min-height: 44px; box-sizing: border-box; }
   header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-bottom: 12px; }
   h1 { margin: 0; font-size: 20px; }
   .rig { color: var(--muted); font-size: 14px; }
