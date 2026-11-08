@@ -854,7 +854,7 @@ function showStrip() {
     runDone.setAttribute('x', x(startsAt))
     runDone.style.width = Math.max(0, x(startsAt + kept * run.exposureSeconds * 1000) - x(startsAt)) + 'px'
   }
-  if (sky.meridianLimitAt !== undefined && sky.meridianLimitAt > sky.duskAt && sky.meridianLimitAt < sky.dawnAt) above.push('<line x1="' + x(sky.meridianLimitAt) + '" y1="4" x2="' + x(sky.meridianLimitAt) + '" y2="24" stroke="#d9a948" stroke-width="2" stroke-dasharray="3 2"/>')
+  if (sky.meridianLimitAt !== undefined && sky.meridianLimitAt > sky.duskAt && sky.meridianLimitAt < sky.dawnAt) above.push('<line x1="' + x(sky.meridianLimitAt) + '" y1="4" x2="' + x(sky.meridianLimitAt) + '" y2="24" stroke="#98a2b6" stroke-width="2" stroke-dasharray="3 2"/>')
   if (night.at > sky.duskAt && night.at < sky.dawnAt) above.push('<line x1="' + x(night.at) + '" y1="0" x2="' + x(night.at) + '" y2="26" stroke="#e3dccd" stroke-width="2"/>')
   const svg = strip.querySelector('svg')
   document.getElementById('strip-dusk').textContent = 'dusk ' + hourMinute(sky.duskAt)
