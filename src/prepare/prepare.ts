@@ -31,8 +31,8 @@ const refuse = (reason: string): PrepareResult => ({ ok: false, reason })
 export function makePrepare({ picture, sender, settings }: PrepareOptions) {
   const { focuser, box, focuserNudgeSteps } = settings
 
-  async function write(device: string, property: string, values: Readonly<Record<string, number | boolean>>, stop = false): Promise<PrepareResult> {
-    const outcome = await sender.send({ device, property, values }, stop)
+  async function write(device: string, property: string, values: Readonly<Record<string, number | boolean>>): Promise<PrepareResult> {
+    const outcome = await sender.send({ device, property, values })
 
     return outcome.result === 'written' ? { ok: true } : refuse(`${property}: ${outcome.reason}`)
   }
@@ -114,7 +114,7 @@ export function makePrepare({ picture, sender, settings }: PrepareOptions) {
         case 'focuser-nudge':
           return nudge(request.direction)
         case 'focuser-stop':
-          return write(focuser, 'FOCUS_ABORT_MOTION', { ABORT: true }, true)
+          return write(focuser, 'FOCUS_ABORT_MOTION', { ABORT: true })
         case 'dew-channel':
           return dewChannel(request.channel, request.on)
         case 'dew-duty':
