@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { syntheticFits } from '../testing/fits.ts'
 import { decodePng } from '../testing/png.ts'
-import { listNight, makePreviews } from './library.ts'
+import { frameDetail, listNight, makePreviews } from './library.ts'
 
 const settings = { bin: 1, blackSigmas: 2.8, targetMedian: 0.25 }
 
@@ -36,14 +36,42 @@ describe('listNight', () => {
     expect(await listNight(keepDir, '2026-11-07')).toEqual({
       night: '2026-11-07',
       frames: [
-        { file: 'a_002.fits', bytes: 1, keptAt: '2026-11-08T03:05:00.000Z' },
-        { file: 'a_001.fits', bytes: 1, keptAt: '2026-11-08T03:00:00.000Z' },
+        { file: 'a_002.fits', bytes: 1, keptAt: '2026-11-08T03:05:00.000Z', run: null, sequence: null, frame: null },
+        { file: 'a_001.fits', bytes: 1, keptAt: '2026-11-08T03:00:00.000Z', run: null, sequence: null, frame: null },
       ],
     })
   })
 
   it('has no frames for a night with no folder', async () => {
     expect(await listNight(keepDir, '2026-11-09')).toEqual({ night: '2026-11-09', frames: [] })
+  })
+})
+
+describe('frameDetail', () => {
+  it('gives a kept frame\'s run, file, hash and every header card, read from the header alone', async () => {
+    const sidecar = { run: 'r1', sequence: 'm31_light', frame: 2, original: '/spool/m31_light_002.fits', sha256: 'ab', bytes: frame.length, keptAt: '2026-11-08T03:00:00.000Z' }
+
+    await writeFile(join(keepDir, '2026-11-07', 'm31_light_002.fits'), frame)
+    await writeFile(join(keepDir, '2026-11-07', 'm31_light_002.fits.json'), JSON.stringify(sidecar))
+
+    const detail = await frameDetail(keepDir, '2026-11-07', 'm31_light_002.fits')
+
+    expect(detail).toMatchObject({ night: '2026-11-07', file: 'm31_light_002.fits', path: join(keepDir, '2026-11-07', 'm31_light_002.fits'), sha256: 'ab', run: 'r1', sequence: 'm31_light', frame: 2, bytes: frame.length })
+    expect(detail?.cards.find(card => card.key === 'BAYERPAT')?.value).toBe('RGGB')
+  })
+
+  it('has nothing for a frame that was not kept or a name outside the frames folder', async () => {
+    await writeFile(join(keepDir, '2026-11-07', 'loose.fits'), frame)
+
+    expect(await frameDetail(keepDir, '2026-11-07', 'loose.fits')).toBeUndefined()
+    expect(await frameDetail(keepDir, '2026-11-07', '../x.fits')).toBeUndefined()
+    expect(await frameDetail(keepDir, 'tonight', 'loose.fits')).toBeUndefined()
+  })
+
+  it('refuses a kept file with no END card', async () => {
+    await keepFrame('broken.fits', '2026-11-08T03:00:00.000Z', Buffer.from('SIMPLE  =                    T'.padEnd(2880 * 2, ' ')))
+
+    await expect(frameDetail(keepDir, '2026-11-07', 'broken.fits')).rejects.toThrow('no END card')
   })
 })
 

@@ -3,19 +3,21 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { CaptureView, StartResult } from '../capture/run.ts'
 import type { Pointing } from '../pointing/pointing.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
-import type { Frames } from '../frames/library.ts'
+import type { FrameDetail, Frames } from '../frames/library.ts'
 import type { Night } from '../rig/night.ts'
 
 const page = readFileSync(new URL('./night.html', import.meta.url))
 const font = readFileSync(new URL('./fonts/AtkinsonHyperlegibleNext.ttf', import.meta.url))
 
 const previewPath = /^\/frames\/(\d{4}-\d{2}-\d{2})\/([A-Za-z0-9._-]+\.fits)\.png$/
+const detailPath = /^\/frames\/(\d{4}-\d{2}-\d{2})\/([A-Za-z0-9._-]+\.fits)\.json$/
 
 export interface PageOptions {
   readonly night: () => Night
   readonly refreshMs: number
   readonly frames: () => Promise<Frames>
   readonly preview: (night: string, file: string) => Promise<Buffer | undefined>
+  readonly frame: (night: string, file: string) => Promise<FrameDetail | undefined>
   readonly capture: {
     readonly view: () => CaptureView
     readonly start: (request: unknown) => StartResult
@@ -25,7 +27,7 @@ export interface PageOptions {
   readonly pointing: Pick<Pointing, 'view' | 'search' | 'preview'> & { readonly act: (request: unknown) => Promise<PrepareResult> }
 }
 
-export function makePage({ night, refreshMs, frames, preview, capture, prepare, pointing }: PageOptions) {
+export function makePage({ night, refreshMs, frames, preview, frame, capture, prepare, pointing }: PageOptions) {
   const watching = new Set<ServerResponse>()
 
   function send(response: ServerResponse, event: string, data: unknown) {
@@ -188,6 +190,20 @@ export function makePage({ night, refreshMs, frames, preview, capture, prepare, 
       frames().then(list => {
         response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         response.end(JSON.stringify(list))
+      }, error => fail(response, error))
+
+      return
+    }
+
+    const detailed = detailPath.exec(path)
+
+    if (detailed !== null) {
+      frame(detailed[1] ?? '', detailed[2] ?? '').then(detail => {
+        if (detail === undefined) response.writeHead(404).end()
+        else {
+          response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+          response.end(JSON.stringify(detail))
+        }
       }, error => fail(response, error))
 
       return

@@ -9,7 +9,7 @@ import { readConfig } from '../config.ts'
 import { announcesFrame } from '../frames/announce.ts'
 import { frameEntry, frameSubject } from '../frames/entry.ts'
 import { makeKeeper } from '../frames/keeper.ts'
-import { listNight, makePreviews } from '../frames/library.ts'
+import { frameDetail, listNight, makePreviews } from '../frames/library.ts'
 import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
 import { makePointing } from '../pointing/pointing.ts'
@@ -67,6 +67,7 @@ const page = makePage({
   refreshMs: settings.pageRefreshSeconds * 1000,
   frames: () => listNight(frames.keepDir, nightOf(Date.now(), naming)),
   preview: makePreviews(frames.keepDir, frames.preview).get,
+  frame: (night, file) => frameDetail(frames.keepDir, night, file),
   capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
   prepare: request => prepare.act(request),
   pointing,
