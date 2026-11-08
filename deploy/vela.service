@@ -1,0 +1,13 @@
+[Unit]
+Description=Vela: the night page, read from the rig stream; exits when the broker is lost
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/bin/node %h/dev/personal/vela-run/src/bin/vela.ts %h/.config/vela/vela.json
+Restart=always
+RestartSec=1
+RestartSteps=5
+RestartMaxDelaySec=60
+
+[Install]
+WantedBy=default.target

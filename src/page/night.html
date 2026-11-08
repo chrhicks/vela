@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vela</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fff; --fg: #1b1f24; --muted: #6a737d; --line: #d8dee4; --card: #f6f8fa; --warn: #9a6700; --bad: #b42318; --good: #1a7f37; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --line: #30363d; --card: #161b22; --warn: #d29922; --bad: #f85149; --good: #3fb950; } }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-bottom: 12px; }
+  h1 { margin: 0; font-size: 20px; }
+  #banner { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid var(--line); background: var(--card); }
+  #banner.bad { border-color: var(--bad); color: var(--bad); }
+  #banner.warn { border-color: var(--warn); color: var(--warn); }
+  #banner[hidden] { display: none; }
+  .rig { color: var(--muted); font-size: 14px; }
+  main { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  section { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--card); }
+  section h2 { margin: 0 0 4px; font-size: 16px; display: flex; justify-content: space-between; gap: 8px; }
+  .link { font-size: 13px; font-weight: normal; }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .stale { color: var(--warn); }
+  .unknown { color: var(--muted); }
+  .current.ok { color: var(--good); }
+</style>
+</head>
+<body>
+<header><h1>Vela</h1><span class="rig" id="rig"></span></header>
+<div id="banner" hidden></div>
+<main id="devices"></main>
+<script>
+const banner = document.getElementById('banner')
+const rig = document.getElementById('rig')
+const devices = document.getElementById('devices')
+
+function clock(ms) {
+  return new Date(ms).toLocaleString([], { hour12: false })
+}
+
+function ago(from, now) {
+  const seconds = Math.max(0, Math.round((now - from) / 1000))
+  if (seconds < 90) return seconds + ' s ago'
+  if (seconds < 5400) return Math.round(seconds / 60) + ' min ago'
+  return Math.round(seconds / 3600) + ' h ago'
+}
+
+function element(tag, className, text) {
+  const node = document.createElement(tag)
+  if (className) node.className = className
+  if (text !== undefined) node.textContent = text
+  return node
+}
+
+function show(night) {
+  const messages = {
+    loading: ['Reading the rig connection from the stream', ''],
+    'no-connection': ['The stream holds no rig connection: nothing is known', 'bad'],
+    silent: ['The rig program has been silent for ' + night.rig.silentSeconds + ' s: every value is stale', 'warn'],
+    live: ['', ''],
+  }
+  const [text, level] = messages[night.phase]
+  banner.hidden = text === ''
+  banner.textContent = text
+  banner.className = level
+  rig.textContent = night.rig.connectedAt === undefined
+    ? 'no rig connection'
+    : 'rig connected ' + clock(night.rig.connectedAt) + ' (' + ago(night.rig.connectedAt, night.at) + '), connection ' + (night.rig.connection ?? '?') + (night.rig.indiserver === 'closed' ? ', indiserver lost' : '')
+
+  devices.replaceChildren(...night.devices.map(device => {
+    const card = element('section')
+    const title = element('h2')
+    title.append(element('span', '', device.title), element('span', 'link ' + device.connection.status, device.connection.text))
+    const list = element('dl')
+    for (const field of device.fields) {
+      const value = element('dd', field.status, field.status === 'stale' ? field.text + ' (stale)' : field.text)
+      if (field.changedAt !== undefined) value.title = 'changed ' + clock(field.changedAt)
+      list.append(element('dt', '', field.label), value)
+    }
+    card.append(title, list)
+    return card
+  }))
+}
+
+const events = new EventSource('/events')
+events.addEventListener('night', event => show(JSON.parse(event.data)))
+events.onerror = () => {
+  banner.hidden = false
+  banner.className = 'bad'
+  banner.textContent = 'Lost the connection to Vela: values on this page are old'
+}
+</script>
+</body>
+</html>

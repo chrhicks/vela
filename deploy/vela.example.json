@@ -1,0 +1,18 @@
+{
+  "port": 8793,
+  "broker": {
+    "servers": "nats://127.0.0.1:4222",
+    "user": "vela",
+    "passFile": "/home/example/.config/vela/broker.pass"
+  },
+  "devices": {
+    "mount": "mount",
+    "primary": "primary",
+    "guide": "guide",
+    "focuser": "focuser",
+    "box": "box"
+  },
+  "silenceSeconds": 10,
+  "pageRefreshSeconds": 1,
+  "historyReadBatch": 2048
+}
