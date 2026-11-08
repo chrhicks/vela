@@ -71,6 +71,12 @@ export const CaptureSettings = Schema.Struct({
     Schema.Number,
     3,
   ),
+  telescope: Schema.optionalKey(
+    Schema.NonEmptyString.annotate({
+      description:
+        "The optical tube the main camera is on, written as TELESCOP into every frame's header through the camera's FITS_HEADER. Without it the camera driver writes the name of the device it reads pointing from, which is the mount",
+    }),
+  ),
 })
 
 export const PrepareSettings = Schema.Struct({

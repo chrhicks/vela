@@ -47,6 +47,17 @@ describe('a capture run on a scripted camera', () => {
     expect(camera.script.sent.find(sent => sent.values['KEYWORD_NAME'] === 'OBJECT')?.values['KEYWORD_VALUE']).toBe('M 31')
   })
 
+  it('writes TELESCOP from the settings before every frame when one is set', async () => {
+    const camera = fakeCamera({ settings: { telescope: 'Example 400' } })
+
+    await runToEnd(camera)
+
+    const telescopes = camera.script.sent.filter(sent => sent.property === 'FITS_HEADER' && sent.values['KEYWORD_NAME'] === 'TELESCOP')
+
+    expect(telescopes).toHaveLength(3)
+    expect(telescopes[0]?.values['KEYWORD_VALUE']).toBe('Example 400')
+  })
+
   it('labels each saved file with the run, the sequence and the frame number', async () => {
     const camera = fakeCamera()
 

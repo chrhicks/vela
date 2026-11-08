@@ -27,6 +27,7 @@ export interface CaptureSettings {
   readonly exposureSilenceMs: number
   readonly failuresInRow: number
   readonly silenceMs: number
+  readonly telescope: string | undefined
 }
 
 export interface CaptureOptions {
@@ -268,7 +269,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
 
       if (!parsed.ok) return parsed
 
-      const wanted = wantedOf(parsed.request, parsed.sequence, settings.spoolDir)
+      const wanted = wantedOf(parsed.request, parsed.sequence, settings.spoolDir, settings.telescope)
       const refusal = refusalToStart(parsed.request, wanted)
 
       if (refusal !== undefined) return { ok: false, reason: refusal }

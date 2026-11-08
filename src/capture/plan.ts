@@ -13,6 +13,7 @@ export interface Wanted {
   readonly uploadDir: string
   readonly uploadPrefix: string
   readonly object: string | undefined
+  readonly telescope: string | undefined
 }
 
 export interface Step {
@@ -23,7 +24,7 @@ export interface Step {
 
 export type Plan = { readonly steps: ReadonlyArray<Step> } | { readonly missing: string }
 
-export function wantedOf(request: CaptureRequest, sequence: string, uploadDir: string): Wanted {
+export function wantedOf(request: CaptureRequest, sequence: string, uploadDir: string, telescope: string | undefined): Wanted {
   return {
     frameElement: frameTypeElement[request.frameType],
     gain: request.gain,
@@ -33,6 +34,7 @@ export function wantedOf(request: CaptureRequest, sequence: string, uploadDir: s
     uploadDir,
     uploadPrefix: `${sequence}_XXX`,
     object: request.frameType === 'light' ? request.object : undefined,
+    telescope,
   }
 }
 
@@ -50,6 +52,7 @@ export function stepsFor(read: Read, wanted: Wanted, first: boolean): Plan {
   if (read('FITS_HEADER') === undefined) return { missing: 'FITS_HEADER' }
   if (first) steps.push(step('FITS_HEADER', { KEYWORD_NAME: 'INDI_CLEAR', KEYWORD_VALUE: '', KEYWORD_COMMENT: '' }, false))
   if (wanted.object !== undefined) steps.push(step('FITS_HEADER', { KEYWORD_NAME: 'OBJECT', KEYWORD_VALUE: wanted.object, KEYWORD_COMMENT: '' }, false))
+  if (wanted.telescope !== undefined) steps.push(step('FITS_HEADER', { KEYWORD_NAME: 'TELESCOP', KEYWORD_VALUE: wanted.telescope, KEYWORD_COMMENT: 'Telescope name' }, false))
 
   if (wanted.cooler !== 'keep') {
     const cooler = read('CCD_COOLER')
