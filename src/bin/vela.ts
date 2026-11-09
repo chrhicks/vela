@@ -55,7 +55,7 @@ const sender = makeSender({
   by: 'vela',
   now: Date.now,
 })
-const prepare = makePrepare({ picture, sender, settings: { focuser: settings.devices.focuser, box: settings.devices.box, focuserNudgeSteps: settings.prepare.focuserNudgeSteps } })
+const prepare = makePrepare({ picture, sender, settings: { focuser: settings.devices.focuser, box: settings.devices.box, camera: settings.devices.primary, focuserNudgeSteps: settings.prepare.focuserNudgeSteps } })
 const pointing = makePointing({ picture, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
 const capture = makeCapture({
   picture,

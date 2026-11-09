@@ -288,6 +288,16 @@
     </div>
     <p id="pa-status" hidden></p>
   </div>
+  <div class="group" id="cooler-controls">
+    <h3>Cooler</h3>
+    <div class="row"><span id="cooler-where" class="unknown">Reading the camera</span></div>
+    <div class="row">
+      <label class="field">Setpoint (°C)<input type="number" step="any" id="cooler-setpoint" value="-10"></label>
+      <button type="button" id="cooler-on">Cooler on</button>
+      <button type="button" id="cooler-off">Cooler off</button>
+    </div>
+    <p class="answer" id="cooler-answer" aria-live="polite" hidden></p>
+  </div>
   <div class="group" id="focuser-controls">
     <h3>Focuser</h3>
     <div class="row">
@@ -1156,6 +1166,12 @@ focusStop.addEventListener('click', () => act(focusStop, stopAnswer, '/prepare',
 focusMove.addEventListener('click', () => prepareAction(focusMove, focusAnswer, { action: 'focuser-move', position: Number(focusTarget.value) }, 'Move focuser to ' + focusTarget.value))
 focusIn.addEventListener('click', () => prepareAction(focusIn, focusAnswer, { action: 'focuser-nudge', direction: 'in' }))
 focusOut.addEventListener('click', () => prepareAction(focusOut, focusAnswer, { action: 'focuser-nudge', direction: 'out' }))
+const coolerSetpoint = document.getElementById('cooler-setpoint')
+const coolerAnswer = document.getElementById('cooler-answer')
+let coolerSetpointTouched = false
+coolerSetpoint.addEventListener('input', () => { coolerSetpointTouched = true })
+document.getElementById('cooler-on').addEventListener('click', event => prepareAction(event.currentTarget, coolerAnswer, { action: 'cooler-on', setpoint: Number(coolerSetpoint.value) }, 'Cooler on at ' + coolerSetpoint.value + ' °C'))
+document.getElementById('cooler-off').addEventListener('click', event => prepareAction(event.currentTarget, coolerAnswer, { action: 'cooler-off' }, 'Cooler off'))
 dewAutoButtons[0].addEventListener('click', () => prepareAction(dewAutoButtons[0], dewAnswer, { action: 'dew-auto', on: true }, 'Automatic dew on'))
 dewAutoButtons[1].addEventListener('click', () => prepareAction(dewAutoButtons[1], dewAnswer, { action: 'dew-auto', on: false }, 'Automatic dew off'))
 
@@ -1194,6 +1210,13 @@ function showPrepare(night) {
   }
   focusIn.textContent = 'Focuser in ' + focuser.nudgeSteps + ' steps'
   focusOut.textContent = 'Focuser out ' + focuser.nudgeSteps + ' steps'
+
+  const sensor = fieldText('primary', 'Sensor temperature')
+  const coolerOn = fieldText('primary', 'Cooler') === 'on'
+  const setpointText = fieldText('primary', 'Setpoint (last written)')
+  asOf(document.getElementById('cooler-where'), sensor === undefined ? 'Main camera not on the stream' : 'Sensor ' + shown(sensor) + (coolerOn ? (/°C/.test(setpointText ?? '') ? ', setpoint ' + setpointText : '') + ', cooler at ' + shown(fieldText('primary', 'Cooler power') ?? '—') : ', cooler ' + shown(fieldText('primary', 'Cooler') ?? '—')), prepareLive || sensor === undefined)
+  const lastSetpoint = parseFloat(setpointText ?? '')
+  if (!coolerSetpointTouched && Number.isFinite(lastSetpoint) && document.activeElement !== coolerSetpoint) coolerSetpoint.value = String(lastSetpoint)
 
   dewNone.hidden = dew.channels.length > 0
   asOf(dewAutoState, dew.auto === undefined ? '' : dew.auto ? 'on' : 'off', prepareLive || dew.auto === undefined)
