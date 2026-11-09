@@ -31,7 +31,7 @@ async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' 
   picture.apply(wire(startedAt + 1, 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), Date.now())
   picture.caughtUp()
 
-  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), focus: () => ({ now: undefined, focused: undefined }), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, activity: () => ({ night: '2026-11-07', items: [], viewer: undefined }), capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, runs: {}, ...frames })
+  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), focus: () => ({ now: undefined, focused: undefined }), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, activity: () => ({ night: '2026-11-07', items: [], viewer: undefined }), capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, runs: {}, copies: { left: () => [], again: () => {} }, ...frames })
 
   open.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -225,7 +225,7 @@ describe('page server', () => {
   it('serves the capture view as json and sends it over server-sent events', async () => {
     const base = await serve()
 
-    expect(await (await fetch(`${base}/capture.json`)).json()).toEqual(idleView)
+    expect(await (await fetch(`${base}/capture.json`)).json()).toEqual({ ...idleView, left: [] })
 
     const response = await fetch(`${base}/events`)
     const reader = response.body?.getReader()
@@ -241,6 +241,6 @@ describe('page server', () => {
 
     await reader?.cancel()
 
-    expect(text).toContain(`event: capture\ndata: ${JSON.stringify(idleView)}`)
+    expect(text).toContain(`event: capture\ndata: ${JSON.stringify({ ...idleView, left: [] })}`)
   })
 })

@@ -150,7 +150,7 @@
   #capture input, #capture select { font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   #capture button[type=submit] { grid-column: 1 / -1; font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 6px; background: var(--action); color: #0d1626; cursor: pointer; justify-self: start; }
   .answer { margin: 8px 0 12px; }
-  #stop-answer { margin: 0; padding: 0 max(24px, env(safe-area-inset-right)) 6px max(24px, env(safe-area-inset-left)); text-align: right; }
+  #stop-answer, #copy-answer { margin: 0; padding: 0 max(24px, env(safe-area-inset-right)) 6px max(24px, env(safe-area-inset-left)); text-align: right; }
   .drift { margin: 0 0 8px; }
   #align.running > .drift, #align.running > .row { display: none; }
   #pa-readout { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 16px 24px; margin: 8px 0 12px; }
@@ -183,6 +183,11 @@
   #last-run.warn { color: var(--warn); }
   #focusbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 0 24px 6px; }
   #focusbar[hidden] { display: none; }
+  #leftbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 0 max(24px, env(safe-area-inset-right)) 8px max(24px, env(safe-area-inset-left)); color: var(--bad); font-weight: 600; }
+  #leftbar[hidden] { display: none; }
+  #leftbar span { flex: 1 1 240px; }
+  #copy-again { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 2px solid var(--star); border-radius: 8px; background: var(--dome-hi); color: var(--star); cursor: pointer; }
+  @media (max-width: 760px) { #leftbar { padding: 0 max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); } }
   #focusbar .progress { flex: 1 1 240px; font-variant-numeric: tabular-nums; }
   #focus-stop { font: inherit; font-weight: 600; min-height: 44px; padding: 0 16px; border: 2px solid var(--star); border-radius: 8px; background: var(--dome-hi); color: var(--star); cursor: pointer; }
   #prepare { margin-bottom: 12px; }
@@ -262,6 +267,8 @@
   <span class="progress" id="focus-progress"></span>
   <button type="button" id="focus-stop">Stop focuser</button>
 </div>
+<div id="leftbar" hidden><span id="left-text"></span><button type="button" id="copy-again">Copy again</button></div>
+<p class="answer" id="copy-answer" aria-live="polite" hidden></p>
 <nav id="tabs" aria-label="Views"><a href="#/tonight" data-to="tonight">Tonight</a><a href="#/prepare" data-to="prepare">Prepare</a><a href="#/point" data-to="point">Point</a><a href="#/capture" data-to="capture">Capture</a><a href="#/frames" data-to="frames">Frames</a><a href="#/rig" data-to="rig">Rig</a><a href="#/activity" data-to="activity">Activity</a></nav>
 </header>
 <div class="view" data-view="tonight"><div id="tonight">
@@ -1044,6 +1051,9 @@ function showCapture(view) {
     const endsAt = view.at + ((exposing ? run.secondsLeft : 0) + framesAfter * run.exposureSeconds) * 1000
     progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + (run.count === undefined ? '' : ' of ' + run.count) + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '') + (run.count === undefined ? '. Runs until Stop.' : '. Run ends about ' + new Date(endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })) + (run.alert === undefined ? '' : ' ' + run.alert.text + (run.alert.seconds === undefined ? '' : ' (' + run.alert.seconds + ' s)') + '.') + (view.late.length === 0 ? '' : ' No answer from the rig program (' + view.late.map(command => command.property).join(', ') + ').')
   }
+  const left = view.left ?? []
+  document.getElementById('leftbar').hidden = left.length === 0
+  document.getElementById('left-text').textContent = left.map(each => each.what + ' is still on the rig computer: the copy failed ' + ago(each.at, view.at) + ' (' + each.reason + ').').join(' ')
   const last = view.last
   lastRun.hidden = last === undefined
   if (last !== undefined) {
@@ -1160,6 +1170,9 @@ function drawAutofocus(view, samples) {
   for (const sample of measured) parts.push('<circle class="' + (sample.stars >= most / 2 ? 'dot' : 'few') + '" cx="' + x(sample.position) + '" cy="' + y(sample.hfd) + '" r="4"><title>' + sample.position + ': HFD ' + sample.hfd.toFixed(1) + ', ' + sample.stars + ' stars</title></circle>')
   afChart.innerHTML = parts.join('')
 }
+
+const copyAgain = document.getElementById('copy-again')
+copyAgain.addEventListener('click', () => act(copyAgain, document.getElementById('copy-answer'), '/frames/copy-again', {}, 'Copy again', ''))
 
 const focusStop = document.getElementById('focus-stop')
 focusStop.addEventListener('click', () => act(focusStop, stopAnswer, '/prepare', { action: 'focuser-stop' }, 'Stop focuser'))

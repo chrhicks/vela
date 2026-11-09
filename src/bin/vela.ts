@@ -80,6 +80,7 @@ const capture = makeCapture({
   onChange: () => page.captureChanged(),
 })
 const astap = makeAstap(settings.astap)
+const copySubject = 'rig-dev.vela.copy'
 const keptPath = (frame: { readonly night: string; readonly file: string }) => join(frames.keepDir, frame.night, frame.file)
 const publishEntry = (subject: string, kind: string, id: string, body: Readonly<Record<string, unknown>>) => {
   const at = Date.now()
@@ -118,6 +119,7 @@ const page = makePage({
   prepare: request => prepare.act(request),
   pointing,
   runs: { autofocus, align },
+  copies: { left: () => keeper.left(), again: () => void keeper.requestScan() },
 })
 
 const keeper = makeKeeper({
@@ -135,6 +137,7 @@ const keeper = makeKeeper({
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))
   },
   onProblem: message => console.error(`vela: ${message}`),
+  onLeft: left => publishEntry(copySubject, 'vela.copy.left', left.what, { what: left.what, reason: left.reason }),
 })
 
 const following = await followRig({

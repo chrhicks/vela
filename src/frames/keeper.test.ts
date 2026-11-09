@@ -37,6 +37,7 @@ function setup(overrides: { attempts?: number; labels?: Record<string, { run: st
     sleep: async ms => void sleeps.push(ms),
     onKept: frame => void kept.push(frame),
     onProblem: message => void problems.push(message),
+    onLeft: () => {},
   })
 
   return { spool, keeper, kept, problems, sleeps }
@@ -119,10 +120,24 @@ describe('keeper', () => {
     expect(problems).toHaveLength(2)
     expect(existsSync(join(keepDir, '2026-11-07', 'test_001.fits'))).toBe(false)
     expect(existsSync(join(keepDir, '2026-11-07', 'test_001.fits.json'))).toBe(false)
+    expect(keeper.left()).toMatchObject([{ what: 'test_001.fits', at: keptAtMs }])
 
     await keeper.requestScan()
 
     expect(kept).toHaveLength(1)
+    expect(keeper.left()).toEqual([])
+  })
+
+  it('forgets a frame it could not copy once the frame is gone from the spool', async () => {
+    const { spool, keeper } = setup({ attempts: 1 })
+
+    spool.files.set('test_001.fits', { content: content('x'), modifiedAt: frameTime })
+    spool.failNextCopies = 1
+    await keeper.requestScan()
+    spool.files.delete('test_001.fits')
+    await keeper.requestScan()
+
+    expect(keeper.left()).toEqual([])
   })
 
   it('catches up: copies only the spooled files that are not yet kept', async () => {
@@ -187,11 +202,13 @@ describe('keeper', () => {
       sleep: async () => {},
       onKept: () => {},
       onProblem: message => void problems.push(message),
+      onLeft: () => {},
     })
 
     await failing.requestScan()
 
     expect(problems[0]).toContain('could not list')
+    expect(failing.left()).toEqual([{ what: 'the list of frames on the rig computer', reason: 'exit 255: no route', at: keptAtMs }])
   })
 
   it('folds scans asked for while one runs into one more scan', async () => {

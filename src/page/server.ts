@@ -4,6 +4,7 @@ import type { Activity, Item } from '../activity/activity.ts'
 import type { CaptureView, StartResult } from '../capture/run.ts'
 import type { Pointing } from '../pointing/pointing.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
+import type { Left } from '../frames/keeper.ts'
 import type { FrameDetail, Frames } from '../frames/library.ts'
 import type { FocusDrift } from '../rig/focus.ts'
 import type { Night } from '../rig/night.ts'
@@ -30,10 +31,11 @@ export interface PageOptions {
   readonly prepare: (request: unknown) => Promise<PrepareResult>
   readonly runs: Readonly<Record<string, { readonly start: (request: unknown) => PrepareResult; readonly view: () => unknown }>>
   readonly pointing: Pick<Pointing, 'view' | 'search' | 'preview'> & { readonly act: (request: unknown) => Promise<PrepareResult> }
+  readonly copies: { readonly left: () => ReadonlyArray<Left>; readonly again: () => void }
 }
 
-export function makePage({ night: nightAlone, focus, refreshMs, frames, preview, frame, activity, capture: captureAlone, prepare, pointing, runs }: PageOptions) {
-  const capture = { ...captureAlone, view: () => ({ ...captureAlone.view(), ...Object.fromEntries(Object.entries(runs).map(([name, run]) => [name, run.view()])) }) }
+export function makePage({ night: nightAlone, focus, refreshMs, frames, preview, frame, activity, capture: captureAlone, prepare, pointing, runs, copies }: PageOptions) {
+  const capture = { ...captureAlone, view: () => ({ ...captureAlone.view(), ...Object.fromEntries(Object.entries(runs).map(([name, run]) => [name, run.view()])), left: copies.left() }) }
   const watching = new Set<ServerResponse>()
   const night = () => ({ ...nightAlone(), focus: focus() })
 
@@ -161,6 +163,15 @@ export function makePage({ night: nightAlone, focus, refreshMs, frames, preview,
 
     if (path === '/target' && request.method === 'GET') {
       answer(response, 200, pointing.preview(new URL(request.url ?? '', 'http://localhost').searchParams.get('id') ?? ''))
+
+      return
+    }
+
+    if (path === '/frames/copy-again' && request.method === 'POST') {
+      if (refuseUnlessJson(request, response)) return
+
+      copies.again()
+      answer(response, 202, {})
 
       return
     }

@@ -187,6 +187,8 @@ export function makeActivity({ titles, nightOf }: ActivityOptions) {
       return add(entry.at, 'run', 'bad', `Run ended early${detail ? `: ${detail}` : reason ? `: ${reason}` : ''}.`, '#/capture')
     }
 
+    if (entry.kind === 'vela.copy.left') return add(entry.at, 'run', 'bad', `${text(body['what']) ?? 'A frame'} is still on the rig computer: the copy failed${text(body['reason']) ? ` (${text(body['reason'])})` : ''}. Copy again is in the header.`, '#/frames')
+
     if (entry.kind === 'vela.frame') {
       const file = text(body['file'])
       const frameNight = text(body['night'])

@@ -31,6 +31,12 @@ interface Spooled {
   readonly modifiedAt: number
 }
 
+export interface Left {
+  readonly what: string
+  readonly reason: string
+  readonly at: number
+}
+
 export interface KeeperOptions {
   readonly ssh: Ssh
   readonly settings: KeeperSettings
@@ -39,6 +45,7 @@ export interface KeeperOptions {
   readonly sleep: (ms: number) => Promise<void>
   readonly onKept: (frame: KeptFrame) => void
   readonly onProblem: (message: string) => void
+  readonly onLeft: (left: Left) => void
 }
 
 export const frameNamePattern = /^[A-Za-z0-9._-]+\.fits$/
@@ -83,7 +90,18 @@ async function writeAtomically(path: string, content: string) {
   await rename(`${path}.part`, path)
 }
 
-export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProblem }: KeeperOptions) {
+const listingKey = ''
+
+export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProblem, onLeft }: KeeperOptions) {
+  const left = new Map<string, Left>()
+
+  function leave(key: string, what: string, reason: string) {
+    const entry = { what, reason, at: now() }
+
+    left.set(key, entry)
+    onLeft(entry)
+  }
+
   async function copyAndCheck(file: Spooled, directory: string) {
     const remote = `${settings.spoolDir}/${file.name}`
     const target = join(directory, file.name)
@@ -134,6 +152,7 @@ export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProbl
 
   async function keep(file: Spooled, night: string) {
     const directory = join(settings.keepDir, night)
+    let reason = ''
 
     for (let attempt = 1; attempt <= settings.copyAttempts; attempt += 1) {
       try {
@@ -142,15 +161,19 @@ export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProbl
         const sidecar: Sidecar = { run: label?.run ?? null, sequence: label?.sequence ?? null, frame: label?.frame ?? null, original: remote, sha256, bytes: file.bytes, keptAt: new Date(now()).toISOString() }
 
         await writeAtomically(join(directory, sidecarName(file.name)), JSON.stringify(sidecar, null, 2))
+        left.delete(file.name)
         onKept({ file: file.name, night, bytes: file.bytes, sha256 })
         await removeOriginal(remote)
 
         return
       } catch (error) {
-        onProblem(`copy of ${file.name}, attempt ${attempt} of ${settings.copyAttempts}: ${error instanceof Error ? error.message : String(error)}`)
+        reason = error instanceof Error ? error.message : String(error)
+        onProblem(`copy of ${file.name}, attempt ${attempt} of ${settings.copyAttempts}: ${reason}`)
         if (attempt < settings.copyAttempts) await sleep(settings.copyRetryMs)
       }
     }
+
+    leave(file.name, file.name, reason)
   }
 
   async function scan() {
@@ -158,11 +181,17 @@ export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProbl
 
     if (listing.code !== 0) {
       onProblem(`could not list ${settings.spoolDir} on the rig computer (exit ${listing.code}): ${listing.stderr.trim()}`)
+      leave(listingKey, 'the list of frames on the rig computer', `exit ${listing.code}: ${listing.stderr.trim()}`)
 
       return
     }
 
-    for (const file of parseListing(listing.stdout, onProblem)) {
+    const files = parseListing(listing.stdout, onProblem)
+
+    left.delete(listingKey)
+    for (const key of left.keys()) if (!files.some(file => file.name === key)) left.delete(key)
+
+    for (const file of files) {
       const night = nightOf(file.modifiedAt, settings.naming)
       const kept = await readSidecar(join(settings.keepDir, night, sidecarName(file.name)))
 
@@ -198,5 +227,5 @@ export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProbl
     return running
   }
 
-  return { requestScan }
+  return { requestScan, left: (): ReadonlyArray<Left> => [...left.values()] }
 }
