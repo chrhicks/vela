@@ -35,6 +35,7 @@ export interface CaptureOptions {
   readonly sender: Pick<Sender, 'send'>
   readonly settings: CaptureSettings
   readonly runFile: RunFile
+  readonly nextName: (sequence: string) => Promise<string>
   readonly now: () => number
   readonly newRunId: () => string
   readonly emit: (event: RunEvent) => void
@@ -74,7 +75,8 @@ interface Active {
   readonly id: string
   readonly request: CaptureRequest
   readonly sequence: string
-  readonly wanted: Wanted
+  wanted: Wanted
+  named: boolean
   readonly abort: AbortController
   readonly between: Between | undefined
   readonly startedAt: number
@@ -91,7 +93,7 @@ type Stop = { readonly reason: EndReason; readonly detail: string }
 
 const abortCommand = (device: string) => ({ device, property: 'CCD_ABORT_EXPOSURE', values: { ABORT: true } })
 
-export function makeCapture({ picture, sender, settings, runFile, now, newRunId, emit, onChange }: CaptureOptions) {
+export function makeCapture({ picture, sender, settings, runFile, nextName, now, newRunId, emit, onChange }: CaptureOptions) {
   const changes = makeChanges()
   const labels = new Map<string, FrameLabel>()
   let active: Active | undefined
@@ -158,6 +160,10 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
     const idle = await changes.until(() => read('CCD_EXPOSURE')?.state !== 'Busy', settings.settleMs, run.abort.signal)
 
     if (!idle) return stoppedOr(run, { reason: 'unknown', detail: `the camera is still exposing ${settings.settleMs / 1000} s after the last frame ended` })
+
+    if (!run.named) run.wanted = { ...run.wanted, uploadPrefix: await nextName(run.sequence) }
+
+    run.named = true
 
     const plan = stepsFor(read, run.wanted, first)
 
@@ -243,6 +249,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
       if (result.frame === 'stop') return finishWith(run, result.stop)
 
       if (result.frame === 'file') {
+        run.named = false
         run.counted += 1
         run.inARow = 0
         emit({ kind: 'exposed', run: run.id, body: { frame: run.counted, sequence: run.sequence, file: basename(result.path) } })
@@ -287,6 +294,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
         request: parsed.request,
         sequence: parsed.sequence,
         wanted,
+        named: false,
         abort: new AbortController(),
         between,
         startedAt: now(),

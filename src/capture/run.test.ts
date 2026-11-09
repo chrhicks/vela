@@ -16,7 +16,7 @@ async function runToEnd(camera: ReturnType<typeof fakeCamera>, body: unknown = r
 }
 
 describe('a capture run on a scripted camera', () => {
-  it('counts a frame when its file appears, and on the first frame commands only what differs', async () => {
+  it('counts a frame when its file appears, names every frame itself, and on the first frame commands only what differs', async () => {
     const camera = fakeCamera()
     const ending = await runToEnd(camera)
 
@@ -27,11 +27,11 @@ describe('a capture run on a scripted camera', () => {
       { property: 'CCD_COOLER', values: { COOLER_ON: true, COOLER_OFF: false } },
       { property: 'CCD_FRAME_TYPE', values: { FRAME_DARK: true } },
       { property: 'CCD_CONTROLS', values: { Gain: 200 } },
-      { property: 'UPLOAD_SETTINGS', values: { UPLOAD_DIR: spoolDir, UPLOAD_PREFIX: 'M-31_dark_XXX' } },
+      { property: 'UPLOAD_SETTINGS', values: { UPLOAD_DIR: spoolDir, UPLOAD_PREFIX: 'M-31_dark_001' } },
       { property: 'CCD_EXPOSURE', values: { CCD_EXPOSURE_VALUE: 0.01 } },
-      { property: 'CCD_EXPOSURE', values: { CCD_EXPOSURE_VALUE: 0.01 } },
+      { property: 'UPLOAD_SETTINGS', values: { UPLOAD_PREFIX: 'M-31_dark_002' } },
     ])
-    expect(camera.script.sent).toHaveLength(9)
+    expect(camera.script.sent).toHaveLength(11)
     expect(kinds(camera.events)).toEqual(['started', 'exposed', 'exposed', 'exposed', 'ended'])
     expect(camera.runFile.read()).toBeUndefined()
   })

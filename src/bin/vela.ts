@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { jetstream } from '@nats-io/jetstream'
@@ -11,6 +12,7 @@ import { makeActivity } from '../activity/activity.ts'
 import { announcesFrame } from '../frames/announce.ts'
 import { frameEntry, frameSubject } from '../frames/entry.ts'
 import { makeKeeper } from '../frames/keeper.ts'
+import { makeNamer } from '../frames/names.ts'
 import { frameDetail, listNight, makePreviews } from '../frames/library.ts'
 import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
@@ -67,6 +69,7 @@ const capture = makeCapture({
     silenceMs: settings.silenceSeconds * 1000,
   },
   runFile: makeRunFile(settings.capture.runFile),
+  nextName: makeNamer({ night: () => nightOf(Date.now(), naming), kept: night => readdir(join(frames.keepDir, night)) }),
   now: Date.now,
   newRunId: () => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''),
   emit: event => {
