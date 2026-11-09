@@ -46,6 +46,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
   let ids = 0
   let fileNumber = 0
   let recorded: Partial<ActiveRecord> | undefined
+  const names: Record<string, number> = {}
 
   const runFile: RunFile = {
     read: () => recorded,
@@ -126,6 +127,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
     sender,
     settings: { ...fastSettings, ...options.settings },
     runFile,
+    nextName: async sequence => `${sequence}_${String((names[sequence] = (names[sequence] ?? 0) + 1)).padStart(3, '0')}`,
     now: Date.now,
     newRunId: () => 'run-1',
     emit: event => {
