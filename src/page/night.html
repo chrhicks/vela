@@ -981,7 +981,7 @@ function showTonight() {
 function showCapture(view) {
   tonightState.capture = view
   showAutofocus(view.autofocus)
-  showAlign(view.align)
+  showAlign(view.align, view.at)
   showTonight()
   const run = view.run
   statusParts.run = run
@@ -1042,7 +1042,7 @@ paStart.addEventListener('click', () => {
 
 const arcmin = value => Math.abs(value) < 1 ? Math.round(Math.abs(value) * 60) + '″' : Math.abs(value).toFixed(1) + '′'
 
-function showAlign(view) {
+function showAlign(view, now) {
   if (view === undefined || view.run === undefined) return
   const solved = view.frames.filter(frame => frame.frame <= 3 && frame.solved).length
   const newest = [...view.frames].sort((a, b) => b.frame - a.frame)[0]
@@ -1053,6 +1053,7 @@ function showAlign(view) {
   if (view.ended !== undefined) { text = 'Polar alignment ended' + (view.ended === 'done' ? ': start it again to keep adjusting.' : ': ' + (tonightState.capture?.last?.detail ?? view.ended) + '.') + (view.error === undefined ? '' : ' Last reading: ' + arcmin(view.error.totalArcmin) + ' from the pole.'); tone = view.ended === 'done' || view.ended === 'stopped' ? '' : 'bad' }
   paStatus.hidden = false
   paStatus.className = tone
+  if (view.ended === undefined && view.lastFrameAt !== undefined) text += ' Last frame ' + Math.max(0, Math.round((now - view.lastFrameAt) / 1000)) + ' s ago.'
   paStatus.textContent = text
   paReadout.hidden = view.error === undefined
   if (view.error === undefined) return
