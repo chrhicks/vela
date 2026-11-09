@@ -62,6 +62,7 @@
   #tabs a.on { color: var(--fg); border-bottom-color: var(--fg); font-weight: 600; }
   #bottom { display: none; }
   body[data-view="tonight"] #runbar { display: none; }
+  body[data-view="prepare"][data-at-rig] #runbar.quiet { display: none; }
   .view-title { font-size: 26px; margin: 0 0 4px; }
   #tonight { display: grid; grid-template-columns: 1.4fr 1fr; gap: 40px; }
   #tonight h1 { font-size: 26px; line-height: 1.2; margin: 0 0 4px; letter-spacing: -0.01em; }
@@ -1008,6 +1009,7 @@ function keepAwake(on) {
 function showCapture(view) {
   tonightState.capture = view
   keepAwake(running(view.align) || running(view.autofocus))
+  document.body.toggleAttribute('data-at-rig', running(view.align) || running(view.autofocus))
   showAutofocus(view.autofocus)
   showAlign(view.align, view.at)
   showTonight()
@@ -1015,6 +1017,7 @@ function showCapture(view) {
   statusParts.run = run
   showStatus()
   runbar.hidden = run === undefined
+  runbar.classList.toggle('quiet', run?.alert === undefined && view.late.length === 0)
   if (run !== undefined) {
     const phase = run.phase === 'exposing' ? (run.secondsLeft === undefined ? 'starting the exposure' : 'exposing, ' + run.secondsLeft + ' s left') : run.phase === 'preparing' ? 'setting the camera' : 'ending'
     const exposing = run.phase === 'exposing' && run.secondsLeft !== undefined
