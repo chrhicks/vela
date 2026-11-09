@@ -94,7 +94,7 @@ describe('a polar alignment run on a scripted camera and mount', () => {
     expect(published.map(entry => entry.kind)).toEqual(['started', 'solve', 'solve', 'solve', 'solve', 'solve'])
     expect(published[1]?.body).not.toHaveProperty('altitudeArcmin')
     expect(published[3]?.body).toHaveProperty('altitudeArcmin')
-    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ frame: 1, solved: true }, { frame: 2, solved: true }, { frame: 3, solved: true }, { frame: 4, solved: true }, { frame: 5, solved: true }], error: { frame: 5 } })
+    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ frame: 1, solved: true }, { frame: 2, solved: true }, { frame: 3, solved: true }, { frame: 4, solved: true }, { frame: 5, solved: true }], error: { frame: 5 }, previous: { frame: 4 } })
     expect(align.view().first?.totalArcmin).toBeGreaterThan(0)
     expect(align.view().lastFrameAt).toBeGreaterThan(startedAt)
   })
@@ -118,7 +118,7 @@ describe('a polar alignment run on a scripted camera and mount', () => {
     await settled(align, published, 5)
 
     expect(slews).toHaveLength(3)
-    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false }, { frame: 5, solved: true }], error: { frame: 5 } })
+    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false }, { frame: 5, solved: true }], error: { frame: 5 }, previous: { frame: 3 } })
   })
 
   it('takes each adjusting frame only after the last one is solved, so the readings never fall behind', async () => {
