@@ -151,6 +151,12 @@
   .answer { margin: 8px 0 12px; }
   #stop-answer { margin: 0; padding: 0 max(24px, env(safe-area-inset-right)) 6px max(24px, env(safe-area-inset-left)); text-align: right; }
   .drift { margin: 0 0 8px; }
+  #af-chart { width: 100%; max-width: 480px; display: block; margin-top: 8px; }
+  #af-chart .axis { stroke: var(--line); }
+  #af-chart .dot { fill: var(--fg); }
+  #af-chart .few { fill: var(--muted); }
+  #af-chart .best { stroke: var(--good); stroke-width: 2; }
+  #af-chart text { fill: var(--muted); font-size: 11px; }
   .answer.bad { color: var(--bad); }
   .answer.warn { color: var(--warn); }
   .answer.sending { color: var(--muted); }
@@ -269,6 +275,18 @@
       <button type="button" class="moves" id="focus-out"></button>
     </div>
     <p class="answer" id="focus-answer" aria-live="polite" hidden></p>
+  </div>
+  <div class="group" id="autofocus">
+    <h3>Autofocus</h3>
+    <div class="row">
+      <label class="field">Step (steps)<input type="number" step="1" id="af-step" value="50"></label>
+      <label class="field">Samples<input type="number" step="1" id="af-samples" value="9"></label>
+      <label class="field">Exposure (s)<input type="number" step="any" id="af-exposure" value="2"></label>
+      <button type="button" class="moves" id="af-start">Start autofocus</button>
+    </div>
+    <p class="answer" id="af-answer" aria-live="polite" hidden></p>
+    <p id="af-status" hidden></p>
+    <svg id="af-chart" viewBox="0 0 320 150" role="img" aria-label="Star size at each focuser position" hidden></svg>
   </div>
   <div class="group" id="dew-controls">
     <h3>Dew heaters</h3>
@@ -941,6 +959,7 @@ function showTonight() {
 
 function showCapture(view) {
   tonightState.capture = view
+  showAutofocus(view.autofocus)
   showTonight()
   const run = view.run
   statusParts.run = run
@@ -979,6 +998,51 @@ let prepareLive = false
 
 function prepareAction(button, answer, request, name) {
   return act(button, answer, '/prepare', request, name ?? button.textContent)
+}
+
+const afStart = document.getElementById('af-start')
+const afAnswer = document.getElementById('af-answer')
+const afStatus = document.getElementById('af-status')
+const afChart = document.getElementById('af-chart')
+afStart.addEventListener('click', () => {
+  const request = { step: Number(document.getElementById('af-step').value), samples: Number(document.getElementById('af-samples').value), exposureSeconds: Number(document.getElementById('af-exposure').value) }
+  act(afStart, afAnswer, '/autofocus', request, 'Start autofocus', 'Autofocus started: ' + request.samples + ' samples ' + request.step + ' steps apart.')
+})
+
+const afHow = { fit: 'fitted through the lowest sample and its neighbours', lowest: 'the lowest sample', edge: 'the lowest sample, at the end of the sweep' }
+
+function showAutofocus(view) {
+  if (view === undefined || view.run === undefined) return
+  const samples = view.samples.slice().sort((a, b) => a.frame - b.frame)
+  const latest = samples[samples.length - 1]
+  let text = latest === undefined ? 'Autofocus: moving to the first sample.' : 'Sample ' + samples.length + ' of ' + view.positions.length + ' at ' + latest.position + ': ' + (latest.hfd === undefined ? 'no stars.' : 'HFD ' + latest.hfd.toFixed(1) + ' px, ' + latest.stars + ' stars.')
+  let tone = ''
+  if (view.best !== undefined) {
+    text = 'Best focus ' + view.best.position + ' (' + afHow[view.best.how] + ').'
+    if (view.best.how === 'edge') { text += ' Run autofocus again from there to see both sides.'; tone = 'warn' }
+    text += view.check === undefined ? ' Taking a check frame there.' : ' Check frame: ' + (view.check.hfd === undefined ? 'no stars.' : 'HFD ' + view.check.hfd.toFixed(1) + ' px, ' + view.check.stars + ' stars.')
+  }
+  if (view.ended !== undefined && view.ended !== 'done') { text += ' Autofocus ended: ' + (tonightState.capture?.last?.detail ?? view.ended) + '.'; tone = 'bad' }
+  afStatus.hidden = false
+  afStatus.className = tone
+  afStatus.textContent = text
+  drawAutofocus(view, samples)
+}
+
+function drawAutofocus(view, samples) {
+  const measured = samples.filter(sample => sample.hfd !== undefined)
+  afChart.hidden = measured.length === 0
+  if (measured.length === 0) return
+  const most = Math.max(...samples.map(sample => sample.stars))
+  const positions = view.positions.concat(view.best ? [view.best.position] : [])
+  const [low, high] = [Math.min(...positions), Math.max(...positions)]
+  const top = Math.max(...measured.map(sample => sample.hfd)) * 1.1
+  const x = position => 30 + ((position - low) / Math.max(1, high - low)) * 280
+  const y = hfd => 130 - (hfd / top) * 120
+  const parts = ['<line class="axis" x1="30" y1="130" x2="310" y2="130"/><line class="axis" x1="30" y1="10" x2="30" y2="130"/>', '<text x="30" y="146">' + low + '</text><text x="310" y="146" text-anchor="end">' + high + '</text><text x="26" y="16" text-anchor="end">' + top.toFixed(0) + '</text><text x="26" y="130" text-anchor="end">0</text>']
+  if (view.best !== undefined) parts.push('<line class="best" x1="' + x(view.best.position) + '" y1="10" x2="' + x(view.best.position) + '" y2="130"/>')
+  for (const sample of measured) parts.push('<circle class="' + (sample.stars >= most / 2 ? 'dot' : 'few') + '" cx="' + x(sample.position) + '" cy="' + y(sample.hfd) + '" r="4"><title>' + sample.position + ': HFD ' + sample.hfd.toFixed(1) + ', ' + sample.stars + ' stars</title></circle>')
+  afChart.innerHTML = parts.join('')
 }
 
 const focusStop = document.getElementById('focus-stop')

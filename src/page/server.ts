@@ -28,10 +28,12 @@ export interface PageOptions {
     readonly stop: () => Promise<boolean>
   }
   readonly prepare: (request: unknown) => Promise<PrepareResult>
+  readonly runs: Readonly<Record<string, { readonly start: (request: unknown) => PrepareResult; readonly view: () => unknown }>>
   readonly pointing: Pick<Pointing, 'view' | 'search' | 'preview'> & { readonly act: (request: unknown) => Promise<PrepareResult> }
 }
 
-export function makePage({ night: nightAlone, focus, refreshMs, frames, preview, frame, activity, capture, prepare, pointing }: PageOptions) {
+export function makePage({ night: nightAlone, focus, refreshMs, frames, preview, frame, activity, capture: captureAlone, prepare, pointing, runs }: PageOptions) {
+  const capture = { ...captureAlone, view: () => ({ ...captureAlone.view(), ...Object.fromEntries(Object.entries(runs).map(([name, run]) => [name, run.view()])) }) }
   const watching = new Set<ServerResponse>()
   const night = () => ({ ...nightAlone(), focus: focus() })
 
@@ -125,7 +127,8 @@ export function makePage({ night: nightAlone, focus, refreshMs, frames, preview,
       return
     }
 
-    const acts = path === '/prepare' ? prepare : path === '/pointing' ? pointing.act : undefined
+    const run = runs[path.slice(1)]
+    const acts = path === '/prepare' ? prepare : path === '/pointing' ? pointing.act : run === undefined ? undefined : (json: unknown) => Promise.resolve(run.start(json))
 
     if (acts !== undefined && request.method === 'POST') {
       if (refuseUnlessJson(request, response)) return

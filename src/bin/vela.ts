@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { jetstream } from '@nats-io/jetstream'
 import { runEntry, runSubject } from '../capture/events.ts'
@@ -16,6 +17,8 @@ import { makeSsh } from '../frames/ssh.ts'
 import { makePointing } from '../pointing/pointing.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
+import { focusSubject, makeAutofocus } from '../focus/autofocus.ts'
+import { makeAstap } from '../measure/astap.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
@@ -71,6 +74,23 @@ const capture = makeCapture({
   },
   onChange: () => page.captureChanged(),
 })
+const astap = makeAstap(settings.astap)
+const keptPath = (frame: { readonly night: string; readonly file: string }) => join(frames.keepDir, frame.night, frame.file)
+const publishEntry = (subject: string, kind: string, id: string, body: Readonly<Record<string, unknown>>) => {
+  const at = Date.now()
+
+  jetstream(following.connection)
+    .publish(subject, JSON.stringify({ v: 2, id: `${kind}:${id}:${at}`, rig: frames.rig, kind, at, source: 'vela', body }))
+    .catch((error: unknown) => console.error(`vela: could not publish ${kind}: ${String(error)}`))
+}
+const autofocus = makeAutofocus({
+  picture,
+  sender,
+  capture,
+  analyse: frame => astap.analyse(keptPath(frame)),
+  publish: (kind, body) => publishEntry(focusSubject, `vela.focus.${kind}`, String(body['run']), body),
+  settings: { focuser: devices.focuser, camera: devices.primary },
+})
 const page = makePage({
   night: () => makeNight(picture, nightSettings, Date.now()),
   focus: () => focusDrift.view(),
@@ -82,6 +102,7 @@ const page = makePage({
   capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
   prepare: request => prepare.act(request),
   pointing,
+  runs: { autofocus },
 })
 
 const keeper = makeKeeper({
@@ -92,6 +113,7 @@ const keeper = makeKeeper({
   sleep: ms => sleep(ms),
   onKept: frame => {
     page.framesChanged()
+    void autofocus.kept(frame)
     jetstream(following.connection)
       .publish(frameSubject, JSON.stringify(frameEntry(frame, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))
@@ -112,6 +134,7 @@ const following = await followRig({
     capture.observe(entry)
     pointing.observe(entry)
     focusDrift.observe(entry)
+    autofocus.observe(entry)
 
     const item = activity.observe(entry)
 

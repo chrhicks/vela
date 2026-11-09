@@ -37,7 +37,7 @@ export const spoolDir = '/spool'
 
 export const fastSettings: CaptureSettings = { device: 'primary', spoolDir, settleMs: 60, exposureSilenceMs: 40, failuresInRow: 3, silenceMs: 60_000, telescope: undefined }
 
-export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial<CaptureSettings>; omit?: string[] } = {}) {
+export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial<CaptureSettings>; omit?: string[]; onEvent?: (event: RunEvent) => void } = {}) {
   const picture = makePicture()
   const events: RunEvent[] = []
   const script: CameraScript = { exposures: options.exposures ?? [], refuse: new Map(), silent: new Set(), ignore: new Set(), sent: [] }
@@ -128,7 +128,10 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
     runFile,
     now: Date.now,
     newRunId: () => 'run-1',
-    emit: event => void events.push(event),
+    emit: event => {
+      events.push(event)
+      options.onEvent?.(event)
+    },
     onChange: () => undefined,
   })
 
@@ -139,7 +142,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
 
   picture.caughtUp()
 
-  return { picture, capture, script, events, files, runFile, plantRunFile: (record: Partial<ActiveRecord>) => void (recorded = record), feed, set }
+  return { picture, sender, capture, script, events, files, runFile, plantRunFile: (record: Partial<ActiveRecord>) => void (recorded = record), feed, set }
 }
 
 export const request = { object: 'M 31', frameType: 'dark', exposureSeconds: 0.01, count: 3, gain: 200, offset: 50, cooler: 'on', setpoint: -10 }
