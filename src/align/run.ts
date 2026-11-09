@@ -20,7 +20,6 @@ export interface AlignSettings {
   readonly camera: string
   readonly declinationDegrees: number
   readonly hourAnglesDegrees: readonly [number, number, number]
-  readonly adjustFrames: number
 }
 
 export interface AlignOptions {
@@ -150,7 +149,7 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
         return hourAngle === undefined ? undefined : slewTo(hourAngle, signal)
       }
 
-      const started = capture.start({ object: 'polar-align', frameType: 'light', exposureSeconds: request.exposureSeconds, count: settings.hourAnglesDegrees.length + settings.adjustFrames, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between)
+      const started = capture.start({ object: 'polar-align', frameType: 'light', exposureSeconds: request.exposureSeconds, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between)
 
       if (!started.ok) return started
 

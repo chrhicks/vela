@@ -56,7 +56,7 @@ export interface CaptureView {
         readonly object: string
         readonly frameType: string
         readonly exposureSeconds: number
-        readonly count: number
+        readonly count: number | undefined
         readonly counted: number
         readonly failed: number
         readonly frame: number
@@ -232,7 +232,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   async function runFrames(run: Active) {
     let first = true
 
-    while (run.counted < run.request.count) {
+    while (run.request.count === undefined || run.counted < run.request.count) {
       const stop = await prepare(run, first)
 
       if (stop !== undefined) return finishWith(run, stop)
@@ -387,7 +387,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
                 count: active.request.count,
                 counted: active.counted,
                 failed: active.failed,
-                frame: Math.min(active.counted + 1, active.request.count),
+                frame: active.request.count === undefined ? active.counted + 1 : Math.min(active.counted + 1, active.request.count),
                 phase: active.phase,
                 secondsLeft: active.exposureEndsAt === undefined ? undefined : Math.max(0, Math.ceil((active.exposureEndsAt - at) / 1000)),
               },

@@ -6,7 +6,7 @@ export interface ActiveRecord {
   readonly startedAt: number
   readonly object: string
   readonly frameType: string
-  readonly count: number
+  readonly count: number | undefined
   readonly counted: number
 }
 
