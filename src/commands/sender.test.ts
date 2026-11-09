@@ -13,6 +13,7 @@ function setup(options: { timeoutMs?: number; publish?: (subject: string, payloa
     newId: () => `vela-${(count += 1)}`,
     answerTimeoutMs: options.timeoutMs ?? 50,
     by: 'vela',
+    now: Date.now,
   })
 
   return { sender, published }
@@ -40,19 +41,41 @@ describe('the command sender', () => {
     expect(await outcome).toEqual({ result: 'refused', reason: 'CCD_FRAME_TYPE is read-only' })
   })
 
-  it('reports unknown when no answer comes, and does not publish again', async () => {
+  it('keeps waiting for an answer, lists the command as late after the answer time, and does not publish again', async () => {
     const { sender, published } = setup({ timeoutMs: 5 })
+    const outcome = sender.send(command)
 
-    expect(await sender.send(command)).toEqual({ result: 'unknown', reason: 'no answer from the rig program within 0.005 s' })
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(sender.late(Date.now())).toMatchObject([{ device: 'primary', property: 'CCD_FRAME_TYPE' }])
+    sender.answered(answer({ id: 'vela-1', result: 'written' }))
+
+    expect(await outcome).toEqual({ result: 'written' })
+    expect(sender.late(Date.now())).toEqual([])
     expect(published).toHaveLength(1)
+  })
+
+  it('stops waiting when Stop is pressed', async () => {
+    const { sender } = setup()
+    const stop = new AbortController()
+    const outcome = sender.send(command, stop.signal)
+
+    stop.abort()
+
+    expect(await outcome).toEqual({ result: 'unknown', reason: 'Stop pressed before the rig program answered' })
+    expect(sender.late(Date.now() + 1000)).toEqual([])
   })
 
   it('ignores answers for other ids', async () => {
     const { sender } = setup({ timeoutMs: 5 })
-    const outcome = sender.send(command)
+    const stop = new AbortController()
+    const outcome = sender.send(command, stop.signal)
 
     sender.answered(answer({ id: 'someone-else', result: 'written' }))
+    await new Promise(resolve => setTimeout(resolve, 20))
 
+    expect(sender.late(Date.now())).toHaveLength(1)
+    stop.abort()
     expect(await outcome).toMatchObject({ result: 'unknown' })
   })
 

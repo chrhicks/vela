@@ -1,5 +1,5 @@
 import { basename } from 'node:path'
-import type { Sender } from '../commands/sender.ts'
+import type { LateCommand, Sender } from '../commands/sender.ts'
 import { announcesFrame } from '../frames/announce.ts'
 import type { Picture } from '../rig/picture.ts'
 import { readWireBody, type Entry } from '../stream/entry.ts'
@@ -32,7 +32,7 @@ export interface CaptureSettings {
 
 export interface CaptureOptions {
   readonly picture: Pick<Picture, 'property' | 'rig' | 'indi' | 'heardAt'>
-  readonly sender: Pick<Sender, 'send'>
+  readonly sender: Pick<Sender, 'send' | 'late'>
   readonly settings: CaptureSettings
   readonly runFile: RunFile
   readonly nextName: (sequence: string) => Promise<string>
@@ -66,6 +66,7 @@ export interface CaptureView {
       }
     | undefined
   readonly last: Ending | undefined
+  readonly late: ReadonlyArray<LateCommand>
 }
 
 export type Between = (frame: number, signal: AbortSignal) => Promise<string | undefined>
@@ -161,9 +162,9 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   }
 
   async function apply(run: Active, step: Step): Promise<Stop | undefined> {
-    const outcome = await sender.send({ device: settings.device, property: step.property, values: step.values })
+    const outcome = await sender.send({ device: settings.device, property: step.property, values: step.values }, run.abort.signal)
 
-    if (outcome.result !== 'written') return { reason: outcome.result, detail: `${step.property}: ${outcome.reason}` }
+    if (outcome.result !== 'written') return stoppedOr(run, { reason: outcome.result, detail: `${step.property}: ${outcome.reason}` })
 
     if (step.shows !== undefined) {
       const shows = step.shows
@@ -207,12 +208,10 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     run.watch = watch
     run.phase = 'exposing'
 
-    const outcome = await sender.send({ device: settings.device, property: 'CCD_EXPOSURE', values: { CCD_EXPOSURE_VALUE: run.request.exposureSeconds } })
+    const outcome = await sender.send({ device: settings.device, property: 'CCD_EXPOSURE', values: { CCD_EXPOSURE_VALUE: run.request.exposureSeconds } }, run.abort.signal)
 
     if (outcome.result !== 'written') {
       run.watch = undefined
-
-      if (outcome.result === 'unknown') await sender.send(abortCommand(settings.device))
 
       return { frame: 'stop', stop: stoppedOr(run, { reason: outcome.result, detail: `CCD_EXPOSURE: ${outcome.reason}` }) }
     }
@@ -228,7 +227,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     if (watch.file !== undefined) return { frame: 'file', path: watch.file }
     if (run.abort.signal.aborted) return { frame: 'stop', stop: { reason: 'stopped', detail: 'Stop pressed' } }
 
-    await sender.send(abortCommand(settings.device))
+    await sender.send(abortCommand(settings.device), run.abort.signal)
 
     return { frame: 'failed', why: 'alert' }
   }
@@ -283,7 +282,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     run.phase = 'ending'
     onChange()
 
-    const stopped = run.stopping === undefined ? undefined : await run.stopping
+    const stopped = run.stopping === undefined ? undefined : await Promise.race([run.stopping, Promise.resolve('Stop pressed, abort sent')])
 
     finish(run, stopped === undefined || stop.reason !== 'stopped' ? stop : { reason: 'stopped', detail: stopped })
   }
@@ -333,7 +332,6 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
       run.stopping ??= sender.send(abortCommand(settings.device)).then(outcome => (outcome.result === 'written' ? 'Stop pressed, abort written' : `Stop pressed, abort ${outcome.result}: ${outcome.reason}`))
       run.abort.abort()
-      await run.stopping
 
       return true
     },
@@ -404,6 +402,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
                 alert: alertOf(active, at),
               },
         last,
+        late: sender.late(at),
       }
     },
   }

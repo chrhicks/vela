@@ -9,7 +9,7 @@ const settings = { devices: { mount: 'mount', primary: 'primary', guide: 'guide'
 
 const open: Array<ReturnType<typeof makePage>['server']> = []
 
-const idleView = { at: 1, run: undefined, last: undefined }
+const idleView = { at: 1, run: undefined, last: undefined, late: [] }
 
 const idlePrepare: PageOptions['prepare'] = async () => ({ ok: false, reason: 'not here' })
 

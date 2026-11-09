@@ -109,7 +109,7 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
   }
 
   async function move(position: number, signal: AbortSignal): Promise<string | undefined> {
-    const outcome = await sender.send({ device: settings.focuser, property: 'ABS_FOCUS_POSITION', values: { FOCUS_ABSOLUTE_POSITION: position } })
+    const outcome = await sender.send({ device: settings.focuser, property: 'ABS_FOCUS_POSITION', values: { FOCUS_ABSOLUTE_POSITION: position } }, signal)
 
     if (outcome.result !== 'written') return `focuser move to ${position}: ${outcome.reason}`
 

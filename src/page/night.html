@@ -957,6 +957,8 @@ function showTonight() {
   } else {
     head.innerHTML = '<h1>Nothing running</h1><p class="sub"><a href="#/point">Choose a target</a> or <a href="#/capture">start a run</a>.</p>'
   }
+  const late = tonightState.capture?.late ?? []
+  if (late.length > 0) head.innerHTML = '<p class="alarm bad">' + escapeText('No answer from the rig program for ' + Math.max(...late.map(command => command.seconds)) + ' s (' + late.map(command => command.property).join(', ') + ')') + '. Vela is still waiting; Stop is yours.</p>' + head.innerHTML
   document.getElementById('tonight-readings').innerHTML = [
     ['Sensor', '#/rig', reading('primary', 'Sensor temperature') + (fieldText('primary', 'Cooler') === 'on' && /°C/.test(fieldText('primary', 'Setpoint (last written)')) ? ', set to ' + reading('primary', 'Setpoint (last written)') + ', cooler at ' + reading('primary', 'Cooler power') : ', cooler ' + reading('primary', 'Cooler'))],
     ['Focus', '#/prepare', focusDriftText(night)],
@@ -993,7 +995,7 @@ function showCapture(view) {
     const exposing = run.phase === 'exposing' && run.secondsLeft !== undefined
     const framesAfter = run.count - run.frame + (exposing ? 0 : 1)
     const endsAt = view.at + ((exposing ? run.secondsLeft : 0) + framesAfter * run.exposureSeconds) * 1000
-    progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + (run.count === undefined ? '' : ' of ' + run.count) + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '') + (run.count === undefined ? '. Runs until Stop.' : '. Run ends about ' + new Date(endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })) + (run.alert === undefined ? '' : ' ' + run.alert.text + (run.alert.seconds === undefined ? '' : ' (' + run.alert.seconds + ' s)') + '.')
+    progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + (run.count === undefined ? '' : ' of ' + run.count) + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '') + (run.count === undefined ? '. Runs until Stop.' : '. Run ends about ' + new Date(endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })) + (run.alert === undefined ? '' : ' ' + run.alert.text + (run.alert.seconds === undefined ? '' : ' (' + run.alert.seconds + ' s)') + '.') + (view.late.length === 0 ? '' : ' No answer from the rig program (' + view.late.map(command => command.property).join(', ') + ').')
   }
   const last = view.last
   lastRun.hidden = last === undefined
