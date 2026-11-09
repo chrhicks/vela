@@ -151,6 +151,12 @@
   .answer { margin: 8px 0 12px; }
   #stop-answer { margin: 0; padding: 0 max(24px, env(safe-area-inset-right)) 6px max(24px, env(safe-area-inset-left)); text-align: right; }
   .drift { margin: 0 0 8px; }
+  #pa-readout { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 8px; }
+  #pa-readout[hidden] { display: none; }
+  .pa-figure { display: flex; flex-direction: column; min-width: 120px; }
+  .pa-figure span { color: var(--muted); font-size: 15px; }
+  .pa-figure strong { font-size: 40px; line-height: 1.1; font-weight: 600; }
+  @media (max-width: 600px) { .pa-figure strong { font-size: 30px; } }
   #af-chart { width: 100%; max-width: 480px; display: block; margin-top: 8px; }
   #af-chart .axis { stroke: var(--line); }
   #af-chart .dot { fill: var(--fg); }
@@ -262,6 +268,21 @@
 <div class="view" data-view="prepare">
 <section id="prepare">
   <h1 class="view-title">Prepare</h1>
+  <div class="group" id="align">
+    <h3>Polar alignment</h3>
+    <p class="drift">The mount slews three times at declination 80, east of the meridian, and solves a frame at each. Then every new frame shows how far the axis is from the pole while you turn the knobs. Stop capture ends it.</p>
+    <div class="row">
+      <label class="field">Exposure (s)<input type="number" step="any" id="pa-exposure" value="2"></label>
+      <button type="button" class="moves" id="pa-start">Start polar alignment</button>
+    </div>
+    <p class="answer" id="pa-answer" aria-live="polite" hidden></p>
+    <p id="pa-status" hidden></p>
+    <div id="pa-readout" hidden>
+      <div class="pa-figure"><span>Altitude</span><strong id="pa-alt"></strong><span id="pa-alt-do"></span></div>
+      <div class="pa-figure"><span>Azimuth</span><strong id="pa-az"></strong><span id="pa-az-do"></span></div>
+      <div class="pa-figure"><span>Total</span><strong id="pa-total"></strong><span id="pa-when"></span></div>
+    </div>
+  </div>
   <div class="group" id="focuser-controls">
     <h3>Focuser</h3>
     <div class="row">
@@ -960,6 +981,7 @@ function showTonight() {
 function showCapture(view) {
   tonightState.capture = view
   showAutofocus(view.autofocus)
+  showAlign(view.align)
   showTonight()
   const run = view.run
   statusParts.run = run
@@ -1008,6 +1030,39 @@ afStart.addEventListener('click', () => {
   const request = { step: Number(document.getElementById('af-step').value), samples: Number(document.getElementById('af-samples').value), exposureSeconds: Number(document.getElementById('af-exposure').value) }
   act(afStart, afAnswer, '/autofocus', request, 'Start autofocus', 'Autofocus started: ' + request.samples + ' samples ' + request.step + ' steps apart.')
 })
+
+const paStart = document.getElementById('pa-start')
+const paAnswer = document.getElementById('pa-answer')
+const paStatus = document.getElementById('pa-status')
+const paReadout = document.getElementById('pa-readout')
+paStart.addEventListener('click', () => {
+  const request = { exposureSeconds: Number(document.getElementById('pa-exposure').value) }
+  act(paStart, paAnswer, '/align', request, 'Start polar alignment', 'Polar alignment started: slewing to the first point.')
+})
+
+const arcmin = value => Math.abs(value) < 1 ? Math.round(Math.abs(value) * 60) + '″' : Math.abs(value).toFixed(1) + '′'
+
+function showAlign(view) {
+  if (view === undefined || view.run === undefined) return
+  const solved = view.frames.filter(frame => frame.frame <= 3 && frame.solved).length
+  const missed = view.frames.filter(frame => !frame.solved).sort((a, b) => b.frame - a.frame)[0]
+  let text = view.error === undefined ? 'Measuring the axis: ' + solved + ' of 3 frames solved.' : 'Turn the knobs; each new frame updates these numbers. First measured: ' + arcmin(view.first?.totalArcmin ?? view.error.totalArcmin) + ' from the pole.'
+  let tone = ''
+  if (missed !== undefined) { text += ' Frame ' + missed.frame + ' did not solve: ' + missed.reason + '.'; tone = 'warn' }
+  if (view.ended !== undefined) { text = 'Polar alignment ended' + (view.ended === 'done' ? ': start it again to keep adjusting.' : ': ' + (tonightState.capture?.last?.detail ?? view.ended) + '.') + (view.error === undefined ? '' : ' Last reading: ' + arcmin(view.error.totalArcmin) + ' from the pole.'); tone = view.ended === 'done' || view.ended === 'stopped' ? '' : 'bad' }
+  paStatus.hidden = false
+  paStatus.className = tone
+  paStatus.textContent = text
+  paReadout.hidden = view.error === undefined
+  if (view.error === undefined) return
+  const error = view.error
+  document.getElementById('pa-alt').textContent = arcmin(error.altitudeArcmin)
+  document.getElementById('pa-alt-do').textContent = error.altitudeArcmin > 0 ? 'axis too high: lower it' : 'axis too low: raise it'
+  document.getElementById('pa-az').textContent = arcmin(error.azimuthArcmin)
+  document.getElementById('pa-az-do').textContent = error.azimuthArcmin > 0 ? 'axis east of the pole: turn it west' : 'axis west of the pole: turn it east'
+  document.getElementById('pa-total').textContent = arcmin(error.totalArcmin)
+  document.getElementById('pa-when').textContent = 'frame ' + error.frame + ', ' + Math.max(0, Math.round((Date.now() - error.at) / 1000)) + ' s ago'
+}
 
 const afHow = { fit: 'fitted through the lowest sample and its neighbours', lowest: 'the lowest sample', edge: 'the lowest sample, at the end of the sweep' }
 

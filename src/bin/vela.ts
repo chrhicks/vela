@@ -19,6 +19,8 @@ import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
 import { focusSubject, makeAutofocus } from '../focus/autofocus.ts'
 import { makeAstap } from '../measure/astap.ts'
+import { alignSubject, makeAlign } from '../align/run.ts'
+import { readCards } from '../frames/library.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
@@ -91,6 +93,16 @@ const autofocus = makeAutofocus({
   publish: (kind, body) => publishEntry(focusSubject, `vela.focus.${kind}`, String(body['run']), body),
   settings: { focuser: devices.focuser, camera: devices.primary },
 })
+const align = makeAlign({
+  picture,
+  sender,
+  capture,
+  solve: frame => astap.solve(keptPath(frame)),
+  cards: frame => readCards(keptPath(frame)),
+  publish: (kind, body) => publishEntry(alignSubject, `vela.align.${kind}`, `${String(body['run'])}:${String(body['frame'] ?? '')}`, body),
+  settings: { mount: devices.mount, camera: devices.primary, ...settings.align },
+  now: Date.now,
+})
 const page = makePage({
   night: () => makeNight(picture, nightSettings, Date.now()),
   focus: () => focusDrift.view(),
@@ -102,7 +114,7 @@ const page = makePage({
   capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
   prepare: request => prepare.act(request),
   pointing,
-  runs: { autofocus },
+  runs: { autofocus, align },
 })
 
 const keeper = makeKeeper({
@@ -114,6 +126,7 @@ const keeper = makeKeeper({
   onKept: frame => {
     page.framesChanged()
     void autofocus.kept(frame)
+    void align.kept(frame)
     jetstream(following.connection)
       .publish(frameSubject, JSON.stringify(frameEntry(frame, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))
@@ -135,6 +148,7 @@ const following = await followRig({
     pointing.observe(entry)
     focusDrift.observe(entry)
     autofocus.observe(entry)
+    align.observe(entry)
 
     const item = activity.observe(entry)
 

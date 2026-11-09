@@ -32,7 +32,7 @@ function rowOf(sidecar: Sidecar) {
   return { bytes: sidecar.bytes, keptAt: sidecar.keptAt, run: sidecar.run ?? null, sequence: sidecar.sequence ?? null, frame: sidecar.frame ?? null }
 }
 
-async function readCards(path: string) {
+export async function readCards(path: string) {
   const file = await open(path)
 
   try {
