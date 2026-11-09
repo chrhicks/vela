@@ -137,7 +137,11 @@ const keeper = makeKeeper({
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))
   },
   onProblem: message => console.error(`vela: ${message}`),
-  onLeft: left => publishEntry(copySubject, 'vela.copy.left', left.what, { what: left.what, reason: left.reason }),
+  onLeft: left => {
+    publishEntry(copySubject, 'vela.copy.left', left.what, { what: left.what, reason: left.reason })
+    autofocus.missed(left.what, left.reason)
+    align.missed(left.what, left.reason)
+  },
 })
 
 const following = await followRig({

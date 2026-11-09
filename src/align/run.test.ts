@@ -13,7 +13,7 @@ const solves = [
   { raDegrees: 190.02, decDegrees: 80.6 },
 ]
 
-function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopAfter = 5, slewAlertAt = 0) {
+function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopAfter = 5, slewAlertAt = 0, missFrame = 0) {
   const published: Array<{ kind: string; body: Record<string, unknown> }> = []
   const events: string[] = []
   const holder = { align: undefined as ReturnType<typeof makeAlign> | undefined }
@@ -21,7 +21,8 @@ function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopA
   const feed = (kind: string, body: Record<string, unknown>) => holder.align?.observe({ id: `${kind}:${(at += 1)}`, kind, at, run: undefined, body })
   const camera = fakeCamera({
     onEvent: event => {
-      if (event.kind === 'exposed') void holder.align?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
+      if (event.kind === 'exposed' && event.body['frame'] === missFrame) holder.align?.missed(String(event.body['file']), 'copy exited 255')
+      else if (event.kind === 'exposed') void holder.align?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
       events.push(`${event.kind}:${String(event.body['frame'] ?? '')}`)
       feed(`vela.run.${event.kind}`, { run: event.run, ...event.body })
     },
@@ -119,6 +120,27 @@ describe('a polar alignment run on a scripted camera and mount', () => {
 
     expect(slews).toHaveLength(3)
     expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false }, { frame: 5, solved: true }], error: { frame: 5 }, previous: { frame: 3 } })
+  })
+
+  it('moves on to the next adjusting frame when one could not be copied from the rig computer', async () => {
+    const { align, published } = scriptedRun(frame => ({ ok: true, ...solves[frame - 1]! }), 0, 5, 0, 4)
+
+    expect(align.start({ exposureSeconds: 0.01 })).toEqual({ ok: true })
+
+    await settled(align, published, 5)
+
+    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false, reason: 'the frame could not be copied from the rig computer: copy exited 255' }, { frame: 5, solved: true }], error: { frame: 5 } })
+  })
+
+  it('stops like a failed solve when one of the first three frames could not be copied', async () => {
+    const { align, published, slews } = scriptedRun(frame => ({ ok: true, ...solves[frame - 1]! }), 0, 5, 0, 2)
+
+    expect(align.start({ exposureSeconds: 0.01 })).toEqual({ ok: true })
+
+    await settled(align, published, 2)
+
+    expect(slews).toHaveLength(2)
+    expect(align.view()).toMatchObject({ ended: 'refused', frames: [{ frame: 1, solved: true }, { frame: 2, solved: false }] })
   })
 
   it('takes each adjusting frame only after the last one is solved, so the readings never fall behind', async () => {
