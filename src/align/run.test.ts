@@ -96,6 +96,7 @@ describe('a polar alignment run on a scripted camera and mount', () => {
     expect(published[3]?.body).toHaveProperty('altitudeArcmin')
     expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ frame: 1, solved: true }, { frame: 2, solved: true }, { frame: 3, solved: true }, { frame: 4, solved: true }, { frame: 5, solved: true }], error: { frame: 5 } })
     expect(align.view().first?.totalArcmin).toBeGreaterThan(0)
+    expect(align.view().lastFrameAt).toBeGreaterThan(startedAt)
   })
 
   it('stops before the next slew when a frame does not solve', async () => {
