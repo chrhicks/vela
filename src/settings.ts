@@ -124,6 +124,14 @@ export const AlignSettings = Schema.Struct({
   ),
 })
 
+export const AutofocusSettings = Schema.Struct({
+  minStars: described(
+    'Stars the best frame of a sweep must show before Vela picks a focus from it. A daylight sweep on the rig found 1 to 4 (noise and hot pixels), and frames with no stars on 11-08 0 to 4; real night frames within 150 steps of focus found 55 to 582 (10-31 replay, 2026-11-09)',
+    Schema.Number,
+    10,
+  ),
+})
+
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the page is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve' }),
   broker: BrokerSettings,
@@ -154,6 +162,7 @@ export const VelaSettings = Schema.Struct({
   pointing: described('Settings for choosing a target and pointing the mount', PointingSettings, {}),
   astap: AstapSettings,
   align: described('Settings for polar alignment', AlignSettings, {}),
+  autofocus: described('Settings for autofocus', AutofocusSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({
       description: "The address of Cria's stream viewer, which shows the raw INDI wire. The Activity view links to it; without it, there is no link",
