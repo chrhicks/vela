@@ -10,6 +10,8 @@ const Request = Schema.Union([
   Schema.Struct({ action: Schema.Literal('dew-channel'), channel: Schema.String, on: Schema.Boolean }),
   Schema.Struct({ action: Schema.Literal('dew-duty'), channel: Schema.String, percent: Schema.Finite }),
   Schema.Struct({ action: Schema.Literal('dew-auto'), on: Schema.Boolean }),
+  Schema.Struct({ action: Schema.Literal('cooler-on'), setpoint: Schema.Finite }),
+  Schema.Struct({ action: Schema.Literal('cooler-off') }),
 ])
 
 export type PrepareResult = { readonly ok: true } | { readonly ok: false; readonly reason: string }
@@ -17,6 +19,7 @@ export type PrepareResult = { readonly ok: true } | { readonly ok: false; readon
 export interface PrepareSettings {
   readonly focuser: string
   readonly box: string
+  readonly camera: string
   readonly focuserNudgeSteps: number
 }
 
@@ -29,7 +32,7 @@ export interface PrepareOptions {
 const refuse = (reason: string): PrepareResult => ({ ok: false, reason })
 
 export function makePrepare({ picture, sender, settings }: PrepareOptions) {
-  const { focuser, box, focuserNudgeSteps } = settings
+  const { focuser, box, camera, focuserNudgeSteps } = settings
 
   async function write(device: string, property: string, values: Readonly<Record<string, number | boolean>>): Promise<PrepareResult> {
     const outcome = await sender.send({ device, property, values })
@@ -98,6 +101,26 @@ export function makePrepare({ picture, sender, settings }: PrepareOptions) {
     return write(box, 'AUTO_DEW_CONTROL', Object.fromEntries(Object.keys(automatic.values).map(element => [element, on])))
   }
 
+  async function coolerOn(setpoint: number): Promise<PrepareResult> {
+    const temperature = picture.property(camera, 'CCD_TEMPERATURE')
+
+    if (temperature === undefined || picture.property(camera, 'CCD_COOLER') === undefined) return refuse(`${camera} has no CCD_TEMPERATURE and CCD_COOLER on the stream`)
+
+    const problem = outside(setpoint, temperature.limits['CCD_TEMPERATURE_VALUE'], 'setpoint')
+
+    if (problem !== undefined) return refuse(problem)
+
+    const set = await write(camera, 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: setpoint })
+
+    return set.ok ? write(camera, 'CCD_COOLER', { COOLER_ON: true, COOLER_OFF: false }) : set
+  }
+
+  async function coolerOff(): Promise<PrepareResult> {
+    if (picture.property(camera, 'CCD_COOLER') === undefined) return refuse(`${camera} has no CCD_COOLER on the stream`)
+
+    return write(camera, 'CCD_COOLER', { COOLER_ON: false, COOLER_OFF: true })
+  }
+
   return {
     async act(json: unknown): Promise<PrepareResult> {
       let request: typeof Request.Type
@@ -121,6 +144,10 @@ export function makePrepare({ picture, sender, settings }: PrepareOptions) {
           return dewDuty(request.channel, request.percent)
         case 'dew-auto':
           return dewAuto(request.on)
+        case 'cooler-on':
+          return coolerOn(request.setpoint)
+        case 'cooler-off':
+          return coolerOff()
       }
     },
   }

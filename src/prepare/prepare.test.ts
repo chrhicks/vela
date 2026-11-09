@@ -5,7 +5,7 @@ import { connected, startedAt, wire } from '../testing/entries.ts'
 import { makePrepare } from './prepare.ts'
 import { makePrepareView } from './view.ts'
 
-const settings = { focuser: 'focuser', box: 'box', focuserNudgeSteps: 100 }
+const settings = { focuser: 'focuser', box: 'box', camera: 'primary', focuserNudgeSteps: 100 }
 
 function rig(options: { limits?: boolean; position?: number } = {}) {
   const picture = makePicture()
@@ -20,6 +20,8 @@ function rig(options: { limits?: boolean; position?: number } = {}) {
   picture.apply(wire(at, 'def', 'box', 'DEW_DUTY_CYCLES', { DEW_CHANNEL_1: 0, DEW_CHANNEL_2: 40 }, 'Idle', 'in', { DEW_CHANNEL_1: { min: 0, max: 100 }, DEW_CHANNEL_2: { min: 0, max: 100 } }), at)
   picture.apply(wire(at, 'def', 'box', 'DEW_LABELS', { DEW_CHANNEL_1: 'Dew A', DEW_CHANNEL_2: 'Dew B' }, 'Idle'), at)
   picture.apply(wire(at, 'def', 'box', 'AUTO_DEW_CONTROL', { DEW_CHANNEL_1: false }, 'Idle'), at)
+  picture.apply(wire(at, 'def', 'primary', 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: 21.5 }, 'Ok', 'in', { CCD_TEMPERATURE_VALUE: { min: -50, max: 50 } }), at)
+  picture.apply(wire(at, 'def', 'primary', 'CCD_COOLER', { COOLER_ON: false, COOLER_OFF: true }, 'Ok'), at)
 
   return picture
 }
@@ -214,5 +216,38 @@ describe('the view', () => {
       focuser: { known: false, position: undefined, min: undefined, max: undefined, moving: false, nudgeSteps: 100 },
       dew: { channels: [], auto: undefined },
     })
+  })
+})
+
+describe('cooler', () => {
+  it('writes the setpoint, then turns the cooler on', async () => {
+    const { prepare, sent } = setup()
+
+    expect(await prepare.act({ action: 'cooler-on', setpoint: -10 })).toEqual({ ok: true })
+    expect(sent).toEqual([
+      { device: 'primary', property: 'CCD_TEMPERATURE', values: { CCD_TEMPERATURE_VALUE: -10 } },
+      { device: 'primary', property: 'CCD_COOLER', values: { COOLER_ON: true, COOLER_OFF: false } },
+    ])
+  })
+
+  it('does not turn the cooler on when the setpoint was refused', async () => {
+    const { prepare, sent } = setup([{ result: 'refused', reason: 'busy' }])
+
+    expect(await prepare.act({ action: 'cooler-on', setpoint: -10 })).toEqual({ ok: false, reason: 'CCD_TEMPERATURE: busy' })
+    expect(sent).toHaveLength(1)
+  })
+
+  it('refuses a setpoint outside the limits the driver gives', async () => {
+    const { prepare, sent } = setup()
+
+    expect(await prepare.act({ action: 'cooler-on', setpoint: -60 })).toEqual({ ok: false, reason: 'setpoint -60 is outside the limits the driver gives, -50 to 50' })
+    expect(sent).toEqual([])
+  })
+
+  it('turns the cooler off', async () => {
+    const { prepare, sent } = setup()
+
+    expect(await prepare.act({ action: 'cooler-off' })).toEqual({ ok: true })
+    expect(sent).toEqual([{ device: 'primary', property: 'CCD_COOLER', values: { COOLER_ON: false, COOLER_OFF: true } }])
   })
 })
