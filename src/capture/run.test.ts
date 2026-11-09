@@ -5,6 +5,10 @@ function kinds(events: ReadonlyArray<{ kind: string }>) {
   return events.map(event => event.kind)
 }
 
+async function until(check: () => boolean) {
+  while (!check()) await new Promise(resolve => setTimeout(resolve, 2))
+}
+
 async function runToEnd(camera: ReturnType<typeof fakeCamera>, body: unknown = request) {
   const started = camera.capture.start(body)
 
@@ -86,19 +90,37 @@ describe('a capture run on a scripted camera', () => {
     expect(camera.script.sent.some(sent => sent.property === 'CCD_ABORT_EXPOSURE')).toBe(false)
   })
 
-  it('fails a frame when the camera sends no CCD_EXPOSURE update for the silence setting', async () => {
-    const camera = fakeCamera({ exposures: ['nothing', 'file'] })
-    const ending = await runToEnd(camera, { ...request, count: 1 })
+  it('keeps waiting for a camera that went quiet during an exposure, says so, and never aborts the frame itself', async () => {
+    const camera = fakeCamera({ exposures: ['nothing'] })
+    const started = camera.capture.start({ ...request, count: 1 })
 
-    expect(ending).toMatchObject({ reason: 'done', counted: 1, failed: 1 })
-    expect(camera.events.filter(event => event.kind === 'failed')).toMatchObject([{ body: { why: 'silent' } }])
+    if (!started.ok) throw new Error(started.reason)
+
+    await until(() => camera.capture.view().run?.alert !== undefined)
+
+    expect(camera.capture.view().run?.alert).toMatchObject({ text: 'Waiting for word from the camera during the exposure' })
+    expect(camera.script.sent.some(sent => sent.property === 'CCD_ABORT_EXPOSURE')).toBe(false)
+
+    await camera.capture.stop()
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'stopped', counted: 0, failed: 0 })
   })
 
-  it('stops after the failure limit in a row and keeps what was counted', async () => {
-    const camera = fakeCamera({ exposures: ['file', 'alert', 'alert', 'alert', 'file'] })
-    const ending = await runToEnd(camera, { ...request, count: 10 })
+  it('keeps going after failures in a row and says so until a frame is saved', async () => {
+    const holder = { camera: undefined as ReturnType<typeof fakeCamera> | undefined }
+    const alerts: unknown[] = []
+    const camera = fakeCamera({
+      exposures: ['file', 'alert', 'alert', 'alert', 'file'],
+      onEvent: event => {
+        if (event.kind === 'failed' || event.kind === 'exposed') alerts.push(holder.camera?.capture.view().run?.alert)
+      },
+    })
 
-    expect(ending).toMatchObject({ reason: 'failures', counted: 1, failed: 3, detail: '3 exposures in a row failed' })
+    holder.camera = camera
+
+    expect(await runToEnd(camera, { ...request, count: 2 })).toMatchObject({ reason: 'done', counted: 2, failed: 3 })
+    expect(alerts).toEqual([undefined, undefined, undefined, { text: '3 exposures in a row failed', seconds: undefined }, undefined])
   })
 
   it('does not stop for failures that are not in a row', async () => {
@@ -216,12 +238,23 @@ describe('what a run does with commands that do not work', () => {
     expect(camera.script.sent.filter(sent => sent.property === 'CCD_CONTROLS')).toHaveLength(1)
   })
 
-  it('ends the run as unknown when a command was written but the stream never shows it', async () => {
+  it('keeps waiting when a command was written but the stream never shows it, says so, and never sends it again', async () => {
     const camera = fakeCamera()
 
     camera.script.ignore.add('CCD_FRAME_TYPE')
 
-    expect(await runToEnd(camera)).toMatchObject({ reason: 'unknown', detail: expect.stringContaining('CCD_FRAME_TYPE was written but the stream does not show it') })
+    const started = camera.capture.start(request)
+
+    if (!started.ok) throw new Error(started.reason)
+
+    await until(() => camera.capture.view().run?.alert !== undefined)
+
+    expect(camera.capture.view().run?.alert?.text).toBe('Waiting for the stream to show CCD_FRAME_TYPE')
+
+    await camera.capture.stop()
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'stopped', counted: 0 })
     expect(camera.script.sent.filter(sent => sent.property === 'CCD_FRAME_TYPE')).toHaveLength(1)
   })
 

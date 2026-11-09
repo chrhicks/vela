@@ -947,6 +947,7 @@ function showTonight() {
     const left = run.phase === 'exposing' && run.secondsLeft !== undefined ? run.secondsLeft + ' s left' : run.phase === 'preparing' ? 'setting up' : 'ending'
     head.innerHTML = alarm + '<h1>' + escapeText(run.object) + ', ' + escapeText(run.frameType) + ' frames</h1>' +
       '<p class="sub">' + (run.count === undefined ? 'Frames' : run.count + ' frames') + ' of ' + run.exposureSeconds + ' s' + (run.count === undefined ? ' until Stop' : '') + (run.failed > 0 ? ', ' + run.failed + ' failed' : '') + '.' + (night.phase === 'live' ? '' : ' <span class="stale">Run numbers' + staleNote(night) + '</span>') + '</p>' +
+      (run.alert === undefined ? '' : '<p class="alarm bad">' + escapeText(run.alert.text + (run.alert.seconds === undefined ? '' : ' (' + run.alert.seconds + ' s)')) + '. The run is still going; Stop is yours.</p>') +
       '<div class="big"><div>Frame<b>' + run.frame + (run.count === undefined ? '' : ' of ' + run.count) + '</b></div><div>This frame<b>' + left + '</b></div>' + (run.count === undefined ? '' : '<div>Run ends<b>' + hourMinute(runEndsAt(capture)) + '</b><span class="left">' + timeLeft(runEndsAt(capture) - capture.at) + '</span></div>') + '</div>'
   } else if (goto !== undefined && ['sending', 'sent', 'slewing'].includes(goto.phase)) {
     head.innerHTML = alarm + '<h1>Slewing to ' + escapeText(goto.name) + '</h1><p class="sub">Sent ' + hourMinute(goto.sentAt) +
@@ -992,7 +993,7 @@ function showCapture(view) {
     const exposing = run.phase === 'exposing' && run.secondsLeft !== undefined
     const framesAfter = run.count - run.frame + (exposing ? 0 : 1)
     const endsAt = view.at + ((exposing ? run.secondsLeft : 0) + framesAfter * run.exposureSeconds) * 1000
-    progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + (run.count === undefined ? '' : ' of ' + run.count) + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '') + (run.count === undefined ? '. Runs until Stop.' : '. Run ends about ' + new Date(endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
+    progress.textContent = run.object + ' ' + run.frameType + ': frame ' + run.frame + (run.count === undefined ? '' : ' of ' + run.count) + ', ' + phase + (run.failed > 0 ? ' (' + run.failed + ' failed)' : '') + (run.count === undefined ? '. Runs until Stop.' : '. Run ends about ' + new Date(endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })) + (run.alert === undefined ? '' : ' ' + run.alert.text + (run.alert.seconds === undefined ? '' : ' (' + run.alert.seconds + ' s)') + '.')
   }
   const last = view.last
   lastRun.hidden = last === undefined

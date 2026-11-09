@@ -62,6 +62,7 @@ export interface CaptureView {
         readonly frame: number
         readonly phase: 'preparing' | 'exposing' | 'ending'
         readonly secondsLeft: number | undefined
+        readonly alert: { readonly text: string; readonly seconds: number | undefined } | undefined
       }
     | undefined
   readonly last: Ending | undefined
@@ -87,6 +88,7 @@ interface Active {
   exposureEndsAt: number | undefined
   stopping: Promise<string> | undefined
   watch: { alerted: boolean; file: string | undefined; previous: string | undefined; exposureHeardAt: number } | undefined
+  waiting: { readonly what: string; readonly since: () => number; readonly alertAfterMs: number } | undefined
 }
 
 type Stop = { readonly reason: EndReason; readonly detail: string }
@@ -134,6 +136,26 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     return ending
   }
 
+  async function wait(run: Active, what: string, alertAfterMs: number, check: () => boolean, since: number | (() => number) = now()) {
+    run.waiting = { what, since: typeof since === 'number' ? () => since : since, alertAfterMs }
+
+    try {
+      return await changes.until(check, undefined, run.abort.signal)
+    } finally {
+      run.waiting = undefined
+    }
+  }
+
+  function alertOf(run: Active, at: number) {
+    const waiting = run.waiting
+    const waited = waiting === undefined ? 0 : at - waiting.since()
+
+    if (waiting !== undefined && waited >= waiting.alertAfterMs) return { text: `Waiting for ${waiting.what}`, seconds: Math.round(waited / 1000) }
+    if (run.inARow >= settings.failuresInRow) return { text: `${run.inARow} exposures in a row failed`, seconds: undefined }
+
+    return undefined
+  }
+
   function stoppedOr(run: Active, stop: Stop): Stop {
     return run.abort.signal.aborted ? { reason: 'stopped', detail: 'Stop pressed' } : stop
   }
@@ -145,9 +167,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
     if (step.shows !== undefined) {
       const shows = step.shows
-      const seen = await changes.until(() => shows(read), settings.settleMs, run.abort.signal)
-
-      if (!seen) return stoppedOr(run, { reason: 'unknown', detail: `${step.property} was written but the stream does not show it within ${settings.settleMs / 1000} s` })
+      await wait(run, `the stream to show ${step.property}`, settings.settleMs, () => shows(read))
     }
 
     return run.abort.signal.aborted ? { reason: 'stopped', detail: 'Stop pressed' } : undefined
@@ -157,9 +177,9 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     run.phase = 'preparing'
     onChange()
 
-    const idle = await changes.until(() => read('CCD_EXPOSURE')?.state !== 'Busy', settings.settleMs, run.abort.signal)
+    await wait(run, 'the camera to finish its last exposure', settings.settleMs, () => read('CCD_EXPOSURE')?.state !== 'Busy')
 
-    if (!idle) return stoppedOr(run, { reason: 'unknown', detail: `the camera is still exposing ${settings.settleMs / 1000} s after the last frame ended` })
+    if (run.abort.signal.aborted) return { reason: 'stopped', detail: 'Stop pressed' }
 
     if (!run.named) run.wanted = { ...run.wanted, uploadPrefix: await nextName(run.sequence) }
 
@@ -178,7 +198,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     return undefined
   }
 
-  type Frame = { readonly frame: 'file'; readonly path: string } | { readonly frame: 'failed'; readonly why: 'alert' | 'silent' } | { readonly frame: 'stop'; readonly stop: Stop }
+  type Frame = { readonly frame: 'file'; readonly path: string } | { readonly frame: 'failed'; readonly why: 'alert' } | { readonly frame: 'stop'; readonly stop: Stop }
 
   async function expose(run: Active): Promise<Frame> {
     const watch = { alerted: false, file: undefined as string | undefined, previous: read('CCD_FILE_PATH')?.values['FILE_PATH'] as string | undefined, exposureHeardAt: now() }
@@ -200,25 +220,17 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     run.exposureEndsAt = now() + exposureMs
     onChange()
 
-    const finished = () => watch.file !== undefined || watch.alerted
-
-    while (!finished() && !run.abort.signal.aborted) {
-      const remainingMs = watch.exposureHeardAt + settings.exposureSilenceMs - now()
-
-      if (remainingMs <= 0) break
-
-      await changes.until(finished, remainingMs, run.abort.signal)
-    }
+    await wait(run, 'word from the camera during the exposure', settings.exposureSilenceMs, () => watch.file !== undefined || watch.alerted, () => watch.exposureHeardAt)
 
     run.watch = undefined
     run.exposureEndsAt = undefined
 
     if (watch.file !== undefined) return { frame: 'file', path: watch.file }
-    await sender.send(abortCommand(settings.device))
-
     if (run.abort.signal.aborted) return { frame: 'stop', stop: { reason: 'stopped', detail: 'Stop pressed' } }
 
-    return { frame: 'failed', why: watch.alerted ? 'alert' : 'silent' }
+    await sender.send(abortCommand(settings.device))
+
+    return { frame: 'failed', why: 'alert' }
   }
 
   async function execute(run: Active) {
@@ -258,8 +270,6 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         run.failed += 1
         run.inARow += 1
         emit({ kind: 'failed', run: run.id, body: { attempt: run.counted + run.failed, why: result.why } })
-
-        if (run.inARow >= settings.failuresInRow) return finishWith(run, { reason: 'failures', detail: `${run.inARow} exposures in a row failed` })
       }
 
       onChange()
@@ -305,6 +315,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         exposureEndsAt: undefined,
         stopping: undefined,
         watch: undefined,
+        waiting: undefined,
       }
 
       active = run
@@ -390,6 +401,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
                 frame: active.request.count === undefined ? active.counted + 1 : Math.min(active.counted + 1, active.request.count),
                 phase: active.phase,
                 secondsLeft: active.exposureEndsAt === undefined ? undefined : Math.max(0, Math.ceil((active.exposureEndsAt - at) / 1000)),
+                alert: alertOf(active, at),
               },
         last,
       }

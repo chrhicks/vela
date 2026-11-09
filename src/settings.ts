@@ -57,17 +57,17 @@ export const CaptureSettings = Schema.Struct({
     10,
   ),
   settleSeconds: described(
-    'How long after a command was written its effect may take to show on the stream (a setting, or the camera ending an abort) before the run stops as unknown. Not measured: no capture has run yet (2026-11-07). The driver echoes a changed property on the same INDI connection, so a missing echo after this long means the write did not take, and the command is never sent again',
+    'How long Vela waits for a written setting to show on the stream, or for the camera to stop exposing before the next frame, before the page says it is still waiting. Vela keeps waiting either way; Stop is Chris\'s. Measured 2026-11-09 on RIG_DEV since 11-08 noon ET: 154 of 154 written settings showed within 248 ms, and the camera left Busy within 5 ms of saving each of 46 frames, so 10 s means something is wrong',
     Schema.Number,
     10,
   ),
   exposureSilenceSeconds: described(
-    'How long the camera driver may send no CCD_EXPOSURE update during an exposure before the frame counts as failed and is aborted. While exposing, the driver sent CCD_EXPOSURE Busy with the time left at most 2.4 s apart (median 0.99 s), a retry showed as the time left jumping back up to the full exposure (110 retries), and from the last Busy update to Ok or Alert took at most 1.5 s (Cria wire recording of 2026-11-03, 434 exposures of 10 s and 60 s on the ASI2600MC Pro, indi-asi 2.2.5); 10 s is ten times the normal gap and four times the largest seen, so a driver that is retrying is never cut off and a driver that went quiet is found within 10 s',
+    'How long the camera driver may send no CCD_EXPOSURE update during an exposure before the page says Vela is waiting for word from the camera. Vela never aborts the frame itself; Stop is Chris\'s. While exposing, the driver sent CCD_EXPOSURE Busy with the time left at most 2.4 s apart (median 0.99 s), and a retry showed as the time left jumping back up (110 retries), with at most 1.5 s from the last Busy to Ok or Alert (Cria wire recording of 2026-11-03, 434 exposures, ASI2600MC Pro, indi-asi 2.2.5); 10 s is four times the largest gap seen',
     Schema.Number,
     10,
   ),
   failuresInRow: described(
-    'Exposures in a row that may fail before the run stops. A failed exposure is one the driver gave up on after its own retries, which it reports as CCD_EXPOSURE Alert: 19 of 434 exposures (about 4.4%) on the ASI2600MC Pro (Cria wire recording of 2026-11-03), so 3 in a row happen by chance (0.044^3, if failures were independent) in about 0.0085% of exposures, about 3% of a 375-exposure night; stopping at 3 means a real fault almost every time and wastes at most three exposures on a dead camera',
+    'Exposures in a row the driver gave up on (CCD_EXPOSURE Alert) before the page says so. The run keeps going; Stop is Chris\'s. 19 of 434 exposures (about 4.4%) went Alert on the ASI2600MC Pro (Cria wire recording of 2026-11-03), so 3 in a row by chance is about 0.0085% of exposures if independent; seeing it means something changed',
     Schema.Number,
     3,
   ),
