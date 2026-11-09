@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { mkdir, readFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
+import type { Card } from '../frames/fits.ts'
 
 const run = promisify(execFile)
 
@@ -47,6 +48,14 @@ export function readSolution(ini: string): Solution {
   return Number.isFinite(ra) && Number.isFinite(dec) ? { ok: true, raDegrees: ra, decDegrees: dec } : { ok: false, reason: 'the solution has no centre' }
 }
 
+export function fieldHeightDegrees(cards: ReadonlyArray<Card>): number | undefined {
+  const number = (key: string) => Number(cards.find(card => card.key === key)?.value)
+  const pixel = cards.some(card => card.key === 'YPIXSZ') ? number('YPIXSZ') : number('XPIXSZ')
+  const height = (number('NAXIS2') * pixel) / 1000 / number('FOCALLEN')
+
+  return Number.isFinite(height) && height > 0 ? (2 * Math.atan(height / 2) * 180) / Math.PI : undefined
+}
+
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 export function makeAstap(settings: AstapSettings) {
@@ -57,13 +66,13 @@ export function makeAstap(settings: AstapSettings) {
       return readAnalysis(stdout)
     },
 
-    async solve(path: string): Promise<Solution> {
+    async solve(path: string, fieldHeight: number | undefined): Promise<Solution> {
       const base = join(settings.workDir, basename(path, '.fits'))
 
       await mkdir(settings.workDir, { recursive: true })
 
       try {
-        await run(settings.program, ['-f', path, '-r', '180', '-fov', '0', '-d', settings.database, '-o', base])
+        await run(settings.program, ['-f', path, '-r', '180', '-fov', fieldHeight === undefined ? '0' : fieldHeight.toFixed(3), '-d', settings.database, '-o', base])
       } catch (error) {
         const ini = await readFile(`${base}.ini`, 'utf8').catch(() => undefined)
 
