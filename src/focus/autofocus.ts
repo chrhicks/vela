@@ -22,6 +22,7 @@ export interface Sample {
   readonly position: number
   readonly hfd: number | undefined
   readonly stars: number
+  readonly missed?: string
 }
 
 export interface Best {
@@ -190,6 +191,15 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
       return { ok: true }
     },
 
+    missed(file: string, reason: string) {
+      const label = capture.labelOf(file)
+      const position = label === undefined || label.run !== view.run ? undefined : (view.positions[label.frame - 1] ?? view.best?.position)
+
+      if (label === undefined || position === undefined) return
+
+      publish('sample', { run: label.run, frame: label.frame, position, hfd: null, stars: 0, missed: `the frame could not be copied from the rig computer: ${reason}` })
+    },
+
     async kept(frame: KeptFrame) {
       const label = capture.labelOf(frame.file)
 
@@ -210,7 +220,7 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
       if (entry.kind === 'vela.focus.started') {
         view = { ...empty, run: String(body['run']), startedAt: entry.at, positions: Array.isArray(body['positions']) ? body['positions'].filter(value => typeof value === 'number') : [] }
       } else if (body['run'] === view.run && entry.kind === 'vela.focus.sample') {
-        const sample: Sample = { frame: Number(body['frame']), position: Number(body['position']), hfd: typeof body['hfd'] === 'number' ? body['hfd'] : undefined, stars: Number(body['stars']) }
+        const sample: Sample = { frame: Number(body['frame']), position: Number(body['position']), hfd: typeof body['hfd'] === 'number' ? body['hfd'] : undefined, stars: Number(body['stars']), ...(typeof body['missed'] === 'string' ? { missed: body['missed'] } : {}) }
 
         view = sample.frame > view.positions.length ? { ...view, check: sample } : { ...view, samples: [...view.samples.filter(old => old.frame !== sample.frame), sample] }
       } else if (body['run'] === view.run && entry.kind === 'vela.focus.best') {

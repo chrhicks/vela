@@ -171,6 +171,14 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
       return { ok: true }
     },
 
+    missed(file: string, reason: string) {
+      const label = capture.labelOf(file)
+
+      if (label === undefined || label.run !== view.run) return
+
+      publish('solve', { run: label.run, frame: label.frame, file, solved: false, reason: `the frame could not be copied from the rig computer: ${reason}` })
+    },
+
     async kept(frame: KeptFrame) {
       const label = capture.labelOf(frame.file)
 

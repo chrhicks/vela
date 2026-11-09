@@ -51,12 +51,13 @@ describe('the best focus of a sweep', () => {
   })
 })
 
-async function scriptedSweep(stars: number, refuseMoves?: string) {
+async function scriptedSweep(stars: number, refuseMoves?: string, missFrame = 0) {
   const published: Array<{ kind: string; body: Record<string, unknown> }> = []
   const focus = { autofocus: undefined as ReturnType<typeof makeAutofocus> | undefined }
   const camera = fakeCamera({
     onEvent: event => {
-      if (event.kind === 'exposed') void focus.autofocus?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
+      if (event.kind === 'exposed' && event.body['frame'] === missFrame) focus.autofocus?.missed(String(event.body['file']), 'copy exited 255')
+      else if (event.kind === 'exposed') void focus.autofocus?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
       focus.autofocus?.observe({ id: event.kind, kind: `vela.run.${event.kind}`, at: startedAt, run: undefined, body: { run: event.run, ...event.body } })
     },
   })
@@ -111,6 +112,13 @@ describe('an autofocus run on a scripted camera and focuser', () => {
     expect(moves).toEqual([1150, 1100, 1050, 1000, 950, 900, 1150, 1010])
     expect(autofocus.view()).toMatchObject({ positions: [1100, 1050, 1000, 950, 900], best: { position: 1010, how: 'fit' }, check: { position: 1010, hfd: 2 }, ended: 'done' })
     expect(published.map(entry => entry.kind)).toEqual(['started', 'sample', 'sample', 'sample', 'sample', 'sample', 'best', 'sample'])
+  })
+
+  it('goes on to the best focus without a sample whose frame could not be copied', async () => {
+    const { autofocus } = await scriptedSweep(200, undefined, 5)
+
+    expect(autofocus.view()).toMatchObject({ best: { position: 1010 }, ended: 'done' })
+    expect(autofocus.view().samples.find(sample => sample.frame === 5)).toMatchObject({ hfd: undefined, stars: 0, missed: 'the frame could not be copied from the rig computer: copy exited 255' })
   })
 
   it('puts the focuser back where it started, from above, when no frame shows enough stars', async () => {
