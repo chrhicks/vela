@@ -6,7 +6,7 @@ export function makeChanges() {
       for (const listener of [...listeners]) listener()
     },
 
-    until(check: () => boolean, timeoutMs: number, signal: AbortSignal): Promise<boolean> {
+    until(check: () => boolean, timeoutMs: number | undefined, signal: AbortSignal): Promise<boolean> {
       if (check()) return Promise.resolve(true)
       if (signal.aborted) return Promise.resolve(false)
 
@@ -21,7 +21,7 @@ export function makeChanges() {
           if (check()) finish(true)
         }
         const onAbort = () => finish(false)
-        const timer = setTimeout(() => finish(false), timeoutMs)
+        const timer = timeoutMs === undefined ? undefined : setTimeout(() => finish(false), timeoutMs)
 
         listeners.add(recheck)
         signal.addEventListener('abort', onAbort)
