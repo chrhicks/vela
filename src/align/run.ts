@@ -39,6 +39,7 @@ export interface AlignView {
   readonly frames: ReadonlyArray<{ readonly frame: number; readonly solved: boolean; readonly reason: string | undefined }>
   readonly first: PolarError | undefined
   readonly error: (PolarError & { readonly at: number; readonly frame: number }) | undefined
+  readonly previous: (PolarError & { readonly at: number; readonly frame: number }) | undefined
   readonly ended: string | undefined
   readonly lastFrameAt: number | undefined
   readonly problem: string | undefined
@@ -46,7 +47,7 @@ export interface AlignView {
 
 type Result = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
-const empty: AlignView = { run: undefined, startedAt: undefined, frames: [], first: undefined, error: undefined, ended: undefined, lastFrameAt: undefined, problem: undefined }
+const empty: AlignView = { run: undefined, startedAt: undefined, frames: [], first: undefined, error: undefined, previous: undefined, ended: undefined, lastFrameAt: undefined, problem: undefined }
 
 export function exposureMiddle(cards: ReadonlyArray<Card>): number | undefined {
   const start = cards.find(card => card.key === 'DATE-OBS')?.value
@@ -206,7 +207,9 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
         const altitude = body['altitudeArcmin']
         const error = typeof altitude === 'number' ? { altitudeArcmin: altitude, azimuthArcmin: Number(body['azimuthArcmin']), totalArcmin: Number(body['totalArcmin']), at: Number(body['at']), frame } : undefined
 
-        view = { ...view, lastFrameAt: entry.at, frames, first: frame === 3 && error !== undefined ? error : view.first, error: error !== undefined && (view.error === undefined || frame > view.error.frame) ? error : view.error }
+        const newer = error !== undefined && (view.error === undefined || frame > view.error.frame)
+
+        view = { ...view, lastFrameAt: entry.at, frames, first: frame === 3 && error !== undefined ? error : view.first, error: newer ? error : view.error, previous: newer ? view.error : view.previous }
       } else if (body['run'] === view.run && entry.kind === 'vela.run.ended') {
         view = { ...view, ended: typeof body['reason'] === 'string' ? body['reason'] : 'ended' }
       } else if (slew !== undefined && entry.kind === 'wire') {

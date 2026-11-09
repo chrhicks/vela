@@ -281,9 +281,9 @@
     </div>
     <p class="answer" id="pa-answer" aria-live="polite" hidden></p>
     <div id="pa-readout" hidden>
-      <div class="pa-figure"><span>Altitude</span><strong id="pa-alt"></strong><b id="pa-alt-do"></b><span id="pa-alt-why"></span></div>
-      <div class="pa-figure"><span>Azimuth</span><strong id="pa-az"></strong><b id="pa-az-do"></b><span id="pa-az-why"></span></div>
-      <p class="pa-total">Total <b id="pa-total"></b><span id="pa-when"></span></p>
+      <div class="pa-figure"><span>Altitude</span><strong id="pa-alt"></strong><b id="pa-alt-do"></b><span id="pa-alt-why"></span><span id="pa-alt-was"></span></div>
+      <div class="pa-figure"><span>Azimuth</span><strong id="pa-az"></strong><b id="pa-az-do"></b><span id="pa-az-why"></span><span id="pa-az-was"></span></div>
+      <p class="pa-total">Total <b id="pa-total"></b><span id="pa-when"></span><br><span id="pa-total-was"></span></p>
     </div>
     <p id="pa-status" hidden></p>
   </div>
@@ -1075,6 +1075,10 @@ function showAlign(view, now) {
   document.getElementById('pa-az-why').textContent = error.azimuthArcmin > 0 ? 'axis east of the pole' : 'axis west of the pole'
   document.getElementById('pa-total').textContent = arcmin(error.totalArcmin)
   document.getElementById('pa-when').textContent = 'frame ' + error.frame + ', ' + Math.max(0, Math.round((now - error.at) / 1000)) + ' s ago'
+  const before = view.previous
+  document.getElementById('pa-alt-was').textContent = before === undefined ? '' : 'was ' + arcmin(before.altitudeArcmin) + (before.altitudeArcmin > 0 ? ' high' : ' low')
+  document.getElementById('pa-az-was').textContent = before === undefined ? '' : 'was ' + arcmin(before.azimuthArcmin) + (before.azimuthArcmin > 0 ? ' east' : ' west')
+  document.getElementById('pa-total-was').textContent = before === undefined ? '' : (error.totalArcmin < before.totalArcmin ? 'closer: ' : error.totalArcmin > before.totalArcmin ? 'farther: ' : 'same: ') + arcmin(before.totalArcmin) + ' on frame ' + before.frame
 }
 
 const afHow = { fit: 'fitted through the lowest sample and its neighbours', lowest: 'the lowest sample', edge: 'the lowest sample, at the end of the sweep' }
