@@ -53,6 +53,7 @@ const sender = makeSender({
   newId: () => `vela-${randomUUID()}`,
   answerTimeoutMs: settings.capture.commandAnswerSeconds * 1000,
   by: 'vela',
+  now: Date.now,
 })
 const prepare = makePrepare({ picture, sender, settings: { focuser: settings.devices.focuser, box: settings.devices.box, focuserNudgeSteps: settings.prepare.focuserNudgeSteps } })
 const pointing = makePointing({ picture, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })

@@ -95,14 +95,14 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
     if (site === undefined) return 'the mount gives no site'
     if (onCoordSet === undefined || !('TRACK' in onCoordSet.values)) return `${settings.mount} has no TRACK element in ON_COORD_SET`
 
-    const mode = await sender.send({ device: settings.mount, property: 'ON_COORD_SET', values: Object.fromEntries(Object.keys(onCoordSet.values).map(element => [element, element === 'TRACK'])) })
+    const mode = await sender.send({ device: settings.mount, property: 'ON_COORD_SET', values: Object.fromEntries(Object.keys(onCoordSet.values).map(element => [element, element === 'TRACK'])) }, signal)
 
     if (mode.result !== 'written') return `ON_COORD_SET: ${mode.reason}`
 
     slew = { phase: 'sent' }
 
     const target = { RA: raForHourAngle(hourAngle, site, now()), DEC: settings.declinationDegrees }
-    const sent = await sender.send({ device: settings.mount, property: 'EQUATORIAL_EOD_COORD', values: target })
+    const sent = await sender.send({ device: settings.mount, property: 'EQUATORIAL_EOD_COORD', values: target }, signal)
 
     if (sent.result !== 'written') return `slew to hour angle ${hourAngle}°: ${sent.reason}`
 

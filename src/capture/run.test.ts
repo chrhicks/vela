@@ -141,7 +141,7 @@ describe('a capture run on a scripted camera', () => {
     expect(await camera.capture.stop()).toBe(true)
     await started.done
 
-    expect(camera.capture.view().last).toMatchObject({ reason: 'stopped', counted: 1, detail: 'Stop pressed, abort written' })
+    expect(camera.capture.view().last).toMatchObject({ reason: 'stopped', counted: 1, detail: 'Stop pressed, abort sent' })
     expect(camera.script.sent.at(-1)).toEqual({ property: 'CCD_ABORT_EXPOSURE', values: { ABORT: true } })
     expect(camera.capture.view().run).toBeUndefined()
   })
@@ -229,12 +229,24 @@ describe('what a run does with commands that do not work', () => {
     expect(camera.script.sent.filter(sent => sent.property === 'CCD_EXPOSURE')).toHaveLength(0)
   })
 
-  it('ends the run as unknown when a command gets no answer, and never sends it again', async () => {
+  it('keeps waiting when a command gets no answer, lists it as late, and never sends it again', async () => {
     const camera = fakeCamera()
 
     camera.script.silent.add('CCD_CONTROLS')
 
-    expect(await runToEnd(camera)).toMatchObject({ reason: 'unknown', detail: expect.stringContaining('CCD_CONTROLS: no answer') })
+    const started = camera.capture.start(request)
+
+    if (!started.ok) throw new Error(started.reason)
+
+    await until(() => camera.capture.view().late.length > 0)
+
+    expect(camera.capture.view().late).toMatchObject([{ device: 'primary', property: 'CCD_CONTROLS' }])
+    expect(camera.capture.view().run).toBeDefined()
+
+    await camera.capture.stop()
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'stopped', counted: 0 })
     expect(camera.script.sent.filter(sent => sent.property === 'CCD_CONTROLS')).toHaveLength(1)
   })
 
@@ -258,12 +270,20 @@ describe('what a run does with commands that do not work', () => {
     expect(camera.script.sent.filter(sent => sent.property === 'CCD_FRAME_TYPE')).toHaveLength(1)
   })
 
-  it('aborts and ends the run as unknown when the exposure command gets no answer', async () => {
+  it('keeps waiting when the exposure command gets no answer, and Stop ends it', async () => {
     const camera = fakeCamera()
 
     camera.script.silent.add('CCD_EXPOSURE')
 
-    expect(await runToEnd(camera)).toMatchObject({ reason: 'unknown', counted: 0 })
+    const started = camera.capture.start(request)
+
+    if (!started.ok) throw new Error(started.reason)
+
+    await until(() => camera.capture.view().late.some(command => command.property === 'CCD_EXPOSURE'))
+    await camera.capture.stop()
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'stopped', counted: 0 })
     expect(camera.script.sent.filter(sent => sent.property === 'CCD_EXPOSURE')).toHaveLength(1)
     expect(camera.script.sent.at(-1)?.property).toBe('CCD_ABORT_EXPOSURE')
   })

@@ -20,6 +20,13 @@ export interface SenderOptions {
   readonly newId: () => string
   readonly answerTimeoutMs: number
   readonly by: string
+  readonly now: () => number
+}
+
+export interface LateCommand {
+  readonly device: string
+  readonly property: string
+  readonly seconds: number
 }
 
 interface Answer {
@@ -39,24 +46,35 @@ export function readAnswer(entry: Entry): Answer | undefined {
   return { id: body['id'], result, reason: typeof body['reason'] === 'string' ? body['reason'] : undefined }
 }
 
-export function makeSender({ publish, newId, answerTimeoutMs, by }: SenderOptions) {
-  const waiting = new Map<string, (answer: Answer) => void>()
+export function makeSender({ publish, newId, answerTimeoutMs, by, now }: SenderOptions) {
+  const waiting = new Map<string, { readonly command: Command; readonly sentAt: number; readonly resolve: (answer: Answer) => void }>()
 
   return {
     answered(entry: Entry) {
       const answer = readAnswer(entry)
 
-      if (answer !== undefined) waiting.get(answer.id)?.(answer)
+      if (answer !== undefined) waiting.get(answer.id)?.resolve(answer)
     },
 
-    async send(command: Command): Promise<Outcome> {
+    late(at: number): ReadonlyArray<LateCommand> {
+      return [...waiting.values()].filter(sent => at - sent.sentAt >= answerTimeoutMs).map(sent => ({ device: sent.command.device, property: sent.command.property, seconds: Math.round((at - sent.sentAt) / 1000) }))
+    },
+
+    async send(command: Command, signal?: AbortSignal): Promise<Outcome> {
+      if (signal?.aborted) return { result: 'unknown', reason: 'Stop pressed before it was sent' }
+
       const id = newId()
       const answer = new Promise<Answer | undefined>(resolve => {
-        const timer = setTimeout(() => resolve(undefined), answerTimeoutMs)
+        const stopped = () => resolve(undefined)
 
-        waiting.set(id, received => {
-          clearTimeout(timer)
-          resolve(received)
+        signal?.addEventListener('abort', stopped, { once: true })
+        waiting.set(id, {
+          command,
+          sentAt: now(),
+          resolve: received => {
+            signal?.removeEventListener('abort', stopped)
+            resolve(received)
+          },
         })
       })
 
@@ -72,7 +90,7 @@ export function makeSender({ publish, newId, answerTimeoutMs, by }: SenderOption
 
       waiting.delete(id)
 
-      if (received === undefined) return { result: 'unknown', reason: `no answer from the rig program within ${answerTimeoutMs / 1000} s` }
+      if (received === undefined) return { result: 'unknown', reason: 'Stop pressed before the rig program answered' }
       if (received.result === 'refused') return { result: 'refused', reason: received.reason ?? 'no reason given' }
 
       return { result: 'written' }

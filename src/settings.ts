@@ -52,7 +52,7 @@ export const CaptureSettings = Schema.Struct({
     description: 'A small file naming the run in progress, written when a run starts and removed when it ends. A run found in it at start is marked interrupted: Vela never resumes a run. Put it on this machine\'s state directory, not a temporary one, so a reboot during a run still shows',
   }),
   commandAnswerSeconds: described(
-    'How long to wait for the rig program\'s answer to one command before it counts as unknown. Not measured: no command has been sent yet (2026-11-07). The rig program answers every command once, as soon as it has written or refused the property, with no queue, so the wait is one broker round trip plus the write',
+    'How long a command may go unanswered by the rig program before the page says so. Vela keeps waiting for the answer and never sends the command again; Stop is Chris\'s. Measured 2026-11-09 on RIG_DEV since 11-08 noon ET: 166 of 166 commands answered, median 1 ms, slowest 17 ms, so 10 s means the rig program or the link to it is down',
     Schema.Number,
     10,
   ),
