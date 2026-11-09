@@ -117,11 +117,6 @@ export const AlignSettings = Schema.Struct({
     Schema.Tuple([Schema.Number, Schema.Number, Schema.Number]),
     [-130, -73, -16],
   ),
-  adjustFrames: described(
-    'Frames taken while the knobs are adjusted before the alignment ends by itself. Each frame is kept (52 MB) and comes about every 8 s with a 2 s exposure, so 100 is about 13 minutes and 5 GB; Start again for more',
-    Schema.Number,
-    100,
-  ),
 })
 
 export const AutofocusSettings = Schema.Struct({

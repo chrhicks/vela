@@ -13,7 +13,7 @@ const solves = [
   { raDegrees: 190.02, decDegrees: 80.6 },
 ]
 
-function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0) {
+function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopAfter = 5) {
   const published: Array<{ kind: string; body: Record<string, unknown> }> = []
   const events: string[] = []
   const holder = { align: undefined as ReturnType<typeof makeAlign> | undefined }
@@ -59,8 +59,9 @@ function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0) {
       published.push({ kind, body: { ...body } })
       if (kind === 'solve') events.push(`solve:${String(body['frame'])}`)
       feed(`vela.align.${kind}`, body)
+      if (kind === 'solve' && body['frame'] === stopAfter) void camera.capture.stop()
     },
-    settings: { mount: 'primary', camera: 'primary', declinationDegrees: 80, hourAnglesDegrees: [-130, -73, -16], adjustFrames: 2 },
+    settings: { mount: 'primary', camera: 'primary', declinationDegrees: 80, hourAnglesDegrees: [-130, -73, -16] },
     now: () => startedAt,
   })
 
@@ -81,7 +82,7 @@ function settled(align: ReturnType<typeof makeAlign>, published: ReadonlyArray<{
 }
 
 describe('a polar alignment run on a scripted camera and mount', () => {
-  it('slews to three hour angles, solves a frame at each, then gives a reading for every adjusting frame', async () => {
+  it('slews to three hour angles, solves a frame at each, then gives a reading for every adjusting frame until Stop', async () => {
     const { align, published, slews } = scriptedRun(frame => ({ ok: true, ...solves[frame - 1]! }))
 
     expect(align.start({ exposureSeconds: 0.01 })).toEqual({ ok: true })
@@ -93,7 +94,7 @@ describe('a polar alignment run on a scripted camera and mount', () => {
     expect(published.map(entry => entry.kind)).toEqual(['started', 'solve', 'solve', 'solve', 'solve', 'solve'])
     expect(published[1]?.body).not.toHaveProperty('altitudeArcmin')
     expect(published[3]?.body).toHaveProperty('altitudeArcmin')
-    expect(align.view()).toMatchObject({ ended: 'done', frames: [{ frame: 1, solved: true }, { frame: 2, solved: true }, { frame: 3, solved: true }, { frame: 4, solved: true }, { frame: 5, solved: true }], error: { frame: 5 } })
+    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ frame: 1, solved: true }, { frame: 2, solved: true }, { frame: 3, solved: true }, { frame: 4, solved: true }, { frame: 5, solved: true }], error: { frame: 5 } })
     expect(align.view().first?.totalArcmin).toBeGreaterThan(0)
   })
 
@@ -116,7 +117,7 @@ describe('a polar alignment run on a scripted camera and mount', () => {
     await settled(align, published, 5)
 
     expect(slews).toHaveLength(3)
-    expect(align.view()).toMatchObject({ ended: 'done', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false }, { frame: 5, solved: true }], error: { frame: 5 } })
+    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false }, { frame: 5, solved: true }], error: { frame: 5 } })
   })
 
   it('takes each adjusting frame only after the last one is solved, so the readings never fall behind', async () => {

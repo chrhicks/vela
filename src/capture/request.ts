@@ -18,7 +18,7 @@ export const CaptureRequest = Schema.Struct({
   object: Schema.String,
   frameType: Schema.Literals(frameTypes),
   exposureSeconds: Schema.Finite.check(Schema.isGreaterThan(0)),
-  count: Schema.Int.check(Schema.isGreaterThan(0)),
+  count: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
   gain: nonNegative,
   offset: nonNegative,
   cooler: Schema.Literals(['keep', 'on', 'off']),
