@@ -1045,7 +1045,8 @@ const arcmin = value => Math.abs(value) < 1 ? Math.round(Math.abs(value) * 60) +
 function showAlign(view) {
   if (view === undefined || view.run === undefined) return
   const solved = view.frames.filter(frame => frame.frame <= 3 && frame.solved).length
-  const missed = view.frames.filter(frame => !frame.solved).sort((a, b) => b.frame - a.frame)[0]
+  const newest = [...view.frames].sort((a, b) => b.frame - a.frame)[0]
+  const missed = newest?.solved === false ? newest : undefined
   let text = view.error === undefined ? 'Measuring the axis: ' + solved + ' of 3 frames solved.' : 'Turn the knobs; each new frame updates these numbers. First measured: ' + arcmin(view.first?.totalArcmin ?? view.error.totalArcmin) + ' from the pole.'
   let tone = ''
   if (missed !== undefined) { text += ' Frame ' + missed.frame + ' did not solve: ' + missed.reason + '.'; tone = 'warn' }
