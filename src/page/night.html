@@ -1383,7 +1383,11 @@ const gotoPhases = {
 }
 
 function showPointing(view, live) {
-  asOf(mountState, (view.parked === undefined ? 'park state unknown' : view.parked ? 'parked' : 'unparked') + ', tracking ' + (view.tracking === undefined ? 'unknown' : view.tracking ? 'on' : 'off'), live)
+  asOf(mountState, (view.parked === undefined ? 'park state unknown' : view.parked ? 'Parked' : 'Unparked') + ', tracking ' + (view.tracking === undefined ? 'unknown' : view.tracking ? 'on' : 'off'), live)
+  if (live) mountState.className = ''
+  document.getElementById('mount-unpark').hidden = view.parked === false
+  document.getElementById('tracking-on').hidden = view.tracking === true
+  document.getElementById('tracking-off').hidden = view.tracking === false
   const goto = view.goto
   statusParts.goto = goto
   showStatus()
