@@ -13,7 +13,7 @@ const solves = [
   { raDegrees: 190.02, decDegrees: 80.6 },
 ]
 
-function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopAfter = 5) {
+function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopAfter = 5, slewAlertAt = 0) {
   const published: Array<{ kind: string; body: Record<string, unknown> }> = []
   const events: string[] = []
   const holder = { align: undefined as ReturnType<typeof makeAlign> | undefined }
@@ -42,7 +42,7 @@ function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopA
           slews.push(command.values)
           setTimeout(() => {
             holder.align?.observe(wire((at += 1), 'set', 'primary', 'EQUATORIAL_EOD_COORD', command.values, 'Busy'))
-            setTimeout(() => holder.align?.observe(wire((at += 1), 'set', 'primary', 'EQUATORIAL_EOD_COORD', command.values, 'Ok')), 5)
+            setTimeout(() => holder.align?.observe(wire((at += 1), 'set', 'primary', 'EQUATORIAL_EOD_COORD', command.values, slews.length === slewAlertAt ? 'Alert' : 'Ok')), 5)
           }, 5)
         }
 
@@ -67,7 +67,7 @@ function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopA
 
   holder.align = align
 
-  return { align, published, slews, events }
+  return { align, published, slews, events, camera }
 }
 
 function settled(align: ReturnType<typeof makeAlign>, published: ReadonlyArray<{ kind: string }>, solveCount: number) {
@@ -129,5 +129,23 @@ describe('a polar alignment run on a scripted camera and mount', () => {
     await settled(align, published, 5)
 
     for (const frame of [1, 2, 3, 4]) expect(events.indexOf(`solve:${frame}`)).toBeLessThan(events.indexOf(`exposed:${frame + 1}`))
+  })
+
+  it('waits with the reason on the page when the mount answers a slew with an alert, and Stop ends it', async () => {
+    const { align, slews, camera } = scriptedRun(frame => ({ ok: true, ...solves[frame - 1]! }), 0, 5, 2)
+
+    expect(align.start({ exposureSeconds: 0.01 })).toEqual({ ok: true })
+
+    while (align.view().problem === undefined) await new Promise(resolve => setTimeout(resolve, 2))
+
+    expect(align.view().problem).toBe('the mount answered the slew to hour angle -73° with an alert')
+    expect(slews).toHaveLength(2)
+
+    await camera.capture.stop()
+
+    while (align.view().ended === undefined) await new Promise(resolve => setTimeout(resolve, 2))
+
+    expect(align.view().ended).toBe('stopped')
+    expect(slews).toHaveLength(2)
   })
 })

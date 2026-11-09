@@ -1054,6 +1054,7 @@ function showAlign(view, now) {
   let tone = ''
   if (missed !== undefined) { text += ' Frame ' + missed.frame + ' did not solve: ' + missed.reason + '.'; tone = 'warn' }
   if (view.ended !== undefined) { text = 'Polar alignment ended' + (view.ended === 'done' ? ': start it again to keep adjusting.' : ': ' + (tonightState.capture?.last?.detail ?? view.ended) + '.') + (view.error === undefined ? '' : ' Last reading: ' + arcmin(view.error.totalArcmin) + ' from the pole.'); tone = view.ended === 'done' || view.ended === 'stopped' ? '' : 'bad' }
+  if (view.problem !== undefined && view.ended === undefined) { text += ' ' + view.problem + '. Waiting for you; Stop is yours.'; tone = 'bad' }
   paStatus.hidden = false
   paStatus.className = tone
   if (view.ended === undefined && view.lastFrameAt !== undefined) text += ' Last frame ' + Math.max(0, Math.round((now - view.lastFrameAt) / 1000)) + ' s ago.'
@@ -1082,6 +1083,7 @@ function showAutofocus(view) {
     if (view.best.how === 'edge') { text += ' Run autofocus again from there to see both sides.'; tone = 'warn' }
     text += view.check === undefined ? ' Taking a check frame there.' : ' Check frame: ' + (view.check.hfd === undefined ? 'no stars.' : 'HFD ' + view.check.hfd.toFixed(1) + ' px, ' + view.check.stars + ' stars.')
   }
+  if (view.problem !== undefined && view.ended === undefined) { text += ' ' + view.problem + '. Waiting for you; Stop is yours.'; tone = 'bad' }
   if (view.ended !== undefined && view.ended !== 'done') { text += ' Autofocus ended: ' + (tonightState.capture?.last?.detail ?? view.ended) + '.'; tone = 'bad' }
   afStatus.hidden = false
   afStatus.className = tone
