@@ -158,7 +158,11 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
 
         const best = bestFocus(view.samples, settings.minStars)
 
-        if (best === undefined) return `no frame of the sweep showed ${settings.minStars} stars`
+        if (best === undefined) {
+          const back = (await move(top + request.step, signal)) ?? (await move(current, signal))
+
+          return `no frame of the sweep showed ${settings.minStars} stars; ${back ?? `the focuser is back at ${current}`}`
+        }
 
         publish('best', { run, ...best })
 

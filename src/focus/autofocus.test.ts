@@ -51,58 +51,72 @@ describe('the best focus of a sweep', () => {
   })
 })
 
+async function scriptedSweep(stars: number) {
+  const published: Array<{ kind: string; body: Record<string, unknown> }> = []
+  const focus = { autofocus: undefined as ReturnType<typeof makeAutofocus> | undefined }
+  const camera = fakeCamera({
+    onEvent: event => {
+      if (event.kind === 'exposed') void focus.autofocus?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
+      focus.autofocus?.observe({ id: event.kind, kind: `vela.run.${event.kind}`, at: startedAt, run: undefined, body: { run: event.run, ...event.body } })
+    },
+  })
+  const moves: number[] = []
+  let at = startedAt + 1000
+
+  camera.feed(wire((at += 1), 'def', 'primary', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1000 }, 'Ok', 'in', { FOCUS_ABSOLUTE_POSITION: { min: 0, max: 60000 } }))
+
+  const autofocus = makeAutofocus({
+    picture: camera.picture,
+    sender: {
+      send: command => {
+        if (command.property === 'ABS_FOCUS_POSITION') moves.push(Number(command.values['FOCUS_ABSOLUTE_POSITION']))
+        return camera.sender.send(command)
+      },
+    },
+    capture: camera.capture,
+    analyse: async frame => {
+      const label = camera.capture.labelOf(frame.file)
+      const position = label === undefined ? 0 : (focus.autofocus?.view().positions[label.frame - 1] ?? 1010)
+      return { hfd: 2 + ((position - 1010) / 50) ** 2, stars }
+    },
+    publish: (kind, body) => {
+      published.push({ kind, body: { ...body } })
+      focus.autofocus?.observe({ id: kind, kind: `vela.focus.${kind}`, at: (at += 1), run: undefined, body })
+    },
+    settings: { focuser: 'primary', camera: 'primary', minStars: 10 },
+  })
+
+  focus.autofocus = autofocus
+  expect(autofocus.start({ step: 50, samples: 5, exposureSeconds: 0.01 })).toEqual({ ok: true })
+
+  await new Promise<void>(resolve => {
+    const check = setInterval(() => {
+      autofocus.observe({ id: 'tick', kind: 'tick', at, run: undefined, body: {} })
+      if (autofocus.view().ended !== undefined) {
+        clearInterval(check)
+        resolve()
+      }
+    }, 5)
+  })
+
+  return { autofocus, moves, published }
+}
+
 describe('an autofocus run on a scripted camera and focuser', () => {
   it('sweeps down from above, lands on the best focus from above, and takes a check frame there', async () => {
-    const published: Array<{ kind: string; body: Record<string, unknown> }> = []
-    const focus = { autofocus: undefined as ReturnType<typeof makeAutofocus> | undefined }
-    const camera = fakeCamera({
-      onEvent: event => {
-        if (event.kind === 'exposed') void focus.autofocus?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
-        focus.autofocus?.observe({ id: event.kind, kind: `vela.run.${event.kind}`, at: startedAt, run: undefined, body: { run: event.run, ...event.body } })
-      },
-    })
-    const moves: number[] = []
-    let at = startedAt + 1000
-
-    camera.feed(wire((at += 1), 'def', 'primary', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1000 }, 'Ok', 'in', { FOCUS_ABSOLUTE_POSITION: { min: 0, max: 60000 } }))
-
-    const autofocus = makeAutofocus({
-      picture: camera.picture,
-      sender: {
-        send: command => {
-          if (command.property === 'ABS_FOCUS_POSITION') moves.push(Number(command.values['FOCUS_ABSOLUTE_POSITION']))
-          return camera.sender.send(command)
-        },
-      },
-      capture: camera.capture,
-      analyse: async frame => {
-        const label = camera.capture.labelOf(frame.file)
-        const position = label === undefined ? 0 : (focus.autofocus?.view().positions[label.frame - 1] ?? 1010)
-        return { hfd: 2 + ((position - 1010) / 50) ** 2, stars: 200 }
-      },
-      publish: (kind, body) => {
-        published.push({ kind, body: { ...body } })
-        focus.autofocus?.observe({ id: kind, kind: `vela.focus.${kind}`, at: (at += 1), run: undefined, body })
-      },
-      settings: { focuser: 'primary', camera: 'primary', minStars: 10 },
-    })
-
-    focus.autofocus = autofocus
-    expect(autofocus.start({ step: 50, samples: 5, exposureSeconds: 0.01 })).toEqual({ ok: true })
-
-    await new Promise<void>(resolve => {
-      const check = setInterval(() => {
-        autofocus.observe({ id: 'tick', kind: 'tick', at, run: undefined, body: {} })
-        if (autofocus.view().ended !== undefined) {
-          clearInterval(check)
-          resolve()
-        }
-      }, 5)
-    })
+    const { autofocus, moves, published } = await scriptedSweep(200)
 
     expect(moves).toEqual([1150, 1100, 1050, 1000, 950, 900, 1150, 1010])
     expect(autofocus.view()).toMatchObject({ positions: [1100, 1050, 1000, 950, 900], best: { position: 1010, how: 'fit' }, check: { position: 1010, hfd: 2 }, ended: 'done' })
     expect(published.map(entry => entry.kind)).toEqual(['started', 'sample', 'sample', 'sample', 'sample', 'sample', 'best', 'sample'])
+  })
+
+  it('puts the focuser back where it started, from above, when no frame shows enough stars', async () => {
+    const { autofocus, moves, published } = await scriptedSweep(3)
+
+    expect(moves).toEqual([1150, 1100, 1050, 1000, 950, 900, 1150, 1000])
+    expect(autofocus.view()).toMatchObject({ best: undefined, check: undefined, ended: 'refused' })
+    expect(published.map(entry => entry.kind)).toEqual(['started', 'sample', 'sample', 'sample', 'sample', 'sample'])
   })
 
   it('refuses a sweep that would leave the focuser travel', () => {
