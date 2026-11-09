@@ -151,12 +151,16 @@
   .answer { margin: 8px 0 12px; }
   #stop-answer { margin: 0; padding: 0 max(24px, env(safe-area-inset-right)) 6px max(24px, env(safe-area-inset-left)); text-align: right; }
   .drift { margin: 0 0 8px; }
-  #pa-readout { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 8px; }
+  #align.running > .drift, #align.running > .row { display: none; }
+  #pa-readout { display: grid; grid-template-columns: repeat(2, minmax(0, 220px)); gap: 16px 24px; margin: 8px 0 12px; }
   #pa-readout[hidden] { display: none; }
-  .pa-figure { display: flex; flex-direction: column; min-width: 120px; }
+  .pa-figure { display: flex; flex-direction: column; }
   .pa-figure span { color: var(--muted); font-size: 15px; }
-  .pa-figure strong { font-size: 40px; line-height: 1.1; font-weight: 600; }
-  @media (max-width: 600px) { .pa-figure strong { font-size: 30px; } }
+  .pa-figure strong { font-size: 60px; line-height: 1.05; font-weight: 600; }
+  .pa-figure b { font-size: 22px; font-weight: 700; }
+  .pa-total { grid-column: 1 / -1; margin: 0; color: var(--muted); }
+  .pa-total b { color: var(--fg); font-size: 30px; font-weight: 600; margin-right: 8px; }
+  @media (max-width: 600px) { .pa-figure strong { font-size: 52px; } #pa-readout { grid-template-columns: 1fr 1fr; gap: 16px 12px; } }
   #af-chart { width: 100%; max-width: 480px; display: block; margin-top: 8px; }
   #af-chart .axis { stroke: var(--line); }
   #af-chart .dot { fill: var(--fg); }
@@ -276,12 +280,12 @@
       <button type="button" class="moves" id="pa-start">Start polar alignment</button>
     </div>
     <p class="answer" id="pa-answer" aria-live="polite" hidden></p>
-    <p id="pa-status" hidden></p>
     <div id="pa-readout" hidden>
-      <div class="pa-figure"><span>Altitude</span><strong id="pa-alt"></strong><span id="pa-alt-do"></span></div>
-      <div class="pa-figure"><span>Azimuth</span><strong id="pa-az"></strong><span id="pa-az-do"></span></div>
-      <div class="pa-figure"><span>Total</span><strong id="pa-total"></strong><span id="pa-when"></span></div>
+      <div class="pa-figure"><span>Altitude</span><strong id="pa-alt"></strong><b id="pa-alt-do"></b><span id="pa-alt-why"></span></div>
+      <div class="pa-figure"><span>Azimuth</span><strong id="pa-az"></strong><b id="pa-az-do"></b><span id="pa-az-why"></span></div>
+      <p class="pa-total">Total <b id="pa-total"></b><span id="pa-when"></span></p>
     </div>
+    <p id="pa-status" hidden></p>
   </div>
   <div class="group" id="focuser-controls">
     <h3>Focuser</h3>
@@ -1046,28 +1050,31 @@ paStart.addEventListener('click', () => {
 const arcmin = value => Math.abs(value) < 1 ? Math.round(Math.abs(value) * 60) + '″' : Math.abs(value).toFixed(1) + '′'
 
 function showAlign(view, now) {
+  document.getElementById('align').classList.toggle('running', view?.run !== undefined && view.ended === undefined)
   if (view === undefined || view.run === undefined) return
   const solved = view.frames.filter(frame => frame.frame <= 3 && frame.solved).length
   const newest = [...view.frames].sort((a, b) => b.frame - a.frame)[0]
   const missed = newest?.solved === false ? newest : undefined
-  let text = view.error === undefined ? 'Measuring the axis: ' + solved + ' of 3 frames solved.' : 'Turn the knobs; each new frame updates these numbers. First measured: ' + arcmin(view.first?.totalArcmin ?? view.error.totalArcmin) + ' from the pole.'
+  let text = view.error === undefined ? 'Measuring the axis: ' + solved + ' of 3 frames solved.' : 'Turn the knobs; each new frame updates the numbers. Started ' + arcmin(view.first?.totalArcmin ?? view.error.totalArcmin) + ' from the pole.'
   let tone = ''
   if (missed !== undefined) { text += ' Frame ' + missed.frame + ' did not solve: ' + missed.reason + '.'; tone = 'warn' }
   if (view.ended !== undefined) { text = 'Polar alignment ended' + (view.ended === 'done' ? ': start it again to keep adjusting.' : ': ' + (tonightState.capture?.last?.detail ?? view.ended) + '.') + (view.error === undefined ? '' : ' Last reading: ' + arcmin(view.error.totalArcmin) + ' from the pole.'); tone = view.ended === 'done' || view.ended === 'stopped' ? '' : 'bad' }
   if (view.problem !== undefined && view.ended === undefined) { text += ' ' + view.problem + '. Waiting for you; Stop is yours.'; tone = 'bad' }
   paStatus.hidden = false
   paStatus.className = tone
-  if (view.ended === undefined && view.lastFrameAt !== undefined) text += ' Last frame ' + Math.max(0, Math.round((now - view.lastFrameAt) / 1000)) + ' s ago.'
+  if (view.ended === undefined && view.lastFrameAt !== undefined && newest?.frame !== view.error?.frame) text += ' Last frame ' + Math.max(0, Math.round((now - view.lastFrameAt) / 1000)) + ' s ago.'
   paStatus.textContent = text
   paReadout.hidden = view.error === undefined
   if (view.error === undefined) return
   const error = view.error
   document.getElementById('pa-alt').textContent = arcmin(error.altitudeArcmin)
-  document.getElementById('pa-alt-do').textContent = error.altitudeArcmin > 0 ? 'axis too high: lower it' : 'axis too low: raise it'
+  document.getElementById('pa-alt-do').textContent = error.altitudeArcmin > 0 ? 'Lower' : 'Raise'
+  document.getElementById('pa-alt-why').textContent = error.altitudeArcmin > 0 ? 'axis too high' : 'axis too low'
   document.getElementById('pa-az').textContent = arcmin(error.azimuthArcmin)
-  document.getElementById('pa-az-do').textContent = error.azimuthArcmin > 0 ? 'axis east of the pole: turn it west' : 'axis west of the pole: turn it east'
+  document.getElementById('pa-az-do').textContent = error.azimuthArcmin > 0 ? 'Turn west' : 'Turn east'
+  document.getElementById('pa-az-why').textContent = error.azimuthArcmin > 0 ? 'axis east of the pole' : 'axis west of the pole'
   document.getElementById('pa-total').textContent = arcmin(error.totalArcmin)
-  document.getElementById('pa-when').textContent = 'frame ' + error.frame + ', ' + Math.max(0, Math.round((Date.now() - error.at) / 1000)) + ' s ago'
+  document.getElementById('pa-when').textContent = 'frame ' + error.frame + ', ' + Math.max(0, Math.round((now - error.at) / 1000)) + ' s ago'
 }
 
 const afHow = { fit: 'fitted through the lowest sample and its neighbours', lowest: 'the lowest sample', edge: 'the lowest sample, at the end of the sweep' }
