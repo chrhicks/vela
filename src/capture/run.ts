@@ -66,6 +66,8 @@ export interface CaptureView {
   readonly last: Ending | undefined
 }
 
+export type Between = (frame: number, signal: AbortSignal) => Promise<string | undefined>
+
 export type StartResult = { readonly ok: true; readonly run: string; readonly done: Promise<void> } | { readonly ok: false; readonly reason: string }
 
 interface Active {
@@ -74,6 +76,7 @@ interface Active {
   readonly sequence: string
   readonly wanted: Wanted
   readonly abort: AbortController
+  readonly between: Between | undefined
   readonly startedAt: number
   counted: number
   failed: number
@@ -230,6 +233,11 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
 
       first = false
 
+      const refused = await run.between?.(run.counted, run.abort.signal)
+
+      if (run.abort.signal.aborted) return finishWith(run, { reason: 'stopped', detail: 'Stop pressed' })
+      if (refused !== undefined) return finishWith(run, { reason: 'refused', detail: refused })
+
       const result = await expose(run)
 
       if (result.frame === 'stop') return finishWith(run, result.stop)
@@ -264,7 +272,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
   }
 
   return {
-    start(json: unknown): StartResult {
+    start(json: unknown, between?: Between): StartResult {
       const parsed = parseRequest(json)
 
       if (!parsed.ok) return parsed
@@ -280,6 +288,7 @@ export function makeCapture({ picture, sender, settings, runFile, now, newRunId,
         sequence: parsed.sequence,
         wanted,
         abort: new AbortController(),
+        between,
         startedAt: now(),
         counted: 0,
         failed: 0,

@@ -137,6 +137,34 @@ describe('a capture run on a scripted camera', () => {
     expect(camera.capture.view().last).toMatchObject({ reason: 'stopped', counted: 0 })
   })
 
+  it('runs the between step before each exposure with the number of frames counted so far', async () => {
+    const camera = fakeCamera()
+    const seen: number[] = []
+    const started = camera.capture.start(request, async frame => {
+      seen.push(frame)
+      seen.push(camera.script.sent.filter(sent => sent.property === 'CCD_EXPOSURE').length)
+
+      return undefined
+    })
+
+    if (!started.ok) throw new Error(started.reason)
+    await started.done
+
+    expect(seen).toEqual([0, 0, 1, 1, 2, 2])
+    expect(camera.capture.view().last).toMatchObject({ reason: 'done', counted: 3 })
+  })
+
+  it('ends the run with the reason the between step gives, before exposing', async () => {
+    const camera = fakeCamera()
+    const started = camera.capture.start(request, async frame => (frame === 1 ? 'the focuser did not arrive' : undefined))
+
+    if (!started.ok) throw new Error(started.reason)
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'refused', detail: 'the focuser did not arrive', counted: 1 })
+    expect(camera.script.sent.filter(sent => sent.property === 'CCD_EXPOSURE')).toHaveLength(1)
+  })
+
   it('answers Stop with false when nothing is running', async () => {
     expect(await fakeCamera().capture.stop()).toBe(false)
   })
