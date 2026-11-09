@@ -7,6 +7,7 @@ const minimal = {
   broker: { servers: 'nats://127.0.0.1:4222' },
   frames: { spoolDir: '/home/example/frames', nightZone: 'America/Phoenix' },
   capture: { runFile: '/home/example/.local/state/vela/run.json' },
+  astap: { program: '/home/example/astap/astap_cli', database: '/home/example/astap/d05', workDir: '/home/example/.local/state/vela/astap' },
 }
 
 describe('settings', () => {
@@ -17,6 +18,7 @@ describe('settings', () => {
       historyReadBatch: 2048,
       devices: { mount: 'mount', primary: 'primary' },
       capture: { commandAnswerSeconds: 10, settleSeconds: 10, exposureSilenceSeconds: 10, failuresInRow: 3 },
+      astap: { analyseSnr: 10 },
       frames: { host: 'errai', keepDir: '/mnt/storage/rig/frames', nightChangesAtHour: 12, copyAttempts: 3, preview: { bin: 2, blackSigmas: 2.8, targetMedian: 0.25 } },
     })
   })
