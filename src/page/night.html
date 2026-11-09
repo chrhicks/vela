@@ -1188,7 +1188,7 @@ function showMeridian() {
   let text = ''
   if (run !== undefined && run.frameType === 'light' && !running(capture.align) && night?.phase === 'live') {
     if (tracking?.text === 'off') text = 'The mount is not tracking' + (tracking.changedAt === undefined ? '' : ' since ' + hourMinute(tracking.changedAt)) + ': frames are trailed. The run is still going; Stop is yours.'
-    else if (tracking?.text === 'on' && limitAt !== undefined && limitAt < night.at) text = 'The mount is ' + Math.round((night.at - limitAt) / 60000) + ' min past its meridian limit and still tracking; on 11-03 the camera reached the tripod leg about 6° (24 min) past it at Dec 60.'
+    else if (tracking?.text === 'on' && limitAt !== undefined && limitAt < night.at) text = 'The mount is ' + Math.round((night.at - limitAt) / 60000) + ' min past its meridian limit and still tracking; on 11-03 the camera reached the tripod leg about 11° past the meridian at Dec 60.'
   }
   const goto = pointing?.goto
   document.getElementById('meridianbar').hidden = text === ''
