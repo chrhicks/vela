@@ -948,7 +948,16 @@ function showTonight() {
     ? { text: 'No word from the rig for ' + night.rig.silentSeconds + ' s', tone: 'stale' }
     : down.length > 0 ? { text: down.map(device => device.title + ' ' + device.connection.text).join(', '), tone: 'bad' } : undefined
   const alarm = problem === undefined ? '' : '<p class="alarm ' + problem.tone + '">' + escapeText(problem.text) + '. <a href="#/rig">See the rig</a></p>'
-  if (run !== undefined) {
+  const align = capture?.align
+  if (run !== undefined && running(align)) {
+    const error = align.error
+    const solved = align.frames.filter(frame => frame.frame <= 3 && frame.solved).length
+    head.innerHTML = alarm + '<h1>Polar alignment</h1>' +
+      '<p class="sub">' + (error === undefined ? 'Measuring the axis: ' + solved + ' of 3 frames solved.' : 'Frame ' + error.frame + ', ' + Math.max(0, Math.round((capture.at - error.at) / 1000)) + ' s ago. <a href="#/prepare">Which way to turn</a>') + '</p>' +
+      (run.alert === undefined ? '' : '<p class="alarm bad">' + escapeText(run.alert.text + (run.alert.seconds === undefined ? '' : ' (' + run.alert.seconds + ' s)')) + '. The run is still going; Stop is yours.</p>') +
+      (align.problem === undefined ? '' : '<p class="alarm bad">' + escapeText(align.problem) + '. Waiting for you; Stop is yours.</p>') +
+      (error === undefined ? '' : '<div class="big"><div>Altitude<b>' + arcmin(error.altitudeArcmin) + '</b></div><div>Azimuth<b>' + arcmin(error.azimuthArcmin) + '</b></div><div>Total<b>' + arcmin(error.totalArcmin) + '</b></div></div>')
+  } else if (run !== undefined) {
     const left = run.phase === 'exposing' && run.secondsLeft !== undefined ? run.secondsLeft + ' s left' : run.phase === 'preparing' ? 'setting up' : 'ending'
     head.innerHTML = alarm + '<h1>' + escapeText(run.object) + ', ' + escapeText(run.frameType) + ' frames</h1>' +
       '<p class="sub">' + (run.count === undefined ? 'Frames' : run.count + ' frames') + ' of ' + run.exposureSeconds + ' s' + (run.count === undefined ? ' until Stop' : '') + (run.failed > 0 ? ', ' + run.failed + ' failed' : '') + '.' + (night.phase === 'live' ? '' : ' <span class="stale">Run numbers' + staleNote(night) + '</span>') + '</p>' +
