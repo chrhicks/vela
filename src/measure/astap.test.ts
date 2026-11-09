@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readAnalysis, readSolution } from './astap.ts'
+import { fieldHeightDegrees, readAnalysis, readSolution } from './astap.ts'
 
 describe('reading ASTAP', () => {
   it('reads the median star size and count from an analysis', () => {
@@ -22,5 +22,13 @@ describe('reading ASTAP', () => {
 
   it('gives the reason a frame did not solve', () => {
     expect(readSolution('PLTSOLVD=F\nERROR=No solution found!\n')).toEqual({ ok: false, reason: 'No solution found!' })
+  })
+
+  it('gives the field height from the frame header, binned or not', () => {
+    const card = (key: string, value: string) => ({ key, value, comment: '' })
+
+    expect(fieldHeightDegrees([card('NAXIS2', '4176'), card('YPIXSZ', '3.76'), card('FOCALLEN', '400')])).toBeCloseTo(2.249, 3)
+    expect(fieldHeightDegrees([card('NAXIS2', '2088'), card('YPIXSZ', '7.52'), card('FOCALLEN', '400')])).toBeCloseTo(2.249, 3)
+    expect(fieldHeightDegrees([card('NAXIS2', '4176'), card('YPIXSZ', '3.76')])).toBeUndefined()
   })
 })

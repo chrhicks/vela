@@ -20,7 +20,7 @@ import { makePointing } from '../pointing/pointing.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
 import { focusSubject, makeAutofocus } from '../focus/autofocus.ts'
-import { makeAstap } from '../measure/astap.ts'
+import { fieldHeightDegrees, makeAstap } from '../measure/astap.ts'
 import { alignSubject, makeAlign } from '../align/run.ts'
 import { readCards } from '../frames/library.ts'
 import { makeNight } from '../rig/night.ts'
@@ -100,7 +100,7 @@ const align = makeAlign({
   picture,
   sender,
   capture,
-  solve: frame => astap.solve(keptPath(frame)),
+  solve: async frame => astap.solve(keptPath(frame), fieldHeightDegrees(await readCards(keptPath(frame)))),
   cards: frame => readCards(keptPath(frame)),
   publish: (kind, body) => publishEntry(alignSubject, `vela.align.${kind}`, `${String(body['run'])}:${String(body['frame'] ?? '')}`, body),
   settings: { mount: devices.mount, camera: devices.primary, ...settings.align },
