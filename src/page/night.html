@@ -985,8 +985,29 @@ function showTonight() {
   }
 }
 
+const running = part => part?.run !== undefined && part.ended === undefined
+let wantAwake = false
+let wakeLock
+
+function keepAwake(on) {
+  wantAwake = on
+  if (!('wakeLock' in navigator)) return
+  if (!on && wakeLock) {
+    wakeLock.release()
+    wakeLock = undefined
+  }
+  if (!on || wakeLock !== undefined || document.visibilityState !== 'visible') return
+  wakeLock = null
+  navigator.wakeLock.request('screen').then(lock => {
+    wakeLock = lock
+    lock.addEventListener('release', () => { if (wakeLock === lock) wakeLock = undefined })
+    if (!wantAwake) keepAwake(false)
+  }, () => { wakeLock = undefined })
+}
+
 function showCapture(view) {
   tonightState.capture = view
+  keepAwake(running(view.align) || running(view.autofocus))
   showAutofocus(view.autofocus)
   showAlign(view.align, view.at)
   showTonight()
@@ -1050,7 +1071,7 @@ paStart.addEventListener('click', () => {
 const arcmin = value => Math.abs(value) < 1 ? Math.round(Math.abs(value) * 60) + '″' : Math.abs(value).toFixed(1) + '′'
 
 function showAlign(view, now) {
-  document.getElementById('align').classList.toggle('running', view?.run !== undefined && view.ended === undefined)
+  document.getElementById('align').classList.toggle('running', running(view))
   if (view === undefined || view.run === undefined) return
   const solved = view.frames.filter(frame => frame.frame <= 3 && frame.solved).length
   const newest = [...view.frames].sort((a, b) => b.frame - a.frame)[0]
