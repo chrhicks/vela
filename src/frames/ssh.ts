@@ -17,7 +17,7 @@ export function quote(text: string) {
 export function makeSsh(host: string, timeoutMs: number): Ssh {
   return (command, sink) =>
     new Promise((resolve, reject) => {
-      const child = spawn('ssh', ['-o', 'BatchMode=yes', host, command], { stdio: ['ignore', 'pipe', 'pipe'], signal: AbortSignal.timeout(timeoutMs) })
+      const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ControlMaster=auto', '-o', 'ControlPath=%d/.ssh/vela-%C', '-o', 'ControlPersist=yes', host, command], { stdio: ['ignore', 'pipe', 'pipe'], signal: AbortSignal.timeout(timeoutMs) })
       const out: Buffer[] = []
       const err: Buffer[] = []
       const copying = sink === undefined ? undefined : pipeline(child.stdout, sink)
