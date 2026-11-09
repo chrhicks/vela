@@ -13,14 +13,16 @@ const solves = [
   { raDegrees: 190.02, decDegrees: 80.6 },
 ]
 
-function scriptedRun(solveFrame: (frame: number) => Solution) {
+function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0) {
   const published: Array<{ kind: string; body: Record<string, unknown> }> = []
+  const events: string[] = []
   const holder = { align: undefined as ReturnType<typeof makeAlign> | undefined }
   let at = startedAt + 1000
   const feed = (kind: string, body: Record<string, unknown>) => holder.align?.observe({ id: `${kind}:${(at += 1)}`, kind, at, run: undefined, body })
   const camera = fakeCamera({
     onEvent: event => {
       if (event.kind === 'exposed') void holder.align?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
+      events.push(`${event.kind}:${String(event.body['frame'] ?? '')}`)
       feed(`vela.run.${event.kind}`, { run: event.run, ...event.body })
     },
   })
@@ -48,10 +50,14 @@ function scriptedRun(solveFrame: (frame: number) => Solution) {
       },
     },
     capture: camera.capture,
-    solve: async frame => solveFrame(camera.capture.labelOf(frame.file)?.frame ?? 1),
+    solve: async frame => {
+      await new Promise(resolve => setTimeout(resolve, solveMs))
+      return solveFrame(camera.capture.labelOf(frame.file)?.frame ?? 1)
+    },
     cards: async frame => [{ key: 'DATE-OBS', value: new Date(startedAt + 60_000 * (camera.capture.labelOf(frame.file)?.frame ?? 1)).toISOString().slice(0, 23), comment: '' }, { key: 'EXPTIME', value: '2', comment: '' }],
     publish: (kind, body) => {
       published.push({ kind, body: { ...body } })
+      if (kind === 'solve') events.push(`solve:${String(body['frame'])}`)
       feed(`vela.align.${kind}`, body)
     },
     settings: { mount: 'primary', camera: 'primary', declinationDegrees: 80, hourAnglesDegrees: [-130, -73, -16], adjustFrames: 2 },
@@ -60,7 +66,7 @@ function scriptedRun(solveFrame: (frame: number) => Solution) {
 
   holder.align = align
 
-  return { align, published, slews }
+  return { align, published, slews, events }
 }
 
 function settled(align: ReturnType<typeof makeAlign>, published: ReadonlyArray<{ kind: string }>, solveCount: number) {
@@ -111,5 +117,15 @@ describe('a polar alignment run on a scripted camera and mount', () => {
 
     expect(slews).toHaveLength(3)
     expect(align.view()).toMatchObject({ ended: 'done', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false }, { frame: 5, solved: true }], error: { frame: 5 } })
+  })
+
+  it('takes each adjusting frame only after the last one is solved, so the readings never fall behind', async () => {
+    const { align, published, events } = scriptedRun(frame => ({ ok: true, ...solves[frame - 1]! }), 30)
+
+    expect(align.start({ exposureSeconds: 0.01 })).toEqual({ ok: true })
+
+    await settled(align, published, 5)
+
+    for (const frame of [1, 2, 3, 4]) expect(events.indexOf(`solve:${frame}`)).toBeLessThan(events.indexOf(`exposed:${frame + 1}`))
   })
 })

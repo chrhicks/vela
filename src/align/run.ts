@@ -135,10 +135,6 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
       let run = ''
 
       const between: Between = async (frame, signal) => {
-        const hourAngle = settings.hourAnglesDegrees[frame]
-
-        if (frame > settings.hourAnglesDegrees.length) return undefined
-
         if (frame > 0) {
           const measured = await until(() => view.run === run && solvedOf(frame) !== undefined, signal)
 
@@ -146,8 +142,10 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
 
           const last = solvedOf(frame)
 
-          if (last?.solved === false) return `frame ${frame} did not solve: ${last.reason}`
+          if (last?.solved === false && frame <= settings.hourAnglesDegrees.length) return `frame ${frame} did not solve: ${last.reason}`
         }
+
+        const hourAngle = settings.hourAnglesDegrees[frame]
 
         return hourAngle === undefined ? undefined : slewTo(hourAngle, signal)
       }
