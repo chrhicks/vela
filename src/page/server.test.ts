@@ -24,14 +24,14 @@ const idlePointing: PageOptions['pointing'] = {
 
 const idleCapture: PageOptions['capture'] = { view: () => idleView, start: () => ({ ok: false, reason: 'not here' }), stop: async () => false }
 
-async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'frame' | 'activity' | 'capture' | 'prepare' | 'pointing'>> = {}) {
+async function serve(refreshMs = 20, frames: Partial<Pick<PageOptions, 'frames' | 'preview' | 'frame' | 'activity' | 'capture' | 'prepare' | 'pointing' | 'runs'>> = {}) {
   const picture = makePicture()
 
   picture.apply(connected(startedAt), Date.now())
   picture.apply(wire(startedAt + 1, 'def', 'focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 1200 }, 'Ok'), Date.now())
   picture.caughtUp()
 
-  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), focus: () => ({ now: undefined, focused: undefined }), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, activity: () => ({ night: '2026-11-07', items: [], viewer: undefined }), capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, ...frames })
+  const { server } = makePage({ night: () => makeNight(picture, settings, Date.now()), focus: () => ({ now: undefined, focused: undefined }), refreshMs, frames: async () => ({ night: '2026-11-07', frames: [] }), preview: async () => undefined, frame: async () => undefined, activity: () => ({ night: '2026-11-07', items: [], viewer: undefined }), capture: idleCapture, prepare: idlePrepare, pointing: idlePointing, runs: {}, ...frames })
 
   open.push(server)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -180,6 +180,17 @@ describe('page server', () => {
     expect(await refused.json()).toEqual({ error: 'position 70000 is outside the limits' })
     expect((await post('not json')).status).toBe(400)
     expect(received).toEqual(['ok', { action: 'focuser-move' }])
+  })
+
+  it('starts a named run such as autofocus and adds its view to the capture view', async () => {
+    const received: unknown[] = []
+    const base = await serve(20, { runs: { autofocus: { start: request => (received.push(request), { ok: false, reason: 'no stars' }), view: () => ({ run: 'run-1' }) } } })
+    const started = await fetch(`${base}/autofocus`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"step":50}' })
+
+    expect(started.status).toBe(409)
+    expect(await started.json()).toEqual({ error: 'no stars' })
+    expect(received).toEqual([{ step: 50 }])
+    expect(await (await fetch(`${base}/capture.json`)).json()).toMatchObject({ autofocus: { run: 'run-1' } })
   })
 
   it('refuses a preparation request a web page could send without asking the browser first', async () => {
