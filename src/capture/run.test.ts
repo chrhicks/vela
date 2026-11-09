@@ -220,13 +220,36 @@ describe('a capture run on a scripted camera', () => {
 })
 
 describe('what a run does with commands that do not work', () => {
-  it('ends the run, saying why, when a command is refused', async () => {
-    const camera = fakeCamera()
+  it('goes on with the frames when a setting is refused, and says so', async () => {
+    const holder = { camera: undefined as ReturnType<typeof fakeCamera> | undefined }
+    const alerts: unknown[] = []
+    const camera = fakeCamera({ onEvent: event => void (event.kind === 'exposed' && alerts.push(holder.camera?.capture.view().run?.alert)) })
 
+    holder.camera = camera
     camera.script.refuse.set('CCD_FRAME_TYPE', 'CCD_FRAME_TYPE is kept by the rig file')
 
-    expect(await runToEnd(camera)).toMatchObject({ reason: 'refused', detail: 'CCD_FRAME_TYPE: CCD_FRAME_TYPE is kept by the rig file', counted: 0 })
-    expect(camera.script.sent.filter(sent => sent.property === 'CCD_EXPOSURE')).toHaveLength(0)
+    expect(await runToEnd(camera)).toMatchObject({ reason: 'done', counted: 3 })
+    expect(alerts[0]).toEqual({ text: 'The rig program refused CCD_FRAME_TYPE: CCD_FRAME_TYPE is kept by the rig file', seconds: undefined })
+  })
+
+  it('waits for Stop when the exposure itself is refused, and says so', async () => {
+    const camera = fakeCamera()
+
+    camera.script.refuse.set('CCD_EXPOSURE', 'the camera is not connected')
+
+    const started = camera.capture.start(request)
+
+    if (!started.ok) throw new Error(started.reason)
+
+    await until(() => camera.capture.view().run?.alert !== undefined)
+
+    expect(camera.capture.view().run?.alert?.text).toBe('Waiting for you: the rig program refused CCD_EXPOSURE (the camera is not connected)')
+    expect(camera.script.sent.filter(sent => sent.property === 'CCD_EXPOSURE')).toHaveLength(1)
+
+    await camera.capture.stop()
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'stopped', counted: 0 })
   })
 
   it('keeps waiting when a command gets no answer, lists it as late, and never sends it again', async () => {
