@@ -106,6 +106,24 @@ export const AstapSettings = Schema.Struct({
   ),
 })
 
+export const AlignSettings = Schema.Struct({
+  declinationDegrees: described(
+    'The declination the three alignment frames are taken at. Every polar alignment recorded from 10-31 to 11-03 (six runs) turned the mount at declination 80 on the west side of the pier, clear of the pier and the tripod legs',
+    Schema.Number,
+    80,
+  ),
+  hourAnglesDegrees: described(
+    'The hour angles of the three alignment frames, east of the meridian negative. The recorded runs swept from -130 to -16 (the same six runs); the three points are its two ends and its middle, because the wider apart they are, the less a solve error moves the fitted axis (on the 11-03 run, three adjacent points 23 degrees apart gave 2.5 arcminutes less than the ends and middle)',
+    Schema.Tuple([Schema.Number, Schema.Number, Schema.Number]),
+    [-130, -73, -16],
+  ),
+  adjustFrames: described(
+    'Frames taken while the knobs are adjusted before the alignment ends by itself. Each frame is kept (52 MB) and comes about every 8 s with a 2 s exposure, so 100 is about 13 minutes and 5 GB; Start again for more',
+    Schema.Number,
+    100,
+  ),
+})
+
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the page is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve' }),
   broker: BrokerSettings,
@@ -135,6 +153,7 @@ export const VelaSettings = Schema.Struct({
   prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),
   pointing: described('Settings for choosing a target and pointing the mount', PointingSettings, {}),
   astap: AstapSettings,
+  align: described('Settings for polar alignment', AlignSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({
       description: "The address of Cria's stream viewer, which shows the raw INDI wire. The Activity view links to it; without it, there is no link",
