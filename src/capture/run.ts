@@ -26,12 +26,11 @@ export interface CaptureSettings {
   readonly settleMs: number
   readonly exposureSilenceMs: number
   readonly failuresInRow: number
-  readonly silenceMs: number
   readonly telescope: string | undefined
 }
 
 export interface CaptureOptions {
-  readonly picture: Pick<Picture, 'property' | 'rig' | 'indi' | 'heardAt'>
+  readonly picture: Pick<Picture, 'property' | 'rig'>
   readonly sender: Pick<Sender, 'send' | 'late'>
   readonly settings: CaptureSettings
   readonly runFile: RunFile
@@ -108,13 +107,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   function refusalToStart(request: CaptureRequest, wanted: Wanted): string | undefined {
     if (active !== undefined) return 'a capture is already running'
     if (picture.rig() === undefined) return 'the stream shows no rig connection'
-    if (picture.indi() !== 'connected') return 'indiserver is not connected'
-
-    const heard = picture.heardAt()
-
-    if (heard === undefined || now() - heard > settings.silenceMs) return `the rig program has been silent for more than ${settings.silenceMs / 1000} s`
     if (read('CCD_EXPOSURE') === undefined) return `${settings.device} has no CCD_EXPOSURE on the stream`
-    if (read('CCD_EXPOSURE')?.state === 'Busy') return 'the camera is already exposing'
 
     const upload = read('UPLOAD_MODE')
 
