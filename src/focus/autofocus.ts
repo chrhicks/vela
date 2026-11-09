@@ -37,6 +37,7 @@ export interface AutofocusView {
   readonly best: Best | undefined
   readonly check: Sample | undefined
   readonly ended: string | undefined
+  readonly problem: string | undefined
 }
 
 export function bestFocus(samples: ReadonlyArray<Sample>, minStars: number): Best | undefined {
@@ -78,7 +79,7 @@ export interface AutofocusOptions {
 
 type Result = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
-const empty: AutofocusView = { run: undefined, startedAt: undefined, positions: [], samples: [], best: undefined, check: undefined, ended: undefined }
+const empty: AutofocusView = { run: undefined, startedAt: undefined, positions: [], samples: [], best: undefined, check: undefined, ended: undefined, problem: undefined }
 
 export function makeAutofocus({ picture, sender, capture, analyse, publish, settings }: AutofocusOptions) {
   let view = empty
@@ -149,8 +150,18 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
       let run = ''
 
       const between: Between = async (frame, signal) => {
-        if (frame === 0) return (await move(top + request.step, signal)) ?? move(top, signal)
-        if (frame < positions.length) return move(positions[frame]!, signal)
+        const waitOn = async (problem: string | undefined) => {
+          if (problem === undefined) return undefined
+
+          view = { ...view, problem }
+          changed()
+          await until(() => false, signal)
+
+          return undefined
+        }
+
+        if (frame === 0) return waitOn((await move(top + request.step, signal)) ?? (await move(top, signal)))
+        if (frame < positions.length) return waitOn(await move(positions[frame]!, signal))
 
         const measured = await until(() => view.run === run && view.samples.length >= positions.length, signal)
 
@@ -166,7 +177,7 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
 
         publish('best', { run, ...best })
 
-        return (await move(top + request.step, signal)) ?? move(best.position, signal)
+        return waitOn((await move(top + request.step, signal)) ?? (await move(best.position, signal)))
       }
 
       const started = capture.start({ object: 'autofocus', frameType: 'light', exposureSeconds: request.exposureSeconds, count: request.samples + 1, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between)

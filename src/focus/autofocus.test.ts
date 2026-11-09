@@ -51,7 +51,7 @@ describe('the best focus of a sweep', () => {
   })
 })
 
-async function scriptedSweep(stars: number) {
+async function scriptedSweep(stars: number, refuseMoves?: string) {
   const published: Array<{ kind: string; body: Record<string, unknown> }> = []
   const focus = { autofocus: undefined as ReturnType<typeof makeAutofocus> | undefined }
   const camera = fakeCamera({
@@ -87,11 +87,13 @@ async function scriptedSweep(stars: number) {
   })
 
   focus.autofocus = autofocus
+  if (refuseMoves !== undefined) camera.script.refuse.set('ABS_FOCUS_POSITION', refuseMoves)
   expect(autofocus.start({ step: 50, samples: 5, exposureSeconds: 0.01 })).toEqual({ ok: true })
 
   await new Promise<void>(resolve => {
     const check = setInterval(() => {
       autofocus.observe({ id: 'tick', kind: 'tick', at, run: undefined, body: {} })
+      if (autofocus.view().problem !== undefined) void camera.capture.stop()
       if (autofocus.view().ended !== undefined) {
         clearInterval(check)
         resolve()
@@ -117,6 +119,13 @@ describe('an autofocus run on a scripted camera and focuser', () => {
     expect(moves).toEqual([1150, 1100, 1050, 1000, 950, 900, 1150, 1000])
     expect(autofocus.view()).toMatchObject({ best: undefined, check: undefined, ended: 'refused' })
     expect(published.map(entry => entry.kind)).toEqual(['started', 'sample', 'sample', 'sample', 'sample', 'sample'])
+  })
+
+  it('waits with the reason on the page when a focuser move is refused, until Stop', async () => {
+    const { autofocus, moves } = await scriptedSweep(200, 'the focuser is not connected')
+
+    expect(moves).toEqual([1150])
+    expect(autofocus.view()).toMatchObject({ problem: 'focuser move to 1150: the focuser is not connected', ended: 'stopped' })
   })
 
   it('refuses a sweep that would leave the focuser travel', () => {

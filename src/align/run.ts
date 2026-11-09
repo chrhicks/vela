@@ -41,11 +41,12 @@ export interface AlignView {
   readonly error: (PolarError & { readonly at: number; readonly frame: number }) | undefined
   readonly ended: string | undefined
   readonly lastFrameAt: number | undefined
+  readonly problem: string | undefined
 }
 
 type Result = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
-const empty: AlignView = { run: undefined, startedAt: undefined, frames: [], first: undefined, error: undefined, ended: undefined, lastFrameAt: undefined }
+const empty: AlignView = { run: undefined, startedAt: undefined, frames: [], first: undefined, error: undefined, ended: undefined, lastFrameAt: undefined, problem: undefined }
 
 export function exposureMiddle(cards: ReadonlyArray<Card>): number | undefined {
   const start = cards.find(card => card.key === 'DATE-OBS')?.value
@@ -147,7 +148,14 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
 
         const hourAngle = settings.hourAnglesDegrees[frame]
 
-        return hourAngle === undefined ? undefined : slewTo(hourAngle, signal)
+        const problem = hourAngle === undefined ? undefined : await slewTo(hourAngle, signal)
+
+        if (problem !== undefined) {
+          view = { ...view, problem }
+          await until(() => false, signal)
+        }
+
+        return undefined
       }
 
       const started = capture.start({ object: 'polar-align', frameType: 'light', exposureSeconds: request.exposureSeconds, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between)
