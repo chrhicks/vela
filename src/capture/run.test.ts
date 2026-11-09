@@ -368,12 +368,23 @@ describe('starting a run', () => {
     expect(camera.capture.start(request)).toMatchObject({ ok: false, reason: expect.stringContaining('not saving frames on the rig computer') })
   })
 
-  it('refuses when the camera is already exposing', () => {
+  it('starts while the camera is still exposing, and waits for it before the first frame', async () => {
     const camera = fakeCamera()
 
     camera.set('CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 30 }, 'Busy')
 
-    expect(camera.capture.start(request)).toEqual({ ok: false, reason: 'the camera is already exposing' })
+    const started = camera.capture.start({ ...request, count: 1 })
+
+    if (!started.ok) throw new Error(started.reason)
+
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(camera.script.sent.some(sent => sent.property === 'CCD_EXPOSURE')).toBe(false)
+
+    camera.set('CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 0 }, 'Ok')
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'done', counted: 1 })
   })
 
   it('refuses when the camera lacks a property the run needs to set', () => {
