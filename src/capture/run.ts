@@ -90,6 +90,7 @@ interface Active {
   stopping: Promise<string> | undefined
   watch: { alerted: boolean; file: string | undefined; previous: string | undefined; exposureHeardAt: number } | undefined
   waiting: { readonly what: string; readonly since: () => number; readonly alertAfterMs: number } | undefined
+  readonly refused: Map<string, string>
 }
 
 type Stop = { readonly reason: EndReason; readonly detail: string }
@@ -151,10 +152,14 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     const waiting = run.waiting
     const waited = waiting === undefined ? 0 : at - waiting.since()
 
-    if (waiting !== undefined && waited >= waiting.alertAfterMs) return { text: `Waiting for ${waiting.what}`, seconds: Math.round(waited / 1000) }
-    if (run.inARow >= settings.failuresInRow) return { text: `${run.inARow} exposures in a row failed`, seconds: undefined }
+    const parts = [
+      ...[...run.refused].map(([property, reason]) => `The rig program refused ${property}: ${reason}`),
+      ...(run.inARow >= settings.failuresInRow ? [`${run.inARow} exposures in a row failed`] : []),
+    ]
 
-    return undefined
+    if (waiting !== undefined && waited >= waiting.alertAfterMs) return { text: [`Waiting for ${waiting.what}`, ...parts].join('. '), seconds: Math.round(waited / 1000) }
+
+    return parts.length === 0 ? undefined : { text: parts.join('. '), seconds: undefined }
   }
 
   function stoppedOr(run: Active, stop: Stop): Stop {
@@ -164,7 +169,15 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   async function apply(run: Active, step: Step): Promise<Stop | undefined> {
     const outcome = await sender.send({ device: settings.device, property: step.property, values: step.values }, run.abort.signal)
 
-    if (outcome.result !== 'written') return stoppedOr(run, { reason: outcome.result, detail: `${step.property}: ${outcome.reason}` })
+    if (outcome.result === 'unknown') return stoppedOr(run, { reason: outcome.result, detail: `${step.property}: ${outcome.reason}` })
+
+    if (outcome.result === 'refused') {
+      run.refused.set(step.property, outcome.reason)
+
+      return undefined
+    }
+
+    run.refused.delete(step.property)
 
     if (step.shows !== undefined) {
       const shows = step.shows
@@ -209,6 +222,13 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     run.phase = 'exposing'
 
     const outcome = await sender.send({ device: settings.device, property: 'CCD_EXPOSURE', values: { CCD_EXPOSURE_VALUE: run.request.exposureSeconds } }, run.abort.signal)
+
+    if (outcome.result === 'refused') {
+      run.watch = undefined
+      await wait(run, `you: the rig program refused CCD_EXPOSURE (${outcome.reason})`, 0, () => false)
+
+      return { frame: 'stop', stop: { reason: 'stopped', detail: 'Stop pressed' } }
+    }
 
     if (outcome.result !== 'written') {
       run.watch = undefined
@@ -315,6 +335,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         stopping: undefined,
         watch: undefined,
         waiting: undefined,
+        refused: new Map(),
       }
 
       active = run
