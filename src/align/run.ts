@@ -137,16 +137,19 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
       const between: Between = async (frame, signal) => {
         const hourAngle = settings.hourAnglesDegrees[frame]
 
-        if (hourAngle !== undefined) return slewTo(hourAngle, signal)
         if (frame > settings.hourAnglesDegrees.length) return undefined
 
-        const measured = await until(() => view.run === run && [1, 2, 3].every(number => solvedOf(number) !== undefined), signal)
+        if (frame > 0) {
+          const measured = await until(() => view.run === run && solvedOf(frame) !== undefined, signal)
 
-        if (!measured) return undefined
+          if (!measured) return undefined
 
-        const missed = [1, 2, 3].map(solvedOf).find(candidate => candidate?.solved === false)
+          const last = solvedOf(frame)
 
-        return missed === undefined ? undefined : `frame ${missed.frame} did not solve: ${missed.reason}`
+          if (last?.solved === false) return `frame ${frame} did not solve: ${last.reason}`
+        }
+
+        return hourAngle === undefined ? undefined : slewTo(hourAngle, signal)
       }
 
       const started = capture.start({ object: 'polar-align', frameType: 'light', exposureSeconds: request.exposureSeconds, count: settings.hourAnglesDegrees.length + settings.adjustFrames, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between)
