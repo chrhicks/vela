@@ -19,7 +19,7 @@ describe('the best focus of a sweep', () => {
       [32274, 7.7, 7],
     ])
 
-    expect(bestFocus(samples)).toEqual({ position: 32522, how: 'fit' })
+    expect(bestFocus(samples, 10)).toEqual({ position: 32522, how: 'fit' })
   })
 
   it('ignores star sizes measured on few stars, and takes the lowest when a neighbour has too few (recorded 10-31 run, 100 steps)', () => {
@@ -35,15 +35,19 @@ describe('the best focus of a sweep', () => {
       [32383, 10.9, 20],
     ])
 
-    expect(bestFocus(samples)).toEqual({ position: 32483, how: 'lowest' })
+    expect(bestFocus(samples, 10)).toEqual({ position: 32483, how: 'lowest' })
   })
 
   it('says when the lowest sample is at the end of the sweep', () => {
-    expect(bestFocus(sweep([[1200, 6, 50], [1150, 5, 60], [1100, 4, 70]]))).toEqual({ position: 1100, how: 'edge' })
+    expect(bestFocus(sweep([[1200, 6, 50], [1150, 5, 60], [1100, 4, 70]]), 10)).toEqual({ position: 1100, how: 'edge' })
+  })
+
+  it('has no best focus when the most stars any frame showed are noise (a daylight sweep on the rig, 2026-11-09)', () => {
+    expect(bestFocus(sweep([[32577, 1.2, 1], [32527, 1.8, 2], [32477, 1.8, 2], [32427, 1.6, 2], [32377, 2.3, 4]]), 10)).toBeUndefined()
   })
 
   it('has no best focus when no frame showed stars', () => {
-    expect(bestFocus(sweep([[1100, 21.5, 0], [1050, 21.5, 0], [1000, 21.5, 0]]))).toBeUndefined()
+    expect(bestFocus(sweep([[1100, 21.5, 0], [1050, 21.5, 0], [1000, 21.5, 0]]), 10)).toBeUndefined()
   })
 })
 
@@ -80,7 +84,7 @@ describe('an autofocus run on a scripted camera and focuser', () => {
         published.push({ kind, body: { ...body } })
         focus.autofocus?.observe({ id: kind, kind: `vela.focus.${kind}`, at: (at += 1), run: undefined, body })
       },
-      settings: { focuser: 'primary', camera: 'primary' },
+      settings: { focuser: 'primary', camera: 'primary', minStars: 10 },
     })
 
     focus.autofocus = autofocus
@@ -106,7 +110,7 @@ describe('an autofocus run on a scripted camera and focuser', () => {
 
     camera.feed(wire(startedAt + 1000, 'def', 'primary', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 100 }, 'Ok', 'in', { FOCUS_ABSOLUTE_POSITION: { min: 0, max: 60000 } }))
 
-    const autofocus = makeAutofocus({ picture: camera.picture, sender: camera.sender, capture: camera.capture, analyse: async () => undefined, publish: () => undefined, settings: { focuser: 'primary', camera: 'primary' } })
+    const autofocus = makeAutofocus({ picture: camera.picture, sender: camera.sender, capture: camera.capture, analyse: async () => undefined, publish: () => undefined, settings: { focuser: 'primary', camera: 'primary', minStars: 10 } })
 
     expect(autofocus.start({ step: 50, samples: 9, exposureSeconds: 1 })).toEqual({ ok: false, reason: "the sweep -100 to 350 leaves the focuser's travel, 0 to 60000" })
   })

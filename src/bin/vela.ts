@@ -94,7 +94,7 @@ const autofocus = makeAutofocus({
   capture,
   analyse: frame => astap.analyse(keptPath(frame)),
   publish: (kind, body) => publishEntry(focusSubject, `vela.focus.${kind}`, String(body['run']), body),
-  settings: { focuser: devices.focuser, camera: devices.primary },
+  settings: { focuser: devices.focuser, camera: devices.primary, ...settings.autofocus },
 })
 const align = makeAlign({
   picture,

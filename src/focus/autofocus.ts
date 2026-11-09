@@ -39,10 +39,10 @@ export interface AutofocusView {
   readonly ended: string | undefined
 }
 
-export function bestFocus(samples: ReadonlyArray<Sample>): Best | undefined {
+export function bestFocus(samples: ReadonlyArray<Sample>, minStars: number): Best | undefined {
   const most = Math.max(0, ...samples.map(sample => sample.stars))
 
-  if (most === 0) return undefined
+  if (most < minStars) return undefined
 
   const byPosition = [...samples].sort((a, b) => a.position - b.position)
   const usable = byPosition.filter(sample => sample.hfd !== undefined && sample.stars >= most / 2)
@@ -64,6 +64,7 @@ export function bestFocus(samples: ReadonlyArray<Sample>): Best | undefined {
 export interface AutofocusSettings {
   readonly focuser: string
   readonly camera: string
+  readonly minStars: number
 }
 
 export interface AutofocusOptions {
@@ -155,9 +156,9 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
 
         if (!measured) return undefined
 
-        const best = bestFocus(view.samples)
+        const best = bestFocus(view.samples, settings.minStars)
 
-        if (best === undefined) return 'no frame of the sweep showed stars'
+        if (best === undefined) return `no frame of the sweep showed ${settings.minStars} stars`
 
         publish('best', { run, ...best })
 
