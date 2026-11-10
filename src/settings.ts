@@ -98,17 +98,6 @@ export const PointingSettings = Schema.Struct({
   ),
 })
 
-export const AstapSettings = Schema.Struct({
-  program: Schema.String.annotate({ description: 'The ASTAP command-line program (astap_cli) on this machine, which measures stars and solves frames' }),
-  database: Schema.String.annotate({ description: "The folder holding ASTAP's star database. D05 solved the main camera's 2.2 degree field blind in 2.3 s (2026-11-09)" }),
-  workDir: Schema.String.annotate({ description: 'A folder on this machine where ASTAP writes the solution files of each solve; only the latest of each frame name is kept' }),
-  analyseSnr: described(
-    'The signal to noise a star needs to be counted when a frame is measured for focus. On the 10-31 autofocus runs, 10 found the same best position as 30 with two to three times the stars, and 30 found under 6 stars once a frame was 150 steps out of focus (replay of the recorded frames, 2026-11-09)',
-    Schema.Number,
-    10,
-  ),
-})
-
 export const AlignSettings = Schema.Struct({
   declinationDegrees: described(
     'The declination the three alignment frames are taken at. Every polar alignment recorded from 10-31 to 11-03 (six runs) turned the mount at declination 80 on the west side of the pier, clear of the pier and the tripod legs',
@@ -158,7 +147,6 @@ export const VelaSettings = Schema.Struct({
   capture: CaptureSettings,
   prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),
   pointing: described('Settings for choosing a target and pointing the mount', PointingSettings, {}),
-  astap: AstapSettings,
   align: described('Settings for polar alignment', AlignSettings, {}),
   autofocus: described('Settings for autofocus', AutofocusSettings, {}),
   streamViewer: Schema.optionalKey(
