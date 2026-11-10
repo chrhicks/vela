@@ -98,6 +98,15 @@ export const PointingSettings = Schema.Struct({
   ),
 })
 
+export const StarSettings = Schema.Struct({
+  program: Schema.String.annotate({ description: 'The ASTAP command-line program (astap_cli) on this machine, which counts and sizes the stars of each kept imaging frame' }),
+  analyseSnr: described(
+    'The signal to noise a star needs to be counted. On the 10-31 autofocus runs, 10 found the same best position as 30 with two to three times the stars, and 30 found under 6 stars once a frame was 150 steps out of focus (replay of the recorded frames, 2026-11-09)',
+    Schema.Number,
+    10,
+  ),
+})
+
 export const AlignSettings = Schema.Struct({
   declinationDegrees: described(
     'The declination the three alignment frames are taken at. Every polar alignment recorded from 10-31 to 11-03 (six runs) turned the mount at declination 80 on the west side of the pier, clear of the pier and the tripod legs',
@@ -148,6 +157,7 @@ export const VelaSettings = Schema.Struct({
   prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),
   pointing: described('Settings for choosing a target and pointing the mount', PointingSettings, {}),
   align: described('Settings for polar alignment', AlignSettings, {}),
+  stars: Schema.optionalKey(StarSettings.annotate({ description: 'Counting and sizing the stars of each kept imaging frame. Without it, kept frames get only their sky level and noise' })),
   autofocus: described('Settings for autofocus', AutofocusSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({

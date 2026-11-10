@@ -4,6 +4,7 @@ import { headerCards, type Card } from './fits.ts'
 import { frameNamePattern, previewName, sidecarName, type Sidecar } from './keeper.ts'
 import { nightPattern } from './night.ts'
 import { makePreview, type PreviewSettings } from './preview.ts'
+import { statsName, type FrameStats } from './stats.ts'
 
 export interface FrameRow {
   readonly file: string
@@ -12,6 +13,7 @@ export interface FrameRow {
   readonly run: string | null
   readonly sequence: string | null
   readonly frame: number | null
+  readonly stats: FrameStats | null
 }
 
 export interface FrameDetail extends FrameRow {
@@ -28,9 +30,15 @@ export interface Frames {
   readonly frames: ReadonlyArray<FrameRow>
 }
 
-function rowOf(sidecar: Sidecar) {
-  return { bytes: sidecar.bytes, keptAt: sidecar.keptAt, run: sidecar.run ?? null, sequence: sidecar.sequence ?? null, frame: sidecar.frame ?? null }
+function rowOf(sidecar: Sidecar, stats: FrameStats | null) {
+  return { bytes: sidecar.bytes, keptAt: sidecar.keptAt, run: sidecar.run ?? null, sequence: sidecar.sequence ?? null, frame: sidecar.frame ?? null, stats }
 }
+
+const statsOf = (directory: string, file: string) =>
+  readFile(join(directory, statsName(file)), 'utf8').then(
+    text => JSON.parse(text) as FrameStats,
+    () => null,
+  )
 
 export async function readCards(path: string) {
   const file = await open(path)
@@ -68,7 +76,7 @@ export async function frameDetail(keepDir: string, night: string, file: string):
 
   const path = join(directory, file)
 
-  return { night, file, path, sha256: sidecar.sha256, ...rowOf(sidecar), cards: await readCards(path) }
+  return { night, file, path, sha256: sidecar.sha256, ...rowOf(sidecar, await statsOf(directory, file)), cards: await readCards(path) }
 }
 
 export async function listNight(keepDir: string, night: string): Promise<Frames> {
@@ -79,8 +87,9 @@ export async function listNight(keepDir: string, night: string): Promise<Frames>
     if (!name.endsWith('.fits.json')) continue
 
     const sidecar = JSON.parse(await readFile(join(keepDir, night, name), 'utf8')) as Sidecar
+    const file = name.slice(0, -'.json'.length)
 
-    rows.push({ file: name.slice(0, -'.json'.length), ...rowOf(sidecar) })
+    rows.push({ file, ...rowOf(sidecar, await statsOf(join(keepDir, night), file)) })
   }
 
   return { night, frames: rows.sort((a, b) => b.keptAt.localeCompare(a.keptAt) || b.file.localeCompare(a.file)) }
