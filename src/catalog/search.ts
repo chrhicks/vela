@@ -1,4 +1,5 @@
 import { catalogRows } from './data.ts'
+import { positionRow } from './position.ts'
 import type { CatalogRow } from './types.ts'
 
 export interface TargetSummary {
@@ -45,10 +46,14 @@ export function summaryOf(row: CatalogRow): TargetSummary {
 }
 
 export function findRow(id: string) {
-  return catalogRows.find(row => row[0] === id)
+  return catalogRows.find(row => row[0] === id) ?? positionRow(id)
 }
 
 export function searchCatalog(text: string, limit: number): ReadonlyArray<TargetSummary> {
+  const position = positionRow(text)
+
+  if (position !== undefined) return [summaryOf(position)]
+
   const query = normalised(text)
 
   if (query === '') return []
