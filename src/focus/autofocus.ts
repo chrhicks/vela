@@ -2,8 +2,7 @@ import { Schema } from 'effect'
 import type { Between, StartResult } from '../capture/run.ts'
 import type { Sender } from '../commands/sender.ts'
 import { decodeConfig } from '../config.ts'
-import type { KeptFrame } from '../frames/entry.ts'
-import type { Stars } from '../measure/astap.ts'
+import type { Measured, Measurement } from '../measure/rig.ts'
 import type { Picture } from '../rig/picture.ts'
 import { recordOf, type Entry } from '../stream/entry.ts'
 
@@ -72,8 +71,7 @@ export interface AutofocusSettings {
 export interface AutofocusOptions {
   readonly picture: Pick<Picture, 'property'>
   readonly sender: Pick<Sender, 'send'>
-  readonly capture: { readonly start: (request: unknown, between: Between) => StartResult; readonly labelOf: (file: string) => { readonly run: string; readonly frame: number } | undefined }
-  readonly analyse: (frame: KeptFrame) => Promise<Stars | undefined>
+  readonly capture: { readonly start: (request: unknown, between: Between, measure: ReadonlyArray<Measurement>) => StartResult; readonly labelOf: (file: string) => { readonly run: string; readonly frame: number } | undefined }
   readonly publish: (kind: 'started' | 'sample' | 'best', body: Readonly<Record<string, unknown>>) => void
   readonly settings: AutofocusSettings
 }
@@ -82,7 +80,7 @@ type Result = { readonly ok: true } | { readonly ok: false; readonly reason: str
 
 const empty: AutofocusView = { run: undefined, startedAt: undefined, positions: [], samples: [], best: undefined, check: undefined, ended: undefined, problem: undefined }
 
-export function makeAutofocus({ picture, sender, capture, analyse, publish, settings }: AutofocusOptions) {
+export function makeAutofocus({ picture, sender, capture, publish, settings }: AutofocusOptions) {
   let view = empty
   const listeners = new Set<() => void>()
 
@@ -181,7 +179,7 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
         return waitOn((await move(top + request.step, signal)) ?? (await move(best.position, signal)))
       }
 
-      const started = capture.start({ object: 'autofocus', frameType: 'light', exposureSeconds: request.exposureSeconds, count: request.samples + 1, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between)
+      const started = capture.start({ object: 'autofocus', frameType: 'light', exposureSeconds: request.exposureSeconds, count: request.samples + 1, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between, ['stars'])
 
       if (!started.ok) return started
 
@@ -191,27 +189,19 @@ export function makeAutofocus({ picture, sender, capture, analyse, publish, sett
       return { ok: true }
     },
 
-    missed(file: string, reason: string) {
-      const label = capture.labelOf(file)
+    measured(answer: Measured) {
+      const label = capture.labelOf(answer.file)
       const position = label === undefined || label.run !== view.run ? undefined : (view.positions[label.frame - 1] ?? view.best?.position)
 
       if (label === undefined || position === undefined) return
 
-      publish('sample', { run: label.run, frame: label.frame, position, hfd: null, stars: 0, missed: `the frame could not be copied from the rig computer: ${reason}` })
-    },
+      const base = { run: label.run, frame: label.frame, position }
 
-    async kept(frame: KeptFrame) {
-      const label = capture.labelOf(frame.file)
+      if (answer.result === 'refused') return publish('sample', { ...base, hfd: null, stars: 0, missed: `the rig program did not measure it: ${answer.reason}` })
 
-      if (label === undefined || label.run !== view.run) return
+      const stars = answer.stars?.measured === true ? answer.stars : undefined
 
-      const position = view.positions[label.frame - 1] ?? view.best?.position
-
-      if (position === undefined) return
-
-      const stars = await analyse(frame).catch(() => undefined)
-
-      publish('sample', { run: label.run, frame: label.frame, position, hfd: stars !== undefined && stars.stars > 0 ? stars.hfd : null, stars: stars?.stars ?? 0 })
+      publish('sample', { ...base, hfd: stars !== undefined && stars.count > 0 ? stars.hfd : null, stars: stars?.count ?? 0 })
     },
 
     observe(entry: Entry) {

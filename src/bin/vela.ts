@@ -20,7 +20,6 @@ import { makePointing } from '../pointing/pointing.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
 import { focusSubject, makeAutofocus } from '../focus/autofocus.ts'
-import { makeAstap } from '../measure/astap.ts'
 import { alignSubject, makeAlign } from '../align/run.ts'
 import { makeMeasureRequests, measuredOf } from '../measure/rig.ts'
 import { makeNight } from '../rig/night.ts'
@@ -80,9 +79,7 @@ const capture = makeCapture({
   },
   onChange: () => page.captureChanged(),
 })
-const astap = makeAstap(settings.astap)
 const copySubject = 'rig-dev.vela.copy'
-const keptPath = (frame: { readonly night: string; readonly file: string }) => join(frames.keepDir, frame.night, frame.file)
 const publishEntry = (subject: string, kind: string, id: string, body: Readonly<Record<string, unknown>>) => {
   const at = Date.now()
 
@@ -94,7 +91,6 @@ const autofocus = makeAutofocus({
   picture,
   sender,
   capture,
-  analyse: frame => astap.analyse(keptPath(frame)),
   publish: (kind, body) => publishEntry(focusSubject, `vela.focus.${kind}`, String(body['run']), body),
   settings: { focuser: devices.focuser, camera: devices.primary, ...settings.autofocus },
 })
@@ -129,7 +125,6 @@ const keeper = makeKeeper({
   sleep: ms => sleep(ms),
   onKept: frame => {
     page.framesChanged()
-    void autofocus.kept(frame)
     jetstream(following.connection)
       .publish(frameSubject, JSON.stringify(frameEntry(frame, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))
@@ -137,7 +132,6 @@ const keeper = makeKeeper({
   onProblem: message => console.error(`vela: ${message}`),
   onLeft: left => {
     publishEntry(copySubject, 'vela.copy.left', left.what, { what: left.what, reason: left.reason })
-    autofocus.missed(left.what, left.reason)
   },
 })
 
@@ -172,7 +166,10 @@ const following = await followRig({
     if (item !== undefined) page.activityAdded(item)
     const measured = measuredOf(entry, 'vela')
 
-    if (measured !== undefined) align.measured(measured)
+    if (measured !== undefined) {
+      align.measured(measured)
+      autofocus.measured(measured)
+    }
     if (announcesFrame(entry, settings.devices.primary)) frameSaved(entry)
   },
   onCaughtUp: () => picture.caughtUp(),

@@ -1143,7 +1143,7 @@ function showAutofocus(view) {
   if (view === undefined || view.run === undefined) return
   const samples = view.samples.slice().sort((a, b) => a.frame - b.frame)
   const latest = samples[samples.length - 1]
-  let text = latest === undefined ? 'Autofocus: moving to the first sample.' : 'Sample ' + samples.length + ' of ' + view.positions.length + ' at ' + latest.position + ': ' + (latest.missed !== undefined ? 'not copied from the rig computer, left out.' : latest.hfd === undefined ? 'no stars.' : 'HFD ' + latest.hfd.toFixed(1) + ' px, ' + latest.stars + ' stars.')
+  let text = latest === undefined ? 'Autofocus: moving to the first sample.' : 'Sample ' + samples.length + ' of ' + view.positions.length + ' at ' + latest.position + ': ' + (latest.missed !== undefined ? 'not measured on the rig computer, left out.' : latest.hfd === undefined ? 'no stars.' : 'HFD ' + latest.hfd.toFixed(1) + ' px, ' + latest.stars + ' stars.')
   let tone = ''
   if (view.best !== undefined) {
     text = 'Best focus ' + view.best.position + ' (' + afHow[view.best.how] + ').'
