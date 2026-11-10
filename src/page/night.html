@@ -206,7 +206,7 @@
   #prepare h3 { margin: 0 0 8px; font-size: 18px; }
   #prepare .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
   #prepare .row > span { min-width: 80px; }
-  #prepare .field { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; }
+  #prepare .field, #pointing .field { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; }
   #prepare .group-inline { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
   #prepare input[type=number] { width: 110px; font: inherit; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   #prepare button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); cursor: pointer; }
@@ -366,9 +366,14 @@
     <h3 id="target-title"></h3>
     <dl id="target-facts"></dl>
     <div class="row"><button type="button" class="moves" id="goto">Slew mount to target</button></div>
+    <div class="row">
+      <label class="field">Centring frames (s)<input type="number" step="any" id="centre-exposure" value="2"></label>
+      <button type="button" class="moves" id="centre-start">Slew and centre</button>
+    </div>
     <p class="answer" id="goto-answer" aria-live="polite" hidden></p>
   </div>
   <p id="goto-status" hidden></p>
+  <p id="centre-status" hidden></p>
   <p id="pointing-error" hidden></p>
 </section>
 </div>
@@ -984,6 +989,14 @@ function showTonight() {
       (run.alert === undefined ? '' : '<p class="alarm bad">' + escapeText(run.alert.text + (run.alert.seconds === undefined ? '' : ' (' + run.alert.seconds + ' s)')) + '. The run is still going; Stop is yours.</p>') +
       (align.problem === undefined ? '' : '<p class="alarm bad">' + escapeText(align.problem) + '. Waiting for you; Stop is yours.</p>') +
       (error === undefined ? '' : '<div class="big"><div>Altitude<b>' + arcmin(error.altitudeArcmin) + '</b></div><div>Azimuth<b>' + arcmin(error.azimuthArcmin) + '</b></div><div>Total<b>' + arcmin(error.totalArcmin) + '</b></div></div>')
+  } else if (run !== undefined && running(capture?.centre)) {
+    const centre = capture.centre
+    const pass = centre.passes[centre.passes.length - 1]
+    head.innerHTML = alarm + '<h1>Centring on ' + escapeText(centre.target?.name ?? 'the target') + '</h1>' +
+      '<p class="sub">' + escapeText(centreDoing(centre, capture.at)) + ' <a href="#/point">Passes</a></p>' +
+      (run.alert === undefined ? '' : '<p class="alarm bad">' + escapeText(run.alert.text + (run.alert.seconds === undefined ? '' : ' (' + run.alert.seconds + ' s)')) + '. The run is still going; Stop is yours.</p>') +
+      (centre.problem === undefined ? '' : '<p class="alarm bad">' + escapeText(centre.problem) + '. Waiting for you; Stop is yours.</p>') +
+      (pass === undefined || !pass.solved ? '' : '<div class="big"><div>Frame ' + pass.frame + '<b>' + arcmin(pass.offsetArcmin) + '</b><span class="left">from the target</span></div><div>Finish within<b>' + arcmin(centre.toleranceArcmin) + '</b></div></div>')
   } else if (run !== undefined) {
     const left = run.phase === 'exposing' && run.secondsLeft !== undefined ? run.secondsLeft + ' s left' : run.phase === 'preparing' ? 'setting up' : 'ending'
     head.innerHTML = alarm + '<h1>' + escapeText(run.object) + ', ' + escapeText(run.frameType) + ' frames</h1>' +
@@ -1048,10 +1061,11 @@ function keepAwake(on) {
 
 function showCapture(view) {
   tonightState.capture = view
-  keepAwake(running(view.align) || running(view.autofocus))
-  document.body.toggleAttribute('data-at-rig', running(view.align) || running(view.autofocus))
+  keepAwake(running(view.align) || running(view.autofocus) || running(view.centre))
+  document.body.toggleAttribute('data-at-rig', running(view.align) || running(view.autofocus) || running(view.centre))
   showAutofocus(view.autofocus)
   showAlign(view.align, view.at)
+  showCentre(view.centre, view.at)
   showTonight()
   const run = view.run
   statusParts.run = run
@@ -1312,6 +1326,40 @@ for (const [id, request] of [['mount-unpark', { action: 'unpark' }], ['mount-hom
   button.addEventListener('click', () => pointingAction(button, mountAnswer, request))
 }
 gotoButton.addEventListener('click', () => pointingAction(gotoButton, gotoAnswer, { action: 'goto', id: chosenId }))
+
+const centreStart = document.getElementById('centre-start')
+const centreStatus = document.getElementById('centre-status')
+centreStart.addEventListener('click', () => act(centreStart, gotoAnswer, '/centre', { id: chosenId, exposureSeconds: Number(document.getElementById('centre-exposure').value) }, 'Slew and centre', 'Slew and centre started: slewing to the target.'))
+
+const centreSteps = { slewing: 'Slewing to the target', measuring: 'Taking and solving a frame', syncing: 'Syncing the mount to the solve' }
+
+function centreDoing(view, now) {
+  if (view.step === undefined) return ''
+  return centreSteps[view.step.what] + ', ' + Math.max(0, Math.round((now - view.step.since) / 1000)) + ' s.'
+}
+
+function passText(pass) {
+  if (!pass.solved) return 'Frame ' + pass.frame + ' did not solve: ' + pass.reason + '.'
+  return 'Frame ' + pass.frame + ': ' + arcmin(pass.offsetArcmin) + ' from the target, ' + arcmin(pass.eastArcmin) + (pass.eastArcmin >= 0 ? ' east' : ' west') + ' and ' + arcmin(pass.northArcmin) + (pass.northArcmin >= 0 ? ' north' : ' south') + ' of it.' +
+    (pass.mountArcmin === undefined ? '' : ' The mount read ' + arcmin(pass.mountArcmin) + ' from the solve.')
+}
+
+function showCentre(view, now) {
+  if (view === undefined || view.run === undefined) {
+    centreStatus.hidden = true
+    return
+  }
+  const last = tonightState.capture?.last
+  const detail = last?.run === view.run ? last.detail : view.ended
+  let text = 'Centring on ' + (view.target?.name ?? 'the target') + '. ' + centreDoing(view, now)
+  let tone = ''
+  if (view.ended === 'done') text = 'Done: ' + detail + '.'
+  else if (view.ended !== undefined) { text = 'Slew and centre ended: ' + detail + '.'; tone = view.ended === 'stopped' ? 'warn' : 'bad' }
+  else if (view.problem !== undefined) { text = view.problem + '. Waiting for you; Stop is yours.'; tone = 'bad' }
+  centreStatus.hidden = false
+  centreStatus.className = tone
+  centreStatus.replaceChildren(text, ...view.passes.flatMap(pass => [element('br'), passText(pass)]))
+}
 
 function duration(seconds) {
   const total = Math.round(Math.abs(seconds) / 60)

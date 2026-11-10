@@ -22,6 +22,7 @@ import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
 import { focusSubject, makeAutofocus } from '../focus/autofocus.ts'
 import { alignSubject, makeAlign } from '../align/run.ts'
+import { centreSubject, makeCentre } from '../pointing/centre.ts'
 import { makeMeasureRequests, measuredOf } from '../measure/rig.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
@@ -103,6 +104,14 @@ const align = makeAlign({
   settings: { mount: devices.mount, camera: devices.primary, ...settings.align },
   now: Date.now,
 })
+const centre = makeCentre({
+  picture,
+  pointing,
+  capture,
+  publish: (kind, body) => publishEntry(centreSubject, `vela.centre.${kind}`, `${String(body['run'])}:${String(body['frame'] ?? '')}`, body),
+  settings: { mount: devices.mount, camera: devices.primary, ...settings.centre },
+  now: Date.now,
+})
 const page = makePage({
   night: () => makeNight(picture, nightSettings, Date.now()),
   focus: () => focusDrift.view(),
@@ -114,7 +123,7 @@ const page = makePage({
   capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
   prepare: request => prepare.act(request),
   pointing,
-  runs: { autofocus, align },
+  runs: { autofocus, align, centre },
   copies: { left: () => keeper.left(), again: () => void keeper.requestScan() },
 })
 
@@ -179,6 +188,7 @@ const following = await followRig({
     focusDrift.observe(entry)
     autofocus.observe(entry)
     align.observe(entry)
+    centre.observe(entry)
 
     const item = activity.observe(entry)
 
@@ -187,6 +197,7 @@ const following = await followRig({
 
     if (measured !== undefined) {
       align.measured(measured)
+      centre.measured(measured)
       autofocus.measured(measured)
     }
     if (announcesFrame(entry, settings.devices.primary)) frameSaved(entry)
