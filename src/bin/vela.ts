@@ -16,6 +16,7 @@ import { makeNamer } from '../frames/names.ts'
 import { frameDetail, listNight, makePreviews } from '../frames/library.ts'
 import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
+import { makeFrameStats, saveStats } from '../frames/stats.ts'
 import { makePointing } from '../pointing/pointing.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
@@ -117,6 +118,23 @@ const page = makePage({
   copies: { left: () => keeper.left(), again: () => void keeper.requestScan() },
 })
 
+const measureStats = makeFrameStats(settings.stars)
+let statsQueue: Promise<void> = Promise.resolve()
+
+function measureKept(frame: { readonly night: string; readonly file: string }) {
+  const path = join(frames.keepDir, frame.night, frame.file)
+
+  statsQueue = statsQueue
+    .then(async () => {
+      const stats = await measureStats(path)
+
+      await saveStats(path, stats)
+      page.framesChanged()
+      publishEntry(frameSubject, 'vela.frame.stats', frame.file, { night: frame.night, file: frame.file, ...stats })
+    })
+    .catch((error: unknown) => console.error(`vela: could not measure ${frame.file}: ${String(error)}`))
+}
+
 const keeper = makeKeeper({
   ssh: makeSsh(frames.host, frames.sshTimeoutSeconds * 1000),
   labelOf: capture.labelOf,
@@ -125,6 +143,7 @@ const keeper = makeKeeper({
   sleep: ms => sleep(ms),
   onKept: frame => {
     page.framesChanged()
+    measureKept(frame)
     jetstream(following.connection)
       .publish(frameSubject, JSON.stringify(frameEntry(frame, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))

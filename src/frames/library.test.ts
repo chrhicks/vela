@@ -27,17 +27,18 @@ async function keepFrame(name: string, keptAt: string, content: Buffer = Buffer.
 const frame = syntheticFits({ width: 8, height: 8, pattern: 'RGGB', rowOrder: 'TOP-DOWN', pixel: (x, y) => 1000 + ((x + y) % 3) * 50 })
 
 describe('listNight', () => {
-  it('lists the night newest first and ignores previews and partial files', async () => {
+  it('lists the night newest first with each frame\'s measured stats, and ignores previews, partial files and stats files', async () => {
     await keepFrame('a_001.fits', '2026-11-08T03:00:00.000Z')
     await keepFrame('a_002.fits', '2026-11-08T03:05:00.000Z')
     await writeFile(join(keepDir, '2026-11-07', 'a_002.fits.png'), 'png')
     await writeFile(join(keepDir, '2026-11-07', 'a_003.fits.part'), 'half')
+    await writeFile(join(keepDir, '2026-11-07', 'a_002.fits.stats.json'), JSON.stringify({ stars: 251, hfdPixels: 2.8, arcsecPerPixel: 1.94, sky: 1234, noise: 12 }))
 
     expect(await listNight(keepDir, '2026-11-07')).toEqual({
       night: '2026-11-07',
       frames: [
-        { file: 'a_002.fits', bytes: 1, keptAt: '2026-11-08T03:05:00.000Z', run: null, sequence: null, frame: null },
-        { file: 'a_001.fits', bytes: 1, keptAt: '2026-11-08T03:00:00.000Z', run: null, sequence: null, frame: null },
+        { file: 'a_002.fits', bytes: 1, keptAt: '2026-11-08T03:05:00.000Z', run: null, sequence: null, frame: null, stats: { stars: 251, hfdPixels: 2.8, arcsecPerPixel: 1.94, sky: 1234, noise: 12 } },
+        { file: 'a_001.fits', bytes: 1, keptAt: '2026-11-08T03:00:00.000Z', run: null, sequence: null, frame: null, stats: null },
       ],
     })
   })

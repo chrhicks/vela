@@ -612,6 +612,12 @@ function number(text, digits) {
   return Number.isFinite(value) ? String(Number(value.toFixed(digits))) : text
 }
 
+function statsText(stats) {
+  if (!stats) return ''
+  const hfd = stats.hfdPixels === null ? undefined : 'HFD ' + stats.hfdPixels.toFixed(1) + ' px' + (stats.arcsecPerPixel === null ? '' : ' (' + (stats.hfdPixels * stats.arcsecPerPixel).toFixed(1) + '″)')
+  return [stats.stars === null ? undefined : stats.stars + (stats.stars === 1 ? ' star' : ' stars'), hfd, 'sky ' + stats.sky.toLocaleString(), 'noise ' + stats.noise].filter(Boolean).join(' · ')
+}
+
 function frameFacts(cards) {
   const card = key => cards.find(each => each.key === key)?.value
   const facts = []
@@ -703,7 +709,7 @@ function showFramePage() {
     const object = detail.cards.find(card => card.key === 'OBJECT')?.value
     document.getElementById('frame-title').textContent = object ? object + (detail.frame === null ? '' : ', frame ' + detail.frame) : file
     document.getElementById('frame-sub').textContent = (detail.sequence ?? 'No run') + ', kept ' + hourMinute(Date.parse(detail.keptAt)) + ' on the night of ' + night
-    definitions(document.getElementById('frame-facts'), frameFacts(detail.cards))
+    definitions(document.getElementById('frame-facts'), frameFacts(detail.cards).concat(detail.stats ? [['Measured', statsText(detail.stats)]] : []))
     definitions(document.getElementById('frame-file'), [
       ['Name', detail.file],
       ['Path', detail.path, 'hash'],
@@ -1012,8 +1018,10 @@ function showTonight() {
   } else if (tonightFrameShown !== latest.file) {
     const arriving = tonightFrameShown !== '' && tonightFrameShown !== 'none'
     tonightFrameShown = latest.file
-    body.innerHTML = '<a href="' + frameUrl(frames.night, latest.file) + '"><img' + (arriving ? ' class="arrive"' : '') + ' alt="' + escapeText(latest.file) + '" src="' + previewUrl(frames.night, latest.file) + '"></a><p class="cap">' + escapeText(latest.file) + ', kept ' + hourMinute(Date.parse(latest.keptAt)) + '. <a href="#/frames">All frames</a></p>'
+    body.innerHTML = '<a href="' + frameUrl(frames.night, latest.file) + '"><img' + (arriving ? ' class="arrive"' : '') + ' alt="' + escapeText(latest.file) + '" src="' + previewUrl(frames.night, latest.file) + '"></a><p class="cap">' + escapeText(latest.file) + ', kept ' + hourMinute(Date.parse(latest.keptAt)) + '. <span id="tonight-stats"></span> <a href="#/frames">All frames</a></p>'
   }
+  const statsLine = document.getElementById('tonight-stats')
+  if (statsLine) statsLine.textContent = latest?.stats ? statsText(latest.stats) + '.' : 'Measuring.'
 }
 
 const running = part => part?.run !== undefined && part.ended === undefined
