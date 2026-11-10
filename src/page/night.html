@@ -990,6 +990,7 @@ function showTonight() {
   } else {
     head.innerHTML = '<h1>Nothing running</h1><p class="sub"><a href="#/point">Choose a target</a> or <a href="#/capture">start a run</a>.</p>'
   }
+  if (run !== undefined && goto !== undefined && ['sending', 'sent', 'slewing'].includes(goto.phase)) head.innerHTML = '<p class="alarm stale">' + escapeText('Slewing to ' + goto.name + ' (sent ' + clock(goto.sentAt) + '). The run is still exposing; frames taken during the slew are trailed.') + '</p>' + head.innerHTML
   const late = tonightState.capture?.late ?? []
   if (late.length > 0) head.innerHTML = '<p class="alarm bad">' + escapeText('No answer from the rig program for ' + Math.max(...late.map(command => command.seconds)) + ' s (' + late.map(command => command.property).join(', ') + ')') + '. Vela is still waiting; Stop is yours.</p>' + head.innerHTML
   document.getElementById('tonight-readings').innerHTML = [
