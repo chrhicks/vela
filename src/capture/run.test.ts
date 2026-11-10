@@ -67,8 +67,20 @@ describe('a capture run on a scripted camera', () => {
 
     await runToEnd(camera)
 
-    expect(camera.capture.labelOf('M-31_dark_001.fits')).toEqual({ run: 'run-1', sequence: 'M-31_dark', frame: 1 })
-    expect(camera.capture.labelOf('M-31_dark_003.fits')).toEqual({ run: 'run-1', sequence: 'M-31_dark', frame: 3 })
+    expect(camera.capture.labelOf('M-31_dark_001.fits')).toEqual({ run: 'run-1', sequence: 'M-31_dark', frame: 1, measure: undefined })
+    expect(camera.capture.labelOf('M-31_dark_003.fits')).toEqual({ run: 'run-1', sequence: 'M-31_dark', frame: 3, measure: undefined })
+  })
+
+  it('saves the frames of a run that wants them measured to the measure folder, and labels them with what to measure', async () => {
+    const camera = fakeCamera()
+    const started = camera.capture.start(request, undefined, ['solve'])
+
+    if (!started.ok) throw new Error(started.reason)
+
+    await started.done
+
+    expect([...camera.files]).toEqual([`${spoolDir}/measure/M-31_dark_001.fits`, `${spoolDir}/measure/M-31_dark_002.fits`, `${spoolDir}/measure/M-31_dark_003.fits`])
+    expect(camera.capture.labelOf('M-31_dark_002.fits')).toEqual({ run: 'run-1', sequence: 'M-31_dark', frame: 2, measure: ['solve'] })
   })
 
   it('aborts a frame that goes Alert, records it, and goes on until the wanted number are counted', async () => {

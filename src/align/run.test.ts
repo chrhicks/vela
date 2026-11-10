@@ -21,8 +21,19 @@ function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopA
   const feed = (kind: string, body: Record<string, unknown>) => holder.align?.observe({ id: `${kind}:${(at += 1)}`, kind, at, run: undefined, body })
   const camera = fakeCamera({
     onEvent: event => {
-      if (event.kind === 'exposed' && event.body['frame'] === missFrame) holder.align?.missed(String(event.body['file']), 'copy exited 255')
-      else if (event.kind === 'exposed') void holder.align?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
+      if (event.kind === 'exposed') {
+        const file = String(event.body['file'])
+        const frame = Number(event.body['frame'])
+
+        setTimeout(() => {
+          if (frame === missFrame) return holder.align?.measured({ file, result: 'refused', reason: 'measure is not set up in the rig file' })
+
+          const solution = solveFrame(frame)
+          const header = { 'DATE-OBS': new Date(startedAt + 60_000 * frame).toISOString().slice(0, 23), EXPTIME: 2 }
+
+          holder.align?.measured({ file, result: 'measured', solve: solution.ok ? { solved: true, raDegrees: solution.raDegrees, decDegrees: solution.decDegrees } : { solved: false, reason: solution.reason }, stars: undefined, header })
+        }, solveMs)
+      }
       events.push(`${event.kind}:${String(event.body['frame'] ?? '')}`)
       feed(`vela.run.${event.kind}`, { run: event.run, ...event.body })
     },
@@ -51,11 +62,6 @@ function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopA
       },
     },
     capture: camera.capture,
-    solve: async frame => {
-      await new Promise(resolve => setTimeout(resolve, solveMs))
-      return solveFrame(camera.capture.labelOf(frame.file)?.frame ?? 1)
-    },
-    cards: async frame => [{ key: 'DATE-OBS', value: new Date(startedAt + 60_000 * (camera.capture.labelOf(frame.file)?.frame ?? 1)).toISOString().slice(0, 23), comment: '' }, { key: 'EXPTIME', value: '2', comment: '' }],
     publish: (kind, body) => {
       published.push({ kind, body: { ...body } })
       if (kind === 'solve') events.push(`solve:${String(body['frame'])}`)
@@ -122,17 +128,17 @@ describe('a polar alignment run on a scripted camera and mount', () => {
     expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false }, { frame: 5, solved: true }], error: { frame: 5 }, previous: { frame: 3 } })
   })
 
-  it('moves on to the next adjusting frame when one could not be copied from the rig computer', async () => {
+  it('moves on to the next adjusting frame when the rig program did not measure one', async () => {
     const { align, published } = scriptedRun(frame => ({ ok: true, ...solves[frame - 1]! }), 0, 5, 0, 4)
 
     expect(align.start({ exposureSeconds: 0.01 })).toEqual({ ok: true })
 
     await settled(align, published, 5)
 
-    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false, reason: 'the frame could not be copied from the rig computer: copy exited 255' }, { frame: 5, solved: true }], error: { frame: 5 } })
+    expect(align.view()).toMatchObject({ ended: 'stopped', frames: [{ solved: true }, { solved: true }, { solved: true }, { frame: 4, solved: false, reason: 'the rig program did not measure it: measure is not set up in the rig file' }, { frame: 5, solved: true }], error: { frame: 5 } })
   })
 
-  it('stops like a failed solve when one of the first three frames could not be copied', async () => {
+  it('stops like a failed solve when one of the first three frames was not measured', async () => {
     const { align, published, slews } = scriptedRun(frame => ({ ok: true, ...solves[frame - 1]! }), 0, 5, 0, 2)
 
     expect(align.start({ exposureSeconds: 0.01 })).toEqual({ ok: true })

@@ -35,7 +35,7 @@ const baseline: ReadonlyArray<readonly [string, Readonly<Record<string, Value>>,
 
 export const spoolDir = '/spool'
 
-export const fastSettings: CaptureSettings = { device: 'primary', spoolDir, settleMs: 60, exposureSilenceMs: 40, failuresInRow: 3, telescope: undefined }
+export const fastSettings: CaptureSettings = { device: 'primary', spoolDir, measureDir: `${spoolDir}/measure`, settleMs: 60, exposureSilenceMs: 40, failuresInRow: 3, telescope: undefined }
 
 export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial<CaptureSettings>; omit?: string[]; onEvent?: (event: RunEvent) => void } = {}) {
   const picture = makePicture()
@@ -90,7 +90,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
       }
 
       const prefix = String(picture.property('primary', 'UPLOAD_SETTINGS')?.values['UPLOAD_PREFIX'])
-      const path = `${spoolDir}/${prefix.replace('XXX', String((fileNumber += 1)).padStart(3, '0'))}.fits`
+      const path = `${String(picture.property('primary', 'UPLOAD_SETTINGS')?.values['UPLOAD_DIR'] ?? spoolDir)}/${prefix.replace('XXX', String((fileNumber += 1)).padStart(3, '0'))}.fits`
 
       files.add(path)
       set('CCD_FILE_PATH', { FILE_PATH: path }, 'Ok')

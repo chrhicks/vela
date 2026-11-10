@@ -3,9 +3,8 @@ import { Schema } from 'effect'
 import type { Between, StartResult } from '../capture/run.ts'
 import type { Sender } from '../commands/sender.ts'
 import { decodeConfig } from '../config.ts'
-import type { KeptFrame } from '../frames/entry.ts'
 import type { Card } from '../frames/fits.ts'
-import type { Solution } from '../measure/astap.ts'
+import type { Measured, Measurement } from '../measure/rig.ts'
 import { siteOf, type Site } from '../pointing/target.ts'
 import type { Picture } from '../rig/picture.ts'
 import { readWireBody, recordOf, type Entry } from '../stream/entry.ts'
@@ -25,9 +24,7 @@ export interface AlignSettings {
 export interface AlignOptions {
   readonly picture: Pick<Picture, 'property'>
   readonly sender: Pick<Sender, 'send'>
-  readonly capture: { readonly start: (request: unknown, between: Between) => StartResult; readonly labelOf: (file: string) => { readonly run: string; readonly frame: number } | undefined }
-  readonly solve: (frame: KeptFrame) => Promise<Solution>
-  readonly cards: (frame: KeptFrame) => Promise<ReadonlyArray<Card>>
+  readonly capture: { readonly start: (request: unknown, between: Between, measure: ReadonlyArray<Measurement>) => StartResult; readonly labelOf: (file: string) => { readonly run: string; readonly frame: number } | undefined }
   readonly publish: (kind: 'started' | 'solve', body: Readonly<Record<string, unknown>>) => void
   readonly settings: AlignSettings
   readonly now: () => number
@@ -63,7 +60,7 @@ export function raForHourAngle(hourAngleDegrees: number, site: Site, at: number)
   return ((((localSiderealDegrees - hourAngleDegrees) % 360) + 360) % 360) / 15
 }
 
-export function makeAlign({ picture, sender, capture, solve, cards, publish, settings, now }: AlignOptions) {
+export function makeAlign({ picture, sender, capture, publish, settings, now }: AlignOptions) {
   let view = empty
   let site: Site | undefined
   let solves = new Map<number, Solve>()
@@ -159,7 +156,7 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
         return undefined
       }
 
-      const started = capture.start({ object: 'polar-align', frameType: 'light', exposureSeconds: request.exposureSeconds, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between)
+      const started = capture.start({ object: 'polar-align', frameType: 'light', exposureSeconds: request.exposureSeconds, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between, ['solve'])
 
       if (!started.ok) return started
 
@@ -171,25 +168,22 @@ export function makeAlign({ picture, sender, capture, solve, cards, publish, set
       return { ok: true }
     },
 
-    missed(file: string, reason: string) {
-      const label = capture.labelOf(file)
-
-      if (label === undefined || label.run !== view.run) return
-
-      publish('solve', { run: label.run, frame: label.frame, file, solved: false, reason: `the frame could not be copied from the rig computer: ${reason}` })
-    },
-
-    async kept(frame: KeptFrame) {
-      const label = capture.labelOf(frame.file)
+    measured(answer: Measured) {
+      const label = capture.labelOf(answer.file)
 
       if (label === undefined || label.run !== view.run || site === undefined) return
 
-      const [solution, at] = await Promise.all([solve(frame).catch((error: unknown): Solution => ({ ok: false, reason: String(error) })), cards(frame).then(exposureMiddle, () => undefined)])
-      const base = { run: label.run, frame: label.frame, file: frame.file }
+      const base = { run: label.run, frame: label.frame, file: answer.file }
 
-      if (!solution.ok || at === undefined) return publish('solve', { ...base, solved: false, reason: solution.ok ? 'the frame has no DATE-OBS or EXPTIME' : solution.reason })
+      if (answer.result === 'refused') return publish('solve', { ...base, solved: false, reason: `the rig program did not measure it: ${answer.reason}` })
+      if (answer.solve === undefined) return publish('solve', { ...base, solved: false, reason: 'the rig program sent no solve' })
+      if (!answer.solve.solved) return publish('solve', { ...base, solved: false, reason: answer.solve.reason })
 
-      const solved: Solve = { raDegrees: solution.raDegrees, decDegrees: solution.decDegrees, at }
+      const at = exposureMiddle(Object.entries(answer.header).map(([key, value]) => ({ key, value: String(value), comment: '' })))
+
+      if (at === undefined) return publish('solve', { ...base, solved: false, reason: 'the frame has no DATE-OBS or EXPTIME' })
+
+      const solved: Solve = { raDegrees: answer.solve.raDegrees, decDegrees: answer.solve.decDegrees, at }
       const measured = { ...base, solved: true, raDegrees: solved.raDegrees, decDegrees: solved.decDegrees, at }
 
       solves.set(label.frame, solved)
