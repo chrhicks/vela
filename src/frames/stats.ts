@@ -27,12 +27,19 @@ export const statsName = (file: string) => `${file}.stats.json`
 
 const madToSigma = 1.4826
 
-export function skyAndNoise(pixels: Uint16Array): { readonly sky: number; readonly noise: number } {
+function medianAndSpread(pixels: Uint16Array, take: (index: number) => boolean): { readonly sky: number; readonly noise: number } {
   const counts = new Uint32Array(65536)
+  let length = 0
 
-  for (const value of pixels) counts[value]! += 1
+  for (let index = 0; index < pixels.length; index += 1) {
+    if (!take(index)) continue
+    counts[pixels[index]!]! += 1
+    length += 1
+  }
 
-  const middle = (pixels.length + 1) / 2
+  const pixelsCounted = length
+
+  const middle = (pixelsCounted + 1) / 2
   const at = (rank: number, histogram: ArrayLike<number>) => {
     let seen = 0
 
@@ -48,7 +55,17 @@ export function skyAndNoise(pixels: Uint16Array): { readonly sky: number; readon
 
   for (let value = 0; value < counts.length; value += 1) if (counts[value]! > 0) deviations[Math.abs(value - sky)]! += counts[value]!
 
-  return { sky, noise: Math.round(at(middle, deviations) * madToSigma * 10) / 10 }
+  return { sky, noise: at(middle, deviations) * madToSigma }
+}
+
+export function skyAndNoise(pixels: Uint16Array, width = pixels.length, bayer = false): { readonly sky: number; readonly noise: number } {
+  const whole = medianAndSpread(pixels, () => true)
+
+  if (!bayer) return { sky: whole.sky, noise: Math.round(whole.noise * 10) / 10 }
+
+  const colours = [0, 1, 2, 3].map(cell => medianAndSpread(pixels, index => ((Math.floor(index / width) % 2) * 2 + (index % width) % 2) === cell).noise).sort((a, b) => a - b)
+
+  return { sky: whole.sky, noise: Math.round(((colours[1]! + colours[2]!) / 2) * 10) / 10 }
 }
 
 export interface ListedStar {
@@ -138,12 +155,16 @@ function elongationOf(star: ListedStar, image: { readonly width: number; readonl
 }
 
 export function shapeOf(stars: ReadonlyArray<ListedStar>, image: { readonly width: number; readonly height: number; readonly pixels: Uint16Array }, settings: Pick<StarSettings, 'shapeMinSnr' | 'shapeStars' | 'saturated'>) {
-  const elongations = [...stars]
-    .filter(star => star.snr >= settings.shapeMinSnr)
-    .sort((a, b) => b.flux - a.flux)
-    .slice(0, settings.shapeStars)
-    .map(star => elongationOf(star, image, settings.saturated))
-    .filter((value): value is number => value !== undefined)
+  const elongations: number[] = []
+
+  for (const star of [...stars].filter(candidate => candidate.snr >= settings.shapeMinSnr).sort((a, b) => b.flux - a.flux)) {
+    if (elongations.length >= settings.shapeStars) break
+
+    const elongation = elongationOf(star, image, settings.saturated)
+
+    if (elongation !== undefined) elongations.push(elongation)
+  }
+
   const typical = median(elongations)
 
   return { elongation: typical === undefined ? null : Math.round(typical * 100) / 100, shapedStars: elongations.length }
@@ -174,7 +195,7 @@ export async function listStars(program: string, path: string, snr: number): Pro
 export function makeFrameStats(settings: StarSettings | undefined, list: (program: string, path: string, snr: number) => Promise<string> = listStars) {
   return async function measure(path: string): Promise<FrameStats> {
     const fits = readFits(await readFile(path))
-    const { sky, noise } = skyAndNoise(fits.pixels)
+    const { sky, noise } = skyAndNoise(fits.pixels, fits.width, typeof fits.header.get('BAYERPAT') === 'string')
     const scale = arcsecPerPixel(fits.header)
 
     if (settings === undefined || !isLight(fits.header)) return { stars: null, hfdPixels: null, arcsecPerPixel: scale, elongation: null, shapedStars: 0, sky, noise }
