@@ -615,7 +615,7 @@ function number(text, digits) {
 function statsText(stats) {
   if (!stats) return ''
   const hfd = stats.hfdPixels === null ? undefined : 'HFD ' + stats.hfdPixels.toFixed(1) + ' px' + (stats.arcsecPerPixel === null ? '' : ' (' + (stats.hfdPixels * stats.arcsecPerPixel).toFixed(1) + '″)')
-  return [stats.stars === null ? undefined : stats.stars + (stats.stars === 1 ? ' star' : ' stars'), hfd, 'sky ' + stats.sky.toLocaleString(), 'noise ' + stats.noise].filter(Boolean).join(' · ')
+  return [stats.stars === null ? undefined : stats.stars + (stats.stars === 1 ? ' star' : ' stars'), hfd, stats.elongation == null ? undefined : 'elongation ' + stats.elongation.toFixed(2), 'sky ' + stats.sky.toLocaleString(), 'noise ' + stats.noise].filter(Boolean).join(' · ')
 }
 
 function frameFacts(cards) {

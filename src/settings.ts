@@ -105,6 +105,17 @@ export const StarSettings = Schema.Struct({
     Schema.Number,
     10,
   ),
+  shapeMinSnr: described(
+    'The signal to noise a star needs for its shape to count towards the frame\'s elongation. With 30 and the brightest 300, tracked 10 s frames of M 52 measured 1.03 to 1.05 from about 260 stars, a frame whose last 3 s were untracked 1.24 (2026-11-09)',
+    Schema.Number,
+    30,
+  ),
+  shapeStars: described('How many of the brightest strong stars are measured for the elongation; 300 gave the 2026-11-09 values above in a few tenths of a second', Schema.Int.check(Schema.isGreaterThan(0)), 300),
+  saturated: described(
+    "A star with any pixel at or above this is left out of the elongation, because its clipped core is flatter than the star. The ASI2600's 14-bit samples top out at 65532 in its 16-bit frames, and a core near that is already off the linear range",
+    Schema.Number,
+    60000,
+  ),
 })
 
 export const AlignSettings = Schema.Struct({
