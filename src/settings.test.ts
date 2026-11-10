@@ -5,7 +5,7 @@ import { VelaSettings } from './settings.ts'
 const minimal = {
   port: 8793,
   broker: { servers: 'nats://127.0.0.1:4222' },
-  frames: { spoolDir: '/home/example/frames', nightZone: 'America/Phoenix' },
+  frames: { spoolDir: '/home/example/frames', measureDir: '/home/example/frames/measure', nightZone: 'America/Phoenix' },
   capture: { runFile: '/home/example/.local/state/vela/run.json' },
   astap: { program: '/home/example/astap/astap_cli', database: '/home/example/astap/d05', workDir: '/home/example/.local/state/vela/astap' },
 }

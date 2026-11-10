@@ -1,4 +1,5 @@
 import { basename } from 'node:path'
+import type { Measurement } from '../measure/rig.ts'
 import type { LateCommand, Sender } from '../commands/sender.ts'
 import { announcesFrame } from '../frames/announce.ts'
 import type { Picture } from '../rig/picture.ts'
@@ -23,6 +24,7 @@ export interface Ending {
 export interface CaptureSettings {
   readonly device: string
   readonly spoolDir: string
+  readonly measureDir: string
   readonly settleMs: number
   readonly exposureSilenceMs: number
   readonly failuresInRow: number
@@ -45,6 +47,7 @@ export interface FrameLabel {
   readonly run: string
   readonly sequence: string
   readonly frame: number
+  readonly measure: ReadonlyArray<Measurement> | undefined
 }
 
 export interface CaptureView {
@@ -80,6 +83,7 @@ interface Active {
   named: boolean
   readonly abort: AbortController
   readonly between: Between | undefined
+  readonly measure: ReadonlyArray<Measurement> | undefined
   readonly startedAt: number
   counted: number
   failed: number
@@ -301,12 +305,12 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   }
 
   return {
-    start(json: unknown, between?: Between): StartResult {
+    start(json: unknown, between?: Between, measure?: ReadonlyArray<Measurement>): StartResult {
       const parsed = parseRequest(json)
 
       if (!parsed.ok) return parsed
 
-      const wanted = wantedOf(parsed.request, parsed.sequence, settings.spoolDir, settings.telescope)
+      const wanted = wantedOf(parsed.request, parsed.sequence, measure === undefined ? settings.spoolDir : settings.measureDir, settings.telescope)
       const refusal = refusalToStart(parsed.request, wanted)
 
       if (refusal !== undefined) return { ok: false, reason: refusal }
@@ -319,6 +323,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         named: false,
         abort: new AbortController(),
         between,
+        measure,
         startedAt: now(),
         counted: 0,
         failed: 0,
@@ -367,7 +372,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
           if (watch.file === undefined && announcesFrame(entry, settings.device) && typeof path === 'string' && path !== watch.previous) {
             watch.file = path
-            labels.set(basename(path), { run: run.id, sequence: run.sequence, frame: run.counted + 1 })
+            labels.set(basename(path), { run: run.id, sequence: run.sequence, frame: run.counted + 1, measure: run.measure })
           }
         }
       }

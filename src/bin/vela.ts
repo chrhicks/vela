@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { jetstream } from '@nats-io/jetstream'
 import { runEntry, runSubject } from '../capture/events.ts'
@@ -20,14 +20,14 @@ import { makePointing } from '../pointing/pointing.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
 import { focusSubject, makeAutofocus } from '../focus/autofocus.ts'
-import { fieldHeightDegrees, makeAstap } from '../measure/astap.ts'
+import { makeAstap } from '../measure/astap.ts'
 import { alignSubject, makeAlign } from '../align/run.ts'
-import { readCards } from '../frames/library.ts'
+import { makeMeasureRequests, measuredOf } from '../measure/rig.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
 import { VelaSettings } from '../settings.ts'
-import { readEntry } from '../stream/entry.ts'
+import { readEntry, readWireBody } from '../stream/entry.ts'
 import { followRig } from '../stream/follow.ts'
 
 const settings = readConfig(VelaSettings, process.argv[2])
@@ -63,6 +63,7 @@ const capture = makeCapture({
   settings: {
     device: settings.devices.primary,
     spoolDir: frames.spoolDir,
+    measureDir: frames.measureDir,
     settleMs: settings.capture.settleSeconds * 1000,
     exposureSilenceMs: settings.capture.exposureSilenceSeconds * 1000,
     failuresInRow: settings.capture.failuresInRow,
@@ -101,8 +102,6 @@ const align = makeAlign({
   picture,
   sender,
   capture,
-  solve: async frame => astap.solve(keptPath(frame), fieldHeightDegrees(await readCards(keptPath(frame)))),
-  cards: frame => readCards(keptPath(frame)),
   publish: (kind, body) => publishEntry(alignSubject, `vela.align.${kind}`, `${String(body['run'])}:${String(body['frame'] ?? '')}`, body),
   settings: { mount: devices.mount, camera: devices.primary, ...settings.align },
   now: Date.now,
@@ -131,7 +130,6 @@ const keeper = makeKeeper({
   onKept: frame => {
     page.framesChanged()
     void autofocus.kept(frame)
-    void align.kept(frame)
     jetstream(following.connection)
       .publish(frameSubject, JSON.stringify(frameEntry(frame, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))
@@ -140,9 +138,18 @@ const keeper = makeKeeper({
   onLeft: left => {
     publishEntry(copySubject, 'vela.copy.left', left.what, { what: left.what, reason: left.reason })
     autofocus.missed(left.what, left.reason)
-    align.missed(left.what, left.reason)
   },
 })
+
+const requestMeasure = makeMeasureRequests({ publish: (subject, payload) => following.connection.publish(subject, payload), newId: () => `vela-${randomUUID()}`, by: 'vela' })
+
+function frameSaved(entry: ReturnType<typeof readEntry> & {}) {
+  const path = readWireBody(entry.body)?.elements['FILE_PATH']
+  const label = typeof path === 'string' ? capture.labelOf(basename(path)) : undefined
+
+  if (label?.measure !== undefined) requestMeasure(basename(String(path)), label.measure)
+  else void keeper.requestScan()
+}
 
 const following = await followRig({
   broker: settings.broker,
@@ -163,7 +170,10 @@ const following = await followRig({
     const item = activity.observe(entry)
 
     if (item !== undefined) page.activityAdded(item)
-    if (announcesFrame(entry, settings.devices.primary)) void keeper.requestScan()
+    const measured = measuredOf(entry, 'vela')
+
+    if (measured !== undefined) align.measured(measured)
+    if (announcesFrame(entry, settings.devices.primary)) frameSaved(entry)
   },
   onCaughtUp: () => picture.caughtUp(),
 })

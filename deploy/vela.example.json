@@ -12,6 +12,7 @@
   },
   "frames": {
     "spoolDir": "/home/example/frames",
+    "measureDir": "/home/example/frames/measure",
     "nightZone": "America/Phoenix"
   },
   "capture": {

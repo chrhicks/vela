@@ -8,6 +8,9 @@ export const FrameSettings = Schema.Struct({
   spoolDir: Schema.String.annotate({
     description: 'The folder on the rig computer where the main camera driver saves frames (its UPLOAD_DIR). Only files directly in it are copied; the driver numbers them from its UPLOAD_PREFIX',
   }),
+  measureDir: Schema.String.annotate({
+    description: "The folder on the rig computer where alignment and autofocus frames are saved to be measured there and not kept: the rig file's measure.folder. The rig program solves or measures each frame on request and removes it once the result is on the stream; the keeper never copies from it",
+  }),
   keepDir: described('The folder on this machine where kept frames are copied to, one folder per night. Data goes on the data disk (/mnt/storage), not the system drive', Schema.String, '/mnt/storage/rig/frames'),
   nightZone: Schema.String.annotate({
     description: 'The time zone whose clock names a night, as an IANA name. A night is named for the evening it starts, by the modification time of its spool file, so a catch-up after the night lands in the same folder as the live copy would have',
