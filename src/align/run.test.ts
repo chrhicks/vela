@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { fakeCamera } from '../testing/camera.ts'
 import { startedAt, wire } from '../testing/entries.ts'
-import type { Solution } from '../measure/astap.ts'
 import { makeAlign } from './run.ts'
+
+type Solution = { readonly ok: true; readonly raDegrees: number; readonly decDegrees: number } | { readonly ok: false; readonly reason: string }
 
 const phoenix = { LAT: 33.45, LONG: 247.93, ELEV: 331 }
 const solves = [

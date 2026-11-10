@@ -18,11 +18,6 @@
   "capture": {
     "runFile": "/home/example/.local/state/vela/run.json"
   },
-  "astap": {
-    "program": "/home/example/astap/astap_cli",
-    "database": "/home/example/astap/d05",
-    "workDir": "/home/example/.local/state/vela/astap"
-  },
   "silenceSeconds": 10,
   "pageRefreshSeconds": 1,
   "historyReadBatch": 2048
