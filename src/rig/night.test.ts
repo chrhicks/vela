@@ -228,6 +228,22 @@ describe('night', () => {
       expect(limitWith(1)).toBe('reached, 40 min past')
     })
 
+    it('has no limit once the scope is on the east side, as after a flip, and counts down again on the west side', () => {
+      const picture = rigWithAll()
+
+      picture.apply(wire(t(29), 'set', 'mount', 'EQUATORIAL_EOD_COORD', { RA: (((localSiderealHours - 1) % 24) + 24) % 24 }), t(29))
+      picture.apply(wire(t(29), 'set', 'mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: false, PIER_EAST: true }), t(29))
+
+      const flipped = makeNight(picture, settings, at)
+
+      expect(texts(deviceOf(flipped, 'mount'))['Meridian limit']).toBe('none on the east side')
+      expect(flipped.sky?.meridianLimitAt).toBeUndefined()
+
+      picture.apply(wire(t(29), 'set', 'mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false }), t(29))
+
+      expect(texts(deviceOf(makeNight(picture, settings, at), 'mount'))['Meridian limit']).toBe('reached, 40 min past')
+    })
+
     it('says so when the mount is not tracking', () => {
       const picture = rigWithAll()
 

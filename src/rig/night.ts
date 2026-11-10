@@ -141,9 +141,11 @@ export function makeNight(picture: Picture, settings: NightSettings, now: number
     const ra = read(ids.mount, 'EQUATORIAL_EOD_COORD', 'RA')
     const longitude = read(ids.mount, 'GEOGRAPHIC_COORD', 'LONG')
     const limit = read(ids.mount, 'MERIDIAN_LIMIT', 'LIMIT')
+    const eastSide = read(ids.mount, 'TELESCOPE_PIER_SIDE', 'PIER_EAST').value === true
 
     return combined('Meridian limit', [tracking, ra, longitude, limit], () => {
       if (tracking.value !== true) return 'not tracking'
+      if (eastSide) return 'none on the east side'
       if (typeof ra.value !== 'number' || typeof longitude.value !== 'number' || typeof limit.value !== 'number') return unknownText
 
       return meridianText(secondsToMeridianLimit({ raHours: ra.value, longitudeDegrees: longitude.value, limitDegrees: limit.value, at: now }))
@@ -245,7 +247,8 @@ export function makeNight(picture: Picture, settings: NightSettings, now: number
   const trackingNow = read(ids.mount, 'TELESCOPE_TRACK_STATE', 'TRACK_ON').value === true
   const raNow = read(ids.mount, 'EQUATORIAL_EOD_COORD', 'RA').value
   const limitNow = read(ids.mount, 'MERIDIAN_LIMIT', 'LIMIT').value
-  const meridianLimitAt = site !== undefined && trackingNow && typeof raNow === 'number' && typeof limitNow === 'number'
+  const eastSideNow = read(ids.mount, 'TELESCOPE_PIER_SIDE', 'PIER_EAST').value === true
+  const meridianLimitAt = site !== undefined && trackingNow && !eastSideNow && typeof raNow === 'number' && typeof limitNow === 'number'
     ? now + secondsToMeridianLimit({ raHours: raNow, longitudeDegrees: site.longitudeDegrees, limitDegrees: limitNow, at: now }) * 1000
     : undefined
 
