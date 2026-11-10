@@ -32,12 +32,12 @@ describe('listNight', () => {
     await keepFrame('a_002.fits', '2026-11-08T03:05:00.000Z')
     await writeFile(join(keepDir, '2026-11-07', 'a_002.fits.png'), 'png')
     await writeFile(join(keepDir, '2026-11-07', 'a_003.fits.part'), 'half')
-    await writeFile(join(keepDir, '2026-11-07', 'a_002.fits.stats.json'), JSON.stringify({ stars: 251, hfdPixels: 2.8, arcsecPerPixel: 1.94, sky: 1234, noise: 12 }))
+    await writeFile(join(keepDir, '2026-11-07', 'a_002.fits.stats.json'), JSON.stringify({ stars: 251, hfdPixels: 2.8, arcsecPerPixel: 1.94, elongation: 1.04, shapedStars: 200, sky: 1234, noise: 12 }))
 
     expect(await listNight(keepDir, '2026-11-07')).toEqual({
       night: '2026-11-07',
       frames: [
-        { file: 'a_002.fits', bytes: 1, keptAt: '2026-11-08T03:05:00.000Z', run: null, sequence: null, frame: null, stats: { stars: 251, hfdPixels: 2.8, arcsecPerPixel: 1.94, sky: 1234, noise: 12 } },
+        { file: 'a_002.fits', bytes: 1, keptAt: '2026-11-08T03:05:00.000Z', run: null, sequence: null, frame: null, stats: { stars: 251, hfdPixels: 2.8, arcsecPerPixel: 1.94, elongation: 1.04, shapedStars: 200, sky: 1234, noise: 12 } },
         { file: 'a_001.fits', bytes: 1, keptAt: '2026-11-08T03:00:00.000Z', run: null, sequence: null, frame: null, stats: null },
       ],
     })
