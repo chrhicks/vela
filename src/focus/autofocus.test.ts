@@ -56,8 +56,15 @@ async function scriptedSweep(stars: number, refuseMoves?: string, missFrame = 0)
   const focus = { autofocus: undefined as ReturnType<typeof makeAutofocus> | undefined }
   const camera = fakeCamera({
     onEvent: event => {
-      if (event.kind === 'exposed' && event.body['frame'] === missFrame) focus.autofocus?.missed(String(event.body['file']), 'copy exited 255')
-      else if (event.kind === 'exposed') void focus.autofocus?.kept({ file: String(event.body['file']), night: '2026-11-08', bytes: 0, sha256: '' })
+      if (event.kind === 'exposed') {
+        const file = String(event.body['file'])
+        const frame = Number(event.body['frame'])
+
+        const position = focus.autofocus?.view().positions[frame - 1] ?? 1010
+
+        if (frame === missFrame) focus.autofocus?.measured({ file, result: 'refused', reason: 'measure is not set up in the rig file' })
+        else focus.autofocus?.measured({ file, result: 'measured', solve: undefined, stars: { measured: true, hfd: 2 + ((position - 1010) / 50) ** 2, count: stars }, header: {} })
+      }
       focus.autofocus?.observe({ id: event.kind, kind: `vela.run.${event.kind}`, at: startedAt, run: undefined, body: { run: event.run, ...event.body } })
     },
   })
@@ -75,11 +82,6 @@ async function scriptedSweep(stars: number, refuseMoves?: string, missFrame = 0)
       },
     },
     capture: camera.capture,
-    analyse: async frame => {
-      const label = camera.capture.labelOf(frame.file)
-      const position = label === undefined ? 0 : (focus.autofocus?.view().positions[label.frame - 1] ?? 1010)
-      return { hfd: 2 + ((position - 1010) / 50) ** 2, stars }
-    },
     publish: (kind, body) => {
       published.push({ kind, body: { ...body } })
       focus.autofocus?.observe({ id: kind, kind: `vela.focus.${kind}`, at: (at += 1), run: undefined, body })
@@ -114,11 +116,11 @@ describe('an autofocus run on a scripted camera and focuser', () => {
     expect(published.map(entry => entry.kind)).toEqual(['started', 'sample', 'sample', 'sample', 'sample', 'sample', 'best', 'sample'])
   })
 
-  it('goes on to the best focus without a sample whose frame could not be copied', async () => {
+  it('goes on to the best focus without a sample the rig program did not measure', async () => {
     const { autofocus } = await scriptedSweep(200, undefined, 5)
 
     expect(autofocus.view()).toMatchObject({ best: { position: 1010 }, ended: 'done' })
-    expect(autofocus.view().samples.find(sample => sample.frame === 5)).toMatchObject({ hfd: undefined, stars: 0, missed: 'the frame could not be copied from the rig computer: copy exited 255' })
+    expect(autofocus.view().samples.find(sample => sample.frame === 5)).toMatchObject({ hfd: undefined, stars: 0, missed: 'the rig program did not measure it: measure is not set up in the rig file' })
   })
 
   it('puts the focuser back where it started, from above, when no frame shows enough stars', async () => {
@@ -141,7 +143,7 @@ describe('an autofocus run on a scripted camera and focuser', () => {
 
     camera.feed(wire(startedAt + 1000, 'def', 'primary', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 100 }, 'Ok', 'in', { FOCUS_ABSOLUTE_POSITION: { min: 0, max: 60000 } }))
 
-    const autofocus = makeAutofocus({ picture: camera.picture, sender: camera.sender, capture: camera.capture, analyse: async () => undefined, publish: () => undefined, settings: { focuser: 'primary', camera: 'primary', minStars: 10 } })
+    const autofocus = makeAutofocus({ picture: camera.picture, sender: camera.sender, capture: camera.capture, publish: () => undefined, settings: { focuser: 'primary', camera: 'primary', minStars: 10 } })
 
     expect(autofocus.start({ step: 50, samples: 9, exposureSeconds: 1 })).toEqual({ ok: false, reason: "the sweep -100 to 350 leaves the focuser's travel, 0 to 60000" })
   })
