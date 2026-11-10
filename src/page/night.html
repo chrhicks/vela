@@ -376,7 +376,7 @@
 <section id="capture">
   <h1 class="view-title">Capture</h1>
   <form id="capture-form">
-    <label>Object<input name="object" value=""></label>
+    <label>Object<input name="object" value=""><span id="object-from" class="unknown" hidden></span></label>
     <label>Frame type<select name="frameType"><option>light</option><option>dark</option><option>flat</option><option>bias</option></select></label>
     <label>Exposure (s)<input name="exposureSeconds" type="number" min="0" step="any" value="120"></label>
     <label>Frames<input name="count" type="number" min="1" step="1" value="10"></label>
@@ -840,6 +840,8 @@ async function act(button, answer, path, request, name, done) {
     button.removeAttribute('aria-busy')
   }
 }
+
+captureForm.elements.namedItem('object').addEventListener('input', () => { document.getElementById('object-from').hidden = true })
 
 captureForm.addEventListener('submit', async event => {
   event.preventDefault()
@@ -1391,6 +1393,19 @@ const gotoPhases = {
   stopped: ['stopped', 'warn'],
 }
 
+let objectFilled = ''
+
+function fillObject(goto) {
+  const field = captureForm.elements.namedItem('object')
+  if (goto === undefined || field.value === goto.name) return
+  if (field.value !== '' && field.value !== objectFilled) return
+  field.value = goto.name
+  objectFilled = goto.name
+  const from = document.getElementById('object-from')
+  from.hidden = false
+  from.textContent = 'from your last goto'
+}
+
 function showPointing(view, live) {
   asOf(mountState, (view.parked === undefined ? 'park state unknown' : view.parked ? 'Parked' : 'Unparked') + ', tracking ' + (view.tracking === undefined ? 'unknown' : view.tracking ? 'on' : 'off'), live)
   if (live) mountState.className = ''
@@ -1408,6 +1423,12 @@ function showPointing(view, live) {
       (goto.arrivedAt === undefined ? '' : ' at ' + clock(goto.arrivedAt)) +
       (goto.separationDegrees === undefined ? '' : ', mount ' + (goto.separationDegrees * 60).toFixed(1) + '′ from it') +
       (goto.detail === undefined ? '' : '. ' + goto.detail)
+    if (goto.phase === 'arrived') {
+      const link = element('a', '', 'Capture this target ›')
+      link.href = '#/capture'
+      gotoStatus.append(' ', link)
+    }
+    fillObject(goto)
   }
 }
 
