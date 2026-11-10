@@ -131,6 +131,14 @@ export const AlignSettings = Schema.Struct({
   ),
 })
 
+export const CentreSettings = Schema.Struct({
+  toleranceArcmin: described(
+    'How far, in arcminutes, the solved centre of a centring frame may be from the target for slew and centre to finish. 1 arcminute is 31 pixels at the FRA400 and ASI2600 scale of 1.94 arcseconds per pixel, under 1% of the 6248-pixel frame width, so frames centred within it stack with no crop worth noticing. Not yet checked against how closely the AM5 repeats a goto after a sync (to measure on 2026-11-10): if passes never get under it, this is the number to change',
+    Schema.Number,
+    1,
+  ),
+})
+
 export const AutofocusSettings = Schema.Struct({
   minStars: described(
     'Stars the best frame of a sweep must show before Vela picks a focus from it. A daylight sweep on the rig found 1 to 4 (noise and hot pixels), and frames with no stars on 11-08 0 to 4; real night frames within 150 steps of focus found 55 to 582 (10-31 replay, 2026-11-09)',
@@ -170,6 +178,7 @@ export const VelaSettings = Schema.Struct({
   align: described('Settings for polar alignment', AlignSettings, {}),
   stars: Schema.optionalKey(StarSettings.annotate({ description: 'Counting and sizing the stars of each kept imaging frame. Without it, kept frames get only their sky level and noise' })),
   autofocus: described('Settings for autofocus', AutofocusSettings, {}),
+  centre: described('Settings for slew and centre', CentreSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({
       description: "The address of Cria's stream viewer, which shows the raw INDI wire. The Activity view links to it; without it, there is no link",

@@ -136,6 +136,26 @@ export function makePointing({ picture, sender, settings, now }: PointingOptions
     return sent
   }
 
+  async function sync(raHours: number, decDegrees: number): Promise<PrepareResult> {
+    const problem = mountProblem('EQUATORIAL_EOD_COORD') ?? mountProblem('ON_COORD_SET')
+
+    if (problem !== undefined) return refuse(problem)
+
+    const elements = Object.keys(read('ON_COORD_SET')?.values ?? {})
+
+    if (!elements.includes('SYNC') || !elements.includes('TRACK')) return refuse(`${mount} has no SYNC and TRACK elements in ON_COORD_SET`)
+
+    const mode = (element: string) => Object.fromEntries(elements.map(name => [name, name === element]))
+    const syncing = await write('ON_COORD_SET', mode('SYNC'))
+
+    if (!syncing.ok) return syncing
+
+    const synced = await write('EQUATORIAL_EOD_COORD', { RA: raHours, DEC: decDegrees })
+    const tracking = await write('ON_COORD_SET', mode('TRACK'))
+
+    return synced.ok ? tracking : synced
+  }
+
   async function unpark(): Promise<PrepareResult> {
     const park = read('TELESCOPE_PARK')
 
@@ -175,6 +195,8 @@ export function makePointing({ picture, sender, settings, now }: PointingOptions
     search: (text: string): ReadonlyArray<TargetSummary> => searchCatalog(text, settings.searchResults),
 
     preview,
+
+    sync,
 
     async act(json: unknown): Promise<PrepareResult> {
       let request: typeof Request.Type

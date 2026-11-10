@@ -71,7 +71,7 @@ export interface CaptureView {
   readonly late: ReadonlyArray<LateCommand>
 }
 
-export type Between = (frame: number, signal: AbortSignal) => Promise<string | undefined>
+export type Between = (frame: number, signal: AbortSignal) => Promise<string | { readonly done: string } | undefined>
 
 export type StartResult = { readonly ok: true; readonly run: string; readonly done: Promise<void> } | { readonly ok: false; readonly reason: string }
 
@@ -267,10 +267,11 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
       first = false
 
-      const refused = await run.between?.(run.counted, run.abort.signal)
+      const next = await run.between?.(run.counted, run.abort.signal)
 
       if (run.abort.signal.aborted) return finishWith(run, { reason: 'stopped', detail: 'Stop pressed' })
-      if (refused !== undefined) return finishWith(run, { reason: 'refused', detail: refused })
+      if (typeof next === 'string') return finishWith(run, { reason: 'refused', detail: next })
+      if (next !== undefined) return finishWith(run, { reason: 'done', detail: next.done })
 
       const result = await expose(run)
 
