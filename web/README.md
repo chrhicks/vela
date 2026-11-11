@@ -47,7 +47,7 @@ Clicking the latest frame or the stack on the run page opens it for judging the 
 
 ## /controls
 
-Every operation on the rig, by itself, in seven areas: mount, guiding, focus, camera, dew heater, calibration and system. Each area shows the true state first and its actions under it (`routes/controls/areas.tsx`). On a desktop all seven are on one page; on a phone `/controls` is the list of areas with one line of state each, and `/controls/<area>` opens one, where the mount's nudge becomes a four-key pad.
+Every operation on the rig, by itself, in seven areas: mount, guiding, focus, camera, dew heater, calibration and system. Each area shows the true state first and its actions under it (`routes/controls/areas.tsx`). `/controls/<area>` shows one area by itself at any width, which is where an alert's fix links to. `/controls` shows all seven on a desktop; on a phone it is the list of areas with one line of state each, and the mount's nudge becomes a four-key pad. Whether the shut-down question is open is in the address (`?ask=shut-down`).
 
 Nothing asks "are you sure?" and nothing is disabled during a run. The one exception is `SHUT DOWN RIG PC`: it sits apart in the header, quieter than the rest, and asks once, because the PC's power button is outside.
 
