@@ -1,0 +1,10 @@
+.link {
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid currentColor;
+  font-size: var(--size-label);
+  font-weight: 700;
+  letter-spacing: var(--track-label);
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}

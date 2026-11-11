@@ -18,3 +18,5 @@ stage() {
 
 stage typecheck pnpm typecheck
 stage tests pnpm test
+stage "web typecheck" pnpm --dir web typecheck
+stage "web build" pnpm --dir web build
