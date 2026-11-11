@@ -70,7 +70,7 @@ export function CapturingView({ run }: CapturingViewProps) {
           </div>
 
           <div className={`${layout.latestPicture} ${layout.first}`}>
-            <Picture label="Latest frame" detail={run.latest.detail}>
+            <Picture label="Latest frame" detail={run.latest.detail} to={`/frame/${run.frame}`}>
               <StubSky seed={run.frame} glow="faint" />
             </Picture>
           </div>
@@ -82,7 +82,7 @@ export function CapturingView({ run }: CapturingViewProps) {
 
         <div className={layout.column}>
           <div className={`${layout.stackPicture} ${layout.first}`}>
-            <Picture label="Stack so far" detail={run.stack.detail}>
+            <Picture label="Stack so far" detail={run.stack.detail} to="/stack">
               <StubSky seed={7} glow="bright" />
             </Picture>
           </div>

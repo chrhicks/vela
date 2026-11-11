@@ -28,7 +28,7 @@ export function StartingView() {
       <div className={layout.night}>
         <div className={layout.column}>
           <div className={layout.first}>
-            <Picture label="Latest frame" detail={starting.latestDetail}>
+            <Picture label="Latest frame" detail={starting.latestDetail} to="/frame/5">
               <StubSky seed={5} glow="faint" />
             </Picture>
           </div>
