@@ -23,4 +23,14 @@ export const sections: ReadonlyArray<Section> = [
       { label: 'Ready', to: '/launch/ready' },
     ],
   },
+  {
+    root: '/',
+    scenes: [
+      { label: 'No run', to: '/' },
+      { label: 'First frames', to: '/?scene=starting' },
+      { label: 'Capturing', to: '/?scene=capturing' },
+      { label: 'Alert', to: '/?scene=alert' },
+      { label: 'Night over', to: '/?scene=over' },
+    ],
+  },
 ]

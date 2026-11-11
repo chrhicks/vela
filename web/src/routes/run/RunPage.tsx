@@ -1,15 +1,23 @@
-import { ActionLink } from '../../components/ActionLink.tsx'
-import { Page } from '../../components/Page.tsx'
-import { PageHeader } from '../../components/PageHeader.tsx'
-import { PillLink } from '../../components/PillLink.tsx'
+import { useScene } from '../../stub/useScene.ts'
+import { CapturingView } from './CapturingView.tsx'
+import { IdleView } from './IdleView.tsx'
+import { NightOverView } from './NightOverView.tsx'
+import { StartingView } from './StartingView.tsx'
+import { capturing } from './stub.ts'
 
 export function RunPage() {
-  return (
-    <Page width="wide">
-      <PageHeader title="No run" facts={['Rig not set up']}>
-        <ActionLink to="/controls">Controls</ActionLink>
-        <PillLink to="/launch">Launch</PillLink>
-      </PageHeader>
-    </Page>
-  )
+  const scene = useScene(['idle', 'starting', 'capturing', 'alert', 'over'])
+
+  switch (scene) {
+    case 'idle':
+      return <IdleView />
+    case 'starting':
+      return <StartingView />
+    case 'capturing':
+      return <CapturingView run={capturing.steady} />
+    case 'alert':
+      return <CapturingView run={capturing.alert} />
+    case 'over':
+      return <NightOverView />
+  }
 }

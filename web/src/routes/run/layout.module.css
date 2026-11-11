@@ -1,0 +1,87 @@
+.night {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.8fr;
+  gap: var(--gap-section) var(--gap-page);
+  align-items: start;
+}
+
+.across {
+  grid-column: 1 / -1;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section);
+  min-width: 0;
+}
+
+.phoneOnly {
+  display: none;
+}
+
+@media (max-width: 60rem) {
+  .night {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .column {
+    display: contents;
+  }
+
+  .wideOnly {
+    display: none;
+  }
+
+  .phoneOnly {
+    display: flex;
+  }
+
+  .phoneOnly > * {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .first {
+    order: 1;
+  }
+
+  .second {
+    order: 2;
+  }
+
+  .third {
+    order: 3;
+  }
+
+  .fourth {
+    order: 4;
+  }
+
+  .fifth {
+    order: 5;
+  }
+
+  .sixth {
+    order: 6;
+  }
+
+  .last {
+    order: 7;
+  }
+
+  .night[data-shown='latest'] .stackPicture,
+  .night[data-shown='stack'] .latestPicture {
+    display: none;
+  }
+}
+
+.tabs {
+  gap: var(--gap-fact);
+}
+
+.tabs > * {
+  flex: none;
+}

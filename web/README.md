@@ -16,7 +16,7 @@ Each route serves one moment of the night.
 
 - `src/App.tsx`: the routes.
 - `src/routes/<route>/`: one folder per route, with its pages, the components only it uses, and its stub values.
-- `src/components/`: the pieces every route shares, each one `.tsx` file and one CSS module: `Page`, `PageHeader`, `Facts`, `Readings`, `Readout`, `Statement`, `Alert`, `Chart`, `ActionLink`, `PillLink`.
+- `src/components/`: the pieces every route shares, each one `.tsx` file and one CSS module: `Page`, `PageHeader`, `Caption`, `Facts`, `Readings`, `Readout`, `StatusLine`, `Statement`, `Alert`, `Log`, `Chart`, `Picture`, `ActionLink`, `ActionButton`, `PillLink`.
 - `src/styles/tokens.css`: the colours, type sizes and spacing. Components use these variables and no literal colours.
 - `src/stub/`: what stands in for the rig while there is no data. It is deleted when the stream arrives.
 
@@ -24,13 +24,19 @@ Each route serves one moment of the night.
 
 The UI is being built first, with no data behind it. Every value on screen comes from a `stub.ts` beside its page, shaped like what the page will later receive from the rig stream, so wiring in real data changes the source and leaves the components alone.
 
-Drawn so far: all of `/launch`. `/` and `/controls` are still the shell.
+Drawn so far: all of `/launch`, and the run page's states from the first frames to the end of the night. Still to draw: the target picker, the frame inspect view and `/controls`.
 
-A state that the rig decides (devices coming up, an alignment error jumping) is a scene: the page reads `?scene=` from the address. The strip at the bottom of the window lists the scenes of the current route. Two launch steps move on by themselves after a few seconds, as the real ones will when the rig finishes: bring-up and autofocus.
+A state that the rig decides (devices coming up, an alignment error jumping) is a scene: the page reads `?scene=` from the address. The strip at the bottom of the window lists the scenes of the current route. Three screens move on by themselves after a few seconds, as the real ones will when the rig finishes: bring-up, autofocus and the first-frames check.
 
 ## /launch
 
 Six steps, one address each, on a phone: `set-up` (the checklist), `bring-up` (the rig setting itself to the rig file), `align` (polar alignment), `filter`, `focus` (autofocus) and `ready` (the verdict). Polar alignment starts only from the tap on `ALIGN`.
+
+## / (the run)
+
+One address whose content follows the run: no run, the first-frames check (`LEAVE THE SCREEN`), capturing, capturing with an alert, and the night over (`READY TO CARRY IN`). On a desktop it is three columns to glance at; on a phone the same pieces are one column in a different order, with one picture and a switch between the latest frame and the stack. `routes/run/layout.module.css` holds both arrangements.
+
+Amber appears only in the alert and on the readings it concerns, so a page with no amber is a night that needs nothing.
 
 ## The look
 

@@ -1,0 +1,26 @@
+.trends {
+  --chart-height: 3.75rem;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.span {
+  display: flex;
+  justify-content: space-between;
+  padding-left: var(--tick-column);
+  color: var(--ember-quiet);
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+}
+
+@media (max-width: 60rem) {
+  .trends {
+    --chart-height: 5rem;
+  }
+
+  .wideOnly {
+    display: none;
+  }
+}

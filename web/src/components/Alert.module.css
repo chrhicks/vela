@@ -11,3 +11,23 @@
   letter-spacing: var(--track-code);
   text-transform: uppercase;
 }
+
+.fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-row) var(--gap-fact);
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 40rem) {
+  .title {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  .fixes {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

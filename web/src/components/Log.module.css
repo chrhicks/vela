@@ -1,0 +1,26 @@
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  display: flex;
+  gap: 1rem;
+}
+
+.at {
+  color: var(--ember-quiet);
+}
