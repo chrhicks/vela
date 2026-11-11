@@ -12,32 +12,23 @@
   display: none;
 }
 
-.controls:not([data-opened='none']) .areas {
-  max-width: 24rem;
-  columns: auto;
-}
-
-.controls:not([data-opened='none']) .back {
-  display: block;
-}
-
-.controls[data-opened='mount'] .areas > :not([data-area='mount']),
-.controls[data-opened='guiding'] .areas > :not([data-area='guiding']),
-.controls[data-opened='focus'] .areas > :not([data-area='focus']),
-.controls[data-opened='camera'] .areas > :not([data-area='camera']),
-.controls[data-opened='dew'] .areas > :not([data-area='dew']),
-.controls[data-opened='calibration'] .areas > :not([data-area='calibration']),
-.controls[data-opened='system'] .areas > :not([data-area='system']) {
-  display: none;
-}
-
 @media (max-width: 60rem) {
   .areas {
     columns: auto;
   }
 
-  .controls:not([data-opened='none']) .areas {
-    max-width: none;
+  .controls:not([data-opened='none']) .back {
+    display: block;
+  }
+
+  .controls[data-opened='mount'] .areas > :not([data-area='mount']),
+  .controls[data-opened='guiding'] .areas > :not([data-area='guiding']),
+  .controls[data-opened='focus'] .areas > :not([data-area='focus']),
+  .controls[data-opened='camera'] .areas > :not([data-area='camera']),
+  .controls[data-opened='dew'] .areas > :not([data-area='dew']),
+  .controls[data-opened='calibration'] .areas > :not([data-area='calibration']),
+  .controls[data-opened='system'] .areas > :not([data-area='system']) {
+    display: none;
   }
 
   .controls[data-opened='none'] .summary {

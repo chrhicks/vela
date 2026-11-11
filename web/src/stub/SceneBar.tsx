@@ -18,7 +18,11 @@ export function SceneBar() {
       <span className={styles.name}>Stub</span>
 
       {section.scenes.map(scene => (
-        <Link key={scene.to} to={scene.to} className={scene.to === here ? styles.here : styles.scene}>
+        <Link
+          key={scene.to}
+          to={scene.to}
+          className={`${scene.to === here ? styles.here : styles.scene} ${scene.phoneOnly === true ? styles.phoneOnly : ''}`}
+        >
           {scene.label}
         </Link>
       ))}

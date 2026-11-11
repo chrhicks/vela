@@ -1,6 +1,7 @@
 export interface Scene {
   readonly label: string
   readonly to: string
+  readonly phoneOnly?: boolean
 }
 
 interface Section {
@@ -28,13 +29,13 @@ export const sections: ReadonlyArray<Section> = [
     scenes: [
       { label: 'All', to: '/controls' },
       { label: 'Shut down?', to: '/controls?ask=shut-down' },
-      { label: 'Mount', to: '/controls/mount' },
-      { label: 'Guiding', to: '/controls/guiding' },
-      { label: 'Focus', to: '/controls/focus' },
-      { label: 'Camera', to: '/controls/camera' },
-      { label: 'Dew heater', to: '/controls/dew' },
-      { label: 'Calibration', to: '/controls/calibration' },
-      { label: 'System', to: '/controls/system' },
+      { label: 'Mount', to: '/controls/mount', phoneOnly: true },
+      { label: 'Guiding', to: '/controls/guiding', phoneOnly: true },
+      { label: 'Focus', to: '/controls/focus', phoneOnly: true },
+      { label: 'Camera', to: '/controls/camera', phoneOnly: true },
+      { label: 'Dew heater', to: '/controls/dew', phoneOnly: true },
+      { label: 'Calibration', to: '/controls/calibration', phoneOnly: true },
+      { label: 'System', to: '/controls/system', phoneOnly: true },
     ],
   },
   {
