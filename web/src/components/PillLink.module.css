@@ -12,3 +12,7 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
+
+.waiting {
+  color: var(--rule);
+}

@@ -5,8 +5,15 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--ember-quiet);
   font-size: var(--size-label);
   letter-spacing: var(--track-label);
   text-transform: uppercase;
+}
+
+.quiet {
+  color: var(--ember-quiet);
+}
+
+.attention {
+  color: var(--amber);
 }

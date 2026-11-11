@@ -37,3 +37,7 @@
   letter-spacing: var(--track-code);
   text-align: right;
 }
+
+.attention {
+  color: var(--amber);
+}

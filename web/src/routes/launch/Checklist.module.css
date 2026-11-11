@@ -1,0 +1,39 @@
+.checklist {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+  font-size: var(--size-label);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.box {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: 0;
+  border: 1px solid var(--ember);
+  appearance: none;
+  cursor: pointer;
+}
+
+.box:checked {
+  border-color: var(--ember-quiet);
+  background: var(--ember-quiet);
+}
+
+.box:checked + .text {
+  color: var(--ember-quiet);
+  font-weight: 400;
+}

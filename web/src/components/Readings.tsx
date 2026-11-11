@@ -3,6 +3,7 @@ import styles from './Readings.module.css'
 export interface Reading {
   readonly label: string
   readonly value: string
+  readonly attention?: boolean
 }
 
 interface ReadingsProps {
@@ -19,7 +20,7 @@ export function Readings({ heading, rows }: ReadingsProps) {
         {rows.map(row => (
           <div key={row.label} className={styles.row}>
             <dt className={styles.label}>{row.label}</dt>
-            <dd className={styles.value}>{row.value}</dd>
+            <dd className={row.attention === true ? `${styles.value} ${styles.attention}` : styles.value}>{row.value}</dd>
           </div>
         ))}
       </dl>

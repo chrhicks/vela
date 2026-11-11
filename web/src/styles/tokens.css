@@ -4,6 +4,8 @@
   --ember-quiet: #96532a;
   --amber: #ff9500;
   --picture-ground: #11100f;
+  --band: #1c130c;
+  --rule: #2a1a10;
 
   --font-code: 'JetBrains Mono', ui-monospace, monospace;
   --font-words: 'Inter', system-ui, sans-serif;
@@ -12,6 +14,9 @@
   --size-heading: 1.25rem;
   --size-reading: 1rem;
   --size-label: 0.8125rem;
+  --size-small: 0.6875rem;
+  --size-readout: 2.75rem;
+  --size-verdict: 2.25rem;
 
   --track-code: 0.08em;
   --track-label: 0.12em;
