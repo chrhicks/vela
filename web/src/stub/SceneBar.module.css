@@ -34,3 +34,9 @@
   color: var(--ember);
   text-decoration: none;
 }
+
+@media (min-width: 60.0625rem) {
+  .phoneOnly {
+    display: none;
+  }
+}
