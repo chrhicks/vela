@@ -12,6 +12,7 @@ export function App() {
         <Route path="/" element={<RunPage />} />
         <Route path="/launch/*" element={<LaunchRoutes />} />
         <Route path="/controls" element={<ControlsPage />} />
+        <Route path="/controls/:area" element={<ControlsPage />} />
       </Routes>
 
       <SceneBar />

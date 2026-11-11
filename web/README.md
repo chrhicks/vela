@@ -24,7 +24,7 @@ Each route serves one moment of the night.
 
 The UI is being built first, with no data behind it. Every value on screen comes from a `stub.ts` beside its page, shaped like what the page will later receive from the rig stream, so wiring in real data changes the source and leaves the components alone.
 
-Drawn so far: all of `/launch` and every state of the run page, the target picker included. Still to draw: the frame inspect view and `/controls`.
+Drawn so far: all of `/launch`, every state of the run page with the target picker, and `/controls`. Still to draw: the frame inspect view.
 
 A state that the rig decides (devices coming up, an alignment error jumping) is a scene: the page reads `?scene=` from the address. The strip at the bottom of the window lists the scenes of the current route. Three screens move on by themselves after a few seconds, as the real ones will when the rig finishes: bring-up, autofocus and the first-frames check.
 
@@ -39,6 +39,12 @@ One address whose content follows the run: no run, the target picker (`READY`), 
 The picker (`routes/run/picker/`) lists what is best placed now, filters as you type on any of a target's names, and shows the chosen target with the camera's frame drawn over it. Two things are set there, the exposure and when the run stops; the end time is worked out from them (`endsBy.ts`). The chosen target is in the address (`&target=`), so on a phone the list and the chosen target are two screens.
 
 Amber appears only in the alert and on the readings it concerns, so a page with no amber is a night that needs nothing.
+
+## /controls
+
+Every operation on the rig, by itself, in seven areas: mount, guiding, focus, camera, dew heater, calibration and system. Each area shows the true state first and its actions under it (`routes/controls/areas.tsx`). On a desktop all seven are on one page; on a phone `/controls` is the list of areas with one line of state each, and `/controls/<area>` opens one, where the mount's nudge becomes a four-key pad.
+
+Nothing asks "are you sure?" and nothing is disabled during a run. The one exception is `SHUT DOWN RIG PC`: it sits apart in the header, quieter than the rest, and asks once, because the PC's power button is outside.
 
 ## The look
 
