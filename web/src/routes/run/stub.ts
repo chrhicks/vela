@@ -226,7 +226,7 @@ export const capturing: Readonly<Record<'steady' | 'alert', Capturing>> = {
     alert: {
       title: 'Guide star lost 21:36',
       facts: ['Cause: guide cam sees 0 stars', 'Tried: restart x3', 'Frames still arriving'],
-      fixes: [{ label: 'Pick new star' }, { label: 'Restart PHD2' }, { label: 'Open guiding controls', to: '/controls' }],
+      fixes: [{ label: 'Pick new star' }, { label: 'Restart PHD2' }, { label: 'Open guiding controls', to: '/controls/guiding' }],
     },
     rig: [
       { label: 'Mount', value: 'Tracking' },

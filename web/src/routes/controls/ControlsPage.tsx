@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import { ActionLink } from '../../components/ActionLink.tsx'
@@ -11,8 +10,10 @@ import { areaIds, areas, run } from './stub.ts'
 
 export function ControlsPage() {
   const { area } = useParams()
-  const [search] = useSearchParams()
-  const [asking, setAsking] = useState(search.get('ask') === 'shut-down')
+  const [search, setSearch] = useSearchParams()
+
+  const asking = search.get('ask') === 'shut-down'
+  const setAsking = (ask: boolean) => setSearch(ask ? { ask: 'shut-down' } : {})
 
   const opened = areaIds.find(id => id === area)
 
