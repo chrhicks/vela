@@ -11,6 +11,7 @@ Each route serves one moment of the night.
 | `/launch` | Setting up at the rig | A phone, one step at a time |
 | `/` | The run | A desktop second monitor, then a phone |
 | `/controls` | Something needs correcting | Either |
+| `/frame/<number>`, `/stack` | Judging a picture by eye | Either |
 
 ## Where things are
 
@@ -24,7 +25,7 @@ Each route serves one moment of the night.
 
 The UI is being built first, with no data behind it. Every value on screen comes from a `stub.ts` beside its page, shaped like what the page will later receive from the rig stream, so wiring in real data changes the source and leaves the components alone.
 
-Drawn so far: all of `/launch`, every state of the run page with the target picker, and `/controls`. Still to draw: the frame inspect view.
+Every screen is drawn: `/launch`, every state of the run page with the target picker, `/controls`, and the frame and stack inspect views.
 
 A state that the rig decides (devices coming up, an alignment error jumping) is a scene: the page reads `?scene=` from the address. The strip at the bottom of the window lists the scenes of the current route. Three screens move on by themselves after a few seconds, as the real ones will when the rig finishes: bring-up, autofocus and the first-frames check.
 
@@ -39,6 +40,10 @@ One address whose content follows the run: no run, the target picker (`READY`), 
 The picker (`routes/run/picker/`) lists what is best placed now, filters as you type on any of a target's names, and shows the chosen target with the camera's frame drawn over it. Two things are set there, the exposure and when the run stops; the end time is worked out from them (`endsBy.ts`). The chosen target is in the address (`&target=`), so on a phone the list and the chosen target are two screens.
 
 Amber appears only in the alert and on the readings it concerns, so a page with no amber is a night that needs nothing.
+
+## /frame/<number> and /stack
+
+Clicking the latest frame or the stack on the run page opens it for judging the stars by eye: the whole picture with a box that follows a click, that box at 100 %, and nine crops at 100 % from the corners, edges and centre, since stars are often fine in the middle and stretched in one corner. A frame links to the one before and after it; the stack is a quick one for inspection, not a finished image.
 
 ## /controls
 

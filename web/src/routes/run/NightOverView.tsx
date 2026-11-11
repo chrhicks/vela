@@ -44,7 +44,7 @@ export function NightOverView() {
 
         <div className={layout.column}>
           <div className={layout.third}>
-            <Picture label="Final quick stack" detail={nightOver.stackDetail}>
+            <Picture label="Final quick stack" detail={nightOver.stackDetail} to="/stack">
               <StubSky seed={7} glow="bright" />
             </Picture>
           </div>

@@ -1,14 +1,16 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 
 import styles from './Picture.module.css'
 
 interface PictureProps {
   readonly label: string
   readonly detail: string
+  readonly to?: string
   readonly children: ReactNode
 }
 
-export function Picture({ label, detail, children }: PictureProps) {
+export function Picture({ label, detail, to, children }: PictureProps) {
   return (
     <figure className={styles.picture}>
       <figcaption className={styles.caption}>
@@ -16,7 +18,13 @@ export function Picture({ label, detail, children }: PictureProps) {
         <span>{detail}</span>
       </figcaption>
 
-      <div className={styles.frame}>{children}</div>
+      {to === undefined ? (
+        <div className={styles.frame}>{children}</div>
+      ) : (
+        <Link to={to} className={styles.frame} aria-label={`Inspect: ${label}`}>
+          {children}
+        </Link>
+      )}
     </figure>
   )
 }

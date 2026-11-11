@@ -16,6 +16,7 @@
 }
 
 .frame {
+  display: block;
   aspect-ratio: 3 / 2;
   overflow: hidden;
   background: var(--picture-ground);

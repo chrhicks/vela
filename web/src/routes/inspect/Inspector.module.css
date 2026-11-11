@@ -1,0 +1,80 @@
+.inspector {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-areas:
+    'whole close'
+    'whole field';
+  gap: var(--gap-section) var(--gap-page);
+  align-items: start;
+}
+
+.whole {
+  grid-area: whole;
+}
+
+.close {
+  grid-area: close;
+}
+
+.field {
+  display: flex;
+  grid-area: field;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fieldCaption {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap-fact);
+}
+
+.sky {
+  position: relative;
+  cursor: crosshair;
+}
+
+.sky > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.box {
+  position: absolute;
+  border: 1px solid var(--ember);
+  pointer-events: none;
+}
+
+.crops {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crop {
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: var(--picture-ground);
+}
+
+.crop > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 60rem) {
+  .inspector {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .close {
+    display: none;
+  }
+}

@@ -11,3 +11,8 @@
   fill: var(--ember);
   opacity: 0.32;
 }
+
+.halo {
+  fill: var(--star);
+  opacity: 0.18;
+}
