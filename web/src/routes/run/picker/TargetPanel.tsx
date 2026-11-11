@@ -68,13 +68,23 @@ export function TargetPanel({ target }: TargetPanelProps) {
                 { value: '60', label: '60 s' },
                 { value: '90', label: '90 s' },
                 { value: '120', label: '120 s' },
-                { value: 'other', label: 'Other' },
               ]}
               chosen={exposure}
               onChoose={setExposure}
             />
 
-            {exposure === 'other' ? <Field name="Exposure seconds" kind="number" value={otherSeconds} onChange={setOtherSeconds} /> : null}
+            <span className={styles.typed}>
+              <Field
+                name="Other exposure, seconds"
+                kind="number"
+                value={otherSeconds}
+                resting={exposure !== 'other'}
+                onChange={setOtherSeconds}
+                onFocus={() => setExposure('other')}
+              />
+
+              <span className={exposure === 'other' ? styles.unit : styles.restingUnit}>s</span>
+            </span>
           </div>
         </div>
 
@@ -86,13 +96,24 @@ export function TargetPanel({ target }: TargetPanelProps) {
               name="Stop"
               choices={[
                 { value: 'said', label: 'When I say' },
-                { value: 'frames', label: 'After frames' },
+                { value: 'frames', label: 'After' },
               ]}
               chosen={stop}
               onChoose={setStop}
             />
 
-            {stop === 'frames' ? <Field name="Frames" kind="number" value={frames} onChange={setFrames} /> : null}
+            <span className={styles.typed}>
+              <Field
+                name="Frames"
+                kind="number"
+                value={frames}
+                resting={stop !== 'frames'}
+                onChange={setFrames}
+                onFocus={() => setStop('frames')}
+              />
+
+              <span className={stop === 'frames' ? styles.unit : styles.restingUnit}>frames</span>
+            </span>
           </div>
         </div>
 
