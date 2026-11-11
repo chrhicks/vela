@@ -105,6 +105,21 @@ const lostTrends: ReadonlyArray<Trend> = [
   {
     onPhone: true,
     chart: {
+      title: 'HFD px',
+      current: '4.9',
+      lines: [
+        [
+          ...drift({ seed: 11, count: 44, from: 3.3, to: 2.9, noise: 0.12 }),
+          ...drift({ seed: 13, count: 14, from: 3.6, to: 4.9, noise: 0.15 }).map(point => ({ x: point.x + 44, y: point.y })),
+        ],
+      ],
+      yTicks: [2.8, 3.9, 5],
+      band: hfdBand,
+    },
+  },
+  {
+    onPhone: true,
+    chart: {
       title: 'Stars',
       current: '120',
       lines: [
@@ -131,6 +146,27 @@ const lostTrends: ReadonlyArray<Trend> = [
       ],
       yTicks: [-5, 0, 5],
       band: guidingBand,
+    },
+  },
+  {
+    onPhone: false,
+    chart: {
+      title: 'Temp °C air / focuser',
+      current: '8.7 / 10.6',
+      lines: [
+        drift({ seed: 53, count: 58, from: 12.5, to: 8.7, noise: 0.15 }),
+        drift({ seed: 59, count: 58, from: 13.6, to: 10.6, noise: 0.15 }),
+      ],
+      yTicks: [6, 11, 16],
+    },
+  },
+  {
+    onPhone: false,
+    chart: {
+      title: 'Dew heater %',
+      current: '100',
+      lines: [drift({ seed: 67, count: 58, from: 42, to: 100, noise: 1.5 })],
+      yTicks: [0, 50, 100],
     },
   },
   {
