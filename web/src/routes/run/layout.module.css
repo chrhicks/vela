@@ -78,10 +78,6 @@
   }
 }
 
-.tabs {
-  gap: var(--gap-fact);
-}
-
 .tabs > * {
   flex: none;
 }

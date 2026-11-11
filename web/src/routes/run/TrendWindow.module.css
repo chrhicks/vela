@@ -4,8 +4,3 @@
   justify-content: space-between;
   gap: var(--gap-fact);
 }
-
-.choices {
-  display: flex;
-  gap: var(--gap-fact);
-}

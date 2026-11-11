@@ -1,0 +1,56 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+}
+
+.name {
+  margin-top: var(--gap-row);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: var(--track-code);
+  text-transform: uppercase;
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+  margin-top: var(--gap-row);
+}
+
+.setting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem var(--gap-fact);
+}
+
+.answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--gap-row) var(--gap-fact);
+}
+
+.start {
+  display: flex;
+  margin-top: var(--gap-row);
+}
+
+.back {
+  display: none;
+}
+
+@media (max-width: 60rem) {
+  .start > * {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .back {
+    display: block;
+    margin-top: var(--gap-row);
+  }
+}
