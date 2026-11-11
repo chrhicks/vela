@@ -1,0 +1,11 @@
+[Unit]
+Description=Vela web app preview: serves the built app from its own checkout, stub values only
+
+[Service]
+WorkingDirectory=%h/dev/personal/vela-web-preview/web
+ExecStart=/usr/bin/node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 8794 --strictPort
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=default.target
