@@ -1,0 +1,13 @@
+.statement {
+  font-weight: 700;
+  letter-spacing: var(--track-code);
+  text-transform: uppercase;
+}
+
+.instruction {
+  font-size: var(--size-heading);
+}
+
+.verdict {
+  font-size: var(--size-verdict);
+}

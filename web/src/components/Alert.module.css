@@ -1,0 +1,13 @@
+.alert {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  color: var(--amber);
+}
+
+.title {
+  font-size: var(--size-reading);
+  font-weight: 700;
+  letter-spacing: var(--track-code);
+  text-transform: uppercase;
+}

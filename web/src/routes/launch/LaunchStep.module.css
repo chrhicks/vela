@@ -1,9 +1,9 @@
-.verdict {
-  margin: var(--gap-section) 0;
-  font-size: 2.25rem;
-  font-weight: 700;
-  letter-spacing: var(--track-code);
-  text-transform: uppercase;
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--gap-section);
 }
 
 .footer {
@@ -11,7 +11,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--gap-fact);
-  margin-top: auto;
+  min-height: 3rem;
 }
 
 .step {

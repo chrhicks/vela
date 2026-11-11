@@ -1,0 +1,31 @@
+.devices,
+.device {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-fact);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.name {
+  color: var(--ember-quiet);
+  font-size: var(--size-label);
+}
+
+.state {
+  font-size: var(--size-label);
+  font-weight: 700;
+}
+
+.change {
+  padding-left: 1rem;
+  color: var(--ember-quiet);
+  font-size: var(--size-small);
+}

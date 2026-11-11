@@ -15,13 +15,22 @@ Each route serves one moment of the night.
 ## Where things are
 
 - `src/App.tsx`: the routes.
-- `src/routes/<route>/`: one folder per route, with its page, its styles and its stub values.
-- `src/components/`: the pieces every route shares: `Page`, `PageHeader`, `Facts`, `Readings`, `ActionLink`, `PillLink`. Each is one `.tsx` file and one CSS module.
+- `src/routes/<route>/`: one folder per route, with its pages, the components only it uses, and its stub values.
+- `src/components/`: the pieces every route shares, each one `.tsx` file and one CSS module: `Page`, `PageHeader`, `Facts`, `Readings`, `Readout`, `Statement`, `Alert`, `Chart`, `ActionLink`, `PillLink`.
 - `src/styles/tokens.css`: the colours, type sizes and spacing. Components use these variables and no literal colours.
+- `src/stub/`: what stands in for the rig while there is no data. It is deleted when the stream arrives.
 
 ## State of the build
 
-This is the shell. Every value on screen comes from a `stub.ts` beside the page; nothing reads the rig yet. The stub values have the shape the pages will later receive from the rig stream, so wiring in real data changes the source and leaves the components alone.
+The UI is being built first, with no data behind it. Every value on screen comes from a `stub.ts` beside its page, shaped like what the page will later receive from the rig stream, so wiring in real data changes the source and leaves the components alone.
+
+Drawn so far: all of `/launch`. `/` and `/controls` are still the shell.
+
+A state that the rig decides (devices coming up, an alignment error jumping) is a scene: the page reads `?scene=` from the address. The strip at the bottom of the window lists the scenes of the current route. Two launch steps move on by themselves after a few seconds, as the real ones will when the rig finishes: bring-up and autofocus.
+
+## /launch
+
+Six steps, one address each, on a phone: `set-up` (the checklist), `bring-up` (the rig setting itself to the rig file), `align` (polar alignment), `filter`, `focus` (autofocus) and `ready` (the verdict). Polar alignment starts only from the tap on `ALIGN`.
 
 ## The look
 
