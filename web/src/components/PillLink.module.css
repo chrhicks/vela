@@ -1,0 +1,14 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3rem;
+  padding: 0 1.75rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--size-label);
+  font-weight: 700;
+  letter-spacing: var(--track-label);
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}

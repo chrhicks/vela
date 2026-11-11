@@ -1,0 +1,17 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: var(--gap-page);
+  padding-bottom: calc(var(--gap-page) + env(safe-area-inset-bottom));
+}
+
+.phone {
+  max-width: 26rem;
+}
+
+.wide {
+  max-width: 90rem;
+}

@@ -1,0 +1,12 @@
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem var(--gap-fact);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ember-quiet);
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}

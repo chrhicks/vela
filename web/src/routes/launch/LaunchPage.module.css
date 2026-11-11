@@ -1,0 +1,22 @@
+.verdict {
+  margin: var(--gap-section) 0;
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: var(--track-code);
+  text-transform: uppercase;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-fact);
+  margin-top: auto;
+}
+
+.step {
+  color: var(--ember-quiet);
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}

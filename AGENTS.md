@@ -14,12 +14,13 @@ Vela is being rebuilt on the rig stream (plan: `bots/observer/specs/vela-next/pl
 - `src/pointing/`: catalog lookup to goto: `target.ts` converts a catalog row to epoch of date (precession and nutation, no site), `pointing.ts` sends goto, Unpark, Home, tracking and Stop and follows a goto from the stream. There is no Park (parking turns the rig sideways). `src/catalog/search.ts` is the lookup, `src/sky/meridian.ts` the time to the meridian limit.
 - `src/frames/`: the frames: copy from the rig computer with a check, the sidecar, the stream entry, the FITS reader and the preview. See the README.
 - `compose.yaml` and `deploy/nats.conf`: the NATS broker that carries the rig stream. It has no logins and nothing to provision; the rig program creates the `RIG_DEV` stream.
-- `verify.sh`: typecheck and tests.
+- `web/`: the web app that will replace the night page: React, built by Vite, its own package in the pnpm workspace. Today it is the shell: the three routes (`/` the run, `/launch`, `/controls`), the shared components and the style tokens, drawn from stub values with no data behind them. See `web/README.md`.
+- `verify.sh`: typecheck and tests, then the web app's typecheck and build.
 
 The broker's data (`~/.local/share/vela/nats`), Vela's saved images and its archives are data on disk. Nothing in this repo deletes them.
 
 ## Rules
 
-- One package, run from source by Node 26; no build step. Style follows Cria's `ts/`.
+- The service under `src/` is run from source by Node 26 with no build step; style follows Cria's `ts/`. Only `web/` is built.
 - No comments in code: a limit or default is a described setting, a surprise is a better name or type.
 - Run `./verify.sh` before a PR.

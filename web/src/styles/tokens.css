@@ -1,0 +1,32 @@
+:root {
+  --ground: #080706;
+  --ember: #c9652a;
+  --ember-quiet: #96532a;
+  --amber: #ff9500;
+  --picture-ground: #11100f;
+
+  --font-code: 'JetBrains Mono', ui-monospace, monospace;
+  --font-words: 'Inter', system-ui, sans-serif;
+
+  --size-title: 2.5rem;
+  --size-heading: 1.25rem;
+  --size-reading: 1rem;
+  --size-label: 0.8125rem;
+
+  --track-code: 0.08em;
+  --track-label: 0.12em;
+
+  --gap-page: 3rem;
+  --gap-section: 2.5rem;
+  --gap-row: 0.875rem;
+  --gap-fact: 1.75rem;
+}
+
+@media (max-width: 40rem) {
+  :root {
+    --size-title: 1.5rem;
+    --gap-page: 1.75rem;
+    --gap-section: 2rem;
+    --gap-fact: 1.125rem;
+  }
+}
