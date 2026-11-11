@@ -1,0 +1,13 @@
+.star {
+  fill: var(--star);
+}
+
+.faint {
+  fill: var(--ember);
+  opacity: 0.12;
+}
+
+.bright {
+  fill: var(--ember);
+  opacity: 0.32;
+}

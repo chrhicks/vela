@@ -5,17 +5,17 @@ export interface Point {
   readonly y: number
 }
 
-interface Band {
+export interface Band {
   readonly from: number
   readonly to: number
 }
 
-interface ChartProps {
+export interface ChartProps {
   readonly title: string
   readonly current?: string
   readonly lines: ReadonlyArray<ReadonlyArray<Point>>
   readonly yTicks: ReadonlyArray<number>
-  readonly xLabels: readonly [string, string]
+  readonly xLabels?: readonly [string, string]
   readonly band?: Band
   readonly marker?: Point
 }
@@ -77,10 +77,12 @@ export function Chart({ title, current, lines, yTicks, xLabels, band, marker }: 
         </div>
       </div>
 
-      <div className={styles.span}>
-        <span>{xLabels[0]}</span>
-        <span>{xLabels[1]}</span>
-      </div>
+      {xLabels === undefined ? null : (
+        <div className={styles.span}>
+          <span>{xLabels[0]}</span>
+          <span>{xLabels[1]}</span>
+        </div>
+      )}
     </figure>
   )
 }

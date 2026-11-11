@@ -1,0 +1,28 @@
+.picture {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.caption {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap-fact);
+  color: var(--ember-quiet);
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.frame {
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: var(--picture-ground);
+}
+
+.frame > * {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

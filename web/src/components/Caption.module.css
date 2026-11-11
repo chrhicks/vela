@@ -1,0 +1,7 @@
+.caption {
+  color: var(--ember-quiet);
+  font-size: var(--size-label);
+  font-weight: 400;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}

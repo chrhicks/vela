@@ -5,6 +5,7 @@
   --amber: #ff9500;
   --picture-ground: #11100f;
   --band: #1c130c;
+  --star: #d8d4cf;
   --rule: #2a1a10;
 
   --font-code: 'JetBrains Mono', ui-monospace, monospace;
@@ -25,6 +26,8 @@
   --gap-section: 2.5rem;
   --gap-row: 0.875rem;
   --gap-fact: 1.75rem;
+
+  --tick-column: 2.25rem;
 }
 
 @media (max-width: 40rem) {

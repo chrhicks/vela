@@ -5,7 +5,9 @@ import { sections } from './scenes.ts'
 
 export function SceneBar() {
   const location = useLocation()
-  const section = sections.find(candidate => location.pathname.startsWith(candidate.root))
+  const section = sections.find(
+    candidate => location.pathname === candidate.root || location.pathname.startsWith(`${candidate.root}/`),
+  )
 
   if (section === undefined) return null
 

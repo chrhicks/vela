@@ -8,3 +8,9 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
+
+.unpressed {
+  border-bottom-color: transparent;
+  color: var(--ember-quiet);
+  font-weight: 400;
+}

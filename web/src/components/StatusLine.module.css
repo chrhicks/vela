@@ -1,0 +1,41 @@
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-row) var(--gap-section);
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  color: var(--ember-quiet);
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.value {
+  font-size: var(--size-reading);
+  font-weight: 500;
+  letter-spacing: var(--track-code);
+  text-transform: uppercase;
+}
+
+.attention {
+  color: var(--amber);
+}
+
+@media (max-width: 40rem) {
+  .line {
+    flex-direction: column;
+  }
+
+  .item {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+}
