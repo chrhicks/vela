@@ -1,0 +1,5 @@
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-row) var(--gap-fact);
+}

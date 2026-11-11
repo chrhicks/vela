@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { ActionButton } from '../../components/ActionButton.tsx'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import { Alert } from '../../components/Alert.tsx'
+import { Choices } from '../../components/Choices.tsx'
 import { Log } from '../../components/Log.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
@@ -57,13 +58,15 @@ export function CapturingView({ run }: CapturingViewProps) {
 
         <div className={layout.column}>
           <div className={`${layout.phoneOnly} ${layout.tabs} ${layout.first}`}>
-            <ActionButton pressed={shown === 'latest'} onPress={() => setShown('latest')}>
-              Latest
-            </ActionButton>
-
-            <ActionButton pressed={shown === 'stack'} onPress={() => setShown('stack')}>
-              Stack
-            </ActionButton>
+            <Choices
+              name="Picture"
+              choices={[
+                { value: 'latest', label: 'Latest' },
+                { value: 'stack', label: 'Stack' },
+              ]}
+              chosen={shown}
+              onChoose={setShown}
+            />
           </div>
 
           <div className={`${layout.latestPicture} ${layout.first}`}>
