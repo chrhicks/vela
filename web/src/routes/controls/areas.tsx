@@ -177,10 +177,6 @@ export function SystemArea() {
         <ActionButton>Reset</ActionButton>
         <Field name="Device to reset" kind="text" value={device} onChange={setDevice} />
       </ActionRow>
-
-      <ActionRow>
-        <ActionButton>Delete align + focus frames</ActionButton>
-      </ActionRow>
     </Area>
   )
 }
