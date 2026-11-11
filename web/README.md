@@ -35,3 +35,7 @@ pnpm --dir web dev
 pnpm --dir web build
 pnpm --dir web typecheck
 ```
+
+## Looking at it on thuban
+
+`deploy/web-preview.sh [--commit REF]` builds the app in its own checkout (`~/dev/personal/vela-web-preview`, a clone of this repo) and serves it with the user unit `deploy/vela-web-preview.service` on `127.0.0.1:8794`. It is separate from the `vela` service, so building or restarting it never touches the rig. Run it again to show a newer commit. It goes away when the service under `src/` serves the built app itself.
