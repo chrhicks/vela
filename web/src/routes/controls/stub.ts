@@ -73,7 +73,6 @@ export const areas: Readonly<Record<AreaId, AreaState>> = {
       { label: 'Rig PC', value: 'UP 3 H 12' },
       { label: 'Rig program', value: 'RUNNING' },
       { label: 'Devices', value: '7 OF 7 SET' },
-      { label: 'Align + focus frames', value: '31 GB' },
     ],
   },
 }
