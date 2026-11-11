@@ -2,7 +2,7 @@ import styles from './Field.module.css'
 
 interface FieldProps {
   readonly name: string
-  readonly kind: 'search' | 'number'
+  readonly kind: 'search' | 'number' | 'text'
   readonly value: string
   readonly onChange: (value: string) => void
 }

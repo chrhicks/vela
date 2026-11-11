@@ -4,18 +4,16 @@ import styles from './ActionLink.module.css'
 
 interface ActionButtonProps {
   readonly pressed?: boolean
+  readonly quiet?: boolean
   readonly onPress?: () => void
   readonly children: ReactNode
 }
 
-export function ActionButton({ pressed, onPress, children }: ActionButtonProps) {
+export function ActionButton({ pressed, quiet = false, onPress, children }: ActionButtonProps) {
+  const look = pressed === false ? styles.unpressed : quiet ? styles.quiet : ''
+
   return (
-    <button
-      type="button"
-      className={pressed === false ? `${styles.link} ${styles.unpressed}` : styles.link}
-      aria-pressed={pressed}
-      onClick={onPress}
-    >
+    <button type="button" className={`${styles.link} ${look}`} aria-pressed={pressed} onClick={onPress}>
       {children}
     </button>
   )

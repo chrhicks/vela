@@ -24,6 +24,15 @@ export const sections: ReadonlyArray<Section> = [
     ],
   },
   {
+    root: '/controls',
+    scenes: [
+      { label: 'Controls', to: '/controls' },
+      { label: 'Shut down?', to: '/controls?ask=shut-down' },
+      { label: 'Mount', to: '/controls/mount' },
+      { label: 'Calibration', to: '/controls/calibration' },
+    ],
+  },
+  {
     root: '/',
     scenes: [
       { label: 'No run', to: '/' },

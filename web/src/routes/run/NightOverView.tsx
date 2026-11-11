@@ -19,7 +19,7 @@ export function NightOverView() {
         <ActionLink to="/controls">Controls</ActionLink>
 
         <span className={layout.wideOnly}>
-          <PillLink to="/controls">Shut down rig PC</PillLink>
+          <PillLink to="/controls?ask=shut-down">Shut down rig PC</PillLink>
         </span>
       </PageHeader>
 
@@ -55,7 +55,7 @@ export function NightOverView() {
         </div>
 
         <div className={`${layout.phoneOnly} ${layout.last}`}>
-          <PillLink to="/controls">Shut down rig PC</PillLink>
+          <PillLink to="/controls?ask=shut-down">Shut down rig PC</PillLink>
         </div>
       </div>
     </Page>

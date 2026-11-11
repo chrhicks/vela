@@ -1,5 +1,64 @@
 .areas {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-  gap: var(--gap-section) var(--gap-page);
+  columns: 4 17rem;
+  column-gap: var(--gap-page);
+}
+
+.areas > * {
+  margin-bottom: var(--gap-section);
+}
+
+.summary,
+.back {
+  display: none;
+}
+
+@media (max-width: 60rem) {
+  .areas {
+    columns: auto;
+  }
+
+  .controls[data-opened='none'] .summary {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .controls[data-opened='none'] .areas {
+    display: none;
+  }
+
+  .controls:not([data-opened='none']) .back {
+    display: block;
+  }
+
+  .controls[data-opened='mount'] .areas > :not([data-area='mount']),
+  .controls[data-opened='guiding'] .areas > :not([data-area='guiding']),
+  .controls[data-opened='focus'] .areas > :not([data-area='focus']),
+  .controls[data-opened='camera'] .areas > :not([data-area='camera']),
+  .controls[data-opened='dew'] .areas > :not([data-area='dew']),
+  .controls[data-opened='calibration'] .areas > :not([data-area='calibration']),
+  .controls[data-opened='system'] .areas > :not([data-area='system']) {
+    display: none;
+  }
+
+  .entry {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--gap-fact);
+    min-height: 3.375rem;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .heading {
+    font-size: var(--size-heading);
+    font-weight: 700;
+    letter-spacing: var(--track-code);
+  }
+
+  .state {
+    color: var(--ember-quiet);
+    font-size: var(--size-label);
+    letter-spacing: var(--track-label);
+  }
 }
