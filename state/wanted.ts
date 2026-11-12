@@ -34,5 +34,5 @@ const kindMatches = (kind: string) => (pattern: string) => (pattern.endsWith('.*
 export function isWanted(entry: Entry): Result.Result<boolean, MalformedReading> {
   if (entry.kind !== 'wire') return Result.succeed(wanted.kinds.some(kindMatches(entry.kind)))
 
-  return readWire(entry).pipe(Result.map(({ device, property }) => property !== undefined && (wanted.properties[device]?.includes(property) ?? false)))
+  return readWire(entry).pipe(Result.map(({ device, type, property }) => (property === undefined ? type === 'del' && wanted.properties[device] !== undefined : (wanted.properties[device]?.includes(property) ?? false))))
 }
