@@ -28,7 +28,7 @@ describe('settings', () => {
   })
 
   it('fills the feed defaults and has none for where the built web app is', () => {
-    expect(decodeConfig(VelaSettings, minimal).feed).toEqual({ host: '127.0.0.1', port: 8796, webRoot: '/home/example/vela/web/dist', heartbeatSeconds: 5 })
+    expect(decodeConfig(VelaSettings, minimal).feed).toEqual({ host: '127.0.0.1', port: 8796, webRoot: '/home/example/vela/web/dist', lostAfterSeconds: 15, heartbeatSeconds: 5 })
     expect(() => decodeConfig(VelaSettings, { ...minimal, feed: {} })).toThrow()
   })
 

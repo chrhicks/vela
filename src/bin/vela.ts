@@ -184,7 +184,7 @@ function frameSaved(entry: Entry) {
 
 const feedApp = FeedServer.pipe(
   Layer.provideMerge(FeedLive),
-  Layer.provide(Layer.mergeAll(ServiceStartNow, Layer.succeed(FeedSettings, settings.feed))),
+  Layer.provide(Layer.mergeAll(ServiceStartNow, Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds }))),
 )
 const servicesScope = runHandledSync(Scope.make())
 const { feed, broker } = await runHandledPromise(

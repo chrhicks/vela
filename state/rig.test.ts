@@ -35,4 +35,11 @@ describe('advance', () => {
   it('fails with the entry when a known kind has the wrong shape', () => {
     expect(Result.isFailure(advance(emptyRig, entry('vela.frame', 1, { night: 'tonight' })))).toBe(true)
   })
+
+  it('remembers when the rig program was last heard from, and not Vela itself', () => {
+    const heard = entry('wire', 5000, { dir: 'in', device: 'mount', type: 'set', property: 'EQUATORIAL_EOD_COORD', state: 'Ok', elements: { RA: 1, DEC: 2 } })
+    const state = fold(rig, emptyRig, [heard, frameKept('m31_001.fits', 9000)])
+
+    expect(state.heardAt).toBe(5000)
+  })
 })

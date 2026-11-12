@@ -1,6 +1,6 @@
 import { Effect, Match, Result, Stream } from 'effect'
 import { useSyncExternalStore } from 'react'
-import type { StartToken } from '../../../state/feed.ts'
+import type { LinkLimits, StartToken } from '../../../state/feed.ts'
 import { advance, emptyRig, type RigState } from '../../../state/rig.ts'
 import { feedEvents, type FeedEvent } from './feed.ts'
 
@@ -12,6 +12,8 @@ export interface Beat {
 export interface Link {
   readonly status: 'connecting' | 'open' | 'lost'
   readonly beat: Beat | undefined
+  readonly limits: LinkLimits | undefined
+  readonly openedAt: number
 }
 
 interface Store {
@@ -20,7 +22,7 @@ interface Store {
   readonly link: Link
 }
 
-let store: Store = { startToken: undefined, rig: emptyRig, link: { status: 'connecting', beat: undefined } }
+let store: Store = { startToken: undefined, rig: emptyRig, link: { status: 'connecting', beat: undefined, limits: undefined, openedAt: Date.now() } }
 
 const changeListeners = new Set<() => void>()
 
@@ -40,7 +42,7 @@ const applyFeedEvent = (event: FeedEvent): Effect.Effect<void> =>
       Effect.suspend(() =>
         store.startToken !== undefined && store.startToken !== bootstrap.token
           ? reloadPage
-          : updateStore(current => ({ startToken: bootstrap.token, rig: bootstrap.state, link: { status: 'open', beat: current.link.beat } })),
+          : updateStore(current => ({ startToken: bootstrap.token, rig: bootstrap.state, link: { ...current.link, status: 'open', limits: bootstrap.limits } })),
       ),
     Entry: ({ entry }) =>
       Effect.suspend(() => Effect.fromResult(advance(store.rig, entry))).pipe(
