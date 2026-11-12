@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { Facts } from './Facts.tsx'
+import { LinkAlert } from './LinkAlert.tsx'
 import styles from './PageHeader.module.css'
 
 interface PageHeaderProps {
@@ -11,14 +12,18 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, facts, children }: PageHeaderProps) {
   return (
-    <header className={styles.header}>
-      <div className={styles.heading}>
-        <h1 className={styles.title}>{title}</h1>
+    <>
+      <header className={styles.header}>
+        <div className={styles.heading}>
+          <h1 className={styles.title}>{title}</h1>
 
-        <Facts items={facts} />
-      </div>
+          <Facts items={facts} />
+        </div>
 
-      {children === undefined ? null : <nav className={styles.actions}>{children}</nav>}
-    </header>
+        {children === undefined ? null : <nav className={styles.actions}>{children}</nav>}
+      </header>
+
+      <LinkAlert />
+    </>
   )
 }
