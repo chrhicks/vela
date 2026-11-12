@@ -4,8 +4,12 @@ import type { Frame } from '../../../../state/frames.ts'
 import type { GuiderActivity, Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type MountActivity, type Readings } from '../../../../state/readings.ts'
 import type { Run } from '../../../../state/run.ts'
+import type { Span } from '../../components/Chart.tsx'
 import type { Reading } from '../../components/Readings.tsx'
-import type { Capturing } from './stub.ts'
+import { niceTicks } from '../../components/ticks.ts'
+import type { Point, Trends } from '../../../../state/trends.ts'
+import type { TrendWindowName } from './TrendWindow.tsx'
+import type { Capturing, Trend, TrendView } from './stub.ts'
 
 const unknown = '—'
 
@@ -76,9 +80,53 @@ function rigLine(readings: Readings, guiding: Guiding, now: number | undefined):
     { label: 'Guiding', value: guidingWord(guiding) },
     { label: 'Sensor', value: sensor === undefined ? unknown : `${sensor.toFixed(1)} °C` },
     { label: 'Focus', value: focus === undefined ? unknown : `${focus}` },
-    { label: 'Dew', value: heaters.length === 0 ? unknown : `${heaters.map(heater => heater.percent).join(' / ')} %` },
+    { label: 'Dew', value: heaters.length === 0 ? unknown : `${heaters.map(heater => heater.percent.toFixed(0)).join(' / ')} %` },
     { label: 'Flip', value: flipWord(flip(readings, now)) },
   ]
+}
+
+const hour = 3_600_000
+
+const lastY = (line: ReadonlyArray<Point>) => line.at(-1)?.y
+
+const shownWith = (digits: number) => (line: ReadonlyArray<Point>) => {
+  const y = lastY(line)
+
+  return y === undefined ? unknown : y.toFixed(digits)
+}
+
+function chart(title: string, lines: ReadonlyArray<ReadonlyArray<Point>>, current: string, span: Span, onPhone: boolean, held = false): Trend {
+  const seen = lines.flatMap(line => line.filter(point => point.x >= span.from && point.x <= span.to).map(point => point.y))
+
+  return { onPhone, chart: { title, current, lines, yTicks: niceTicks(seen), span, held } }
+}
+
+function trendView(trends: Trends, readings: Readings, span: Span): TrendView {
+  const dewChannels = Object.keys(trends.dewHeaters).sort()
+  const dewLabels = readings['box']?.['DEW_LABELS']?.values ?? {}
+  const dewLines = dewChannels.map(channel => trends.dewHeaters[channel] ?? [])
+  const twoDigits = shownWith(2)
+  const oneDigit = shownWith(1)
+  const whole = shownWith(0)
+
+  return {
+    span: [clock(span.from), clock(span.to)],
+    trends: [
+      chart('HFD px', [trends.hfd], twoDigits(trends.hfd), span, true),
+      chart('Stars', [trends.stars], whole(trends.stars), span, true),
+      chart('Guiding px RA / Dec', [trends.guideRa, trends.guideDec], `${twoDigits(trends.guideRa)} / ${twoDigits(trends.guideDec)}`, span, false),
+      chart('Temp °C air / focuser', [trends.airTemperature, trends.focuserTemperature], `${oneDigit(trends.airTemperature)} / ${oneDigit(trends.focuserTemperature)}`, span, false, true),
+      chart(`Dew heater % ${dewChannels.map(channel => String(dewLabels[channel] ?? channel)).join(' / ')}`.trim(), dewLines, dewLines.length === 0 ? unknown : dewLines.map(whole).join(' / '), span, false, true),
+      chart('Humidity %', [trends.humidity], whole(trends.humidity), span, false, true),
+    ],
+  }
+}
+
+function trendWindows(trends: Trends, readings: Readings, now: number): Readonly<Record<TrendWindowName, TrendView>> {
+  return {
+    hour: trendView(trends, readings, { from: now - hour, to: now }),
+    run: trendView(trends, readings, { from: trends.since ?? now - hour, to: now }),
+  }
 }
 
 export interface Live {
@@ -87,16 +135,18 @@ export interface Live {
   readonly readings: Readings
   readonly guiding: Guiding
   readonly now: number | undefined
+  readonly trends: Trends
 }
 
-export function liveCapturing({ run, frames, readings, guiding, now }: Live, placeholder: Capturing): Capturing {
-  if (run === undefined) return { ...placeholder, rig: rigLine(readings, guiding, now) }
+export function liveCapturing({ run, frames, readings, guiding, now, trends }: Live, placeholder: Capturing): Capturing {
+  const live = { ...placeholder, rig: rigLine(readings, guiding, now), trendWindows: now === undefined ? placeholder.trendWindows : trendWindows(trends, readings, now) }
+
+  if (run === undefined) return live
 
   const latest = latestMeasured(frames)
 
   return {
-    ...placeholder,
-    rig: rigLine(readings, guiding, now),
+    ...live,
     frame: run.frames,
     facts: [run.object, `${run.exposureSeconds} s`, `Since ${clock(run.startedAt)}`, run.count === undefined ? 'Until stopped' : `${run.count} frames`],
     latest: {

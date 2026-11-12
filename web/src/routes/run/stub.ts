@@ -2,6 +2,7 @@ import type { Band, ChartProps } from '../../components/Chart.tsx'
 import type { LogLine } from '../../components/Log.tsx'
 import type { Reading } from '../../components/Readings.tsx'
 import { drift } from '../../stub/series.ts'
+import type { TrendWindowName } from './TrendWindow.tsx'
 
 export interface Trend {
   readonly chart: Omit<ChartProps, 'xLabels'>
@@ -27,6 +28,10 @@ export interface Capturing {
   readonly latest: { readonly detail: string; readonly stats: ReadonlyArray<Reading> }
   readonly stack: { readonly detail: string; readonly counts: ReadonlyArray<Reading> }
   readonly handled: ReadonlyArray<LogLine>
+  readonly trendWindows: Readonly<Record<TrendWindowName, TrendView>>
+}
+
+export interface TrendView {
   readonly trends: ReadonlyArray<Trend>
   readonly span: readonly [string, string]
 }
@@ -217,8 +222,10 @@ export const capturing: Readonly<Record<'steady' | 'alert', Capturing>> = {
       { at: '20:53', text: 'First frames OK' },
       { at: '20:49', text: 'Slew and centre done' },
     ],
-    trends: steadyTrends,
-    span: ['20:53', '21:52'],
+    trendWindows: {
+      hour: { trends: steadyTrends, span: ['20:53', '21:52'] },
+      run: { trends: steadyTrends, span: ['20:53', '21:52'] },
+    },
   },
   alert: {
     frame: 57,
@@ -252,8 +259,10 @@ export const capturing: Readonly<Record<'steady' | 'alert', Capturing>> = {
       ],
     },
     handled: [],
-    trends: lostTrends,
-    span: ['20:53', '21:50'],
+    trendWindows: {
+      hour: { trends: lostTrends, span: ['20:53', '21:50'] },
+      run: { trends: lostTrends, span: ['20:53', '21:50'] },
+    },
   },
 }
 

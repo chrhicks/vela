@@ -10,6 +10,7 @@ import type { Picture } from '../rig/picture.ts'
 import type { Entry } from '../../state/entry.ts'
 import { readWireBody, recordOf } from '../stream/json.ts'
 import { errorNow, polarError, poleOf, referenceFrom, type PolarError, type Reference, type Solve } from './polar.ts'
+import { operationObjects } from '../../state/entries.ts'
 
 const Request = Schema.Struct({ exposureSeconds: Schema.Finite.check(Schema.isGreaterThan(0)) })
 
@@ -155,7 +156,7 @@ export function makeAlign({ picture, sender, capture, publish, settings, now }: 
         return undefined
       }
 
-      const started = capture.start({ object: 'polar-align', frameType: 'light', exposureSeconds: request.exposureSeconds, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between, ['solve'])
+      const started = capture.start({ object: operationObjects.align, frameType: 'light', exposureSeconds: request.exposureSeconds, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between, ['solve'])
 
       if (!started.ok) return started
 

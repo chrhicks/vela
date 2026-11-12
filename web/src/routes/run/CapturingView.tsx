@@ -15,7 +15,7 @@ import { StubSky } from '../../stub/StubSky.tsx'
 import layout from './layout.module.css'
 import type { Capturing } from './stub.ts'
 import { Trends } from './Trends.tsx'
-import { TrendWindow } from './TrendWindow.tsx'
+import { TrendWindow, type TrendWindowName } from './TrendWindow.tsx'
 
 interface CapturingViewProps {
   readonly run: Capturing
@@ -25,6 +25,7 @@ type Shown = 'latest' | 'stack'
 
 export function CapturingView({ run }: CapturingViewProps) {
   const [shown, setShown] = useState<Shown>('latest')
+  const [trendWindow, setTrendWindow] = useState<TrendWindowName>('hour')
 
   return (
     <Page width="wide">
@@ -100,11 +101,11 @@ export function CapturingView({ run }: CapturingViewProps) {
 
         <div className={layout.column}>
           <div className={layout.fifth}>
-            <TrendWindow />
+            <TrendWindow shown={trendWindow} onChoose={setTrendWindow} />
           </div>
 
           <div className={layout.fifth}>
-            <Trends trends={run.trends} span={run.span} />
+            <Trends {...run.trendWindows[trendWindow]} />
           </div>
         </div>
 

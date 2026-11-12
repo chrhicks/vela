@@ -9,6 +9,7 @@ import { angularDistance, fromMount, toMount, type EquatorialPosition } from '..
 import type { Entry } from '../../state/entry.ts'
 import { recordOf } from '../stream/json.ts'
 import type { Pointing } from './pointing.ts'
+import { operationObjects } from '../../state/entries.ts'
 
 const Request = Schema.Struct({ id: Schema.String, exposureSeconds: Schema.Finite.check(Schema.isGreaterThan(0)) })
 
@@ -217,7 +218,7 @@ export function makeCentre({ picture, pointing, capture, publish, settings, now 
         return undefined
       }
 
-      const started = capture.start({ object: 'centre', frameType: 'light', exposureSeconds: request.exposureSeconds, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between, ['solve'])
+      const started = capture.start({ object: operationObjects.centre, frameType: 'light', exposureSeconds: request.exposureSeconds, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between, ['solve'])
 
       if (!started.ok) return started
 
