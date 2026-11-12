@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { connected, indiserver, olderWire, phd2, phd2Link, startedAt, wire } from '../testing/entries.ts'
+import { connected, indiserver, phd2, phd2Link, startedAt, wire } from '../testing/entries.ts'
 import { makePicture } from './picture.ts'
 
 const t = (seconds: number) => startedAt + seconds * 1000
@@ -44,15 +44,7 @@ describe('picture', () => {
     expect(picture.property('box', 'POWER_SENSORS')).toBeUndefined()
   })
 
-  it('reads entries from before the run id and the control facts were added', () => {
-    const picture = makePicture()
-
-    picture.apply(olderWire(t(1), 'def', 'mount', 'TELESCOPE_PARK', { PARK: false, UNPARK: true }, 'Ok'), 0)
-
-    expect(picture.property('mount', 'TELESCOPE_PARK')?.values).toEqual({ PARK: false, UNPARK: true })
-  })
-
-  it('forgets everything at the next rig connection, and ignores entries of an older run', () => {
+  it('forgets everything at the next rig connection', () => {
     const picture = makePicture()
 
     picture.apply(connected(t(0), 1, 'run-a'), 0)
@@ -61,10 +53,6 @@ describe('picture', () => {
 
     expect(picture.property('mount', 'TELESCOPE_PARK')).toBeUndefined()
     expect(picture.rig()).toMatchObject({ at: t(10), run: 'run-b', connection: 2 })
-
-    picture.apply(wire(t(11), 'set', 'mount', 'TELESCOPE_PARK', { PARK: false }, 'Ok'), 0)
-
-    expect(picture.property('mount', 'TELESCOPE_PARK')).toBeUndefined()
   })
 
   it('forgets the devices when the rig loses indiserver', () => {
@@ -128,7 +116,7 @@ describe('picture', () => {
     const picture = makePicture()
 
     picture.apply(wire(t(1), 'def', 'mount', 'TELESCOPE_PARK', { PARK: true }, 'Ok'), 111)
-    picture.apply({ id: '', kind: 'system', at: 1, run: undefined, body: {} }, 222)
+    picture.apply({ seq: 0, kind: 'system', at: 1, body: {} }, 222)
 
     expect(picture.heardAt()).toBe(111)
   })

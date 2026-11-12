@@ -1,11 +1,17 @@
 export type Value = number | boolean | string
 
 export interface Entry {
-  readonly id: string
+  readonly seq: number
   readonly kind: string
   readonly at: number
-  readonly run: string | undefined
   readonly body: unknown
+}
+
+export interface Message {
+  readonly seq: number
+  readonly subject: string
+  readonly time: number
+  readonly text: string
 }
 
 export interface WireBody {
@@ -25,30 +31,62 @@ export interface Limits {
 
 type JsonRecord = Readonly<Record<string, unknown>>
 
+const commandSubjectPrefix = 'rig-dev.command.'
+
+export const commandSubject = (device: string) => `${commandSubjectPrefix}${device}`
+
 export function recordOf(value: unknown): JsonRecord | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as JsonRecord) : undefined
 }
 
-export function readEntry(text: string): Entry | undefined {
-  let parsed: unknown
+export function textOf(record: JsonRecord, name: string): string | undefined {
+  const value = record[name]
 
+  return typeof value === 'string' ? value : undefined
+}
+
+export function numberOf(record: JsonRecord, name: string): number | undefined {
+  const value = record[name]
+
+  return typeof value === 'number' ? value : undefined
+}
+
+function parseRecord(text: string): JsonRecord | undefined {
   try {
-    parsed = JSON.parse(text)
+    return recordOf(JSON.parse(text))
   } catch {
     return undefined
   }
+}
 
-  const entry = recordOf(parsed)
+function commandDevice(subject: string): string | undefined {
+  return subject.startsWith(commandSubjectPrefix) ? subject.slice(commandSubjectPrefix.length) : undefined
+}
 
-  if (entry === undefined || typeof entry['kind'] !== 'string' || typeof entry['at'] !== 'number') return undefined
+function readEntry(seq: number, text: string): Entry | undefined {
+  const entry = parseRecord(text)
+  const kind = entry === undefined ? undefined : textOf(entry, 'kind')
+  const at = entry === undefined ? undefined : numberOf(entry, 'at')
 
-  return {
-    id: typeof entry['id'] === 'string' ? entry['id'] : '',
-    kind: entry['kind'],
-    at: entry['at'],
-    run: typeof entry['run'] === 'string' ? entry['run'] : undefined,
-    body: entry['body'],
-  }
+  if (entry === undefined || kind === undefined || at === undefined) return undefined
+
+  return { seq, kind, at, body: entry['body'] }
+}
+
+function readCommand(seq: number, device: string, at: number, text: string): Entry | undefined {
+  const request = parseRecord(text)
+
+  if (request === undefined) return undefined
+
+  return { seq, kind: 'command', at, body: { ...request, device } }
+}
+
+export function readMessage({ seq, subject, time, text }: Message): Entry | undefined {
+  const device = commandDevice(subject)
+
+  if (device === undefined) return readEntry(seq, text)
+
+  return readCommand(seq, device, time, text)
 }
 
 export function readWireBody(body: unknown): WireBody | undefined {

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { Entry } from '../stream/entry.ts'
+import type { Entry } from '../../state/entry.ts'
 import { makeActivity } from './activity.ts'
 
 const titles = { primary: 'Main camera', mount: 'Mount', focuser: 'Focuser' }
 const nightOf = (at: number) => (at < 1000 ? '2026-11-07' : '2026-11-08')
 
 function entry(kind: string, body: unknown, at = 10): Entry {
-  return { id: `${kind}:${at}`, kind, at, run: undefined, body }
+  return { seq: 0, kind, at, body }
 }
 
 const message = (device: string, text: string, at = 10) => entry('wire', { dir: 'in', device, type: 'message', text }, at)

@@ -7,7 +7,7 @@ import type { Card } from '../frames/fits.ts'
 import type { Measured, Measurement } from '../measure/rig.ts'
 import { siteOf, type Site } from '../pointing/target.ts'
 import type { Picture } from '../rig/picture.ts'
-import { readWireBody, recordOf, type Entry } from '../stream/entry.ts'
+import { readWireBody, recordOf, type Entry } from '../../state/entry.ts'
 import { errorNow, polarError, poleOf, referenceFrom, type PolarError, type Reference, type Solve } from './polar.ts'
 
 export const alignSubject = 'rig-dev.vela.align'

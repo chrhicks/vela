@@ -1,6 +1,6 @@
 import { SiderealTime } from 'astronomy-engine'
 import { describe, expect, it } from 'vitest'
-import { connected, indiserver, inRun, phd2, phd2Link, phoenixLongitude, startedAt, wire } from '../testing/entries.ts'
+import { connected, indiserver, phd2, phd2Link, phoenixLongitude, startedAt, wire } from '../testing/entries.ts'
 import { formatDec, formatRa, makeNight, type DeviceView, type Night } from './night.ts'
 import { makePicture, type Picture } from './picture.ts'
 
@@ -115,7 +115,7 @@ describe('night', () => {
     const picture = rigWithAll()
 
     picture.apply(connected(t(20), 2, 'run-b'), t(20))
-    picture.apply(inRun(wire(t(21), 'def', 'mount', 'TELESCOPE_TRACK_STATE', { TRACK_ON: false, TRACK_OFF: true }, 'Ok'), 'run-b'), t(21))
+    picture.apply(wire(t(21), 'def', 'mount', 'TELESCOPE_TRACK_STATE', { TRACK_ON: false, TRACK_OFF: true }, 'Ok'), t(21))
 
     const night = makeNight(picture, settings, t(22))
     const mount = deviceOf(night, 'mount')

@@ -1,4 +1,4 @@
-import { readWireBody, recordOf, type Entry, type Limits, type Value } from '../stream/entry.ts'
+import { readWireBody, recordOf, type Entry, type Limits, type Value } from '../../state/entry.ts'
 
 export interface Property {
   readonly state: string | undefined
@@ -108,7 +108,7 @@ export function makePicture() {
       phd2 = { link: 'unknown', state: undefined, changedAt: undefined, lastStepAt: undefined }
       rig = {
         at: entry.at,
-        run: typeof body['run'] === 'string' ? body['run'] : entry.run,
+        run: typeof body['run'] === 'string' ? body['run'] : undefined,
         connection: typeof body['connection'] === 'number' ? body['connection'] : undefined,
         version: typeof body['version'] === 'string' ? body['version'] : undefined,
       }
@@ -154,7 +154,6 @@ export function makePicture() {
   return {
     apply(entry: Entry, receivedAt: number) {
       if (entry.kind.startsWith('client.')) applyClient(entry)
-      else if (rig !== undefined && entry.run !== undefined && rig.run !== undefined && entry.run !== rig.run) return
       else if (entry.kind === 'wire') applyWire(entry)
       else if (entry.kind.startsWith('phd2.')) applyPhd2(entry)
       else return

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeMeasureRequests, measuredOf, measureSubject } from './rig.ts'
 
-const answer = (body: Record<string, unknown>) => ({ id: 'client:1', kind: 'client.measure', at: 1, run: 'rig-run', body })
+const answer = (body: Record<string, unknown>) => ({ seq: 0, kind: 'client.measure', at: 1, body })
 
 describe("asking the rig program to measure a frame, and reading its answer", () => {
   it('asks to measure and remove one frame', () => {
@@ -32,6 +32,6 @@ describe("asking the rig program to measure a frame, and reading its answer", ()
   it('ignores answers to other programs, a frame that could not be removed, and other entries', () => {
     expect(measuredOf(answer({ by: 'observer', file: 'a_001.fits', result: 'measured', header: {} }), 'vela')).toBeUndefined()
     expect(measuredOf(answer({ by: 'vela', file: 'a_001.fits', result: 'not removed', reason: 'EACCES' }), 'vela')).toBeUndefined()
-    expect(measuredOf({ id: 'x', kind: 'client.command', at: 1, run: 'r', body: { by: 'vela', file: 'a_001.fits', result: 'measured' } }, 'vela')).toBeUndefined()
+    expect(measuredOf({ seq: 0, kind: 'client.command', at: 1, body: { by: 'vela', file: 'a_001.fits', result: 'measured' } }, 'vela')).toBeUndefined()
   })
 })

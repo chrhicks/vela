@@ -1,4 +1,4 @@
-import { recordOf, type Entry } from '../stream/entry.ts'
+import { recordOf, type Entry } from '../../state/entry.ts'
 
 export const measureSubject = 'rig-dev.command.measure'
 

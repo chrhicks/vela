@@ -1,6 +1,4 @@
-import { recordOf, type Entry, type Value } from '../stream/entry.ts'
-
-export const commandSubject = (device: string) => `rig-dev.command.${device}`
+import { commandSubject, recordOf, type Entry, type Value } from '../../state/entry.ts'
 
 export const answerKind = 'client.command'
 

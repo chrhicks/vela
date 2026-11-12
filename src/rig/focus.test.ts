@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { Entry } from '../stream/entry.ts'
+import type { Entry } from '../../state/entry.ts'
 import { makeFocusDrift } from './focus.ts'
 
 function wire(at: number, type: string, property: string, elements: Record<string, number>, state = 'Ok', device = 'focuser'): Entry {
-  return { id: `w${at}`, kind: 'wire', at, run: undefined, body: { dir: 'in', device, type, property, state, elements } }
+  return { seq: 0, kind: 'wire', at, body: { dir: 'in', device, type, property, state, elements } }
 }
 
 describe('focus drift', () => {
@@ -31,7 +31,7 @@ describe('focus drift', () => {
     drift.observe(wire(3, 'set', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 31000 }))
     expect(drift.view().focused?.position).toBe(31000)
 
-    drift.observe({ id: 'c', kind: 'client.connected', at: 4, run: undefined, body: {} })
+    drift.observe({ seq: 0, kind: 'client.connected', at: 4, body: {} })
     expect(drift.view()).toEqual({ now: undefined, focused: undefined })
   })
 

@@ -6,7 +6,7 @@ import type { Measured, Measurement } from '../measure/rig.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
 import type { Picture } from '../rig/picture.ts'
 import { angularDistance, fromMount, toMount, type EquatorialPosition } from '../sky/coordinates.ts'
-import { recordOf, type Entry } from '../stream/entry.ts'
+import { recordOf, type Entry } from '../../state/entry.ts'
 import type { Pointing } from './pointing.ts'
 
 export const centreSubject = 'rig-dev.vela.centre'

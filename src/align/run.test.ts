@@ -19,7 +19,7 @@ function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopA
   const events: string[] = []
   const holder = { align: undefined as ReturnType<typeof makeAlign> | undefined }
   let at = startedAt + 1000
-  const feed = (kind: string, body: Record<string, unknown>) => holder.align?.observe({ id: `${kind}:${(at += 1)}`, kind, at, run: undefined, body })
+  const feed = (kind: string, body: Record<string, unknown>) => holder.align?.observe({ seq: (at += 1), kind, at, body })
   const camera = fakeCamera({
     onEvent: event => {
       if (event.kind === 'exposed') {

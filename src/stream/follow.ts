@@ -1,17 +1,16 @@
-import { DeliverPolicy, jetstream } from '@nats-io/jetstream'
+import { DeliverPolicy, jetstream, type JsMsg } from '@nats-io/jetstream'
 import { connect, type NatsConnection } from '@nats-io/transport-node'
+import type { Message } from '../../state/entry.ts'
 import type { BrokerSettings } from './broker.ts'
 import { clientSubject, followedSubjects, makeConnectionFinder, streamName } from './connection.ts'
-
-export interface Message {
-  readonly seq: number
-  readonly subject: string
-  readonly text: string
-}
 
 export interface Following {
   readonly connection: NatsConnection
   readonly done: Promise<void>
+}
+
+function messageOf(message: JsMsg): Message {
+  return { seq: message.seq, subject: message.subject, time: Number(message.timestampNanos / 1_000_000n), text: message.string() }
 }
 
 export async function followRig(options: {
@@ -32,7 +31,7 @@ export async function followRig(options: {
     const messages = await consumer.consume({ max_messages: options.readBatch })
 
     for await (const message of messages) {
-      finder.take(message.seq, message.string())
+      finder.take(messageOf(message))
       if (message.info.pending === 0) {
         void messages.stop()
         break
@@ -55,7 +54,7 @@ export async function followRig(options: {
     const messages = await consumer.consume({ max_messages: options.readBatch })
 
     for await (const message of messages) {
-      options.onMessage({ seq: message.seq, subject: message.subject, text: message.string() })
+      options.onMessage(messageOf(message))
       if (!caught && message.info.pending === 0) {
         caught = true
         options.onCaughtUp()

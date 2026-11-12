@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fromMount } from '../sky/coordinates.ts'
-import type { Entry } from '../stream/entry.ts'
+import type { Entry } from '../../state/entry.ts'
 import { fakeCamera } from '../testing/camera.ts'
 import { phoenixLongitude, startedAt, wire } from '../testing/entries.ts'
 import { makeCentre } from './centre.ts'
@@ -36,7 +36,7 @@ function scriptedMount(options: { errorDegrees: number; unsolved?: ReadonlyArray
           holder.centre?.measured({ file, result: 'measured', solve, stars: undefined, header: { 'DATE-OBS': new Date(startedAt).toISOString().slice(0, 23), EXPTIME: 0 } })
         }, 2)
       }
-      feedAll({ id: `vela.run.${event.kind}:${(at += 1)}`, kind: `vela.run.${event.kind}`, at, run: undefined, body: { run: event.run, ...event.body } })
+      feedAll({ seq: 0, kind: `vela.run.${event.kind}`, at, body: { run: event.run, ...event.body } })
     },
   })
 
@@ -94,7 +94,7 @@ function scriptedMount(options: { errorDegrees: number; unsolved?: ReadonlyArray
     capture: camera.capture,
     publish: (kind, body) => {
       published.push({ kind, body: { ...body } })
-      feedAll({ id: `vela.centre.${kind}:${(at += 1)}`, kind: `vela.centre.${kind}`, at, run: undefined, body })
+      feedAll({ seq: 0, kind: `vela.centre.${kind}`, at, body })
     },
     settings: { mount: 'primary', camera: 'primary', toleranceArcmin: options.toleranceArcmin ?? 1 },
     now: () => startedAt,
