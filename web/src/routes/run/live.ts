@@ -108,9 +108,8 @@ function chart(title: string, lines: ReadonlyArray<ReadonlyArray<Point>>, curren
   return { onPhone, chart: { title, current, lines, yTicks: niceTicks(seen), span, held } }
 }
 
-function trendView(trends: Trends, readings: Readings, span: Span): TrendView {
+function trendView(trends: Trends, span: Span): TrendView {
   const dewChannels = Object.keys(trends.dewHeaters).sort()
-  const dewLabels = readings['box']?.['DEW_LABELS']?.values ?? {}
   const dewLines = dewChannels.map(channel => trends.dewHeaters[channel] ?? [])
   const twoDigits = shownWith(2)
   const oneDigit = shownWith(1)
@@ -123,16 +122,16 @@ function trendView(trends: Trends, readings: Readings, span: Span): TrendView {
       chart('Stars', [trends.stars], whole(trends.stars), span, true),
       chart('Guiding px RA / Dec', [trends.guideRa, trends.guideDec], `${twoDigits(trends.guideRa)} / ${twoDigits(trends.guideDec)}`, span, false),
       chart('Temp °C air / focuser', [trends.airTemperature, trends.focuserTemperature], `${oneDigit(trends.airTemperature)} / ${oneDigit(trends.focuserTemperature)}`, span, false, true),
-      chart(`Dew heater % ${dewChannels.map(channel => String(dewLabels[channel] ?? channel)).join(' / ')}`.trim(), dewLines, dewLines.length === 0 ? unknown : dewLines.map(whole).join(' / '), span, false, true),
+      chart('Dew heater %', dewLines, dewLines.length === 0 ? unknown : dewLines.map(whole).join(' / '), span, false, true),
       chart('Humidity %', [trends.humidity], whole(trends.humidity), span, false, true),
     ],
   }
 }
 
-function trendWindows(trends: Trends, readings: Readings, now: number): Readonly<Record<TrendWindowName, TrendView>> {
+function trendWindows(trends: Trends, now: number): Readonly<Record<TrendWindowName, TrendView>> {
   return {
-    hour: trendView(trends, readings, { from: now - hour, to: now }),
-    run: trendView(trends, readings, { from: trends.since ?? now - hour, to: now }),
+    hour: trendView(trends, { from: now - hour, to: now }),
+    run: trendView(trends, { from: trends.since ?? now - hour, to: now }),
   }
 }
 
@@ -146,7 +145,7 @@ export interface Live {
 }
 
 export function liveCapturing({ run, frames, readings, guiding, now, trends }: Live, placeholder: Capturing): Capturing {
-  const live = { ...placeholder, rig: rigLine(readings, guiding, now), trendWindows: now === undefined ? placeholder.trendWindows : trendWindows(trends, readings, now) }
+  const live = { ...placeholder, rig: rigLine(readings, guiding, now), trendWindows: now === undefined ? placeholder.trendWindows : trendWindows(trends, now) }
 
   if (run === undefined) return live
 

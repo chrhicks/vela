@@ -1,6 +1,11 @@
 .window {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--gap-fact);
+  gap: var(--gap-row) var(--gap-fact);
+}
+
+.choices {
+  flex: none;
 }

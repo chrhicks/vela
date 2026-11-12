@@ -15,15 +15,17 @@ export function TrendWindow({ shown, onChoose }: TrendWindowProps) {
     <div className={styles.window}>
       <Caption>Trends</Caption>
 
-      <Choices
-        name="Trend window"
-        choices={[
-          { value: 'hour', label: 'Last hour' },
-          { value: 'run', label: 'Whole run' },
-        ]}
-        chosen={shown}
-        onChoose={onChoose}
-      />
+      <div className={styles.choices}>
+        <Choices
+          name="Trend window"
+          choices={[
+            { value: 'hour', label: 'Last hour' },
+            { value: 'run', label: 'Whole run' },
+          ]}
+          chosen={shown}
+          onChoose={onChoose}
+        />
+      </div>
     </div>
   )
 }
