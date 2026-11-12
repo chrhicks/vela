@@ -1,3 +1,5 @@
+import { Match } from 'effect'
+import { flip, type Flip } from '../../../../state/flip.ts'
 import type { Frame } from '../../../../state/frames.ts'
 import type { GuiderActivity, Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type MountActivity, type Readings } from '../../../../state/readings.ts'
@@ -47,7 +49,23 @@ function guidingWord({ link, activity, averagePixels }: Guiding): string {
   return guiderWords[activity]
 }
 
-function rigLine(readings: Readings, guiding: Guiding): ReadonlyArray<Reading> {
+function duration(seconds: number): string {
+  const minutes = Math.round(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+
+  return hours === 0 ? `${minutes} min` : `${hours} h ${String(minutes % 60).padStart(2, '0')}`
+}
+
+const flipWord = (time: Flip): string =>
+  Match.valueTags(time, {
+    Unknown: () => unknown,
+    NotTracking: () => 'Not tracking',
+    NoneThisSide: () => 'None',
+    In: ({ seconds }) => `In ${duration(seconds)}`,
+    Past: ({ seconds }) => `Past ${duration(seconds)}`,
+  })
+
+function rigLine(readings: Readings, guiding: Guiding, now: number | undefined): ReadonlyArray<Reading> {
   const activity = mountActivity(readings)
   const sensor = sensorCelsius(readings)
   const focus = focusPosition(readings)
@@ -59,7 +77,7 @@ function rigLine(readings: Readings, guiding: Guiding): ReadonlyArray<Reading> {
     { label: 'Sensor', value: sensor === undefined ? unknown : `${sensor.toFixed(1)} °C` },
     { label: 'Focus', value: focus === undefined ? unknown : `${focus}` },
     { label: 'Dew', value: heaters.length === 0 ? unknown : `${heaters.map(heater => heater.percent).join(' / ')} %` },
-    { label: 'Flip', value: unknown },
+    { label: 'Flip', value: flipWord(flip(readings, now)) },
   ]
 }
 
@@ -68,16 +86,17 @@ export interface Live {
   readonly frames: ReadonlyArray<Frame>
   readonly readings: Readings
   readonly guiding: Guiding
+  readonly now: number | undefined
 }
 
-export function liveCapturing({ run, frames, readings, guiding }: Live, placeholder: Capturing): Capturing {
-  if (run === undefined) return { ...placeholder, rig: rigLine(readings, guiding) }
+export function liveCapturing({ run, frames, readings, guiding, now }: Live, placeholder: Capturing): Capturing {
+  if (run === undefined) return { ...placeholder, rig: rigLine(readings, guiding, now) }
 
   const latest = latestMeasured(frames)
 
   return {
     ...placeholder,
-    rig: rigLine(readings, guiding),
+    rig: rigLine(readings, guiding, now),
     frame: run.frames,
     facts: [run.object, `${run.exposureSeconds} s`, `Since ${clock(run.startedAt)}`, run.count === undefined ? 'Until stopped' : `${run.count} frames`],
     latest: {
