@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router'
 
-import { useRig } from '../../rig/store.ts'
+import { useLink, useRig } from '../../rig/store.ts'
 import { useScene } from '../../stub/useScene.ts'
 import { CapturingView } from './CapturingView.tsx'
 import { IdleView } from './IdleView.tsx'
@@ -16,6 +16,7 @@ export function RunPage() {
   const frames = useRig(rig => rig.frames)
   const readings = useRig(rig => rig.readings)
   const guiding = useRig(rig => rig.guiding)
+  const now = useLink().beat?.at
   const asked = useScene(['idle', 'ready', 'starting', 'capturing', 'alert', 'over'])
   const scene = !search.has('scene') && run?.status === 'capturing' ? 'capturing' : asked
 
@@ -27,7 +28,7 @@ export function RunPage() {
     case 'starting':
       return <StartingView />
     case 'capturing':
-      return <CapturingView run={liveCapturing({ run, frames, readings, guiding }, capturing.steady)} />
+      return <CapturingView run={liveCapturing({ run, frames, readings, guiding, now }, capturing.steady)} />
     case 'alert':
       return <CapturingView run={capturing.alert} />
     case 'over':
