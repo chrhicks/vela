@@ -51,6 +51,19 @@ export const FrameSettings = Schema.Struct({
   ),
 })
 
+export const FeedConfig = Schema.Struct({
+  port: described(
+    "Local port the web app's event stream is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve. Its own port, apart from the night page's, so each server can go without the other",
+    Schema.Number,
+    8796,
+  ),
+  heartbeatSeconds: described(
+    "How often the event stream sends the service's clock, so a page can tell a quiet rig from a lost connection and age readings by one clock. Not measured: 5 s lets a page see a dropped connection within seconds for 12 small messages a minute",
+    Schema.Number,
+    5,
+  ),
+})
+
 export const CaptureSettings = Schema.Struct({
   runFile: Schema.String.annotate({
     description: 'A small file naming the run in progress, written when a run starts and removed when it ends. A run found in it at start is marked interrupted: Vela never resumes a run. Put it on this machine\'s state directory, not a temporary one, so a reboot during a run still shows',
@@ -177,6 +190,7 @@ export const VelaSettings = Schema.Struct({
     Schema.Number,
     1,
   ),
+  feed: described('The event stream the web app reads: the state first, then each wanted entry, and a heartbeat', FeedConfig, {}),
   frames: FrameSettings,
   capture: CaptureSettings,
   prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),
