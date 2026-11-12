@@ -1,14 +1,16 @@
-import { Option, Result } from 'effect'
+import { Option, Result, Schema } from 'effect'
 import { readRigEntry, type MalformedEntry, type RigEntry } from './entries.ts'
-import type { Entry, StreamPosition } from './entry.ts'
-import { frames, type Frame } from './frames.ts'
-import { run, type Run } from './run.ts'
+import { StreamPosition, type Entry } from './entry.ts'
+import { Frame, frames } from './frames.ts'
+import { Run, run } from './run.ts'
 
-export interface RigState {
-  readonly position: StreamPosition | undefined
-  readonly run: Run | undefined
-  readonly frames: ReadonlyArray<Frame>
-}
+export const RigState = Schema.Struct({
+  position: Schema.optional(StreamPosition),
+  run: Schema.optional(Run),
+  frames: Schema.Array(Frame),
+})
+
+export type RigState = typeof RigState.Type
 
 export const emptyRig: RigState = { position: undefined, run: undefined, frames: [] }
 

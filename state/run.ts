@@ -1,19 +1,23 @@
-import type { RigEntry, RunEnding, RunId } from './entries.ts'
+import { Schema } from 'effect'
+import { RunEnding, RunId, type RigEntry } from './entries.ts'
 
-interface RunFacts {
-  readonly id: RunId
-  readonly object: string
-  readonly frameType: string
-  readonly exposureSeconds: number
-  readonly count: number | undefined
-  readonly startedAt: number
-  readonly frames: number
-  readonly failures: number
+const runFacts = {
+  id: RunId,
+  object: Schema.String,
+  frameType: Schema.String,
+  exposureSeconds: Schema.Number,
+  count: Schema.optional(Schema.Number),
+  startedAt: Schema.Number,
+  frames: Schema.Number,
+  failures: Schema.Number,
 }
 
-export type Run =
-  | (RunFacts & { readonly status: 'capturing' })
-  | (RunFacts & { readonly status: 'ended'; readonly endedAt: number; readonly reason: RunEnding })
+export const Run = Schema.Union([
+  Schema.Struct({ status: Schema.Literal('capturing'), ...runFacts }),
+  Schema.Struct({ status: Schema.Literal('ended'), ...runFacts, endedAt: Schema.Number, reason: RunEnding }),
+])
+
+export type Run = typeof Run.Type
 
 export function run(state: Run | undefined, entry: RigEntry): Run | undefined {
   if (entry.kind === 'vela.run.started') {

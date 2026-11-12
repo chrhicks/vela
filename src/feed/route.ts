@@ -4,6 +4,7 @@ import { Clock, Context, Duration, Effect, Layer, Stream } from 'effect'
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from 'effect/http'
 import type { FeedConfig } from '../settings.ts'
 import { Feed } from './feed.ts'
+import { feedEvent, feedPath } from '../../state/feed.ts'
 import { ServiceStart } from './start.ts'
 
 export class FeedSettings extends Context.Service<FeedSettings, typeof FeedConfig.Type>()('vela/FeedSettings') {}
@@ -17,7 +18,7 @@ const feedEvents = Effect.gen(function* () {
 
   const heartbeats = Stream.tick(Duration.seconds(heartbeatSeconds)).pipe(
     Stream.mapEffect(() => Clock.currentTimeMillis),
-    Stream.map(at => event('heartbeat', { at })),
+    Stream.map(at => event(feedEvent.heartbeat, { at })),
   )
 
   return Stream.unwrap(
@@ -25,14 +26,14 @@ const feedEvents = Effect.gen(function* () {
       const { state, entries } = yield* feed.follow
       const at = yield* Clock.currentTimeMillis
 
-      return Stream.concat(Stream.succeed(event('state', { token, at, state })), Stream.merge(entries.pipe(Stream.map(entry => event('entry', entry))), heartbeats))
+      return Stream.concat(Stream.succeed(event(feedEvent.state, { token, at, state })), Stream.merge(entries.pipe(Stream.map(entry => event(feedEvent.entry, entry))), heartbeats))
     }),
   )
 })
 
 export const FeedRoute = HttpRouter.add(
   'GET',
-  '/feed',
+  feedPath,
   Effect.map(feedEvents, events => HttpServerResponse.stream(Stream.encodeText(events), { contentType: 'text/event-stream', headers: { 'cache-control': 'no-store' } })),
 )
 
