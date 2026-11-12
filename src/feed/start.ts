@@ -1,8 +1,5 @@
-import { Clock, Context, Effect, Layer, Schema } from 'effect'
-
-export const StartToken = Schema.String.pipe(Schema.brand('StartToken'))
-
-export type StartToken = typeof StartToken.Type
+import { Clock, Context, Effect, Layer } from 'effect'
+import { StartToken } from '../../state/feed.ts'
 
 export class ServiceStart extends Context.Service<ServiceStart, { readonly token: StartToken }>()('vela/ServiceStart') {}
 

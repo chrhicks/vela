@@ -1,19 +1,24 @@
-import type { FrameFile, NightName, RigEntry } from './entries.ts'
+import { Schema } from 'effect'
+import { FrameFile, NightName, type RigEntry } from './entries.ts'
 
-export interface Measurements {
-  readonly stars: number | null
-  readonly hfdPixels: number | null
-  readonly elongation: number | null
-  readonly sky: number
-  readonly noise: number
-}
+export const Measurements = Schema.Struct({
+  stars: Schema.NullOr(Schema.Number),
+  hfdPixels: Schema.NullOr(Schema.Number),
+  elongation: Schema.NullOr(Schema.Number),
+  sky: Schema.Number,
+  noise: Schema.Number,
+})
 
-export interface Frame {
-  readonly night: NightName
-  readonly file: FrameFile
-  readonly keptAt: number
-  readonly measurements: Measurements | undefined
-}
+export type Measurements = typeof Measurements.Type
+
+export const Frame = Schema.Struct({
+  night: NightName,
+  file: FrameFile,
+  keptAt: Schema.Number,
+  measurements: Schema.optional(Measurements),
+})
+
+export type Frame = typeof Frame.Type
 
 const sameFrame = (night: NightName, file: FrameFile) => (frame: Frame) => frame.night === night && frame.file === file
 

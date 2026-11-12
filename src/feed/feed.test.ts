@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest'
 import { entry, frameKept, runStarted, wire } from '../../state/testing.ts'
 import { Feed, FeedLive } from './feed.ts'
 import { FeedRoute, FeedServer, FeedSettings } from './route.ts'
-import { ServiceStart, StartToken } from './start.ts'
+import { StartToken } from '../../state/feed.ts'
+import { ServiceStart } from './start.ts'
 
 const makeFeed = () => Effect.runPromise(Feed.pipe(Effect.provide(FeedLive)))
 
