@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { entry, frameKept, runStarted, wire } from '../../state/testing.ts'
 import { Feed, FeedLive } from './feed.ts'
 import { FeedRoute, FeedServer, FeedSettings } from './route.ts'
-import { ServiceVersion } from './version.ts'
+import { Commit, ServiceVersion } from './version.ts'
 
 const makeFeed = () => Effect.runPromise(Feed.pipe(Effect.provide(FeedLive)))
 
@@ -63,7 +63,7 @@ describe('GET /feed', () => {
 
     await Effect.runPromise(feed.take(runStarted('r1', 1000)))
 
-    const services = Context.make(Feed, feed).pipe(Context.add(ServiceVersion, { commit: 'abc1234' }), Context.add(FeedSettings, { host: '127.0.0.1', port: 0, heartbeatSeconds: 0.05 }))
+    const services = Context.make(Feed, feed).pipe(Context.add(ServiceVersion, { commit: Commit.make('abc1234') }), Context.add(FeedSettings, { host: '127.0.0.1', port: 0, heartbeatSeconds: 0.05 }))
     const { handler, dispose } = HttpRouter.toWebHandler(FeedRoute, { disableLogger: true })
     const abort = new AbortController()
     const response = await handler(new Request('http://localhost/feed', { signal: abort.signal }), services)
@@ -97,7 +97,7 @@ describe('starting the event stream', () => {
     const port = typeof address === 'object' && address !== null ? address.port : 0
     const app = FeedServer.pipe(
       Layer.provideMerge(FeedLive),
-      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceVersion, { commit: 'abc1234' }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port, heartbeatSeconds: 5 }))),
+      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceVersion, { commit: Commit.make('abc1234') }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port, heartbeatSeconds: 5 }))),
     )
     const error = await Effect.runPromise(Effect.scoped(Effect.flip(Layer.build(app))))
 

@@ -69,7 +69,7 @@ export function makePicture() {
   }
 
   function applyWire(entry: Entry) {
-    const wire = readWireBody(entry.body)
+    const wire = readWireBody(entry)
 
     if (wire === undefined || wire.device === 'server' || wire.device === 'other') return
 

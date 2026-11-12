@@ -362,7 +362,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
       const watch = run?.watch
 
       if (run !== undefined && watch !== undefined) {
-        const wire = readWireBody(entry.body)
+        const wire = readWireBody(entry)
 
         if (entry.kind === 'wire' && wire?.dir === 'in' && wire.device === settings.device) {
           if (wire.property === 'CCD_EXPOSURE') {

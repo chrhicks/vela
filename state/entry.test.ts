@@ -1,6 +1,7 @@
-import { Option, Result } from 'effect'
+import { Result } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { decodeWireBody, makeReader } from './entry.ts'
+import { makeReader, readWire } from './entry.ts'
+import { entry } from './testing.ts'
 import { Environment, streamOf } from './stream.ts'
 
 const stream = streamOf(Environment.make('test'))
@@ -47,19 +48,24 @@ describe('streamOf', () => {
   })
 })
 
-describe('decodeWireBody', () => {
+describe('readWire', () => {
   it('keeps the elements that are numbers, switches or text and drops the rest', () => {
-    const wire = decodeWireBody({ dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x', D: null, E: { nested: 1 } }, perm: 'rw', numbers: { A: { min: 0, max: 1, step: 1, format: '%g' } } })
+    const wire = readWire(entry('wire', 0, { dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x', D: null, E: { nested: 1 } }, perm: 'rw', numbers: { A: { min: 0, max: 1, step: 1, format: '%g' } } }))
 
-    expect(wire).toEqual(Option.some({ dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x' }, numbers: { A: { min: 0, max: 1 } } }))
+    expect(Result.getOrThrow(wire)).toEqual({ dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x' }, numbers: { A: { min: 0, max: 1 } } })
   })
 
   it('gives a body without elements or limits empty ones', () => {
-    expect(decodeWireBody({ dir: 'in', device: 'box', type: 'del' })).toEqual(Option.some({ dir: 'in', device: 'box', type: 'del', elements: {}, numbers: {} }))
+    expect(Result.getOrThrow(readWire(entry('wire', 0, { dir: 'in', device: 'box', type: 'del' })))).toEqual({ dir: 'in', device: 'box', type: 'del', elements: {}, numbers: {} })
   })
 
-  it('refuses a body without a direction or device', () => {
-    expect(decodeWireBody({ device: 'mount', type: 'set' })).toEqual(Option.none())
-    expect(decodeWireBody('text')).toEqual(Option.none())
+  it('fails with a typed MalformedReading, with its position, for a body without a direction or device', () => {
+    const missing = entry('wire', 0, { device: 'mount', type: 'set' })
+
+    for (const source of [missing, entry('wire', 0, 'text')]) {
+      const read = readWire(source)
+
+      expect(Result.isFailure(read) && read.failure).toMatchObject({ _tag: 'MalformedReading', seq: source.seq })
+    }
   })
 })

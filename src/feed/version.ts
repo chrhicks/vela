@@ -1,17 +1,24 @@
-import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-import { Context, Data, Effect, Layer } from 'effect'
+import { Context, Data, Effect, Layer, Schema } from 'effect'
+import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 
-export class VersionUnknown extends Data.TaggedError('VersionUnknown')<{ readonly checkout: string; readonly issue: string }> {}
+export const Commit = Schema.String.check(Schema.isPattern(/^[0-9a-f]{7,40}$/)).pipe(Schema.brand('Commit'))
 
-export class ServiceVersion extends Context.Service<ServiceVersion, { readonly commit: string }>()('vela/ServiceVersion') {}
+export type Commit = typeof Commit.Type
 
-const checkout = fileURLToPath(new URL('../../', import.meta.url))
+export class VersionUnknown extends Data.TaggedError('VersionUnknown')<{ readonly checkout: string; readonly output: string }> {}
 
-export const ServiceVersionFromCheckout = Layer.effect(
-  ServiceVersion,
-  Effect.try({
-    try: () => ({ commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: checkout, encoding: 'utf8' }).trim() }),
-    catch: error => new VersionUnknown({ checkout, issue: String(error) }),
-  }),
-)
+export class ServiceVersion extends Context.Service<ServiceVersion, { readonly commit: Commit }>()('vela/ServiceVersion') {}
+
+const decodeCommit = Schema.decodeUnknownEffect(Commit)
+
+export const serviceVersionOf = (checkout: string) =>
+  Layer.effect(
+    ServiceVersion,
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const output = (yield* spawner.string(ChildProcess.make('git', ['rev-parse', '--short', 'HEAD'], { cwd: checkout }))).trim()
+      const commit = yield* decodeCommit(output).pipe(Effect.mapError(() => new VersionUnknown({ checkout, output })))
+
+      return { commit }
+    }),
+  )

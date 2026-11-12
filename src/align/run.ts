@@ -214,7 +214,7 @@ export function makeAlign({ picture, sender, capture, publish, settings, now }: 
       } else if (body['run'] === view.run && entry.kind === 'vela.run.ended') {
         view = { ...view, ended: typeof body['reason'] === 'string' ? body['reason'] : 'ended' }
       } else if (slew !== undefined && entry.kind === 'wire') {
-        const wire = readWireBody(entry.body)
+        const wire = readWireBody(entry)
 
         if (wire?.dir === 'in' && wire.device === settings.mount && wire.property === 'EQUATORIAL_EOD_COORD') {
           if (wire.state === 'Alert') slew.phase = 'alert'
