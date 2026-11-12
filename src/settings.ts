@@ -65,6 +65,11 @@ export const FeedConfig = Schema.Struct({
   webRoot: Schema.String.annotate({
     description: "The folder of the built web app (web/dist after its build), served at every address the event stream does not answer, so the page and its event stream come from one place",
   }),
+  lostAfterSeconds: described(
+    "How long a page goes without a heartbeat before it says the connection is lost. Not measured: three missed heartbeats at the default 5 s, so one late beat on a phone's wifi does not raise it",
+    Schema.Number,
+    15,
+  ),
   heartbeatSeconds: described(
     "How often the event stream sends the service's clock, so a page can tell a quiet rig from a lost connection and age readings by one clock. Not measured: 5 s lets a page see a dropped connection within seconds for 12 small messages a minute",
     Schema.Number,

@@ -14,11 +14,14 @@ export const RigState = Schema.Struct({
   readings: Readings,
   guiding: Guiding,
   trends: Trends,
+  heardAt: Schema.optional(Schema.Number),
 })
 
 export type RigState = typeof RigState.Type
 
 export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, guiding: unknownGuiding, trends: noTrends }
+
+const fromRig = (entry: RigEntry) => entry.kind === 'wire' || entry.kind === 'client.connected' || entry.kind === 'client.connection' || entry.kind.startsWith('phd2.')
 
 export function rig(state: RigState, entry: RigEntry): RigState {
   return {
@@ -28,6 +31,7 @@ export function rig(state: RigState, entry: RigEntry): RigState {
     readings: readings(state.readings, entry),
     guiding: guiding(state.guiding, entry),
     trends: trends(state.trends, entry),
+    heardAt: fromRig(entry) ? entry.at : state.heardAt,
   }
 }
 

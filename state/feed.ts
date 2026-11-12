@@ -10,7 +10,11 @@ export const feedPath = '/feed'
 
 export const feedEvent = { state: 'state', entry: 'entry', heartbeat: 'heartbeat' } as const
 
-export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, state: RigState })
+export const LinkLimits = Schema.Struct({ heartbeatSeconds: Schema.Number, lostAfterSeconds: Schema.Number, rigSilentAfterSeconds: Schema.Number })
+
+export type LinkLimits = typeof LinkLimits.Type
+
+export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, limits: LinkLimits, state: RigState })
 
 export type Bootstrap = typeof Bootstrap.Type
 

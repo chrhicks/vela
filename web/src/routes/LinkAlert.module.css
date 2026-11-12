@@ -1,0 +1,5 @@
+.placement {
+  max-width: 90rem;
+  margin: 0 auto;
+  padding: var(--gap-page) var(--gap-page) 0;
+}

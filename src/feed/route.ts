@@ -7,14 +7,15 @@ import { Feed } from './feed.ts'
 import { feedEvent, feedPath } from '../../state/feed.ts'
 import { ServiceStart } from './start.ts'
 
-export class FeedSettings extends Context.Service<FeedSettings, typeof FeedConfig.Type>()('vela/FeedSettings') {}
+export class FeedSettings extends Context.Service<FeedSettings, typeof FeedConfig.Type & { readonly rigSilentAfterSeconds: number }>()('vela/FeedSettings') {}
 
 const event = (name: string, data: unknown) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`
 
 const feedEvents = Effect.gen(function* () {
   const feed = yield* Feed
   const { token } = yield* ServiceStart
-  const { heartbeatSeconds } = yield* FeedSettings
+  const { heartbeatSeconds, lostAfterSeconds, rigSilentAfterSeconds } = yield* FeedSettings
+  const limits = { heartbeatSeconds, lostAfterSeconds, rigSilentAfterSeconds }
 
   const heartbeats = Stream.tick(Duration.seconds(heartbeatSeconds)).pipe(
     Stream.mapEffect(() => Clock.currentTimeMillis),
@@ -26,7 +27,7 @@ const feedEvents = Effect.gen(function* () {
       const { state, entries } = yield* feed.subscribe
       const at = yield* Clock.currentTimeMillis
 
-      return Stream.concat(Stream.succeed(event(feedEvent.state, { token, at, state })), Stream.merge(entries.pipe(Stream.map(entry => event(feedEvent.entry, entry))), heartbeats))
+      return Stream.concat(Stream.succeed(event(feedEvent.state, { token, at, limits, state })), Stream.merge(entries.pipe(Stream.map(entry => event(feedEvent.entry, entry))), heartbeats))
     }),
   )
 })

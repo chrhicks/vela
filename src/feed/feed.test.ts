@@ -67,7 +67,7 @@ describe('GET /feed', () => {
 
     await Effect.runPromise(feed.receive(runStarted('r1', 1000)))
 
-    const services = Context.make(Feed, feed).pipe(Context.add(ServiceStart, { token: StartToken.make('1794500000000') }), Context.add(FeedSettings, { host: '127.0.0.1', port: 0, webRoot: '.', heartbeatSeconds: 0.05 }))
+    const services = Context.make(Feed, feed).pipe(Context.add(ServiceStart, { token: StartToken.make('1794500000000') }), Context.add(FeedSettings, { host: '127.0.0.1', port: 0, webRoot: '.', heartbeatSeconds: 0.05, lostAfterSeconds: 15, rigSilentAfterSeconds: 10 }))
     const { handler, dispose } = HttpRouter.toWebHandler(FeedRoute, { disableLogger: true })
     const abort = new AbortController()
     const response = await handler(new Request('http://localhost/feed', { signal: abort.signal }), services)
@@ -101,7 +101,7 @@ describe('starting the event stream', () => {
     const port = typeof address === 'object' && address !== null ? address.port : 0
     const app = FeedServer.pipe(
       Layer.provideMerge(FeedLive),
-      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port, webRoot: '.', heartbeatSeconds: 5 }))),
+      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port, webRoot: '.', heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10 }))),
     )
     const error = await Effect.runPromise(Effect.scoped(Effect.flip(Layer.build(app))))
 
@@ -118,7 +118,7 @@ describe('starting the event stream', () => {
 
     const app = FeedServer.pipe(
       Layer.provideMerge(FeedLive),
-      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port: 0, webRoot, heartbeatSeconds: 5 }))),
+      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port: 0, webRoot, heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10 }))),
     )
     const pages = await Effect.runPromise(
       Effect.scoped(
