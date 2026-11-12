@@ -4,7 +4,7 @@ import type { Entry, MalformedReading } from '../../state/entry.ts'
 import { advance, emptyRig, type RigState } from '../../state/rig.ts'
 import { isWanted } from '../../state/wanted.ts'
 
-export interface Following {
+export interface FeedSubscription {
   readonly state: RigState
   readonly entries: Stream.Stream<Entry>
 }
@@ -12,8 +12,8 @@ export interface Following {
 export class Feed extends Context.Service<
   Feed,
   {
-    readonly take: (entry: Entry) => Effect.Effect<void, MalformedEntry | MalformedReading>
-    readonly follow: Effect.Effect<Following, never, Scope.Scope>
+    readonly receive: (entry: Entry) => Effect.Effect<void, MalformedEntry | MalformedReading>
+    readonly subscribe: Effect.Effect<FeedSubscription, never, Scope.Scope>
   }
 >()('vela/Feed') {}
 
@@ -23,7 +23,7 @@ export const FeedLive = Layer.effect(
     const state = yield* Ref.make(emptyRig)
     const wanted = yield* PubSub.unbounded<Entry>()
 
-    const take = (entry: Entry) =>
+    const receive = (entry: Entry) =>
       Effect.gen(function* () {
         if (!(yield* Effect.fromResult(isWanted(entry)))) return
 
@@ -36,7 +36,7 @@ export const FeedLive = Layer.effect(
         if (Result.isFailure(next)) return yield* Effect.fail(next.failure)
       })
 
-    const follow = Effect.gen(function* () {
+    const subscribe = Effect.gen(function* () {
       const subscription = yield* PubSub.subscribe(wanted)
       const current = yield* Ref.get(state)
       const since = current.position
@@ -47,6 +47,6 @@ export const FeedLive = Layer.effect(
       }
     })
 
-    return { take, follow }
+    return { receive, subscribe }
   }),
 )

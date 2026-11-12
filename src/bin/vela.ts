@@ -221,26 +221,26 @@ function observe(entry: Entry) {
   if (announcesFrame(entry, settings.devices.primary)) frameSaved(entry)
 }
 
-const report = (line: string) => Effect.sync(() => console.error(`vela: ${line}`))
+const logProblem = (line: string) => Effect.sync(() => console.error(`vela: ${line}`))
 
-const takeMessage = (message: Message) =>
+const handleMessage = (message: Message) =>
   Effect.fromResult(readMessage(message)).pipe(
     Effect.tap(entry =>
-      feed.take(entry).pipe(
+      feed.receive(entry).pipe(
         Effect.catchTags({
-          MalformedEntry: error => report(`${error.kind} #${error.seq} is malformed: ${error.issue}`),
-          MalformedReading: error => report(`device reading #${error.seq} is malformed: ${error.issue}`),
+          MalformedEntry: error => logProblem(`${error.kind} #${error.seq} is malformed: ${error.issue}`),
+          MalformedReading: error => logProblem(`device reading #${error.seq} is malformed: ${error.issue}`),
         }),
       ),
     ),
     Effect.tap(entry => Effect.sync(() => observe(entry))),
-    Effect.catchTag('UnreadableMessage', error => report(`${error.subject} #${error.seq} could not be read: ${error.issue}`)),
+    Effect.catchTag('UnreadableMessage', error => logProblem(`${error.subject} #${error.seq} could not be read: ${error.issue}`)),
     Effect.asVoid,
   )
 
-const take = (followed: Followed) =>
+const handleFollowed = (followed: Followed) =>
   Match.valueTags(followed, {
-    Message: ({ message }) => takeMessage(message),
+    Message: ({ message }) => handleMessage(message),
     CaughtUp: () => Effect.sync(() => picture.caughtUp()),
   })
 
@@ -253,9 +253,9 @@ await runHandledPromise(
     stream,
     readBatch: settings.historyReadBatch,
     read: readMessage,
-    onUnreadable: error => runHandledSync(report(`${error.subject} #${error.seq} could not be read while finding the rig's latest connection: ${error.issue}`)),
+    onUnreadable: error => runHandledSync(logProblem(`${error.subject} #${error.seq} could not be read while finding the rig's latest connection: ${error.issue}`)),
   }).pipe(
-    Stream.runForEach(take),
+    Stream.runForEach(handleFollowed),
     Effect.provideService(Broker, broker),
     Effect.catchTags({
       StreamUnreadable: error => Effect.sync(() => lost(`the stream ${error.stream} could not be read (${error.step}): ${error.issue}`)),
