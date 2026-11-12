@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import type { Entry } from '../../state/entry.ts'
+import { StreamPosition, type Entry } from '../../state/entry.ts'
 import { makeSender, readAnswer } from './sender.ts'
 
-const answer = (body: unknown): Entry => ({ seq: 0, kind: 'client.command', at: 1, body })
+const answer = (body: unknown): Entry => ({ seq: StreamPosition.make(0), kind: 'client.command', at: 1, body })
 
 function setup(options: { timeoutMs?: number; publish?: (subject: string, payload: string) => void } = {}) {
   const published: Array<{ subject: string; payload: Record<string, unknown> }> = []
   let count = 0
 
   const sender = makeSender({
+    subjectOf: device => `rig-test.command.${device}`,
     publish: options.publish ?? ((subject, payload) => void published.push({ subject, payload: JSON.parse(payload) as Record<string, unknown> })),
     newId: () => `vela-${(count += 1)}`,
     answerTimeoutMs: options.timeoutMs ?? 50,
@@ -26,7 +27,7 @@ describe('the command sender', () => {
     const { sender, published } = setup()
     const outcome = sender.send(command)
 
-    expect(published).toEqual([{ subject: 'rig-dev.command.primary', payload: { id: 'vela-1', property: 'CCD_FRAME_TYPE', values: { FRAME_DARK: true }, by: 'vela' } }])
+    expect(published).toEqual([{ subject: 'rig-test.command.primary', payload: { id: 'vela-1', property: 'CCD_FRAME_TYPE', values: { FRAME_DARK: true }, by: 'vela' } }])
     sender.answered(answer({ id: 'vela-1', by: 'vela', device: 'primary', property: 'CCD_FRAME_TYPE', result: 'written' }))
 
     expect(await outcome).toEqual({ result: 'written' })

@@ -6,7 +6,7 @@ Chris Hicks's observing program. Read `SOUL.md` for how to work on it and `/home
 
 Vela is being rebuilt on the rig stream (plan: `bots/observer/specs/vela-next/plan-v2.md` in the home repo). The old Vela was removed on 2026-11-07; what remains:
 
-- `state/`: what the stream means, shared by the service and the web app (architecture: `bots/observer/specs/thuban-ui/architecture.md` in the home repo). The entry reader (`entry.ts`: stream position, kind, time, body; command requests become `command` entries), the list of what the browser receives (`wanted.ts`) and the reducers (`rig.ts` and one file per slice), each with tests on made-up entries.
+- `state/`: what the stream means, shared by the service and the web app (architecture: `bots/observer/specs/thuban-ui/architecture.md` in the home repo). `stream.ts` names the stream and its subjects from the `environment` setting (`dev` gives `RIG_DEV` and `rig-dev.*`); `entry.ts` reads a stream message into an entry (stream position, kind, time, body; command requests become `command` entries); `entries.ts` decodes the kinds the reducers use into typed entries with Effect Schema, once; `wanted.ts` is the list of what the browser receives; `rig.ts` and one file per slice are the reducers, each with tests on made-up entries.
 - `src/catalog/`: OpenNGC target data (J2000) and its row types. See its `README.md` for provenance and the license.
 - `src/sky/coordinates.ts`: J2000 to epoch-of-date conversion (`toMount`, `fromMount`, `angularDistance`) on `astronomy-engine`.
 - `src/bin/vela.ts`: the night page and capture controls, a Node service on thuban. `src/stream/` follows the stream (including command requests), `src/rig/` holds the picture (`picture.ts`) and what the page shows (`night.ts`), `src/page/` serves it. Deploy files in `deploy/`.
@@ -23,5 +23,6 @@ The broker's data (`~/.local/share/vela/nats`), Vela's saved images and its arch
 ## Rules
 
 - The service under `src/` is run from source by Node 26 with no build step; style follows Cria's `ts/`. Only `web/` is built.
+- Non-React code uses Effect: Schema decodes at every boundary, ids are branded, failures are typed errors. React gets Promises from hooks. The shared coding standard (TypeScript) owns the rule; files move to it as they are touched, and `src/stream/json.ts` holds the old hand-written readers until then.
 - No comments in code: a limit or default is a described setting, a surprise is a better name or type.
 - Run `./verify.sh` before a PR.

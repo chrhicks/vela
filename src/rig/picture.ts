@@ -1,4 +1,5 @@
-import { readWireBody, recordOf, type Entry, type Limits, type Value } from '../../state/entry.ts'
+import type { Entry, Limits, Value } from '../../state/entry.ts'
+import { readWireBody, recordOf } from '../stream/json.ts'
 
 export interface Property {
   readonly state: string | undefined
@@ -94,7 +95,7 @@ export function makePicture() {
     const state = wire.state ?? before?.state
     const changed = before === undefined || before.state !== state || !sameValues(before.values, values)
 
-    properties.set(key, { state, values, limits: wire.type === 'def' ? wire.limits : (before?.limits ?? {}), changedAt: changed ? entry.at : before.changedAt, confirmedAt: entry.at })
+    properties.set(key, { state, values, limits: wire.type === 'def' ? wire.numbers : (before?.limits ?? {}), changedAt: changed ? entry.at : before.changedAt, confirmedAt: entry.at })
   }
 
   function applyClient(entry: Entry) {

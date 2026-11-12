@@ -3,7 +3,7 @@ import type { RunEvent } from '../capture/events.ts'
 import type { ActiveRecord, RunFile } from '../capture/runfile.ts'
 import { makeSender } from '../commands/sender.ts'
 import { makePicture } from '../rig/picture.ts'
-import type { Entry, Value } from '../../state/entry.ts'
+import { StreamPosition, type Entry, type Value } from '../../state/entry.ts'
 import { connected, indiserver, startedAt, wire } from './entries.ts'
 
 export type Exposure = 'file' | 'alert' | 'nothing' | 'retry'
@@ -67,7 +67,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
   const set = (property: string, values: Readonly<Record<string, Value>>, state = 'Ok') => feed(wire(startedAt + (tick += 1), 'set', 'primary', property, values, state))
 
   const answer = (id: string, property: string, result: 'written' | 'refused', reason?: string) =>
-    feed({ seq: 0, kind: 'client.command', at: startedAt + (tick += 1), body: { id, by: 'vela', device: 'primary', property, result, ...(reason === undefined ? {} : { reason }) } })
+    feed({ seq: StreamPosition.make(0), kind: 'client.command', at: startedAt + (tick += 1), body: { id, by: 'vela', device: 'primary', property, result, ...(reason === undefined ? {} : { reason }) } })
 
   function expose() {
     const behaviour = script.exposures.shift() ?? 'file'
@@ -120,7 +120,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
     }, 1)
   }
 
-  const sender = makeSender({ publish: (_subject, payload) => handle(payload), newId: () => `vela-${(ids += 1)}`, answerTimeoutMs: 30, by: 'vela', now: Date.now })
+  const sender = makeSender({ subjectOf: device => `rig-test.command.${device}`, publish: (_subject, payload) => handle(payload), newId: () => `vela-${(ids += 1)}`, answerTimeoutMs: 30, by: 'vela', now: Date.now })
 
   const capture = makeCapture({
     picture,

@@ -1,3 +1,4 @@
+import { StreamPosition } from '../../state/entry.ts'
 import { describe, expect, it } from 'vitest'
 import { fakeCamera } from '../testing/camera.ts'
 import { startedAt, wire } from '../testing/entries.ts'
@@ -65,7 +66,7 @@ async function scriptedSweep(stars: number, refuseMoves?: string, missFrame = 0)
         if (frame === missFrame) focus.autofocus?.measured({ file, result: 'refused', reason: 'measure is not set up in the rig file' })
         else focus.autofocus?.measured({ file, result: 'measured', solve: undefined, stars: { measured: true, hfd: 2 + ((position - 1010) / 50) ** 2, count: stars }, header: {} })
       }
-      focus.autofocus?.observe({ seq: 0, kind: `vela.run.${event.kind}`, at: startedAt, body: { run: event.run, ...event.body } })
+      focus.autofocus?.observe({ seq: StreamPosition.make(0), kind: `vela.run.${event.kind}`, at: startedAt, body: { run: event.run, ...event.body } })
     },
   })
   const moves: number[] = []
@@ -84,7 +85,7 @@ async function scriptedSweep(stars: number, refuseMoves?: string, missFrame = 0)
     capture: camera.capture,
     publish: (kind, body) => {
       published.push({ kind, body: { ...body } })
-      focus.autofocus?.observe({ seq: 0, kind: `vela.focus.${kind}`, at: (at += 1), body })
+      focus.autofocus?.observe({ seq: StreamPosition.make(0), kind: `vela.focus.${kind}`, at: (at += 1), body })
     },
     settings: { focuser: 'primary', camera: 'primary', minStars: 10 },
   })
@@ -95,7 +96,7 @@ async function scriptedSweep(stars: number, refuseMoves?: string, missFrame = 0)
 
   await new Promise<void>(resolve => {
     const check = setInterval(() => {
-      autofocus.observe({ seq: 0, kind: 'tick', at, body: {} })
+      autofocus.observe({ seq: StreamPosition.make(0), kind: 'tick', at, body: {} })
       if (autofocus.view().problem !== undefined) void camera.capture.stop()
       if (autofocus.view().ended !== undefined) {
         clearInterval(check)

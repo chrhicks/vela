@@ -1,5 +1,3 @@
-export const runSubject = 'rig-dev.vela.run'
-
 export type RunEventKind = 'started' | 'exposed' | 'failed' | 'ended'
 
 export interface RunEvent {

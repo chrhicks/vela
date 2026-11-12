@@ -1,11 +1,11 @@
-import { numberOf, recordOf, textOf, type Entry } from './entry.ts'
+import type { RigEntry, RunEnding, RunId } from './entries.ts'
 
 interface RunFacts {
-  readonly id: string
+  readonly id: RunId
   readonly object: string
   readonly frameType: string
   readonly exposureSeconds: number
-  readonly count: number
+  readonly count: number | undefined
   readonly startedAt: number
   readonly frames: number
   readonly failures: number
@@ -13,44 +13,25 @@ interface RunFacts {
 
 export type Run =
   | (RunFacts & { readonly status: 'capturing' })
-  | (RunFacts & { readonly status: 'ended'; readonly endedAt: number; readonly reason: string })
+  | (RunFacts & { readonly status: 'ended'; readonly endedAt: number; readonly reason: RunEnding })
 
-function started(entry: Entry): Run | undefined {
-  const body = recordOf(entry.body)
+export function run(state: Run | undefined, entry: RigEntry): Run | undefined {
+  if (entry.kind === 'vela.run.started') {
+    const { run: id, object, frameType, exposureSeconds, count } = entry.body
 
-  if (body === undefined) return undefined
+    return { status: 'capturing', id, object, frameType, exposureSeconds, count, startedAt: entry.at, frames: 0, failures: 0 }
+  }
 
-  const id = textOf(body, 'run')
-  const object = textOf(body, 'object')
-  const frameType = textOf(body, 'frameType')
-  const exposureSeconds = numberOf(body, 'exposureSeconds')
-  const count = numberOf(body, 'count')
-
-  if (id === undefined || object === undefined || frameType === undefined || exposureSeconds === undefined || count === undefined) return undefined
-
-  return { status: 'capturing', id, object, frameType, exposureSeconds, count, startedAt: entry.at, frames: 0, failures: 0 }
-}
-
-function followUp(state: Run, entry: Entry): Run {
-  const body = recordOf(entry.body)
-
-  if (state.status !== 'capturing' || body === undefined || textOf(body, 'run') !== state.id) return state
+  if (state?.status !== 'capturing') return state
 
   switch (entry.kind) {
     case 'vela.run.exposed':
-      return { ...state, frames: numberOf(body, 'frame') ?? state.frames + 1 }
+      return entry.body.run === state.id ? { ...state, frames: entry.body.frame } : state
     case 'vela.run.failed':
-      return { ...state, failures: state.failures + 1 }
+      return entry.body.run === state.id ? { ...state, failures: state.failures + 1 } : state
     case 'vela.run.ended':
-      return { ...state, status: 'ended', endedAt: entry.at, reason: textOf(body, 'reason') ?? 'unknown' }
+      return entry.body.run === state.id ? { ...state, status: 'ended', endedAt: entry.at, reason: entry.body.reason } : state
     default:
       return state
   }
-}
-
-export function run(state: Run | undefined, entry: Entry): Run | undefined {
-  if (entry.kind === 'vela.run.started') return started(entry) ?? state
-  if (state === undefined) return state
-
-  return followUp(state, entry)
 }

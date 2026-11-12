@@ -1,4 +1,5 @@
-import { readWireBody, type Entry } from './entry.ts'
+import { Option, Schema } from 'effect'
+import type { Entry } from './entry.ts'
 
 interface Wanted {
   readonly kinds: ReadonlyArray<string>
@@ -28,14 +29,15 @@ export const wanted: Wanted = {
   },
 }
 
-function kindMatches(pattern: string, kind: string) {
-  return pattern.endsWith('.*') ? kind.startsWith(pattern.slice(0, -1)) : kind === pattern
-}
+const decodeReading = Schema.decodeUnknownOption(Schema.Struct({ device: Schema.String, property: Schema.String }))
+
+const kindMatches = (kind: string) => (pattern: string) => (pattern.endsWith('.*') ? kind.startsWith(pattern.slice(0, -1)) : kind === pattern)
 
 export function isWanted(entry: Entry): boolean {
-  if (entry.kind !== 'wire') return wanted.kinds.some(pattern => kindMatches(pattern, entry.kind))
+  if (entry.kind !== 'wire') return wanted.kinds.some(kindMatches(entry.kind))
 
-  const wire = readWireBody(entry.body)
-
-  return wire?.property !== undefined && (wanted.properties[wire.device]?.includes(wire.property) ?? false)
+  return Option.match(decodeReading(entry.body), {
+    onNone: () => false,
+    onSome: ({ device, property }) => wanted.properties[device]?.includes(property) ?? false,
+  })
 }

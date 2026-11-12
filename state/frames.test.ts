@@ -1,8 +1,9 @@
+import { Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { frames, type Frame } from './frames.ts'
-import { entry, frameKept, frameMeasured } from './testing.ts'
+import { fold, frameKept, frameMeasured, read, runStarted } from './testing.ts'
 
-const reduce = (entries: ReadonlyArray<ReturnType<typeof entry>>) => entries.reduce<ReadonlyArray<Frame>>(frames, [])
+const reduce = (entries: Parameters<typeof fold>[2]) => fold<ReadonlyArray<Frame>>(frames, [], entries)
 
 describe('frames', () => {
   it('adds a kept frame, then its measurements', () => {
@@ -30,7 +31,7 @@ describe('frames', () => {
   it('returns the same list for measurements of a frame it does not hold, and for other entries', () => {
     const state = reduce([frameKept('m31_042.fits', 1000)])
 
-    expect(frames(state, frameMeasured('m31_099.fits', 1002, {}))).toBe(state)
-    expect(frames(state, entry('phd2.GuideStep', 1003, {}))).toBe(state)
+    expect(frames(state, Option.getOrThrow(read(frameMeasured('m31_099.fits', 1002, {}))))).toBe(state)
+    expect(frames(state, Option.getOrThrow(read(runStarted('r1', 1003))))).toBe(state)
   })
 })

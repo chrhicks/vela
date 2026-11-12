@@ -1,16 +1,17 @@
+import { StreamPosition } from '../../state/entry.ts'
 import { describe, expect, it } from 'vitest'
-import { makeMeasureRequests, measuredOf, measureSubject } from './rig.ts'
+import { makeMeasureRequests, measuredOf } from './rig.ts'
 
-const answer = (body: Record<string, unknown>) => ({ seq: 0, kind: 'client.measure', at: 1, body })
+const answer = (body: Record<string, unknown>) => ({ seq: StreamPosition.make(0), kind: 'client.measure', at: 1, body })
 
 describe("asking the rig program to measure a frame, and reading its answer", () => {
   it('asks to measure and remove one frame', () => {
     const sent: Array<[string, unknown]> = []
-    const request = makeMeasureRequests({ publish: (subject, payload) => void sent.push([subject, JSON.parse(payload)]), newId: () => 'vela-1', by: 'vela' })
+    const request = makeMeasureRequests({ subject: 'rig-test.command.measure', publish: (subject, payload) => void sent.push([subject, JSON.parse(payload)]), newId: () => 'vela-1', by: 'vela' })
 
     request('polar-align_light_013.fits', ['solve'])
 
-    expect(sent).toEqual([[measureSubject, { id: 'vela-1', by: 'vela', file: 'polar-align_light_013.fits', measure: ['solve'], remove: true }]])
+    expect(sent).toEqual([['rig-test.command.measure', { id: 'vela-1', by: 'vela', file: 'polar-align_light_013.fits', measure: ['solve'], remove: true }]])
   })
 
   it('reads a solve and the header cards', () => {
@@ -32,6 +33,6 @@ describe("asking the rig program to measure a frame, and reading its answer", ()
   it('ignores answers to other programs, a frame that could not be removed, and other entries', () => {
     expect(measuredOf(answer({ by: 'observer', file: 'a_001.fits', result: 'measured', header: {} }), 'vela')).toBeUndefined()
     expect(measuredOf(answer({ by: 'vela', file: 'a_001.fits', result: 'not removed', reason: 'EACCES' }), 'vela')).toBeUndefined()
-    expect(measuredOf({ seq: 0, kind: 'client.command', at: 1, body: { by: 'vela', file: 'a_001.fits', result: 'measured' } }, 'vela')).toBeUndefined()
+    expect(measuredOf({ seq: StreamPosition.make(0), kind: 'client.command', at: 1, body: { by: 'vela', file: 'a_001.fits', result: 'measured' } }, 'vela')).toBeUndefined()
   })
 })

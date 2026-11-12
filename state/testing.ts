@@ -1,11 +1,13 @@
-import type { Entry } from './entry.ts'
+import { Option, Result } from 'effect'
+import { readRigEntry, type RigEntry } from './entries.ts'
+import { StreamPosition, type Entry } from './entry.ts'
 
 let seq = 0
 
 export function entry(kind: string, at: number, body: unknown): Entry {
   seq += 1
 
-  return { seq, kind, at, body }
+  return { seq: StreamPosition.make(seq), kind, at, body }
 }
 
 export function wire(device: string, property: string | undefined, elements: Readonly<Record<string, number | boolean | string>> = {}): Entry {
@@ -22,4 +24,12 @@ export function frameKept(file: string, at: number, night = '2026-11-08'): Entry
 
 export function frameMeasured(file: string, at: number, measurements: Readonly<Record<string, number | null>>, night = '2026-11-08'): Entry {
   return entry('vela.frame.stats', at, { night, file, stars: 846, hfdPixels: 2.9, arcsecPerPixel: 1.45, elongation: 1.06, shapedStars: 40, sky: 1200, noise: 30, ...measurements })
+}
+
+export function read(source: Entry): Option.Option<RigEntry> {
+  return Result.getOrThrow(readRigEntry(source))
+}
+
+export function fold<S>(reduce: (state: S, entry: RigEntry) => S, initial: S, entries: ReadonlyArray<Entry>): S {
+  return entries.reduce((state, source) => Option.match(read(source), { onNone: () => state, onSome: rigEntry => reduce(state, rigEntry) }), initial)
 }

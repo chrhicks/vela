@@ -1,7 +1,16 @@
-export type Value = number | boolean | string
+import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effect'
+import type { Stream } from './stream.ts'
+
+export const StreamPosition = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand('StreamPosition'))
+
+export type StreamPosition = typeof StreamPosition.Type
+
+export const Value = Schema.Union([Schema.Number, Schema.Boolean, Schema.String])
+
+export type Value = typeof Value.Type
 
 export interface Entry {
-  readonly seq: number
+  readonly seq: StreamPosition
   readonly kind: string
   readonly at: number
   readonly body: unknown
@@ -14,103 +23,71 @@ export interface Message {
   readonly text: string
 }
 
-export interface WireBody {
-  readonly dir: 'in' | 'out'
-  readonly device: string
-  readonly type: string
-  readonly property: string | undefined
-  readonly state: string | undefined
-  readonly elements: Readonly<Record<string, Value>>
-  readonly limits: Readonly<Record<string, Limits>>
-}
+export class UnreadableMessage extends Data.TaggedError('UnreadableMessage')<{
+  readonly seq: number
+  readonly subject: string
+  readonly issue: string
+}> {}
 
-export interface Limits {
-  readonly min: number
-  readonly max: number
-}
+const Envelope = Schema.fromJsonString(
+  Schema.Struct({
+    kind: Schema.String,
+    at: Schema.Number,
+    body: Schema.optionalKey(Schema.Unknown),
+  }),
+)
 
-type JsonRecord = Readonly<Record<string, unknown>>
+const Request = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
 
-const commandSubjectPrefix = 'rig-dev.command.'
+export function makeReader(stream: Stream) {
+  const decodeEnvelope = Schema.decodeUnknownResult(Envelope)
+  const decodeRequest = Schema.decodeUnknownResult(Request)
 
-export const commandSubject = (device: string) => `${commandSubjectPrefix}${device}`
+  return function readMessage({ seq, subject, time, text }: Message): Result.Result<Entry, UnreadableMessage> {
+    const position = StreamPosition.makeOption(seq)
+    const unreadable = (issue: string) => new UnreadableMessage({ seq, subject, issue })
 
-export function recordOf(value: unknown): JsonRecord | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as JsonRecord) : undefined
-}
+    if (Option.isNone(position)) return Result.fail(unreadable('not a stream position'))
 
-export function textOf(record: JsonRecord, name: string): string | undefined {
-  const value = record[name]
+    const device = stream.commandDevice(subject)
 
-  return typeof value === 'string' ? value : undefined
-}
+    if (device === undefined) {
+      return decodeEnvelope(text).pipe(
+        Result.map(({ kind, at, body }) => ({ seq: position.value, kind, at, body })),
+        Result.mapError(error => unreadable(error.message)),
+      )
+    }
 
-export function numberOf(record: JsonRecord, name: string): number | undefined {
-  const value = record[name]
-
-  return typeof value === 'number' ? value : undefined
-}
-
-function parseRecord(text: string): JsonRecord | undefined {
-  try {
-    return recordOf(JSON.parse(text))
-  } catch {
-    return undefined
+    return decodeRequest(text).pipe(
+      Result.map(request => ({ seq: position.value, kind: 'command', at: time, body: { ...request, device } })),
+      Result.mapError(error => unreadable(error.message)),
+    )
   }
 }
 
-function commandDevice(subject: string): string | undefined {
-  return subject.startsWith(commandSubjectPrefix) ? subject.slice(commandSubjectPrefix.length) : undefined
-}
+const Limits = Schema.Struct({ min: Schema.Number, max: Schema.Number })
 
-function readEntry(seq: number, text: string): Entry | undefined {
-  const entry = parseRecord(text)
-  const kind = entry === undefined ? undefined : textOf(entry, 'kind')
-  const at = entry === undefined ? undefined : numberOf(entry, 'at')
+const keepValues = (elements: Readonly<Record<string, unknown>>): Readonly<Record<string, Value>> =>
+  Object.fromEntries(Object.entries(elements).filter((pair): pair is [string, Value] => Schema.is(Value)(pair[1])))
 
-  if (entry === undefined || kind === undefined || at === undefined) return undefined
+const Elements = Schema.Record(Schema.String, Schema.Unknown).pipe(
+  Schema.decodeTo(Schema.Record(Schema.String, Value), SchemaTransformation.transform<Readonly<Record<string, Value>>, Readonly<Record<string, unknown>>>({ decode: keepValues, encode: elements => elements })),
+)
 
-  return { seq, kind, at, body: entry['body'] }
-}
+const withEmpty = <S extends Schema.Top>(schema: S) => Schema.withDecodingDefaultKey<S['Rebuild']>(Effect.succeed({}))(schema)
 
-function readCommand(seq: number, device: string, at: number, text: string): Entry | undefined {
-  const request = parseRecord(text)
+export const WireBody = Schema.Struct({
+  dir: Schema.Literals(['in', 'out']),
+  device: Schema.String,
+  type: Schema.String,
+  property: Schema.optionalKey(Schema.String),
+  state: Schema.optionalKey(Schema.String),
+  elements: withEmpty(Elements),
+  numbers: withEmpty(Schema.Record(Schema.String, Limits)),
+})
 
-  if (request === undefined) return undefined
+export type WireBody = typeof WireBody.Type
 
-  return { seq, kind: 'command', at, body: { ...request, device } }
-}
+export type Limits = typeof Limits.Type
 
-export function readMessage({ seq, subject, time, text }: Message): Entry | undefined {
-  const device = commandDevice(subject)
-
-  if (device === undefined) return readEntry(seq, text)
-
-  return readCommand(seq, device, time, text)
-}
-
-export function readWireBody(body: unknown): WireBody | undefined {
-  const record = recordOf(body)
-
-  if (record === undefined) return undefined
-
-  const { dir, device, type, property, state, elements, numbers } = record
-
-  if ((dir !== 'in' && dir !== 'out') || typeof device !== 'string' || typeof type !== 'string') return undefined
-
-  const values: Record<string, Value> = {}
-
-  for (const [name, value] of Object.entries(recordOf(elements) ?? {})) {
-    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string') values[name] = value
-  }
-
-  const limits: Record<string, Limits> = {}
-
-  for (const [name, number] of Object.entries(recordOf(numbers) ?? {})) {
-    const range = recordOf(number)
-
-    if (typeof range?.['min'] === 'number' && typeof range['max'] === 'number') limits[name] = { min: range['min'], max: range['max'] }
-  }
-
-  return { dir, device, type, property: typeof property === 'string' ? property : undefined, state: typeof state === 'string' ? state : undefined, elements: values, limits }
-}
+export const decodeWireBody = Schema.decodeUnknownOption(WireBody)

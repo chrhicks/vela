@@ -3,14 +3,15 @@ import { readdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { jetstream } from '@nats-io/jetstream'
-import { runEntry, runSubject } from '../capture/events.ts'
+import { Result } from 'effect'
+import { runEntry } from '../capture/events.ts'
 import { makeRunFile } from '../capture/runfile.ts'
 import { makeCapture } from '../capture/run.ts'
 import { makeSender } from '../commands/sender.ts'
 import { readConfig } from '../config.ts'
 import { makeActivity } from '../activity/activity.ts'
 import { announcesFrame } from '../frames/announce.ts'
-import { frameEntry, frameSubject } from '../frames/entry.ts'
+import { frameEntry } from '../frames/entry.ts'
 import { makeKeeper } from '../frames/keeper.ts'
 import { makeNamer } from '../frames/names.ts'
 import { frameDetail, listNight, makePreviews } from '../frames/library.ts'
@@ -20,18 +21,22 @@ import { makeFrameStats, saveStats } from '../frames/stats.ts'
 import { makePointing } from '../pointing/pointing.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
-import { focusSubject, makeAutofocus } from '../focus/autofocus.ts'
-import { alignSubject, makeAlign } from '../align/run.ts'
-import { centreSubject, makeCentre } from '../pointing/centre.ts'
+import { makeAutofocus } from '../focus/autofocus.ts'
+import { makeAlign } from '../align/run.ts'
+import { makeCentre } from '../pointing/centre.ts'
 import { makeMeasureRequests, measuredOf } from '../measure/rig.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
 import { VelaSettings } from '../settings.ts'
-import { readMessage, readWireBody, type Entry } from '../../state/entry.ts'
+import { makeReader, type Entry } from '../../state/entry.ts'
+import { streamOf } from '../../state/stream.ts'
+import { readWireBody } from '../stream/json.ts'
 import { followRig } from '../stream/follow.ts'
 
 const settings = readConfig(VelaSettings, process.argv[2])
+const stream = streamOf(settings.environment)
+const readMessage = makeReader(stream)
 const frames = settings.frames
 const naming = { zone: frames.nightZone, changesAtHour: frames.nightChangesAtHour }
 const picture = makePicture()
@@ -50,6 +55,7 @@ function lost(reason: string): never {
 }
 
 const sender = makeSender({
+  subjectOf: stream.command,
   publish: (subject, payload) => following.connection.publish(subject, payload),
   newId: () => `vela-${randomUUID()}`,
   answerTimeoutMs: settings.capture.commandAnswerSeconds * 1000,
@@ -76,12 +82,11 @@ const capture = makeCapture({
   newRunId: () => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''),
   emit: event => {
     jetstream(following.connection)
-      .publish(runSubject, JSON.stringify(runEntry(event, frames.rig, Date.now())))
+      .publish(stream.vela('run'), JSON.stringify(runEntry(event, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the ${event.kind} entry of run ${event.run}: ${String(error)}`))
   },
   onChange: () => page.captureChanged(),
 })
-const copySubject = 'rig-dev.vela.copy'
 const publishEntry = (subject: string, kind: string, id: string, body: Readonly<Record<string, unknown>>) => {
   const at = Date.now()
 
@@ -93,14 +98,14 @@ const autofocus = makeAutofocus({
   picture,
   sender,
   capture,
-  publish: (kind, body) => publishEntry(focusSubject, `vela.focus.${kind}`, String(body['run']), body),
+  publish: (kind, body) => publishEntry(stream.vela('focus'), `vela.focus.${kind}`, String(body['run']), body),
   settings: { focuser: devices.focuser, camera: devices.primary, ...settings.autofocus },
 })
 const align = makeAlign({
   picture,
   sender,
   capture,
-  publish: (kind, body) => publishEntry(alignSubject, `vela.align.${kind}`, `${String(body['run'])}:${String(body['frame'] ?? '')}`, body),
+  publish: (kind, body) => publishEntry(stream.vela('align'), `vela.align.${kind}`, `${String(body['run'])}:${String(body['frame'] ?? '')}`, body),
   settings: { mount: devices.mount, camera: devices.primary, ...settings.align },
   now: Date.now,
 })
@@ -108,7 +113,7 @@ const centre = makeCentre({
   picture,
   pointing,
   capture,
-  publish: (kind, body) => publishEntry(centreSubject, `vela.centre.${kind}`, `${String(body['run'])}:${String(body['frame'] ?? '')}`, body),
+  publish: (kind, body) => publishEntry(stream.vela('centre'), `vela.centre.${kind}`, `${String(body['run'])}:${String(body['frame'] ?? '')}`, body),
   settings: { mount: devices.mount, camera: devices.primary, ...settings.centre },
   now: Date.now,
 })
@@ -139,7 +144,7 @@ function measureKept(frame: { readonly night: string; readonly file: string }) {
 
       await saveStats(path, stats)
       page.framesChanged()
-      publishEntry(frameSubject, 'vela.frame.stats', frame.file, { night: frame.night, file: frame.file, ...stats })
+      publishEntry(stream.vela('frame'), 'vela.frame.stats', frame.file, { night: frame.night, file: frame.file, ...stats })
     })
     .catch((error: unknown) => console.error(`vela: could not measure ${frame.file}: ${String(error)}`))
 }
@@ -154,16 +159,16 @@ const keeper = makeKeeper({
     page.framesChanged()
     measureKept(frame)
     jetstream(following.connection)
-      .publish(frameSubject, JSON.stringify(frameEntry(frame, frames.rig, Date.now())))
+      .publish(stream.vela('frame'), JSON.stringify(frameEntry(frame, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))
   },
   onProblem: message => console.error(`vela: ${message}`),
   onLeft: left => {
-    publishEntry(copySubject, 'vela.copy.left', left.what, { what: left.what, reason: left.reason })
+    publishEntry(stream.vela('copy'), 'vela.copy.left', left.what, { what: left.what, reason: left.reason })
   },
 })
 
-const requestMeasure = makeMeasureRequests({ publish: (subject, payload) => following.connection.publish(subject, payload), newId: () => `vela-${randomUUID()}`, by: 'vela' })
+const requestMeasure = makeMeasureRequests({ subject: stream.command('measure'), publish: (subject, payload) => following.connection.publish(subject, payload), newId: () => `vela-${randomUUID()}`, by: 'vela' })
 
 function frameSaved(entry: Entry) {
   const path = readWireBody(entry.body)?.elements['FILE_PATH']
@@ -175,11 +180,18 @@ function frameSaved(entry: Entry) {
 
 const following = await followRig({
   broker: settings.broker,
+  stream,
+  read: readMessage,
   readBatch: settings.historyReadBatch,
   onMessage: message => {
-    const entry = readMessage(message)
+    const read = readMessage(message)
 
-    if (entry === undefined) return
+    if (Result.isFailure(read)) {
+      console.error(`vela: ${read.failure.subject} #${read.failure.seq} could not be read: ${read.failure.issue}`)
+      return
+    }
+
+    const entry = read.success
 
     picture.apply(entry, Date.now())
     sender.answered(entry)

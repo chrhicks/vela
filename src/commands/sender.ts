@@ -1,4 +1,5 @@
-import { commandSubject, recordOf, type Entry, type Value } from '../../state/entry.ts'
+import type { Entry, Value } from '../../state/entry.ts'
+import { recordOf } from '../stream/json.ts'
 
 export const answerKind = 'client.command'
 
@@ -14,6 +15,7 @@ export interface Command {
 }
 
 export interface SenderOptions {
+  readonly subjectOf: (device: string) => string
   readonly publish: (subject: string, payload: string) => void
   readonly newId: () => string
   readonly answerTimeoutMs: number
@@ -44,7 +46,7 @@ export function readAnswer(entry: Entry): Answer | undefined {
   return { id: body['id'], result, reason: typeof body['reason'] === 'string' ? body['reason'] : undefined }
 }
 
-export function makeSender({ publish, newId, answerTimeoutMs, by, now }: SenderOptions) {
+export function makeSender({ subjectOf, publish, newId, answerTimeoutMs, by, now }: SenderOptions) {
   const waiting = new Map<string, { readonly command: Command; readonly sentAt: number; readonly resolve: (answer: Answer) => void }>()
 
   return {
@@ -77,7 +79,7 @@ export function makeSender({ publish, newId, answerTimeoutMs, by, now }: SenderO
       })
 
       try {
-        publish(commandSubject(command.device), JSON.stringify({ id, property: command.property, values: command.values, by }))
+        publish(subjectOf(command.device), JSON.stringify({ id, property: command.property, values: command.values, by }))
       } catch (error) {
         waiting.delete(id)
 

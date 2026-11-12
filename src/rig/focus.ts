@@ -1,4 +1,5 @@
-import { readWireBody, type Entry } from '../../state/entry.ts'
+import type { Entry } from '../../state/entry.ts'
+import { readWireBody } from '../stream/json.ts'
 
 export interface Reading {
   readonly celsius: number

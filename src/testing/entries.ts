@@ -1,4 +1,4 @@
-import type { Entry } from '../../state/entry.ts'
+import { StreamPosition, type Entry } from '../../state/entry.ts'
 
 type Elements = Readonly<Record<string, number | boolean | string>>
 
@@ -13,7 +13,7 @@ let seq = 0
 function entry(kind: string, at: number, body: unknown): Entry {
   seq += 1
 
-  return { seq, kind, at, body }
+  return { seq: StreamPosition.make(seq), kind, at, body }
 }
 
 export function connected(at: number, connection = 1, withRun = run): Entry {

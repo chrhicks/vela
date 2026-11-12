@@ -6,10 +6,9 @@ import type { Measured, Measurement } from '../measure/rig.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
 import type { Picture } from '../rig/picture.ts'
 import { angularDistance, fromMount, toMount, type EquatorialPosition } from '../sky/coordinates.ts'
-import { recordOf, type Entry } from '../../state/entry.ts'
+import type { Entry } from '../../state/entry.ts'
+import { recordOf } from '../stream/json.ts'
 import type { Pointing } from './pointing.ts'
-
-export const centreSubject = 'rig-dev.vela.centre'
 
 const Request = Schema.Struct({ id: Schema.String, exposureSeconds: Schema.Finite.check(Schema.isGreaterThan(0)) })
 
