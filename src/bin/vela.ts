@@ -3,7 +3,7 @@ import { readdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { jetstream } from '@nats-io/jetstream'
-import { Effect, Layer, ManagedRuntime, Result } from 'effect'
+import { Context, Effect, Layer, Result, Scope } from 'effect'
 import { runEntry } from '../capture/events.ts'
 import { makeRunFile } from '../capture/runfile.ts'
 import { makeCapture } from '../capture/run.ts'
@@ -31,6 +31,7 @@ import { makePage } from '../page/server.ts'
 import { VelaSettings } from '../settings.ts'
 import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings } from '../feed/route.ts'
+import { runHandledPromise, runHandledSync } from '../edge.ts'
 import { ServiceVersionFromCheckout } from '../feed/version.ts'
 import { makeReader, type Entry } from '../../state/entry.ts'
 import { streamOf } from '../../state/stream.ts'
@@ -181,10 +182,17 @@ function frameSaved(entry: Entry) {
   else void keeper.requestScan()
 }
 
-const feedRuntime = ManagedRuntime.make(
-  FeedServer.pipe(Layer.provideMerge(FeedLive), Layer.provide(Layer.mergeAll(ServiceVersionFromCheckout, Layer.succeed(FeedSettings, settings.feed)))),
+const feedApp = FeedServer.pipe(Layer.provideMerge(FeedLive), Layer.provide(Layer.mergeAll(ServiceVersionFromCheckout, Layer.succeed(FeedSettings, settings.feed))))
+const feedScope = runHandledSync(Scope.make())
+const feed = await runHandledPromise(
+  Layer.buildWithScope(feedApp, feedScope).pipe(
+    Effect.map(context => Context.get(context, Feed)),
+    Effect.catchTags({
+      ServeError: error => Effect.sync(() => lost(`the event stream could not listen on ${settings.feed.host}:${settings.feed.port}: ${String(error.cause)}`)),
+      VersionUnknown: error => Effect.sync(() => lost(`the event stream could not read the commit of ${error.checkout}: ${error.issue}`)),
+    }),
+  ),
 )
-const feed = await feedRuntime.runPromise(Feed).catch((error: unknown) => lost(`the event stream could not start: ${String(error)}`))
 
 const following = await followRig({
   broker: settings.broker,
@@ -200,9 +208,11 @@ const following = await followRig({
     }
 
     const entry = read.success
-    const fed = feedRuntime.runSync(Effect.result(feed.take(entry)))
-
-    if (Result.isFailure(fed)) console.error(`vela: ${fed.failure.kind} #${fed.failure.seq} is malformed: ${fed.failure.issue}`)
+    runHandledSync(
+      feed.take(entry).pipe(
+        Effect.catchTag('MalformedEntry', error => Effect.sync(() => console.error(`vela: ${error.kind} #${error.seq} is malformed: ${error.issue}`))),
+      ),
+    )
 
     picture.apply(entry, Date.now())
     sender.answered(entry)

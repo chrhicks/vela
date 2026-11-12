@@ -39,7 +39,8 @@ export const FeedRoute = HttpRouter.add(
 export const FeedServer = HttpRouter.serve(FeedRoute, { disableLogger: true }).pipe(
   Layer.provide(
     Layer.unwrap(
-      Effect.map(FeedSettings, ({ port }) => NodeHttpServer.layer(createServer, { port, host: '127.0.0.1' })),
+      Effect.map(FeedSettings, ({ host, port }) => NodeHttpServer.layer(createServer, { port, host })),
     ),
   ),
 )
+
