@@ -1,10 +1,10 @@
 import { createServer } from 'node:http'
 import { NodeHttpServer } from '@effect/platform-node'
 import { Clock, Context, Duration, Effect, Layer, Stream } from 'effect'
-import { HttpRouter, HttpServerResponse } from 'effect/http'
+import { HttpRouter, HttpServerResponse, HttpStaticServer } from 'effect/http'
 import type { FeedConfig } from '../settings.ts'
 import { Feed } from './feed.ts'
-import { ServiceVersion } from './version.ts'
+import { ServiceStart } from './start.ts'
 
 export class FeedSettings extends Context.Service<FeedSettings, typeof FeedConfig.Type>()('vela/FeedSettings') {}
 
@@ -12,7 +12,7 @@ const event = (name: string, data: unknown) => `event: ${name}\ndata: ${JSON.str
 
 const feedEvents = Effect.gen(function* () {
   const feed = yield* Feed
-  const { commit } = yield* ServiceVersion
+  const { token } = yield* ServiceStart
   const { heartbeatSeconds } = yield* FeedSettings
 
   const heartbeats = Stream.tick(Duration.seconds(heartbeatSeconds)).pipe(
@@ -25,7 +25,7 @@ const feedEvents = Effect.gen(function* () {
       const { state, entries } = yield* feed.follow
       const at = yield* Clock.currentTimeMillis
 
-      return Stream.concat(Stream.succeed(event('state', { version: commit, at, state })), Stream.merge(entries.pipe(Stream.map(entry => event('entry', entry))), heartbeats))
+      return Stream.concat(Stream.succeed(event('state', { token, at, state })), Stream.merge(entries.pipe(Stream.map(entry => event('entry', entry))), heartbeats))
     }),
   )
 })
@@ -36,8 +36,10 @@ export const FeedRoute = HttpRouter.add(
   Effect.map(feedEvents, events => HttpServerResponse.stream(Stream.encodeText(events), { contentType: 'text/event-stream', headers: { 'cache-control': 'no-store' } })),
 )
 
-export const FeedServer = HttpRouter.serve(FeedRoute, { disableLogger: true }).pipe(
-  Layer.provide(
+export const WebApp = Layer.unwrap(Effect.map(FeedSettings, ({ webRoot }) => HttpStaticServer.layer({ root: webRoot, spa: true, cacheControl: 'no-cache' })))
+
+export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, WebApp), { disableLogger: true }).pipe(
+  Layer.provideMerge(
     Layer.unwrap(
       Effect.map(FeedSettings, ({ host, port }) => NodeHttpServer.layer(createServer, { port, host })),
     ),

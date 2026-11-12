@@ -2,9 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
 import { jetstream } from '@nats-io/jetstream'
-import { NodeServices } from '@effect/platform-node'
 import { Context, Effect, Layer, Match, Scope, Stream } from 'effect'
 import { runEntry } from '../capture/events.ts'
 import { makeRunFile } from '../capture/runfile.ts'
@@ -34,7 +32,7 @@ import { VelaSettings } from '../settings.ts'
 import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings } from '../feed/route.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
-import { serviceVersionOf } from '../feed/version.ts'
+import { ServiceStartNow } from '../feed/start.ts'
 import { makeReader, type Entry, type Message } from '../../state/entry.ts'
 import { streamOf } from '../../state/stream.ts'
 import { readWireBody } from '../stream/json.ts'
@@ -184,10 +182,9 @@ function frameSaved(entry: Entry) {
   else void keeper.requestScan()
 }
 
-const checkout = fileURLToPath(new URL('../../', import.meta.url))
 const feedApp = FeedServer.pipe(
   Layer.provideMerge(FeedLive),
-  Layer.provide(Layer.mergeAll(serviceVersionOf(checkout).pipe(Layer.provide(NodeServices.layer)), Layer.succeed(FeedSettings, settings.feed))),
+  Layer.provide(Layer.mergeAll(ServiceStartNow, Layer.succeed(FeedSettings, settings.feed))),
 )
 const servicesScope = runHandledSync(Scope.make())
 const { feed, broker } = await runHandledPromise(
@@ -196,8 +193,7 @@ const { feed, broker } = await runHandledPromise(
     Effect.catchTags({
       BrokerUnreachable: error => Effect.sync(() => lost(`the broker at ${error.servers} could not be reached: ${error.issue}`)),
       ServeError: error => Effect.sync(() => lost(`the event stream could not listen on ${settings.feed.host}:${settings.feed.port}: ${String(error.cause)}`)),
-      VersionUnknown: error => Effect.sync(() => lost(`the event stream could not read the commit of ${error.checkout}: git gave '${error.output}'`)),
-      PlatformError: error => Effect.sync(() => lost(`the event stream could not run git in ${checkout}: ${error.message}`)),
+      PlatformError: error => Effect.sync(() => lost(`the web app could not be served from ${settings.feed.webRoot}: ${error.message}`)),
     }),
   ),
 )
