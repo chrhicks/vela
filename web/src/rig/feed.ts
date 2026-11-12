@@ -10,7 +10,7 @@ export type FeedEvent =
   | { readonly _tag: 'Heartbeat'; readonly at: number; readonly receivedAt: number }
   | { readonly _tag: 'Lost' }
 
-interface Sent {
+interface ServerMessage {
   readonly name: string
   readonly data: string
 }
@@ -21,7 +21,7 @@ const decodeHeartbeat = Schema.decodeUnknownResult(Schema.fromJsonString(Heartbe
 
 const unreadable = (event: string) => (error: Schema.SchemaError) => new FeedUnreadable({ event, issue: error.message })
 
-function readSent({ name, data }: Sent, receivedAt: number): Result.Result<FeedEvent, FeedUnreadable> {
+function decodeServerMessage({ name, data }: ServerMessage, receivedAt: number): Result.Result<FeedEvent, FeedUnreadable> {
   switch (name) {
     case feedEvent.state:
       return decodeBootstrap(data).pipe(Result.map(bootstrap => ({ _tag: 'State', bootstrap }) as const), Result.mapError(unreadable(name)))
@@ -34,22 +34,22 @@ function readSent({ name, data }: Sent, receivedAt: number): Result.Result<FeedE
   }
 }
 
-const lost: Sent = { name: 'lost', data: '' }
+const connectionError: ServerMessage = { name: 'error', data: '' }
 
 export const feedEvents = (address: string): Stream.Stream<Result.Result<FeedEvent, FeedUnreadable>> =>
-  Stream.callback<Sent>(queue =>
+  Stream.callback<ServerMessage>(queue =>
     Effect.acquireRelease(
       Effect.sync(() => {
         const source = new EventSource(address)
-        const forward = (name: string) => (message: MessageEvent<string>) => void Queue.offerUnsafe(queue, { name, data: message.data })
+        const queueMessage = (name: string) => (message: MessageEvent<string>) => void Queue.offerUnsafe(queue, { name, data: message.data })
 
-        source.addEventListener(feedEvent.state, forward(feedEvent.state))
-        source.addEventListener(feedEvent.entry, forward(feedEvent.entry))
-        source.addEventListener(feedEvent.heartbeat, forward(feedEvent.heartbeat))
-        source.addEventListener('error', () => void Queue.offerUnsafe(queue, lost))
+        source.addEventListener(feedEvent.state, queueMessage(feedEvent.state))
+        source.addEventListener(feedEvent.entry, queueMessage(feedEvent.entry))
+        source.addEventListener(feedEvent.heartbeat, queueMessage(feedEvent.heartbeat))
+        source.addEventListener('error', () => void Queue.offerUnsafe(queue, connectionError))
 
         return source
       }),
       source => Effect.sync(() => source.close()),
     ),
-  ).pipe(Stream.mapEffect(sent => Effect.map(Clock.currentTimeMillis, receivedAt => readSent(sent, receivedAt))))
+  ).pipe(Stream.mapEffect(message => Effect.map(Clock.currentTimeMillis, receivedAt => decodeServerMessage(message, receivedAt))))

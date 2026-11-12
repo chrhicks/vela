@@ -14,33 +14,33 @@ import { ServiceStart } from './start.ts'
 const makeFeed = () => Effect.runPromise(Feed.pipe(Effect.provide(FeedLive)))
 
 describe('Feed', () => {
-  it('holds the state of the wanted entries taken so far, and leaves the rest out', async () => {
+  it('holds the state of the wanted entries received so far, and leaves the rest out', async () => {
     const feed = await makeFeed()
     const started = runStarted('r1', 1000)
 
-    await Effect.runPromise(feed.take(started))
-    await Effect.runPromise(feed.take(wire('primary', 'CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 3 })))
+    await Effect.runPromise(feed.receive(started))
+    await Effect.runPromise(feed.receive(wire('primary', 'CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 3 })))
 
-    const { state } = await Effect.runPromise(Effect.scoped(feed.follow))
+    const { state } = await Effect.runPromise(Effect.scoped(feed.subscribe))
 
     expect(state.run?.id).toBe('r1')
     expect(state.position).toBe(started.seq)
   })
 
-  it('follows with the entries taken after the state, and only wanted ones', async () => {
+  it('subscribes with the state, then the wanted entries received after it', async () => {
     const feed = await makeFeed()
     const before = runStarted('r1', 1000)
     const after = frameKept('m31_001.fits', 2000)
 
-    await Effect.runPromise(feed.take(before))
+    await Effect.runPromise(feed.receive(before))
 
     const received = await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
-          const { entries } = yield* feed.follow
+          const { entries } = yield* feed.subscribe
 
-          yield* feed.take(wire('primary', 'CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 3 }))
-          yield* feed.take(after)
+          yield* feed.receive(wire('primary', 'CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 3 }))
+          yield* feed.receive(after)
 
           return yield* Stream.runCollect(Stream.take(entries, 1))
         }),
@@ -53,8 +53,8 @@ describe('Feed', () => {
   it('passes on a malformed entry and reports it, leaving the state as it was', async () => {
     const feed = await makeFeed()
     const malformed = entry('vela.frame', 1, { night: 'tonight' })
-    const taken = await Effect.runPromise(Effect.result(feed.take(malformed)))
-    const { state } = await Effect.runPromise(Effect.scoped(feed.follow))
+    const taken = await Effect.runPromise(Effect.result(feed.receive(malformed)))
+    const { state } = await Effect.runPromise(Effect.scoped(feed.subscribe))
 
     expect(taken).toMatchObject({ _tag: 'Failure', failure: { _tag: 'MalformedEntry', kind: 'vela.frame' } })
     expect(state.position).toBeUndefined()
@@ -65,7 +65,7 @@ describe('GET /feed', () => {
   it('sends the state with the start token first, then entries and heartbeats', async () => {
     const feed = await makeFeed()
 
-    await Effect.runPromise(feed.take(runStarted('r1', 1000)))
+    await Effect.runPromise(feed.receive(runStarted('r1', 1000)))
 
     const services = Context.make(Feed, feed).pipe(Context.add(ServiceStart, { token: StartToken.make('1794500000000') }), Context.add(FeedSettings, { host: '127.0.0.1', port: 0, webRoot: '.', heartbeatSeconds: 0.05 }))
     const { handler, dispose } = HttpRouter.toWebHandler(FeedRoute, { disableLogger: true })
@@ -74,7 +74,7 @@ describe('GET /feed', () => {
     const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
     let text = ''
 
-    await Effect.runPromise(feed.take(frameKept('m31_001.fits', 2000)))
+    await Effect.runPromise(feed.receive(frameKept('m31_001.fits', 2000)))
 
     while (!text.includes('event: heartbeat')) text += (await reader.read()).value ?? ''
 

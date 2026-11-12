@@ -23,7 +23,7 @@ const feedEvents = Effect.gen(function* () {
 
   return Stream.unwrap(
     Effect.gen(function* () {
-      const { state, entries } = yield* feed.follow
+      const { state, entries } = yield* feed.subscribe
       const at = yield* Clock.currentTimeMillis
 
       return Stream.concat(Stream.succeed(event(feedEvent.state, { token, at, state })), Stream.merge(entries.pipe(Stream.map(entry => event(feedEvent.entry, entry))), heartbeats))
