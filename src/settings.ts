@@ -62,6 +62,9 @@ export const FeedConfig = Schema.Struct({
     Schema.Number,
     8796,
   ),
+  webRoot: Schema.String.annotate({
+    description: "The folder of the built web app (web/dist after its build), served at every address the event stream does not answer, so the page and its event stream come from one place",
+  }),
   heartbeatSeconds: described(
     "How often the event stream sends the service's clock, so a page can tell a quiet rig from a lost connection and age readings by one clock. Not measured: 5 s lets a page see a dropped connection within seconds for 12 small messages a minute",
     Schema.Number,
@@ -195,7 +198,7 @@ export const VelaSettings = Schema.Struct({
     Schema.Number,
     1,
   ),
-  feed: described('The event stream the web app reads: the state first, then each wanted entry, and a heartbeat', FeedConfig, {}),
+  feed: FeedConfig.annotate({ description: 'The web app and the event stream it reads: the state first, then each wanted entry, and a heartbeat' }),
   frames: FrameSettings,
   capture: CaptureSettings,
   prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),

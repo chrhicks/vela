@@ -20,5 +20,8 @@
   },
   "silenceSeconds": 10,
   "pageRefreshSeconds": 1,
-  "historyReadBatch": 2048
+  "historyReadBatch": 2048,
+  "feed": {
+    "webRoot": "/home/example/vela/web/dist"
+  }
 }
