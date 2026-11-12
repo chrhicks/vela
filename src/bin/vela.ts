@@ -5,7 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { jetstream } from '@nats-io/jetstream'
 import { NodeServices } from '@effect/platform-node'
-import { Context, Effect, Layer, Scope } from 'effect'
+import { Context, Effect, Layer, Match, Scope, Stream } from 'effect'
 import { runEntry } from '../capture/events.ts'
 import { makeRunFile } from '../capture/runfile.ts'
 import { makeCapture } from '../capture/run.ts'
@@ -35,10 +35,10 @@ import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings } from '../feed/route.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
 import { serviceVersionOf } from '../feed/version.ts'
-import { makeReader, type Entry } from '../../state/entry.ts'
+import { makeReader, type Entry, type Message } from '../../state/entry.ts'
 import { streamOf } from '../../state/stream.ts'
 import { readWireBody } from '../stream/json.ts'
-import { followRig } from '../stream/follow.ts'
+import { Broker, brokerOf, followRig, type Followed } from '../stream/follow.ts'
 
 const settings = readConfig(VelaSettings, process.argv[2])
 const stream = streamOf(settings.environment)
@@ -62,7 +62,7 @@ function lost(reason: string): never {
 
 const sender = makeSender({
   subjectOf: stream.command,
-  publish: (subject, payload) => following.connection.publish(subject, payload),
+  publish: (subject, payload) => broker.connection.publish(subject, payload),
   newId: () => `vela-${randomUUID()}`,
   answerTimeoutMs: settings.capture.commandAnswerSeconds * 1000,
   by: 'vela',
@@ -87,7 +87,7 @@ const capture = makeCapture({
   now: Date.now,
   newRunId: () => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''),
   emit: event => {
-    jetstream(following.connection)
+    jetstream(broker.connection)
       .publish(stream.vela('run'), JSON.stringify(runEntry(event, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the ${event.kind} entry of run ${event.run}: ${String(error)}`))
   },
@@ -96,7 +96,7 @@ const capture = makeCapture({
 const publishEntry = (subject: string, kind: string, id: string, body: Readonly<Record<string, unknown>>) => {
   const at = Date.now()
 
-  jetstream(following.connection)
+  jetstream(broker.connection)
     .publish(subject, JSON.stringify({ v: 2, id: `${kind}:${id}:${at}`, rig: frames.rig, kind, at, source: 'vela', body }))
     .catch((error: unknown) => console.error(`vela: could not publish ${kind}: ${String(error)}`))
 }
@@ -164,7 +164,7 @@ const keeper = makeKeeper({
   onKept: frame => {
     page.framesChanged()
     measureKept(frame)
-    jetstream(following.connection)
+    jetstream(broker.connection)
       .publish(stream.vela('frame'), JSON.stringify(frameEntry(frame, frames.rig, Date.now())))
       .catch((error: unknown) => console.error(`vela: could not publish the entry for ${frame.file}: ${String(error)}`))
   },
@@ -174,7 +174,7 @@ const keeper = makeKeeper({
   },
 })
 
-const requestMeasure = makeMeasureRequests({ subject: stream.command('measure'), publish: (subject, payload) => following.connection.publish(subject, payload), newId: () => `vela-${randomUUID()}`, by: 'vela' })
+const requestMeasure = makeMeasureRequests({ subject: stream.command('measure'), publish: (subject, payload) => broker.connection.publish(subject, payload), newId: () => `vela-${randomUUID()}`, by: 'vela' })
 
 function frameSaved(entry: Entry) {
   const path = readWireBody(entry)?.elements['FILE_PATH']
@@ -189,11 +189,12 @@ const feedApp = FeedServer.pipe(
   Layer.provideMerge(FeedLive),
   Layer.provide(Layer.mergeAll(serviceVersionOf(checkout).pipe(Layer.provide(NodeServices.layer)), Layer.succeed(FeedSettings, settings.feed))),
 )
-const feedScope = runHandledSync(Scope.make())
-const feed = await runHandledPromise(
-  Layer.buildWithScope(feedApp, feedScope).pipe(
-    Effect.map(context => Context.get(context, Feed)),
+const servicesScope = runHandledSync(Scope.make())
+const { feed, broker } = await runHandledPromise(
+  Layer.buildWithScope(Layer.mergeAll(feedApp, brokerOf(settings.broker)), servicesScope).pipe(
+    Effect.map(context => ({ feed: Context.get(context, Feed), broker: Context.get(context, Broker) })),
     Effect.catchTags({
+      BrokerUnreachable: error => Effect.sync(() => lost(`the broker at ${error.servers} could not be reached: ${error.issue}`)),
       ServeError: error => Effect.sync(() => lost(`the event stream could not listen on ${settings.feed.host}:${settings.feed.port}: ${String(error.cause)}`)),
       VersionUnknown: error => Effect.sync(() => lost(`the event stream could not read the commit of ${error.checkout}: git gave '${error.output}'`)),
       PlatformError: error => Effect.sync(() => lost(`the event stream could not run git in ${checkout}: ${error.message}`)),
@@ -226,37 +227,44 @@ function observe(entry: Entry) {
 
 const report = (line: string) => Effect.sync(() => console.error(`vela: ${line}`))
 
-const following = await followRig({
-  broker: settings.broker,
-  stream,
-  read: readMessage,
-  readBatch: settings.historyReadBatch,
-  onUnreadable: error => runHandledSync(report(`${error.subject} #${error.seq} could not be read while finding the rig's latest connection: ${error.issue}`)),
-  onMessage: message =>
-    runHandledSync(
-      Effect.fromResult(readMessage(message)).pipe(
-        Effect.tap(entry =>
-          feed.take(entry).pipe(
-            Effect.catchTags({
-              MalformedEntry: error => report(`${error.kind} #${error.seq} is malformed: ${error.issue}`),
-              MalformedReading: error => report(`device reading #${error.seq} is malformed: ${error.issue}`),
-            }),
-          ),
-        ),
-        Effect.tap(entry => Effect.sync(() => observe(entry))),
-        Effect.catchTag('UnreadableMessage', error => report(`${error.subject} #${error.seq} could not be read: ${error.issue}`)),
-        Effect.asVoid,
+const takeMessage = (message: Message) =>
+  Effect.fromResult(readMessage(message)).pipe(
+    Effect.tap(entry =>
+      feed.take(entry).pipe(
+        Effect.catchTags({
+          MalformedEntry: error => report(`${error.kind} #${error.seq} is malformed: ${error.issue}`),
+          MalformedReading: error => report(`device reading #${error.seq} is malformed: ${error.issue}`),
+        }),
       ),
     ),
-  onCaughtUp: () => picture.caughtUp(),
-})
+    Effect.tap(entry => Effect.sync(() => observe(entry))),
+    Effect.catchTag('UnreadableMessage', error => report(`${error.subject} #${error.seq} could not be read: ${error.issue}`)),
+    Effect.asVoid,
+  )
 
-void following.connection.closed().then(error => lost(`broker connection lost${error ? `: ${error.message}` : ''}`))
-following.done.then(
-  () => lost('the stream reader ended'),
-  (error: unknown) => lost(`the stream reader failed: ${String(error)}`),
-)
+const take = (followed: Followed) =>
+  Match.valueTags(followed, {
+    Message: ({ message }) => takeMessage(message),
+    CaughtUp: () => Effect.sync(() => picture.caughtUp()),
+  })
 
 void keeper.requestScan()
 
 page.server.listen(settings.port, '127.0.0.1', () => console.error(`vela: http://127.0.0.1:${settings.port}/`))
+
+await runHandledPromise(
+  followRig({
+    stream,
+    readBatch: settings.historyReadBatch,
+    read: readMessage,
+    onUnreadable: error => runHandledSync(report(`${error.subject} #${error.seq} could not be read while finding the rig's latest connection: ${error.issue}`)),
+  }).pipe(
+    Stream.runForEach(take),
+    Effect.provideService(Broker, broker),
+    Effect.catchTags({
+      StreamUnreadable: error => Effect.sync(() => lost(`the stream ${error.stream} could not be read (${error.step}): ${error.issue}`)),
+      BrokerLost: error => Effect.sync(() => lost(`broker connection lost${error.issue === undefined ? '' : `: ${error.issue}`}`)),
+      FollowEnded: error => Effect.sync(() => lost(`the stream ${error.stream} ended`)),
+    }),
+  ),
+)
