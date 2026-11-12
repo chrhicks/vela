@@ -1,7 +1,7 @@
-import { Option } from 'effect'
+import { Option, Result } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { emptyRig, rig } from './rig.ts'
-import { fold, frameKept, frameMeasured, read, runStarted } from './testing.ts'
+import { advance, emptyRig, rig } from './rig.ts'
+import { entry, fold, frameKept, frameMeasured, read, runStarted } from './testing.ts'
 
 describe('rig', () => {
   it('records how far along the stream the state is', () => {
@@ -19,5 +19,20 @@ describe('rig', () => {
 
     expect(after.run).toBe(before.run)
     expect(after.frames).toBe(before.frames)
+  })
+})
+
+describe('advance', () => {
+  it('folds an entry a reducer reads, and moves the position past one none reads', () => {
+    const started = runStarted('r1', 1000)
+    const guided = entry('phd2.GuideStep', 1001, { Frame: 1 })
+    const state = [started, guided].reduce((current, next) => Result.getOrThrow(advance(current, next)), emptyRig)
+
+    expect(state.run?.id).toBe('r1')
+    expect(state.position).toBe(guided.seq)
+  })
+
+  it('fails with the entry when a known kind has the wrong shape', () => {
+    expect(Result.isFailure(advance(emptyRig, entry('vela.frame', 1, { night: 'tonight' })))).toBe(true)
   })
 })

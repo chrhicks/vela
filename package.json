@@ -9,6 +9,7 @@
     "verify": "./verify.sh"
   },
   "dependencies": {
+    "@effect/platform-node": "4.0.3",
     "@nats-io/jetstream": "3.4.0",
     "@nats-io/transport-node": "3.4.0",
     "astronomy-engine": "2.1.19",
