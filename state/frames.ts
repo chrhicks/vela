@@ -1,4 +1,4 @@
-import { numberOf, recordOf, textOf, type Entry } from './entry.ts'
+import type { FrameFile, NightName, RigEntry } from './entries.ts'
 
 export interface Measurements {
   readonly stars: number | null
@@ -9,57 +9,31 @@ export interface Measurements {
 }
 
 export interface Frame {
-  readonly night: string
-  readonly file: string
+  readonly night: NightName
+  readonly file: FrameFile
   readonly keptAt: number
   readonly measurements: Measurements | undefined
 }
 
-function nullableNumber(body: Readonly<Record<string, unknown>>, name: string): number | null | undefined {
-  return body[name] === null ? null : numberOf(body, name)
-}
+const sameFrame = (night: NightName, file: FrameFile) => (frame: Frame) => frame.night === night && frame.file === file
 
-function measurementsOf(body: Readonly<Record<string, unknown>>): Measurements | undefined {
-  const stars = nullableNumber(body, 'stars')
-  const hfdPixels = nullableNumber(body, 'hfdPixels')
-  const elongation = nullableNumber(body, 'elongation')
-  const sky = numberOf(body, 'sky')
-  const noise = numberOf(body, 'noise')
-
-  if (stars === undefined || hfdPixels === undefined || elongation === undefined || sky === undefined || noise === undefined) return undefined
-
-  return { stars, hfdPixels, elongation, sky, noise }
-}
-
-function kept(state: ReadonlyArray<Frame>, entry: Entry): ReadonlyArray<Frame> {
-  const body = recordOf(entry.body)
-  const night = body === undefined ? undefined : textOf(body, 'night')
-  const file = body === undefined ? undefined : textOf(body, 'file')
-
-  if (night === undefined || file === undefined) return state
-  if (state.some(frame => frame.night === night && frame.file === file)) return state
-
-  return [...state, { night, file, keptAt: entry.at, measurements: undefined }]
-}
-
-function measured(state: ReadonlyArray<Frame>, entry: Entry): ReadonlyArray<Frame> {
-  const body = recordOf(entry.body)
-  const night = body === undefined ? undefined : textOf(body, 'night')
-  const file = body === undefined ? undefined : textOf(body, 'file')
-  const measurements = body === undefined ? undefined : measurementsOf(body)
-  const isMeasured = (frame: Frame) => frame.night === night && frame.file === file
-
-  if (measurements === undefined || !state.some(isMeasured)) return state
-
-  return state.map(frame => (isMeasured(frame) ? { ...frame, measurements } : frame))
-}
-
-export function frames(state: ReadonlyArray<Frame>, entry: Entry): ReadonlyArray<Frame> {
+export function frames(state: ReadonlyArray<Frame>, entry: RigEntry): ReadonlyArray<Frame> {
   switch (entry.kind) {
-    case 'vela.frame':
-      return kept(state, entry)
-    case 'vela.frame.stats':
-      return measured(state, entry)
+    case 'vela.frame': {
+      const { night, file } = entry.body
+
+      if (state.some(sameFrame(night, file))) return state
+
+      return [...state, { night, file, keptAt: entry.at, measurements: undefined }]
+    }
+    case 'vela.frame.stats': {
+      const { night, file, stars, hfdPixels, elongation, sky, noise } = entry.body
+      const isMeasured = sameFrame(night, file)
+
+      if (!state.some(isMeasured)) return state
+
+      return state.map(frame => (isMeasured(frame) ? { ...frame, measurements: { stars, hfdPixels, elongation, sky, noise } } : frame))
+    }
     default:
       return state
   }

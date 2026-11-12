@@ -1,3 +1,4 @@
+import { StreamPosition } from '../../state/entry.ts'
 import { describe, expect, it } from 'vitest'
 import { connected, indiserver, phd2, phd2Link, startedAt, wire } from '../testing/entries.ts'
 import { makePicture } from './picture.ts'
@@ -116,7 +117,7 @@ describe('picture', () => {
     const picture = makePicture()
 
     picture.apply(wire(t(1), 'def', 'mount', 'TELESCOPE_PARK', { PARK: true }, 'Ok'), 111)
-    picture.apply({ seq: 0, kind: 'system', at: 1, body: {} }, 222)
+    picture.apply({ seq: StreamPosition.make(0), kind: 'system', at: 1, body: {} }, 222)
 
     expect(picture.heardAt()).toBe(111)
   })

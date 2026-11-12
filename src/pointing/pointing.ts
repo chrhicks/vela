@@ -5,7 +5,8 @@ import { decodeConfig } from '../config.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
 import type { Picture } from '../rig/picture.ts'
 import { angularDistance } from '../sky/coordinates.ts'
-import { readWireBody, type Entry } from '../../state/entry.ts'
+import type { Entry } from '../../state/entry.ts'
+import { readWireBody } from '../stream/json.ts'
 import { meridianLimitAt, targetOf, type Target } from './target.ts'
 
 const Request = Schema.Union([

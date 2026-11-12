@@ -1,4 +1,5 @@
-import { readWireBody, type Entry } from '../../state/entry.ts'
+import type { Entry } from '../../state/entry.ts'
+import { readWireBody } from '../stream/json.ts'
 
 export function announcesFrame(entry: Entry, camera: string) {
   if (entry.kind !== 'wire') return false

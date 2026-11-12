@@ -1,16 +1,17 @@
-import type { Entry } from './entry.ts'
+import type { RigEntry } from './entries.ts'
+import type { StreamPosition } from './entry.ts'
 import { frames, type Frame } from './frames.ts'
 import { run, type Run } from './run.ts'
 
 export interface RigState {
-  readonly position: number
+  readonly position: StreamPosition | undefined
   readonly run: Run | undefined
   readonly frames: ReadonlyArray<Frame>
 }
 
-export const emptyRig: RigState = { position: 0, run: undefined, frames: [] }
+export const emptyRig: RigState = { position: undefined, run: undefined, frames: [] }
 
-export function rig(state: RigState, entry: Entry): RigState {
+export function rig(state: RigState, entry: RigEntry): RigState {
   return {
     position: entry.seq,
     run: run(state.run, entry),

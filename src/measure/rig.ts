@@ -1,6 +1,5 @@
-import { recordOf, type Entry } from '../../state/entry.ts'
-
-export const measureSubject = 'rig-dev.command.measure'
+import type { Entry } from '../../state/entry.ts'
+import { recordOf } from '../stream/json.ts'
 
 export type Measurement = 'solve' | 'stars'
 
@@ -54,11 +53,12 @@ export function measuredOf(entry: Entry, by: string): Measured | undefined {
 }
 
 export interface MeasureRequests {
+  readonly subject: string
   readonly publish: (subject: string, payload: string) => void
   readonly newId: () => string
   readonly by: string
 }
 
-export function makeMeasureRequests({ publish, newId, by }: MeasureRequests) {
-  return (file: string, measure: ReadonlyArray<Measurement>) => publish(measureSubject, JSON.stringify({ id: newId(), by, file, measure, remove: true }))
+export function makeMeasureRequests({ subject, publish, newId, by }: MeasureRequests) {
+  return (file: string, measure: ReadonlyArray<Measurement>) => publish(subject, JSON.stringify({ id: newId(), by, file, measure, remove: true }))
 }

@@ -1,8 +1,10 @@
 import { DeliverPolicy, jetstream, type JsMsg } from '@nats-io/jetstream'
 import { connect, type NatsConnection } from '@nats-io/transport-node'
-import type { Message } from '../../state/entry.ts'
+import type { Result } from 'effect'
+import type { Entry, Message, UnreadableMessage } from '../../state/entry.ts'
+import type { Stream } from '../../state/stream.ts'
 import type { BrokerSettings } from './broker.ts'
-import { clientSubject, followedSubjects, makeConnectionFinder, streamName } from './connection.ts'
+import { makeConnectionFinder } from './connection.ts'
 
 export interface Following {
   readonly connection: NatsConnection
@@ -15,6 +17,8 @@ function messageOf(message: JsMsg): Message {
 
 export async function followRig(options: {
   readonly broker: BrokerSettings
+  readonly stream: Stream
+  readonly read: (message: Message) => Result.Result<Entry, UnreadableMessage>
   readonly readBatch: number
   readonly onMessage: (message: Message) => void
   readonly onCaughtUp: () => void
@@ -23,8 +27,8 @@ export async function followRig(options: {
   const client = jetstream(connection)
 
   async function latestConnectionStart() {
-    const finder = makeConnectionFinder()
-    const consumer = await client.consumers.get(streamName, { filter_subjects: [clientSubject], deliver_policy: DeliverPolicy.All })
+    const finder = makeConnectionFinder(options.read)
+    const consumer = await client.consumers.get(options.stream.name, { filter_subjects: [options.stream.client], deliver_policy: DeliverPolicy.All })
 
     if ((await consumer.info()).num_pending === 0) return undefined
 
@@ -42,8 +46,8 @@ export async function followRig(options: {
   }
 
   async function replayAndFollow(start: number | undefined) {
-    const consumer = await client.consumers.get(streamName, {
-      filter_subjects: followedSubjects,
+    const consumer = await client.consumers.get(options.stream.name, {
+      filter_subjects: [...options.stream.followed],
       ...(start === undefined ? { deliver_policy: DeliverPolicy.New } : { deliver_policy: DeliverPolicy.StartSequence, opt_start_seq: start }),
     })
 

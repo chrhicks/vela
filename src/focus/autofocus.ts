@@ -4,9 +4,8 @@ import type { Sender } from '../commands/sender.ts'
 import { decodeConfig } from '../config.ts'
 import type { Measured, Measurement } from '../measure/rig.ts'
 import type { Picture } from '../rig/picture.ts'
-import { recordOf, type Entry } from '../../state/entry.ts'
-
-export const focusSubject = 'rig-dev.vela.focus'
+import type { Entry } from '../../state/entry.ts'
+import { recordOf } from '../stream/json.ts'
 
 const positive = Schema.Int.check(Schema.isGreaterThan(0))
 

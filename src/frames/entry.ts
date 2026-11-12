@@ -1,5 +1,3 @@
-export const frameSubject = 'rig-dev.vela.frame'
-
 export interface KeptFrame {
   readonly file: string
   readonly night: string

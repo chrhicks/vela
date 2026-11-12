@@ -1,8 +1,9 @@
+import { Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { run, type Run } from './run.ts'
-import { entry, runStarted } from './testing.ts'
+import { entry, fold, read, runStarted } from './testing.ts'
 
-const reduce = (entries: ReadonlyArray<ReturnType<typeof entry>>) => entries.reduce<Run | undefined>(run, undefined)
+const reduce = (entries: Parameters<typeof fold>[2]) => fold<Run | undefined>(run, undefined, entries)
 
 describe('run', () => {
   it('starts a run with what was asked for', () => {
@@ -27,6 +28,12 @@ describe('run', () => {
     expect(state).toMatchObject({ status: 'capturing', id: 'r2', frames: 0 })
   })
 
+  it('starts an open-ended run, such as alignment, with no count', () => {
+    const state = reduce([entry('vela.run.started', 1000, { run: 'a1', object: 'polar-align', frameType: 'light', exposureSeconds: 2, gain: 100, offset: 50, cooler: 'keep', sequence: 'polar-align_light' })])
+
+    expect(state).toMatchObject({ status: 'capturing', id: 'a1', object: 'polar-align', count: undefined })
+  })
+
   it('replaces an ended run when the next one starts', () => {
     const state = reduce([runStarted('r1', 1000), entry('vela.run.ended', 1100, { run: 'r1', reason: 'done' }), runStarted('r2', 2000, 'M 42')])
 
@@ -35,7 +42,8 @@ describe('run', () => {
 
   it('returns the same object for an entry that does not concern it', () => {
     const state = reduce([runStarted('r1', 1000)])
+    const measured = Option.getOrThrow(read(entry('vela.frame.stats', 1001, { night: '2026-11-08', file: 'a.fits', stars: 1, hfdPixels: 2, elongation: 1, sky: 3, noise: 4 })))
 
-    expect(run(state, entry('phd2.GuideStep', 1001, {}))).toBe(state)
+    expect(run(state, measured)).toBe(state)
   })
 })
