@@ -28,7 +28,7 @@ import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
 import { VelaSettings } from '../settings.ts'
-import { readEntry, readWireBody } from '../stream/entry.ts'
+import { readMessage, readWireBody, type Entry } from '../../state/entry.ts'
 import { followRig } from '../stream/follow.ts'
 
 const settings = readConfig(VelaSettings, process.argv[2])
@@ -165,7 +165,7 @@ const keeper = makeKeeper({
 
 const requestMeasure = makeMeasureRequests({ publish: (subject, payload) => following.connection.publish(subject, payload), newId: () => `vela-${randomUUID()}`, by: 'vela' })
 
-function frameSaved(entry: ReturnType<typeof readEntry> & {}) {
+function frameSaved(entry: Entry) {
   const path = readWireBody(entry.body)?.elements['FILE_PATH']
   const label = typeof path === 'string' ? capture.labelOf(basename(path)) : undefined
 
@@ -177,7 +177,7 @@ const following = await followRig({
   broker: settings.broker,
   readBatch: settings.historyReadBatch,
   onMessage: message => {
-    const entry = readEntry(message.text)
+    const entry = readMessage(message)
 
     if (entry === undefined) return
 

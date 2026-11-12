@@ -1,5 +1,5 @@
 import type { Property } from '../rig/picture.ts'
-import type { Value } from '../stream/entry.ts'
+import type { Value } from '../../state/entry.ts'
 import { frameTypeElement, type CaptureRequest } from './request.ts'
 
 export type Read = (property: string) => Property | undefined

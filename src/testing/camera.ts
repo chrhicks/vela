@@ -3,7 +3,7 @@ import type { RunEvent } from '../capture/events.ts'
 import type { ActiveRecord, RunFile } from '../capture/runfile.ts'
 import { makeSender } from '../commands/sender.ts'
 import { makePicture } from '../rig/picture.ts'
-import type { Entry, Value } from '../stream/entry.ts'
+import type { Entry, Value } from '../../state/entry.ts'
 import { connected, indiserver, startedAt, wire } from './entries.ts'
 
 export type Exposure = 'file' | 'alert' | 'nothing' | 'retry'
@@ -67,7 +67,7 @@ export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial
   const set = (property: string, values: Readonly<Record<string, Value>>, state = 'Ok') => feed(wire(startedAt + (tick += 1), 'set', 'primary', property, values, state))
 
   const answer = (id: string, property: string, result: 'written' | 'refused', reason?: string) =>
-    feed({ id: `client:${id}`, kind: 'client.command', at: startedAt + (tick += 1), run: 'run-a', body: { id, by: 'vela', device: 'primary', property, result, ...(reason === undefined ? {} : { reason }) } })
+    feed({ seq: 0, kind: 'client.command', at: startedAt + (tick += 1), body: { id, by: 'vela', device: 'primary', property, result, ...(reason === undefined ? {} : { reason }) } })
 
   function expose() {
     const behaviour = script.exposures.shift() ?? 'file'

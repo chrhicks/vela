@@ -1,4 +1,4 @@
-import { readWireBody, recordOf, type Entry } from '../stream/entry.ts'
+import { readWireBody, recordOf, type Entry } from '../../state/entry.ts'
 
 export type Topic = 'command' | 'run' | 'device' | 'driver'
 

@@ -6,9 +6,10 @@ Chris Hicks's observing program. Read `SOUL.md` for how to work on it and `/home
 
 Vela is being rebuilt on the rig stream (plan: `bots/observer/specs/vela-next/plan-v2.md` in the home repo). The old Vela was removed on 2026-11-07; what remains:
 
+- `state/`: what the stream means, shared by the service and the web app (architecture: `bots/observer/specs/thuban-ui/architecture.md` in the home repo). The entry reader (`entry.ts`: stream position, kind, time, body; command requests become `command` entries), the list of what the browser receives (`wanted.ts`) and the reducers (`rig.ts` and one file per slice), each with tests on made-up entries.
 - `src/catalog/`: OpenNGC target data (J2000) and its row types. See its `README.md` for provenance and the license.
 - `src/sky/coordinates.ts`: J2000 to epoch-of-date conversion (`toMount`, `fromMount`, `angularDistance`) on `astronomy-engine`.
-- `src/bin/vela.ts`: the night page and capture controls, a Node service on thuban. `src/stream/` follows the stream, `src/rig/` holds the picture (`picture.ts`) and what the page shows (`night.ts`), `src/page/` serves it. Deploy files in `deploy/`.
+- `src/bin/vela.ts`: the night page and capture controls, a Node service on thuban. `src/stream/` follows the stream (including command requests), `src/rig/` holds the picture (`picture.ts`) and what the page shows (`night.ts`), `src/page/` serves it. Deploy files in `deploy/`.
 - `src/commands/`: the command sender (publish `rig-dev.command.<device>`, wait for the `client.command` answer). `src/capture/`: the capture run, the settings comparison, the run file and the `vela.run` entries. See the README.
 - `src/prepare/`: the focuser and dew controls (`prepare.ts` checks a request against the limits on the stream and sends the commands) and the view the page draws them from (`view.ts`). PHD2's state and the time of its last guide step are on the page.
 - `src/pointing/`: catalog lookup to goto: `target.ts` converts a catalog row to epoch of date (precession and nutation, no site), `pointing.ts` sends goto, Unpark, Home, tracking and Stop and follows a goto from the stream. There is no Park (parking turns the rig sideways). `src/catalog/search.ts` is the lookup, `src/sky/meridian.ts` the time to the meridian limit.

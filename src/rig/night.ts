@@ -2,7 +2,7 @@ import { makePrepareView, type PrepareView } from '../prepare/view.ts'
 import { siteOf } from '../pointing/target.ts'
 import { nightTimes, type NightTimes } from '../sky/darkness.ts'
 import { formatDuration, meridianText, secondsToMeridianLimit } from '../sky/meridian.ts'
-import type { Value } from '../stream/entry.ts'
+import type { Value } from '../../state/entry.ts'
 import type { Picture, Property } from './picture.ts'
 
 export type Status = 'current' | 'stale' | 'unknown'

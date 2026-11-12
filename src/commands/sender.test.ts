@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { Entry } from '../stream/entry.ts'
+import type { Entry } from '../../state/entry.ts'
 import { makeSender, readAnswer } from './sender.ts'
 
-const answer = (body: unknown): Entry => ({ id: 'client:1', kind: 'client.command', at: 1, run: 'rig-run', body })
+const answer = (body: unknown): Entry => ({ seq: 0, kind: 'client.command', at: 1, body })
 
 function setup(options: { timeoutMs?: number; publish?: (subject: string, payload: string) => void } = {}) {
   const published: Array<{ subject: string; payload: Record<string, unknown> }> = []
