@@ -89,7 +89,7 @@ export function Chart({ title, current, lines, yTicks, xLabels, band, marker, sp
               <rect className={styles.band} x="0" width="100" y={top(band.to)} height={top(band.from) - top(band.to)} />
             )}
 
-            {shown.map((line, index) => (
+            {yTicks.length === 0 ? null : shown.map((line, index) => (
               <polyline
                 key={index}
                 className={styles.line}
