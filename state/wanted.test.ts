@@ -30,4 +30,9 @@ describe('isWanted', () => {
   it('fails with a typed MalformedReading for a device reading with no device', () => {
     expect(Result.isFailure(isWanted(entry('wire', 0, { dir: 'in', type: 'set', property: 'P' })))).toBe(true)
   })
+
+  it('takes the removal of a whole device on the list, and leaves out one that is not', () => {
+    expect(Result.getOrThrow(isWanted(entry('wire', 0, { dir: 'in', device: 'mount', type: 'del' })))).toBe(true)
+    expect(Result.getOrThrow(isWanted(entry('wire', 0, { dir: 'in', device: 'camera2', type: 'del' })))).toBe(false)
+  })
 })

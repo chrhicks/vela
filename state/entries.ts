@@ -1,5 +1,5 @@
 import { Data, Option, Result, Schema } from 'effect'
-import { StreamPosition, type Entry } from './entry.ts'
+import { StreamPosition, WireBody, type Entry } from './entry.ts'
 
 export const RunId = Schema.NonEmptyString.pipe(Schema.brand('RunId'))
 
@@ -48,7 +48,13 @@ export const FrameMeasured = entryOf('vela.frame.stats', {
   noise: Schema.Number,
 })
 
-const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured] as const
+export const DeviceReported = entryOf('wire', WireBody.fields)
+
+export const RigConnected = entryOf('client.connected', {})
+
+export const RigLink = entryOf('client.connection', { target: Schema.String, status: Schema.String })
+
+const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink] as const
 
 export const RigEntry = Schema.Union(members)
 
