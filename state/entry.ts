@@ -90,4 +90,13 @@ export type WireBody = typeof WireBody.Type
 
 export type Limits = typeof Limits.Type
 
-export const decodeWireBody = Schema.decodeUnknownOption(WireBody)
+export class MalformedReading extends Data.TaggedError('MalformedReading')<{
+  readonly seq: StreamPosition
+  readonly issue: string
+}> {}
+
+const decodeWireBody = Schema.decodeUnknownResult(WireBody)
+
+export function readWire(entry: Entry): Result.Result<WireBody, MalformedReading> {
+  return decodeWireBody(entry.body).pipe(Result.mapError(error => new MalformedReading({ seq: entry.seq, issue: error.message })))
+}

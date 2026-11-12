@@ -36,7 +36,7 @@ export function makeFocusDrift(focuser: string) {
 
       if (entry.kind !== 'wire') return
 
-      const wire = readWireBody(entry.body)
+      const wire = readWireBody(entry)
 
       if (wire === undefined || wire.dir !== 'in' || wire.device !== focuser) return
 

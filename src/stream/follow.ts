@@ -19,6 +19,7 @@ export async function followRig(options: {
   readonly broker: BrokerSettings
   readonly stream: Stream
   readonly read: (message: Message) => Result.Result<Entry, UnreadableMessage>
+  readonly onUnreadable: (error: UnreadableMessage) => void
   readonly readBatch: number
   readonly onMessage: (message: Message) => void
   readonly onCaughtUp: () => void
@@ -27,7 +28,7 @@ export async function followRig(options: {
   const client = jetstream(connection)
 
   async function latestConnectionStart() {
-    const finder = makeConnectionFinder(options.read)
+    const finder = makeConnectionFinder(options.read, options.onUnreadable)
     const consumer = await client.consumers.get(options.stream.name, { filter_subjects: [options.stream.client], deliver_policy: DeliverPolicy.All })
 
     if ((await consumer.info()).num_pending === 0) return undefined

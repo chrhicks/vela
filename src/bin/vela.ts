@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto'
 import { readdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
 import { jetstream } from '@nats-io/jetstream'
-import { Context, Effect, Layer, Result, Scope } from 'effect'
+import { NodeServices } from '@effect/platform-node'
+import { Context, Effect, Layer, Scope } from 'effect'
 import { runEntry } from '../capture/events.ts'
 import { makeRunFile } from '../capture/runfile.ts'
 import { makeCapture } from '../capture/run.ts'
@@ -32,7 +34,7 @@ import { VelaSettings } from '../settings.ts'
 import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings } from '../feed/route.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
-import { ServiceVersionFromCheckout } from '../feed/version.ts'
+import { serviceVersionOf } from '../feed/version.ts'
 import { makeReader, type Entry } from '../../state/entry.ts'
 import { streamOf } from '../../state/stream.ts'
 import { readWireBody } from '../stream/json.ts'
@@ -175,66 +177,77 @@ const keeper = makeKeeper({
 const requestMeasure = makeMeasureRequests({ subject: stream.command('measure'), publish: (subject, payload) => following.connection.publish(subject, payload), newId: () => `vela-${randomUUID()}`, by: 'vela' })
 
 function frameSaved(entry: Entry) {
-  const path = readWireBody(entry.body)?.elements['FILE_PATH']
+  const path = readWireBody(entry)?.elements['FILE_PATH']
   const label = typeof path === 'string' ? capture.labelOf(basename(path)) : undefined
 
   if (label?.measure !== undefined) requestMeasure(basename(String(path)), label.measure)
   else void keeper.requestScan()
 }
 
-const feedApp = FeedServer.pipe(Layer.provideMerge(FeedLive), Layer.provide(Layer.mergeAll(ServiceVersionFromCheckout, Layer.succeed(FeedSettings, settings.feed))))
+const checkout = fileURLToPath(new URL('../../', import.meta.url))
+const feedApp = FeedServer.pipe(
+  Layer.provideMerge(FeedLive),
+  Layer.provide(Layer.mergeAll(serviceVersionOf(checkout).pipe(Layer.provide(NodeServices.layer)), Layer.succeed(FeedSettings, settings.feed))),
+)
 const feedScope = runHandledSync(Scope.make())
 const feed = await runHandledPromise(
   Layer.buildWithScope(feedApp, feedScope).pipe(
     Effect.map(context => Context.get(context, Feed)),
     Effect.catchTags({
       ServeError: error => Effect.sync(() => lost(`the event stream could not listen on ${settings.feed.host}:${settings.feed.port}: ${String(error.cause)}`)),
-      VersionUnknown: error => Effect.sync(() => lost(`the event stream could not read the commit of ${error.checkout}: ${error.issue}`)),
+      VersionUnknown: error => Effect.sync(() => lost(`the event stream could not read the commit of ${error.checkout}: git gave '${error.output}'`)),
+      PlatformError: error => Effect.sync(() => lost(`the event stream could not run git in ${checkout}: ${error.message}`)),
     }),
   ),
 )
+
+function observe(entry: Entry) {
+  picture.apply(entry, Date.now())
+  sender.answered(entry)
+  capture.observe(entry)
+  pointing.observe(entry)
+  focusDrift.observe(entry)
+  autofocus.observe(entry)
+  align.observe(entry)
+  centre.observe(entry)
+
+  const item = activity.observe(entry)
+
+  if (item !== undefined) page.activityAdded(item)
+  const measured = measuredOf(entry, 'vela')
+
+  if (measured !== undefined) {
+    align.measured(measured)
+    centre.measured(measured)
+    autofocus.measured(measured)
+  }
+  if (announcesFrame(entry, settings.devices.primary)) frameSaved(entry)
+}
+
+const report = (line: string) => Effect.sync(() => console.error(`vela: ${line}`))
 
 const following = await followRig({
   broker: settings.broker,
   stream,
   read: readMessage,
   readBatch: settings.historyReadBatch,
-  onMessage: message => {
-    const read = readMessage(message)
-
-    if (Result.isFailure(read)) {
-      console.error(`vela: ${read.failure.subject} #${read.failure.seq} could not be read: ${read.failure.issue}`)
-      return
-    }
-
-    const entry = read.success
+  onUnreadable: error => runHandledSync(report(`${error.subject} #${error.seq} could not be read while finding the rig's latest connection: ${error.issue}`)),
+  onMessage: message =>
     runHandledSync(
-      feed.take(entry).pipe(
-        Effect.catchTag('MalformedEntry', error => Effect.sync(() => console.error(`vela: ${error.kind} #${error.seq} is malformed: ${error.issue}`))),
+      Effect.fromResult(readMessage(message)).pipe(
+        Effect.tap(entry =>
+          feed.take(entry).pipe(
+            Effect.catchTags({
+              MalformedEntry: error => report(`${error.kind} #${error.seq} is malformed: ${error.issue}`),
+              MalformedReading: error => report(`device reading #${error.seq} is malformed: ${error.issue}`),
+            }),
+          ),
+        ),
+        Effect.tap(entry => Effect.sync(() => observe(entry))),
+        Effect.catchTag('UnreadableMessage', error => report(`${error.subject} #${error.seq} could not be read: ${error.issue}`)),
+        Effect.asVoid,
       ),
-    )
-
-    picture.apply(entry, Date.now())
-    sender.answered(entry)
-    capture.observe(entry)
-    pointing.observe(entry)
-    focusDrift.observe(entry)
-    autofocus.observe(entry)
-    align.observe(entry)
-    centre.observe(entry)
-
-    const item = activity.observe(entry)
-
-    if (item !== undefined) page.activityAdded(item)
-    const measured = measuredOf(entry, 'vela')
-
-    if (measured !== undefined) {
-      align.measured(measured)
-      centre.measured(measured)
-      autofocus.measured(measured)
-    }
-    if (announcesFrame(entry, settings.devices.primary)) frameSaved(entry)
-  },
+    ),
   onCaughtUp: () => picture.caughtUp(),
 })
 

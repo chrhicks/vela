@@ -135,7 +135,7 @@ export function makeActivity({ titles, nightOf }: ActivityOptions) {
   }
 
   function wire(entry: Entry) {
-    const body = readWireBody(entry.body)
+    const body = readWireBody(entry)
 
     if (body === undefined || body.dir !== 'in') return undefined
 

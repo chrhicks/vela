@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, PubSub, Ref, Result, Stream, type Scope } from 'effect'
 import type { MalformedEntry } from '../../state/entries.ts'
-import type { Entry } from '../../state/entry.ts'
+import type { Entry, MalformedReading } from '../../state/entry.ts'
 import { advance, emptyRig, type RigState } from '../../state/rig.ts'
 import { isWanted } from '../../state/wanted.ts'
 
@@ -12,7 +12,7 @@ export interface Following {
 export class Feed extends Context.Service<
   Feed,
   {
-    readonly take: (entry: Entry) => Effect.Effect<void, MalformedEntry>
+    readonly take: (entry: Entry) => Effect.Effect<void, MalformedEntry | MalformedReading>
     readonly follow: Effect.Effect<Following, never, Scope.Scope>
   }
 >()('vela/Feed') {}
@@ -25,7 +25,7 @@ export const FeedLive = Layer.effect(
 
     const take = (entry: Entry) =>
       Effect.gen(function* () {
-        if (!isWanted(entry)) return
+        if (!(yield* Effect.fromResult(isWanted(entry)))) return
 
         const next = advance(yield* Ref.get(state), entry)
 
