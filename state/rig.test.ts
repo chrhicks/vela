@@ -25,7 +25,7 @@ describe('rig', () => {
 describe('advance', () => {
   it('folds an entry a reducer reads, and moves the position past one none reads', () => {
     const started = runStarted('r1', 1000)
-    const guided = entry('phd2.GuideStep', 1001, { Frame: 1 })
+    const guided = entry('phd2.Version', 1001, { Event: 'Version' })
     const state = [started, guided].reduce((current, next) => Result.getOrThrow(advance(current, next)), emptyRig)
 
     expect(state.run?.id).toBe('r1')
