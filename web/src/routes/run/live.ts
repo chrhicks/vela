@@ -95,8 +95,15 @@ const shownWith = (digits: number) => (line: ReadonlyArray<Point>) => {
   return y === undefined ? unknown : y.toFixed(digits)
 }
 
+function shownValues(line: ReadonlyArray<Point>, span: Span, held: boolean): ReadonlyArray<number> {
+  const inside = line.filter(point => point.x >= span.from && point.x <= span.to).map(point => point.y)
+  const carriedIn = held ? line.filter(point => point.x < span.from).at(-1)?.y : undefined
+
+  return carriedIn === undefined ? inside : [carriedIn, ...inside]
+}
+
 function chart(title: string, lines: ReadonlyArray<ReadonlyArray<Point>>, current: string, span: Span, onPhone: boolean, held = false): Trend {
-  const seen = lines.flatMap(line => line.filter(point => point.x >= span.from && point.x <= span.to).map(point => point.y))
+  const seen = lines.flatMap(line => shownValues(line, span, held))
 
   return { onPhone, chart: { title, current, lines, yTicks: niceTicks(seen), span, held } }
 }
