@@ -2,6 +2,7 @@ import { Option, Result, Schema } from 'effect'
 import { readRigEntry, type MalformedEntry, type RigEntry } from './entries.ts'
 import { StreamPosition, type Entry } from './entry.ts'
 import { Frame, frames } from './frames.ts'
+import { Guiding, guiding, unknownGuiding } from './guiding.ts'
 import { Readings, readings } from './readings.ts'
 import { Run, run } from './run.ts'
 
@@ -10,11 +11,12 @@ export const RigState = Schema.Struct({
   run: Schema.optional(Run),
   frames: Schema.Array(Frame),
   readings: Readings,
+  guiding: Guiding,
 })
 
 export type RigState = typeof RigState.Type
 
-export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {} }
+export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, guiding: unknownGuiding }
 
 export function rig(state: RigState, entry: RigEntry): RigState {
   return {
@@ -22,6 +24,7 @@ export function rig(state: RigState, entry: RigEntry): RigState {
     run: run(state.run, entry),
     frames: frames(state.frames, entry),
     readings: readings(state.readings, entry),
+    guiding: guiding(state.guiding, entry),
   }
 }
 

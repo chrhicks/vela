@@ -54,7 +54,20 @@ export const RigConnected = entryOf('client.connected', {})
 
 export const RigLink = entryOf('client.connection', { target: Schema.String, status: Schema.String })
 
-const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink] as const
+export const guiderEvents = ['GuideStep', 'StartGuiding', 'GuidingStopped', 'LoopingExposures', 'LoopingExposuresStopped', 'StartCalibration', 'StarSelected', 'StarLost', 'Paused', 'Resumed'] as const
+
+export type GuiderEvent = (typeof guiderEvents)[number]
+
+export const GuiderReported = Schema.Struct({
+  seq: StreamPosition,
+  at: Schema.Number,
+  kind: Schema.Literals(guiderEvents.map(event => `phd2.${event}` as const)),
+  body: Schema.Struct({ Event: Schema.Literals(guiderEvents), AvgDist: Schema.optionalKey(Schema.Number) }),
+})
+
+export type GuiderReport = typeof GuiderReported.Type
+
+const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported] as const
 
 export const RigEntry = Schema.Union(members)
 
@@ -66,7 +79,7 @@ export class MalformedEntry extends Data.TaggedError('MalformedEntry')<{
   readonly issue: string
 }> {}
 
-const rigKinds: ReadonlySet<string> = new Set(members.map(member => member.fields.kind.literal))
+const rigKinds: ReadonlySet<string> = new Set(members.flatMap(member => ('literal' in member.fields.kind ? [member.fields.kind.literal] : member.fields.kind.literals)))
 
 const decodeRigEntry = Schema.decodeUnknownResult(RigEntry)
 

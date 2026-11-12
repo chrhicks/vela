@@ -11,7 +11,7 @@ describe('readRigEntry', () => {
   })
 
   it('passes over kinds no reducer reads', () => {
-    expect(Result.getOrThrow(readRigEntry(entry('phd2.GuideStep', 1, { Frame: 3 })))).toEqual(Option.none())
+    expect(Result.getOrThrow(readRigEntry(entry('phd2.Version', 1, { Event: 'Version' })))).toEqual(Option.none())
   })
 
   it('fails with the entry and the issue when a known kind has the wrong shape', () => {
