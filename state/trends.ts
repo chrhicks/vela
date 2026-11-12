@@ -54,6 +54,8 @@ function dewHeatersReported(state: Trends, wire: WireBody, at: number): Trends {
   return { ...state, dewHeaters: { ...state.dewHeaters, ...dewHeaters } }
 }
 
+const boxHasRead = (elements: WireBody['elements']) => Object.values(elements).some(value => value !== 0)
+
 function deviceReported(state: Trends, wire: WireBody, at: number): Trends {
   if (wire.dir !== 'in' || wire.type !== 'set') return state
 
@@ -65,7 +67,7 @@ function deviceReported(state: Trends, wire: WireBody, at: number): Trends {
 
   switch (`${wire.device} ${wire.property}`) {
     case 'box WEATHER_PARAMETERS':
-      return { ...state, airTemperature: added(state.airTemperature, at, number('WEATHER_TEMPERATURE')), humidity: added(state.humidity, at, number('WEATHER_HUMIDITY')) }
+      return !boxHasRead(wire.elements) ? state : { ...state, airTemperature: added(state.airTemperature, at, number('WEATHER_TEMPERATURE')), humidity: added(state.humidity, at, number('WEATHER_HUMIDITY')) }
     case 'focuser FOCUS_TEMPERATURE':
       return { ...state, focuserTemperature: added(state.focuserTemperature, at, number('TEMPERATURE')) }
     case 'box DEW_DUTY_CYCLES':

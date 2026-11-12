@@ -33,6 +33,11 @@ describe('trends', () => {
     })
   })
 
+  it("leaves out the power box's all-zero weather update from before its first reading", () => {
+    expect(reduce([reported('box', 'WEATHER_PARAMETERS', { WEATHER_TEMPERATURE: 0, WEATHER_HUMIDITY: 0, WEATHER_DEWPOINT: 0 }, 1)])).toEqual(noTrends)
+    expect(reduce([reported('box', 'WEATHER_PARAMETERS', { WEATHER_TEMPERATURE: 0, WEATHER_HUMIDITY: 92, WEATHER_DEWPOINT: -1.2 }, 1)]).airTemperature).toEqual([{ x: 1, y: 0 }])
+  })
+
   it('leaves out a definition, whose values are placeholders, and a frame with no stars found', () => {
     const state = reduce([reported('box', 'WEATHER_PARAMETERS', { WEATHER_TEMPERATURE: 0, WEATHER_HUMIDITY: 0 }, 1, 'def'), frameMeasured('a.fits', 2, { hfdPixels: null, stars: null })])
 

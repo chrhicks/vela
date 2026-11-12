@@ -7,7 +7,7 @@ export function niceTicks(values: ReadonlyArray<number>): ReadonlyArray<number> 
 
   const low = values.reduce((least, value) => Math.min(least, value))
   const high = values.reduce((most, value) => Math.max(most, value))
-  const wanted = (high - low || Math.abs(high) || 1) / 2
+  const wanted = (high - low || Math.max(Math.abs(high) / 10, 1)) / 2
   const power = 10 ** Math.floor(Math.log10(wanted))
   const step = (niceSteps.find(nice => nice * power >= wanted) ?? 10) * power
   const first = Math.floor(low / step)
