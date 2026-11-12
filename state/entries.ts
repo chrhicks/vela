@@ -13,6 +13,12 @@ export const FrameFile = Schema.NonEmptyString.pipe(Schema.brand('FrameFile'))
 
 export type FrameFile = typeof FrameFile.Type
 
+export const operationObjects = { align: 'polar-align', focus: 'autofocus', centre: 'centre' } as const
+
+const operationObjectNames: ReadonlySet<string> = new Set(Object.values(operationObjects))
+
+export const isOperationObject = (object: string) => operationObjectNames.has(object)
+
 export const RunEnding = Schema.Literals(['done', 'stopped', 'refused', 'interrupted', 'unknown'])
 
 export type RunEnding = typeof RunEnding.Type
@@ -62,7 +68,12 @@ export const GuiderReported = Schema.Struct({
   seq: StreamPosition,
   at: Schema.Number,
   kind: Schema.Literals(guiderEvents.map(event => `phd2.${event}` as const)),
-  body: Schema.Struct({ Event: Schema.Literals(guiderEvents), AvgDist: Schema.optionalKey(Schema.Number) }),
+  body: Schema.Struct({
+    Event: Schema.Literals(guiderEvents),
+    AvgDist: Schema.optionalKey(Schema.Number),
+    RADistanceRaw: Schema.optionalKey(Schema.Number),
+    DECDistanceRaw: Schema.optionalKey(Schema.Number),
+  }),
 })
 
 export type GuiderReport = typeof GuiderReported.Type

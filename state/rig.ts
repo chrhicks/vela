@@ -5,6 +5,7 @@ import { Frame, frames } from './frames.ts'
 import { Guiding, guiding, unknownGuiding } from './guiding.ts'
 import { Readings, readings } from './readings.ts'
 import { Run, run } from './run.ts'
+import { noTrends, Trends, trends } from './trends.ts'
 
 export const RigState = Schema.Struct({
   position: Schema.optional(StreamPosition),
@@ -12,11 +13,12 @@ export const RigState = Schema.Struct({
   frames: Schema.Array(Frame),
   readings: Readings,
   guiding: Guiding,
+  trends: Trends,
 })
 
 export type RigState = typeof RigState.Type
 
-export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, guiding: unknownGuiding }
+export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, guiding: unknownGuiding, trends: noTrends }
 
 export function rig(state: RigState, entry: RigEntry): RigState {
   return {
@@ -25,6 +27,7 @@ export function rig(state: RigState, entry: RigEntry): RigState {
     frames: frames(state.frames, entry),
     readings: readings(state.readings, entry),
     guiding: guiding(state.guiding, entry),
+    trends: trends(state.trends, entry),
   }
 }
 

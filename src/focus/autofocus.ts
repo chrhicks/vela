@@ -6,6 +6,7 @@ import type { Measured, Measurement } from '../measure/rig.ts'
 import type { Picture } from '../rig/picture.ts'
 import type { Entry } from '../../state/entry.ts'
 import { recordOf } from '../stream/json.ts'
+import { operationObjects } from '../../state/entries.ts'
 
 const positive = Schema.Int.check(Schema.isGreaterThan(0))
 
@@ -178,7 +179,7 @@ export function makeAutofocus({ picture, sender, capture, publish, settings }: A
         return waitOn((await move(top + request.step, signal)) ?? (await move(best.position, signal)))
       }
 
-      const started = capture.start({ object: 'autofocus', frameType: 'light', exposureSeconds: request.exposureSeconds, count: request.samples + 1, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between, ['stars'])
+      const started = capture.start({ object: operationObjects.focus, frameType: 'light', exposureSeconds: request.exposureSeconds, count: request.samples + 1, gain: controls['Gain'], offset: controls['Offset'], cooler: 'keep' }, between, ['stars'])
 
       if (!started.ok) return started
 

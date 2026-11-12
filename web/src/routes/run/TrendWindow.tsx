@@ -1,13 +1,15 @@
-import { useState } from 'react'
-
 import { Caption } from '../../components/Caption.tsx'
 import { Choices } from '../../components/Choices.tsx'
 import styles from './TrendWindow.module.css'
 
-type Window = 'hour' | 'run'
+export type TrendWindowName = 'hour' | 'run'
 
-export function TrendWindow() {
-  const [shown, setShown] = useState<Window>('hour')
+interface TrendWindowProps {
+  readonly shown: TrendWindowName
+  readonly onChoose: (shown: TrendWindowName) => void
+}
+
+export function TrendWindow({ shown, onChoose }: TrendWindowProps) {
 
   return (
     <div className={styles.window}>
@@ -20,7 +22,7 @@ export function TrendWindow() {
           { value: 'run', label: 'Whole run' },
         ]}
         chosen={shown}
-        onChoose={setShown}
+        onChoose={onChoose}
       />
     </div>
   )

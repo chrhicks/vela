@@ -17,6 +17,7 @@ export function RunPage() {
   const readings = useRig(rig => rig.readings)
   const guiding = useRig(rig => rig.guiding)
   const now = useLink().beat?.at
+  const trends = useRig(rig => rig.trends)
   const asked = useScene(['idle', 'ready', 'starting', 'capturing', 'alert', 'over'])
   const scene = !search.has('scene') && run?.status === 'capturing' ? 'capturing' : asked
 
@@ -28,7 +29,7 @@ export function RunPage() {
     case 'starting':
       return <StartingView />
     case 'capturing':
-      return <CapturingView run={liveCapturing({ run, frames, readings, guiding, now }, capturing.steady)} />
+      return <CapturingView run={liveCapturing({ run, frames, readings, guiding, now, trends }, capturing.steady)} />
     case 'alert':
       return <CapturingView run={capturing.alert} />
     case 'over':
