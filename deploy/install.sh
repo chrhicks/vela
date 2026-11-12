@@ -34,7 +34,7 @@ main() {
   git -C "$checkout" checkout --quiet --detach "$commit"
   echo "install: $machine at $(git -C "$checkout" rev-parse --short HEAD)"
 
-  (cd "$checkout" && pnpm install --frozen-lockfile && pnpm --dir web build)
+  (cd "$checkout" && pnpm install --frozen-lockfile --config.confirm-modules-purge=false && pnpm --dir web build)
 
   mkdir -p "$HOME/.config/systemd/user"
   local unit source target
