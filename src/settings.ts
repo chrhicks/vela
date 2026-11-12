@@ -52,8 +52,13 @@ export const FrameSettings = Schema.Struct({
 })
 
 export const FeedConfig = Schema.Struct({
+  host: described(
+    "The address the web app's event stream listens on. 127.0.0.1 keeps it to this machine; other machines reach it through tailscale serve",
+    Schema.String,
+    '127.0.0.1',
+  ),
   port: described(
-    "Local port the web app's event stream is served on, on 127.0.0.1 only; reach it from other machines through tailscale serve. Its own port, apart from the night page's, so each server can go without the other",
+    "The port the web app's event stream is served on. Its own port, apart from the night page's, so each server can go without the other",
     Schema.Number,
     8796,
   ),
