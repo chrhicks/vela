@@ -1,4 +1,14 @@
-export const defaults = {
+interface ControlDefaults {
+  readonly slewTarget: string
+  readonly focusPosition: string
+  readonly testFrame: string
+  readonly coolerSetpoint: string
+  readonly dewLevel: string
+  readonly calibrationFrames: string
+  readonly resetDevice: string
+}
+
+export const defaults: ControlDefaults = {
   slewTarget: 'NGC 7635',
   focusPosition: '32332',
   testFrame: '2 s',
@@ -6,7 +16,7 @@ export const defaults = {
   dewLevel: '60 %',
   calibrationFrames: '30',
   resetDevice: 'Camera',
-} as const
+}
 
 export type CalibrationType = 'darks' | 'flats' | 'dark-flats' | 'bias'
 

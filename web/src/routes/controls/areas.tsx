@@ -9,7 +9,7 @@ import { NudgePad } from './NudgePad.tsx'
 import { calibrationFirstStep, type CalibrationType, defaults } from './stub.ts'
 
 export function MountArea() {
-  const [target, setTarget] = useState<string>(defaults.slewTarget)
+  const [target, setTarget] = useState(defaults.slewTarget)
   const [rate, setRate] = useState<'slow' | 'fast'>('slow')
 
   return (
@@ -61,7 +61,7 @@ export function GuidingArea() {
 }
 
 export function FocusArea() {
-  const [position, setPosition] = useState<string>(defaults.focusPosition)
+  const [position, setPosition] = useState(defaults.focusPosition)
 
   return (
     <Area id="focus">
@@ -85,8 +85,8 @@ export function FocusArea() {
 }
 
 export function CameraArea() {
-  const [exposure, setExposure] = useState<string>(defaults.testFrame)
-  const [setpoint, setSetpoint] = useState<string>(defaults.coolerSetpoint)
+  const [exposure, setExposure] = useState(defaults.testFrame)
+  const [setpoint, setSetpoint] = useState(defaults.coolerSetpoint)
 
   return (
     <Area id="camera">
@@ -110,7 +110,7 @@ export function CameraArea() {
 
 export function DewArea() {
   const [mode, setMode] = useState<'auto' | 'fixed' | 'off'>('auto')
-  const [level, setLevel] = useState<string>(defaults.dewLevel)
+  const [level, setLevel] = useState(defaults.dewLevel)
 
   return (
     <Area id="dew">
@@ -134,7 +134,7 @@ export function DewArea() {
 
 export function CalibrationArea() {
   const [type, setType] = useState<CalibrationType>('darks')
-  const [frames, setFrames] = useState<string>(defaults.calibrationFrames)
+  const [frames, setFrames] = useState(defaults.calibrationFrames)
 
   return (
     <Area id="calibration">
@@ -165,7 +165,7 @@ export function CalibrationArea() {
 }
 
 export function SystemArea() {
-  const [device, setDevice] = useState<string>(defaults.resetDevice)
+  const [device, setDevice] = useState(defaults.resetDevice)
 
   return (
     <Area id="system">
