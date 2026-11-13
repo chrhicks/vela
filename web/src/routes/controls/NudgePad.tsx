@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { NudgeDirection, type NudgeId, type NudgeRate, type Refusal } from '../../../../state/commands.ts'
-import { RefusalLine } from '../../components/RefusalLine.tsx'
-import { newNudgeId, sendCommand } from '../../rig/commands.ts'
+import { NudgeDirection, type NudgeId, type NudgeRate } from '../../../../state/commands.ts'
+import { newNudgeId, sendCommand, type Answer } from '../../rig/commands.ts'
 import { useLink } from '../../rig/store.ts'
 import { nudgeWords } from '../../rig/words.ts'
 import styles from './NudgePad.module.css'
@@ -13,11 +12,15 @@ interface Holding {
   readonly renew: number
 }
 
-export function NudgePad({ rate }: { readonly rate: NudgeRate }) {
+interface NudgePadProps {
+  readonly rate: NudgeRate
+  readonly onRefused: (answer: Answer) => void
+}
+
+export function NudgePad({ rate, onRefused }: NudgePadProps) {
   const holdMs = useLink().controls?.nudgeHoldMs
   const holding = useRef<Holding | undefined>(undefined)
   const [held, setHeld] = useState<NudgeDirection | undefined>(undefined)
-  const [refusal, setRefusal] = useState<Refusal | undefined>(undefined)
 
   const letGo = () => {
     const was = holding.current
@@ -40,11 +43,10 @@ export function NudgePad({ rate }: { readonly rate: NudgeRate }) {
 
     holding.current = { id, direction, renew }
     setHeld(direction)
-    setRefusal(undefined)
     void sendCommand({ command: 'nudge', id, direction, rate }).then(answer => {
-      if (answer === undefined) return
+      if (answer.result === 'done') return
 
-      setRefusal(answer)
+      onRefused(answer)
       if (holding.current?.id === id) letGo()
     })
   }
@@ -65,32 +67,28 @@ export function NudgePad({ rate }: { readonly rate: NudgeRate }) {
   }, [])
 
   return (
-    <div className={styles.nudge}>
-      <div className={styles.pad} role="group" aria-label="Nudge">
-        <span className={styles.label}>Nudge</span>
+    <div className={styles.pad} role="group" aria-label="Nudge">
+      <span className={styles.label}>Nudge</span>
 
-        {NudgeDirection.literals.map(direction => (
-          <button
-            key={direction}
-            type="button"
-            className={`${styles.key} ${styles[nudgeWords[direction]]}`}
-            aria-label={`Nudge ${direction}, hold to move`}
-            aria-pressed={held === direction}
-            onPointerDown={event => {
-              event.preventDefault()
-              press(direction)
-            }}
-            onPointerUp={letGo}
-            onPointerCancel={letGo}
-            onPointerLeave={letGo}
-            onContextMenu={event => event.preventDefault()}
-          >
-            {nudgeWords[direction]}
-          </button>
-        ))}
-      </div>
-
-      {refusal === undefined ? null : <RefusalLine refusal={refusal} />}
+      {NudgeDirection.literals.map(direction => (
+        <button
+          key={direction}
+          type="button"
+          className={`${styles.key} ${styles[nudgeWords[direction]]}`}
+          aria-label={`Nudge ${direction}, hold to move`}
+          aria-pressed={held === direction}
+          onPointerDown={event => {
+            event.preventDefault()
+            press(direction)
+          }}
+          onPointerUp={letGo}
+          onPointerCancel={letGo}
+          onPointerLeave={letGo}
+          onContextMenu={event => event.preventDefault()}
+        >
+          {nudgeWords[direction]}
+        </button>
+      ))}
     </div>
   )
 }

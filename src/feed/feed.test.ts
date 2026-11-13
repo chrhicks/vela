@@ -11,7 +11,10 @@ import { NightName } from '../../state/entries.ts'
 import { Operations } from './commands.ts'
 import { FeedRoute, FeedServer, FeedSettings, Tonight } from './route.ts'
 import { StartToken } from '../../state/feed.ts'
+import type { Done } from '../../state/commands.ts'
 import { ServiceStart } from './start.ts'
+
+const answered = (done: Done) => Effect.succeed(done)
 
 const makeFeed = () => Effect.runPromise(Feed.pipe(Effect.provide(FeedLive)))
 
@@ -103,7 +106,7 @@ describe('starting the event stream', () => {
     const port = typeof address === 'object' && address !== null ? address.port : 0
     const app = FeedServer.pipe(
       Layer.provideMerge(FeedLive),
-      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(Tonight, { nightOf: () => NightName.make('2026-11-08') }), Layer.succeed(Operations, { startAlignment: Effect.void, finishAlignment: Effect.void, answerFilter: () => Effect.void, home: Effect.void, stop: Effect.void, tracking: () => Effect.void, nudge: () => Effect.void, holdNudge: () => Effect.void, releaseNudge: () => Effect.void, slewAndCentre: () => Effect.void, flipNow: Effect.void }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port, webRoot: '.', heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10, launch: { alignGoodArcmin: 1, alignMovedArcmin: 10 }, controls: { nudgeHoldMs: 250 } }))),
+      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(Tonight, { nightOf: () => NightName.make('2026-11-08') }), Layer.succeed(Operations, { startAlignment: Effect.void, finishAlignment: Effect.void, answerFilter: () => Effect.void, home: answered({ code: 'home' }), stop: answered({ code: 'stop' }), tracking: on => answered({ code: 'tracking', on }), nudge: () => Effect.void, holdNudge: () => Effect.void, releaseNudge: () => Effect.void, slewAndCentre: target => answered({ code: 'centring', target }), flipNow: answered({ code: 'flip-sent' }) }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port, webRoot: '.', heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10, launch: { alignGoodArcmin: 1, alignMovedArcmin: 10 }, controls: { nudgeHoldMs: 250 } }))),
     )
     const error = await Effect.runPromise(Effect.scoped(Effect.flip(Layer.build(app))))
 
@@ -120,7 +123,7 @@ describe('starting the event stream', () => {
 
     const app = FeedServer.pipe(
       Layer.provideMerge(FeedLive),
-      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(Tonight, { nightOf: () => NightName.make('2026-11-08') }), Layer.succeed(Operations, { startAlignment: Effect.void, finishAlignment: Effect.void, answerFilter: () => Effect.void, home: Effect.void, stop: Effect.void, tracking: () => Effect.void, nudge: () => Effect.void, holdNudge: () => Effect.void, releaseNudge: () => Effect.void, slewAndCentre: () => Effect.void, flipNow: Effect.void }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port: 0, webRoot, heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10, launch: { alignGoodArcmin: 1, alignMovedArcmin: 10 }, controls: { nudgeHoldMs: 250 } }))),
+      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(Tonight, { nightOf: () => NightName.make('2026-11-08') }), Layer.succeed(Operations, { startAlignment: Effect.void, finishAlignment: Effect.void, answerFilter: () => Effect.void, home: answered({ code: 'home' }), stop: answered({ code: 'stop' }), tracking: on => answered({ code: 'tracking', on }), nudge: () => Effect.void, holdNudge: () => Effect.void, releaseNudge: () => Effect.void, slewAndCentre: target => answered({ code: 'centring', target }), flipNow: answered({ code: 'flip-sent' }) }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port: 0, webRoot, heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10, launch: { alignGoodArcmin: 1, alignMovedArcmin: 10 }, controls: { nudgeHoldMs: 250 } }))),
     )
     const pages = await Effect.runPromise(
       Effect.scoped(

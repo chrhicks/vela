@@ -26,7 +26,7 @@ function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) =>
   const ask = (request: Request, signal: AbortSignal) => (sent.push(`${request.device} ${request.id} ${JSON.stringify(request.body)}`), answer({ device: request.device, property: request.label, values: {} }, signal))
   const tell = (device: string, body: Readonly<Record<string, unknown>>) => void sent.push(`${device} told ${JSON.stringify(body)}`)
   const rates = Layer.succeed(NudgeRates, { slow: '7x', fast: '8x' })
-  const centring = Layer.succeed(Centring, { centreOn: (target: string) => Effect.sync(() => void sent.push(`centre on ${target}`)) })
+  const centring = Layer.succeed(Centring, { centreOn: (target: string) => Effect.sync(() => (sent.push(`centre on ${target}`), `${target} found`)) })
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
   const runs = Layer.succeed(MountRuns, { stopMoving: Effect.sync(() => void sent.push('vela run stopped')) })
   const press = (choose: (controls: Controls) => Effect.Effect<void, unknown>) =>

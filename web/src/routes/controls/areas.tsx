@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { ActionButton } from '../../components/ActionButton.tsx'
 import type { NudgeRate } from '../../../../state/commands.ts'
 import { CommandButton } from '../../components/CommandButton.tsx'
+import { PressLine, type Pressed } from '../../components/PressLine.tsx'
+import type { Answer } from '../../rig/commands.ts'
 import { useRig } from '../../rig/store.ts'
 import { Choices } from '../../components/Choices.tsx'
 import { Facts } from '../../components/Facts.tsx'
@@ -11,10 +13,18 @@ import { ActionRow, Area } from './Area.tsx'
 import { NudgePad } from './NudgePad.tsx'
 import { calibrationFirstStep, type CalibrationType, defaults } from './stub.ts'
 
-function TrackingButton() {
+function TrackingButton({ onAnswer }: { readonly onAnswer: (answer: Answer) => void }) {
   const tracking = useRig(rig => rig.devices.mount.TELESCOPE_TRACK_STATE?.values.TRACK_ON)
 
-  return tracking === true ? <CommandButton request={{ command: 'tracking', on: false }}>Tracking off</CommandButton> : <CommandButton request={{ command: 'tracking', on: true }}>Tracking on</CommandButton>
+  return tracking === true ? (
+    <CommandButton request={{ command: 'tracking', on: false }} onAnswer={onAnswer}>
+      Tracking off
+    </CommandButton>
+  ) : (
+    <CommandButton request={{ command: 'tracking', on: true }} onAnswer={onAnswer}>
+      Tracking on
+    </CommandButton>
+  )
 }
 
 export function MountArea() {
@@ -22,24 +32,34 @@ export function MountArea() {
   const [typed, setTyped] = useState<string | undefined>(undefined)
   const target = typed ?? runTarget ?? ''
   const [rate, setRate] = useState<NudgeRate>('slow')
+  const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
+  const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
 
   return (
     <Area id="mount">
+      <PressLine pressed={pressed} />
+
       <ActionRow>
-        <CommandButton request={{ command: 'home' }}>Home</CommandButton>
-        <CommandButton request={{ command: 'stop' }} alwaysReady>
+        <CommandButton request={{ command: 'home' }} onAnswer={answered}>
+          Home
+        </CommandButton>
+        <CommandButton request={{ command: 'stop' }} alwaysReady onAnswer={answered}>
           Stop
         </CommandButton>
-        <TrackingButton />
-        <CommandButton request={{ command: 'flipNow' }}>Flip now</CommandButton>
+        <TrackingButton onAnswer={answered} />
+        <CommandButton request={{ command: 'flipNow' }} onAnswer={answered}>
+          Flip now
+        </CommandButton>
       </ActionRow>
 
       <ActionRow>
-        <CommandButton request={{ command: 'slewAndCentre', target }}>Slew and centre</CommandButton>
+        <CommandButton request={{ command: 'slewAndCentre', target }} onAnswer={answered}>
+          Slew and centre
+        </CommandButton>
         <Field name="Target" kind="text" value={target} onChange={setTyped} />
       </ActionRow>
 
-      <NudgePad rate={rate} />
+      <NudgePad rate={rate} onRefused={answered} />
 
       <ActionRow label="Rate">
         <Choices
