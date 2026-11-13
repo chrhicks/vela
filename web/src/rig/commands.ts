@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { commandsPath, Refusal, type CommandRequest } from '../../../state/commands.ts'
+import { commandsPath, NudgeId, Refusal, type CommandRequest } from '../../../state/commands.ts'
 
 const decodeRefusal = Schema.decodeUnknownEffect(Refusal)
 
@@ -12,3 +12,5 @@ const send = (request: CommandRequest): Effect.Effect<Refusal | undefined> =>
   )
 
 export const sendCommand = (request: CommandRequest): Promise<Refusal | undefined> => Effect.runPromise(send(request))
+
+export const newNudgeId = (): NudgeId => NudgeId.make(crypto.randomUUID())

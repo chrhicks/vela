@@ -11,12 +11,26 @@
   text-transform: uppercase;
 }
 
+.nudge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .key {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   padding-bottom: 0.2em;
   border-bottom: 1px solid currentColor;
   font-size: var(--size-label);
   font-weight: 700;
   letter-spacing: var(--track-label);
+}
+
+.key[aria-pressed='true'] {
+  color: var(--amber);
 }
 
 @media (max-width: 60rem) {

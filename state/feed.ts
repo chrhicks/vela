@@ -21,7 +21,11 @@ export const LaunchLimits = Schema.Struct({ alignGoodArcmin: Schema.Number, alig
 
 export type LaunchLimits = typeof LaunchLimits.Type
 
-export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, launch: LaunchLimits, state: RigState })
+export const ControlsLimits = Schema.Struct({ nudgeHoldMs: Schema.Number })
+
+export type ControlsLimits = typeof ControlsLimits.Type
+
+export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, launch: LaunchLimits, controls: ControlsLimits, state: RigState })
 
 export type Bootstrap = typeof Bootstrap.Type
 

@@ -6,12 +6,12 @@ import type { FeedConfig } from '../settings.ts'
 import { CommandsRoute } from './commands.ts'
 import { Feed } from './feed.ts'
 import type { NightName } from '../../state/entries.ts'
-import { feedPath, type FeedEventName, type LaunchLimits } from '../../state/feed.ts'
+import { feedPath, type ControlsLimits, type FeedEventName, type LaunchLimits } from '../../state/feed.ts'
 import { ServiceStart } from './start.ts'
 
 export class Tonight extends Context.Service<Tonight, { readonly nightOf: (at: number) => NightName }>()('vela/Tonight') {}
 
-export class FeedSettings extends Context.Service<FeedSettings, typeof FeedConfig.Type & { readonly rigSilentAfterSeconds: number; readonly launch: LaunchLimits }>()('vela/FeedSettings') {}
+export class FeedSettings extends Context.Service<FeedSettings, typeof FeedConfig.Type & { readonly rigSilentAfterSeconds: number; readonly launch: LaunchLimits; readonly controls: ControlsLimits }>()('vela/FeedSettings') {}
 
 const event = (name: FeedEventName, data: unknown) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`
 
@@ -19,7 +19,7 @@ const feedEvents = Effect.gen(function* () {
   const feed = yield* Feed
   const { token } = yield* ServiceStart
   const { nightOf } = yield* Tonight
-  const { heartbeatSeconds, lostAfterSeconds, rigSilentAfterSeconds, launch } = yield* FeedSettings
+  const { heartbeatSeconds, lostAfterSeconds, rigSilentAfterSeconds, launch, controls } = yield* FeedSettings
   const limits = { heartbeatSeconds, lostAfterSeconds, rigSilentAfterSeconds }
 
   const heartbeats = Stream.tick(Duration.seconds(heartbeatSeconds)).pipe(
@@ -32,7 +32,7 @@ const feedEvents = Effect.gen(function* () {
       const { state, entries } = yield* feed.subscribe
       const at = yield* Clock.currentTimeMillis
 
-      return Stream.concat(Stream.succeed(event('state', { token, at, night: nightOf(at), limits, launch, state })), Stream.merge(entries.pipe(Stream.map(entry => event('entry', entry))), heartbeats))
+      return Stream.concat(Stream.succeed(event('state', { token, at, night: nightOf(at), limits, launch, controls, state })), Stream.merge(entries.pipe(Stream.map(entry => event('entry', entry))), heartbeats))
     }),
   )
 })

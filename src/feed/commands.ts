@@ -1,6 +1,6 @@
 import { Context, Data, Effect, Match } from 'effect'
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
-import { commandsPath, CommandRequest, type FilterAnswer, type Refusal } from '../../state/commands.ts'
+import { commandsPath, CommandRequest, type FilterAnswer, type NudgeDirection, type NudgeId, type NudgeRate, type Refusal } from '../../state/commands.ts'
 
 export class CommandRefused extends Data.TaggedError('CommandRefused')<{ readonly refusal: Refusal }> {}
 
@@ -13,6 +13,9 @@ export class Operations extends Context.Service<
     readonly home: Effect.Effect<void, CommandRefused>
     readonly stop: Effect.Effect<void, CommandRefused>
     readonly tracking: (on: boolean) => Effect.Effect<void, CommandRefused>
+    readonly nudge: (id: NudgeId, direction: NudgeDirection, rate: NudgeRate) => Effect.Effect<void, CommandRefused>
+    readonly holdNudge: (id: NudgeId) => Effect.Effect<void>
+    readonly releaseNudge: (id: NudgeId) => Effect.Effect<void, CommandRefused>
   }
 >()('vela/Operations') {}
 
@@ -30,6 +33,9 @@ const carryOut = (request: CommandRequest) =>
         home: () => operations.home,
         stop: () => operations.stop,
         tracking: ({ on }) => operations.tracking(on),
+        nudge: ({ id, direction, rate }) => operations.nudge(id, direction, rate),
+        holdNudge: ({ id }) => operations.holdNudge(id),
+        releaseNudge: ({ id }) => operations.releaseNudge(id),
       }),
     )
   })

@@ -33,7 +33,7 @@ import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
-import { mountControls, MountRuns } from '../controls/mount.ts'
+import { mountControls, MountRuns, NudgeRates } from '../controls/mount.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -218,7 +218,7 @@ const mountRuns = Layer.succeed(MountRuns, {
   stopMoving: Effect.promise(() => (capturingFor([align.view().run, centre.view().run]) ? capture.stop() : Promise.resolve(false))).pipe(Effect.asVoid),
 })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, ...mount }))).pipe(Layer.provide(mountRuns))
+const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, ...mount }))).pipe(Layer.provide(mountRuns), Layer.provide(Layer.succeed(NudgeRates, { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate })))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),
@@ -226,8 +226,8 @@ const feedApp = FeedServer.pipe(
   Layer.provide(Layer.mergeAll(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
-      deviceCommandsFrom({ send: (command, signal) => sender.send(command, signal), deviceIds: settings.devices, answerSeconds: settings.capture.commandAnswerSeconds }),
-      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin } }),
+      deviceCommandsFrom({ send: (command, signal) => sender.send(command, signal), ask: (request, signal) => sender.ask(request, signal), tell: (device, body) => sender.tell(device, body), deviceIds: settings.devices, answerSeconds: settings.capture.commandAnswerSeconds }),
+      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs } }),
     )),
 )
 const servicesScope = runHandledSync(Scope.make())

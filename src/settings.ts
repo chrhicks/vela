@@ -163,6 +163,12 @@ export const AlignSettings = Schema.Struct({
   ),
 })
 
+export const ControlsSettings = Schema.Struct({
+  nudgeHoldMs: described('How often the page tells the rig program a nudge is still held, in milliseconds', Schema.Number, 250),
+  nudgeSlowRate: described("The mount's TELESCOPE_SLEW_RATE element for a slow nudge", Schema.NonEmptyString, '7x'),
+  nudgeFastRate: described("The mount's TELESCOPE_SLEW_RATE element for a fast nudge", Schema.NonEmptyString, '8x'),
+})
+
 export const LaunchSettings = Schema.Struct({
   alignExposureSeconds: described(
     'Seconds of exposure for each polar alignment frame',
@@ -238,6 +244,7 @@ export const VelaSettings = Schema.Struct({
   stars: Schema.optionalKey(StarSettings.annotate({ description: 'Counting and sizing the stars of each kept imaging frame. Without it, kept frames get only their sky level and noise' })),
   autofocus: described('Settings for autofocus', AutofocusSettings, {}),
   launch: described('What the launch steps start on a tap: alignment, and autofocus after the filter answer', LaunchSettings, {}),
+  controls: described('The controls page', ControlsSettings, {}),
   centre: described('Settings for slew and centre', CentreSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({

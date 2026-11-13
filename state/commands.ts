@@ -7,9 +7,17 @@ export const FilterAnswer = Schema.Literals(['in', 'out'])
 
 export type FilterAnswer = typeof FilterAnswer.Type
 
-export const NudgeDirection = Schema.Literals(['N', 'S', 'E', 'W'])
+export const NudgeDirection = Schema.Literals(['north', 'south', 'east', 'west'])
 
 export type NudgeDirection = typeof NudgeDirection.Type
+
+export const NudgeRate = Schema.Literals(['slow', 'fast'])
+
+export type NudgeRate = typeof NudgeRate.Type
+
+export const NudgeId = Schema.String.check(Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)).pipe(Schema.brand('NudgeId'))
+
+export type NudgeId = typeof NudgeId.Type
 
 export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('startAlignment') }),
@@ -18,6 +26,9 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('home') }),
   Schema.Struct({ command: Schema.Literal('stop') }),
   Schema.Struct({ command: Schema.Literal('tracking'), on: Schema.Boolean }),
+  Schema.Struct({ command: Schema.Literal('nudge'), id: NudgeId, direction: NudgeDirection, rate: NudgeRate }),
+  Schema.Struct({ command: Schema.Literal('holdNudge'), id: NudgeId }),
+  Schema.Struct({ command: Schema.Literal('releaseNudge'), id: NudgeId }),
 ])
 
 export type CommandRequest = typeof CommandRequest.Type
