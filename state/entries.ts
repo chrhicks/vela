@@ -1,4 +1,5 @@
 import { Data, Option, Result, Schema } from 'effect'
+import { FilterAnswer } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
 
 export const RunId = Schema.NonEmptyString.pipe(Schema.brand('RunId'))
@@ -78,7 +79,13 @@ export const GuiderReported = Schema.Struct({
 
 export type GuiderReport = typeof GuiderReported.Type
 
-const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported] as const
+export const AlignStarted = entryOf('vela.align.started', { run: RunId })
+
+export const FocusStarted = entryOf('vela.focus.started', { run: RunId })
+
+export const FilterAnswered = entryOf('vela.filter', { filter: FilterAnswer })
+
+const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, FocusStarted, FilterAnswered] as const
 
 export const RigEntry = Schema.Union(members)
 

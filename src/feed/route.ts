@@ -3,6 +3,7 @@ import { NodeHttpServer } from '@effect/platform-node'
 import { Clock, Context, Duration, Effect, Layer, Stream } from 'effect'
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from 'effect/http'
 import type { FeedConfig } from '../settings.ts'
+import { CommandsRoute } from './commands.ts'
 import { Feed } from './feed.ts'
 import type { NightName } from '../../state/entries.ts'
 import { feedEvent, feedPath } from '../../state/feed.ts'
@@ -44,7 +45,7 @@ export const FeedRoute = HttpRouter.add(
 
 export const WebApp = Layer.unwrap(Effect.map(FeedSettings, ({ webRoot }) => HttpStaticServer.layer({ root: webRoot, spa: true, cacheControl: 'no-cache' })))
 
-export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, WebApp), { disableLogger: true }).pipe(
+export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, CommandsRoute, WebApp), { disableLogger: true }).pipe(
   Layer.provideMerge(
     Layer.unwrap(
       Effect.map(FeedSettings, ({ host, port }) => NodeHttpServer.layer(createServer, { port, host })),

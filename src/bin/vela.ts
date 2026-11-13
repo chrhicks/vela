@@ -31,6 +31,8 @@ import { makePage } from '../page/server.ts'
 import { VelaSettings } from '../settings.ts'
 import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
+import { CommandRefused, Operations } from '../feed/commands.ts'
+import { operationObjects } from '../../state/entries.ts'
 import { NightName } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
 import { ServiceStartNow } from '../feed/start.ts'
@@ -183,11 +185,32 @@ function frameSaved(entry: Entry) {
   else void keeper.requestScan()
 }
 
+const started = (result: { readonly ok: true } | { readonly ok: false; readonly reason: string }) =>
+  result.ok ? Effect.void : Effect.fail(new CommandRefused({ text: result.reason }))
+
+const launchOperations = {
+  startAlignment: Effect.suspend(() => started(align.start({ exposureSeconds: settings.launch.alignExposureSeconds }))),
+  finishAlignment: Effect.suspend(() =>
+    capture.view().run?.object === operationObjects.align
+      ? Effect.promise(() => capture.stop()).pipe(Effect.asVoid)
+      : Effect.fail(new CommandRefused({ text: 'no alignment is running' })),
+  ),
+  answerFilter: (filter: 'in' | 'out') =>
+    Effect.sync(() => publishEntry(stream.vela('filter'), 'vela.filter', filter, { filter })).pipe(
+      Effect.andThen(
+        Effect.suspend(() =>
+          started(autofocus.start({ step: settings.launch.autofocusStep, samples: settings.launch.autofocusSamples, exposureSeconds: settings.launch.autofocusExposureSeconds[filter] })),
+        ),
+      ),
+    ),
+}
+
 const feedApp = FeedServer.pipe(
   Layer.provideMerge(FeedLive),
   Layer.provide(Layer.mergeAll(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
+      Layer.succeed(Operations, launchOperations),
       Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds }),
     )),
 )

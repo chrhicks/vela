@@ -1,0 +1,12 @@
+.command {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.refusal {
+  color: var(--amber);
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}

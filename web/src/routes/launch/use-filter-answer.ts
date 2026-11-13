@@ -1,9 +1,4 @@
-import { useSearchParams } from 'react-router'
+import type { FilterAnswer } from '../../../../state/commands.ts'
+import { useRig } from '../../rig/store.ts'
 
-export type FilterAnswer = 'in' | 'out'
-
-export function useFilterAnswer(): FilterAnswer {
-  const [search] = useSearchParams()
-
-  return search.get('filter') === 'out' ? 'out' : 'in'
-}
+export const useFilterAnswer = (): FilterAnswer | undefined => useRig(rig => rig.operations.filter)
