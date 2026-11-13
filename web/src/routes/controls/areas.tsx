@@ -2,12 +2,19 @@ import { useState } from 'react'
 
 import { ActionButton } from '../../components/ActionButton.tsx'
 import { CommandButton } from '../../components/CommandButton.tsx'
+import { useRig } from '../../rig/store.ts'
 import { Choices } from '../../components/Choices.tsx'
 import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
 import { ActionRow, Area } from './Area.tsx'
 import { NudgePad } from './NudgePad.tsx'
 import { calibrationFirstStep, type CalibrationType, defaults } from './stub.ts'
+
+function TrackingButton() {
+  const tracking = useRig(rig => rig.devices.mount.TELESCOPE_TRACK_STATE?.values.TRACK_ON)
+
+  return tracking === true ? <CommandButton request={{ command: 'tracking', on: false }}>Tracking off</CommandButton> : <CommandButton request={{ command: 'tracking', on: true }}>Tracking on</CommandButton>
+}
 
 export function MountArea() {
   const [target, setTarget] = useState(defaults.slewTarget)
@@ -17,8 +24,10 @@ export function MountArea() {
     <Area id="mount">
       <ActionRow>
         <CommandButton request={{ command: 'home' }}>Home</CommandButton>
-        <ActionButton>Stop</ActionButton>
-        <ActionButton>Tracking off</ActionButton>
+        <CommandButton request={{ command: 'stop' }} alwaysReady>
+          Stop
+        </CommandButton>
+        <TrackingButton />
         <ActionButton>Flip now</ActionButton>
       </ActionRow>
 

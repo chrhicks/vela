@@ -8,15 +8,17 @@ import { RefusalLine } from './RefusalLine.tsx'
 
 interface CommandButtonProps {
   readonly request: CommandRequest
+  readonly alwaysReady?: boolean
   readonly children: ReactNode
 }
 
-export function CommandButton({ request, children }: CommandButtonProps) {
+export function CommandButton({ request, alwaysReady = false, children }: CommandButtonProps) {
   const { sending, refusal, press } = useCommand(request)
+  const dimmed = sending && !alwaysReady
 
   return (
     <span className={styles.command}>
-      <button type="button" className={sending ? `${link.link} ${styles.sending}` : link.link} disabled={sending} onClick={press}>
+      <button type="button" className={dimmed ? `${link.link} ${styles.sending}` : link.link} disabled={dimmed} onClick={press}>
         {children}
       </button>
 
