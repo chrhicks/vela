@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import type { GuiderEvent, GuiderReport, RigEntry } from './entries.ts'
+import type { GuiderEvent, GuiderReport, LinkStatus, RigEntry } from './entries.ts'
 
 export const GuiderActivity = Schema.Literals(['guiding', 'looping', 'calibrating', 'starPicked', 'starLost', 'paused', 'stopped'])
 
@@ -32,7 +32,7 @@ const activityOf: Readonly<Record<GuiderEvent, GuiderActivity>> = {
   Paused: 'paused',
 }
 
-function guiderLinkChanged(state: Guiding, status: string): Guiding {
+function guiderLinkChanged(state: Guiding, status: LinkStatus): Guiding {
   if (status === 'connected') return state.link === 'connected' ? state : { ...state, link: 'connected' }
 
   return state.link === 'closed' && state.activity === undefined ? state : { link: 'closed' }
