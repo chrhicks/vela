@@ -168,10 +168,6 @@ export function CameraArea() {
         </CommandButton>
         <Field name="Cooler setpoint, degrees Celsius" kind="number" value={setpoint} onChange={setTypedSetpoint} />
       </ActionRow>
-
-      <ActionRow>
-        <ActionButton>Power cycle</ActionButton>
-      </ActionRow>
     </Area>
   )
 }
