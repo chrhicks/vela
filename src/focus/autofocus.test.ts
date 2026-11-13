@@ -2,6 +2,8 @@ import { StreamPosition } from '../../state/entry.ts'
 import { describe, expect, it } from 'vitest'
 import { fakeCamera } from '../testing/camera.ts'
 import { startedAt, wire } from '../testing/entries.ts'
+import { decodeConfig } from '../config.ts'
+import { AutofocusSettings } from '../settings.ts'
 import { bestFocus, makeAutofocus, type Sample } from './autofocus.ts'
 
 const sweep = (rows: ReadonlyArray<readonly [number, number, number]>): Sample[] => rows.map(([position, hfd, stars], index) => ({ frame: index + 1, position, hfd: stars > 0 ? hfd : undefined, stars }))
@@ -43,7 +45,14 @@ describe('the best focus of a sweep', () => {
     expect(bestFocus(sweep([[1200, 6, 50], [1150, 5, 60], [1100, 4, 70]]), 10)).toEqual({ position: 1100, how: 'edge' })
   })
 
-  it('has no best focus when the most stars any frame showed are noise (a daylight sweep on the rig, 2026-11-09)', () => {
+  it('has no best focus, at the default star count, for a sweep of a dark frame whose stars are hot pixels and noise', () => {
+    const { minStars } = decodeConfig(AutofocusSettings, {})
+    const dark = sweep([[32762, 2.1, 12], [32712, 1.9, 10], [32662, 2.5, 4], [32612, 2, 8], [32562, 2.5, 5], [32512, 1.9, 9], [32462, 2, 11], [32412, 2.1, 9], [32362, 2.3, 9]])
+
+    expect(bestFocus(dark, minStars)).toBeUndefined()
+  })
+
+  it('has no best focus when the most stars any frame showed are noise', () => {
     expect(bestFocus(sweep([[32577, 1.2, 1], [32527, 1.8, 2], [32477, 1.8, 2], [32427, 1.6, 2], [32377, 2.3, 4]]), 10)).toBeUndefined()
   })
 

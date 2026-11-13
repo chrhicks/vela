@@ -186,7 +186,7 @@ export const AutofocusSettings = Schema.Struct({
   minStars: described(
     'Stars the best frame of an autofocus sweep must show before Vela picks a focus from it',
     Schema.Number,
-    10,
+    50,
   ),
 })
 
