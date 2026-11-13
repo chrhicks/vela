@@ -1,5 +1,5 @@
 import { Option, Result, Schema } from 'effect'
-import { readRigEntry, type MalformedEntry, type RigEntry } from './entries.ts'
+import { isGuiderReport, readRigEntry, type MalformedEntry, type RigEntry } from './entries.ts'
 import { StreamPosition, type Entry } from './entry.ts'
 import { Frame, frames } from './frames.ts'
 import { Guiding, guiding, unknownGuiding } from './guiding.ts'
@@ -35,7 +35,7 @@ export type RigState = typeof RigState.Type
 
 export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, devices: noDevices, guiding: unknownGuiding, trends: noTrends, writes: {}, operations: noOperations, alignment: noAlignment, autofocus: noAutofocus, calibration: undefined }
 
-const fromRig = (entry: RigEntry) => entry.kind === 'wire' || entry.kind === 'client.connected' || entry.kind === 'client.connection' || entry.kind.startsWith('phd2.')
+const fromRig = (entry: RigEntry) => entry.kind === 'wire' || entry.kind === 'client.connected' || entry.kind === 'client.connection' || isGuiderReport(entry)
 
 export function rig(state: RigState, entry: RigEntry): Result.Result<RigState, MalformedReading> {
   const nextReadings = readings(state.readings, entry)

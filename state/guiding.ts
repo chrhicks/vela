@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import type { GuiderEvent, GuiderReport, LinkStatus, RigEntry } from './entries.ts'
+import { isGuiderReport, type GuiderEvent, type GuiderReport, type LinkStatus, type RigEntry } from './entries.ts'
 
 export const GuiderActivity = Schema.Literals(['guiding', 'looping', 'calibrating', 'starPicked', 'starLost', 'paused', 'stopped'])
 
@@ -50,8 +50,6 @@ function guiderReported(state: Guiding, report: GuiderReport['body'], at: number
     at,
   }
 }
-
-const isGuiderReport = (entry: RigEntry): entry is GuiderReport => entry.kind.startsWith('phd2.')
 
 export function guiding(state: Guiding, entry: RigEntry): Guiding {
   if (isGuiderReport(entry)) return guiderReported(state, entry.body, entry.at)

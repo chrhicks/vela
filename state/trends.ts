@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { isOperationObject, type GuiderReport, type RigEntry } from './entries.ts'
+import { isGuiderReport, isOperationObject, type GuiderReport, type RigEntry } from './entries.ts'
 import type { Devices } from './devices.ts'
 import type { WireBody } from './entry.ts'
 
@@ -75,8 +75,6 @@ function deviceReported(state: Trends, wire: WireBody, at: number, devices: Devi
       return state
   }
 }
-
-const isGuiderReport = (entry: RigEntry): entry is GuiderReport => entry.kind.startsWith('phd2.')
 
 export function trends(state: Trends, entry: RigEntry, devices: Devices): Trends {
   if (isGuiderReport(entry)) return guided(state, entry)

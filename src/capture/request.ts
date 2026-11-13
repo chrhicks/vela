@@ -1,9 +1,6 @@
 import { Schema } from 'effect'
+import { FrameType } from '../../state/entries.ts'
 import { decodeConfig } from '../config.ts'
-
-export const frameTypes = ['light', 'dark', 'flat', 'bias'] as const
-
-export type FrameType = (typeof frameTypes)[number]
 
 export const frameTypeElement: Readonly<Record<FrameType, string>> = {
   light: 'FRAME_LIGHT',
@@ -16,7 +13,7 @@ const nonNegative = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
 
 export const CaptureRequest = Schema.Struct({
   object: Schema.String,
-  frameType: Schema.Literals(frameTypes),
+  frameType: FrameType,
   exposureSeconds: Schema.Finite.check(Schema.isGreaterThan(0)),
   count: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
   gain: nonNegative,
