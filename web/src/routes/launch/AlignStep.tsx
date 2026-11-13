@@ -80,7 +80,7 @@ export function AlignStep() {
         lines={[totals]}
         yTicks={niceTicks([0, ...totals.map(point => point.y)])}
         xLabels={[`Frame ${totals[0]?.x ?? 3}`, `Frame ${totals.at(-1)?.x ?? 3}`]}
-        band={{ from: 0, to: goodArcmin }}
+        {...(totals.length === 0 ? {} : { band: { from: 0, to: goodArcmin } })}
       />
     </LaunchStep>
   )
