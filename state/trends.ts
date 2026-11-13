@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { isGuiderReport, isOperationObject, type GuiderReport, type RigEntry } from './entries.ts'
+import { isGuiderReport, type GuiderReport, type RigEntry } from './entries.ts'
 import type { Devices } from './devices.ts'
 import type { WireBody } from './entry.ts'
 
@@ -81,7 +81,7 @@ export function trends(state: Trends, entry: RigEntry, devices: Devices): Trends
 
   switch (entry.kind) {
     case 'vela.run.started':
-      return entry.body.frameType === 'light' && !isOperationObject(entry.body.object) ? startedOver(state, entry.body.object, entry.at) : state
+      return entry.body.frameType === 'light' && entry.body.object._tag === 'Target' ? startedOver(state, entry.body.object.name, entry.at) : state
     case 'vela.frame.stats':
       return { ...state, hfd: added(state.hfd, entry.at, entry.body.hfdPixels), stars: added(state.stars, entry.at, entry.body.stars) }
     case 'wire':

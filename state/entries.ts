@@ -1,4 +1,4 @@
-import { Data, Option, Result, Schema } from 'effect'
+import { Data, Option, Result, Schema, SchemaTransformation } from 'effect'
 import { FilterAnswer } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
 
@@ -16,9 +16,25 @@ export type FrameFile = typeof FrameFile.Type
 
 export const operationObjects = { align: 'polar-align', focus: 'autofocus', centre: 'centre' } as const
 
-const operationObjectNames: ReadonlySet<string> = new Set(Object.values(operationObjects))
+export const Operation = Schema.Literals(['align', 'focus', 'centre'])
 
-export const isOperationObject = (object: string) => operationObjectNames.has(object)
+export type Operation = typeof Operation.Type
+
+export const RunObject = Schema.Union([Schema.TaggedStruct('Operation', { operation: Operation }), Schema.TaggedStruct('Target', { name: Schema.String })])
+
+export type RunObject = typeof RunObject.Type
+
+const operationNamed: ReadonlyMap<string, Operation> = new Map(Operation.literals.map(operation => [operationObjects[operation], operation]))
+
+const runObjectOf = (object: string): RunObject => {
+  const operation = operationNamed.get(object)
+
+  return operation === undefined ? { _tag: 'Target', name: object } : { _tag: 'Operation', operation }
+}
+
+const objectOf = (subject: RunObject) => (subject._tag === 'Operation' ? operationObjects[subject.operation] : subject.name)
+
+const RunObjectName = Schema.String.pipe(Schema.decodeTo(RunObject, SchemaTransformation.transform<RunObject, string>({ decode: runObjectOf, encode: objectOf })))
 
 export const FrameType = Schema.Literals(['light', 'dark', 'flat', 'bias'])
 
@@ -35,7 +51,7 @@ const entryOf = <const Kind extends string, const Body extends Schema.Struct.Fie
 
 export const RunStarted = entryOf('vela.run.started', {
   run: RunId,
-  object: Schema.String,
+  object: RunObjectName,
   frameType: FrameType,
   exposureSeconds: Schema.Number,
   count: Schema.optionalKey(Count),
