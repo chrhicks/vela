@@ -10,7 +10,7 @@ function fakeOperations(refuse?: string) {
 
   return {
     calls,
-    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: carry('home'), stop: carry('stop'), tracking: (on: boolean) => carry(`tracking ${on}`), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release') },
+    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: carry('home'), stop: carry('stop'), tracking: (on: boolean) => carry(`tracking ${on}`), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => carry(`centre ${target}`), flipNow: carry('flip') },
   }
 }
 
@@ -37,6 +37,8 @@ describe('POST /commands', () => {
     expect(await post({ command: 'nudge', id: nudgeId, direction: 'north', rate: 'fast' })).toMatchObject({ status: 202, calls: ['nudge north fast'] })
     expect(await post({ command: 'holdNudge', id: nudgeId })).toMatchObject({ status: 202, calls: ['hold'] })
     expect(await post({ command: 'releaseNudge', id: nudgeId })).toMatchObject({ status: 202, calls: ['release'] })
+    expect(await post({ command: 'slewAndCentre', target: 'NGC 7635' })).toMatchObject({ status: 202, calls: ['centre NGC 7635'] })
+    expect(await post({ command: 'flipNow' })).toMatchObject({ status: 202, calls: ['flip'] })
   })
 
   it("answers a refusal as data, with Vela's reason", async () => {
