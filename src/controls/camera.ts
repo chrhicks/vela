@@ -33,6 +33,21 @@ export const cameraControls = Effect.gen(function* () {
 
         return { code: 'cooling', celsius } satisfies Done
       }),
+    takeDarks: (frames: number, exposureSeconds: number, celsius: number) =>
+      Effect.gen(function* () {
+        const reported = yield* camera
+        const gain = reported.CCD_CONTROLS?.values['Gain']
+        const offset = reported.CCD_CONTROLS?.values['Offset']
+        const limits = reported.CCD_TEMPERATURE?.limits?.['CCD_TEMPERATURE_VALUE']
+
+        if (gain === undefined || offset === undefined) return yield* Effect.fail(notConnected)
+        if (limits !== undefined && (celsius < limits.min || celsius > limits.max)) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'out-of-range', value: celsius, ...limits } }))
+        if (yield* capturing.busy) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'run-active' } }))
+
+        yield* capturing.start({ object: 'dark', frameType: 'dark', exposureSeconds, count: frames, gain, offset, cooler: 'on', setpoint: celsius })
+
+        return { code: 'darks', frames, exposureSeconds, celsius } satisfies Done
+      }),
     testFrame: (exposureSeconds: number) =>
       Effect.gen(function* () {
         const controls = (yield* camera).CCD_CONTROLS?.values

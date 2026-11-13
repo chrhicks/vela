@@ -24,6 +24,7 @@ export class Operations extends Context.Service<
     readonly coolTo: (celsius: number) => Effect.Effect<Done, CommandRefused>
     readonly coolerOff: Effect.Effect<Done, CommandRefused>
     readonly testFrame: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
+    readonly takeDarks: (frames: number, exposureSeconds: number, celsius: number) => Effect.Effect<Done, CommandRefused>
   }
 >()('vela/Operations') {}
 
@@ -54,6 +55,7 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         coolTo: ({ celsius }) => operations.coolTo(celsius),
         coolerOff: () => operations.coolerOff,
         testFrame: ({ exposureSeconds }) => operations.testFrame(exposureSeconds),
+        takeDarks: ({ frames, exposureSeconds, celsius }) => operations.takeDarks(frames, exposureSeconds, celsius),
       }),
     )
   })
