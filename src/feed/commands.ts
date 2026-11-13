@@ -11,6 +11,8 @@ export class Operations extends Context.Service<
     readonly finishAlignment: Effect.Effect<void, CommandRefused>
     readonly answerFilter: (filter: FilterAnswer) => Effect.Effect<void, CommandRefused>
     readonly home: Effect.Effect<void, CommandRefused>
+    readonly stop: Effect.Effect<void, CommandRefused>
+    readonly tracking: (on: boolean) => Effect.Effect<void, CommandRefused>
   }
 >()('vela/Operations') {}
 
@@ -26,6 +28,8 @@ const carryOut = (request: CommandRequest) =>
         finishAlignment: () => operations.finishAlignment,
         answerFilter: ({ filter }) => operations.answerFilter(filter),
         home: () => operations.home,
+        stop: () => operations.stop,
+        tracking: ({ on }) => operations.tracking(on),
       }),
     )
   })

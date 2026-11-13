@@ -33,7 +33,7 @@ import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
-import { mountControls } from '../controls/mount.ts'
+import { mountControls, MountRuns } from '../controls/mount.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -208,7 +208,17 @@ const launchOperations = {
     ),
 }
 
-const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, home: mount.home })))
+const capturingFor = (runs: ReadonlyArray<string | undefined>) => {
+  const capturing = capture.view().run?.id
+
+  return capturing !== undefined && runs.includes(capturing)
+}
+
+const mountRuns = Layer.succeed(MountRuns, {
+  stopMoving: Effect.promise(() => (capturingFor([align.view().run, centre.view().run]) ? capture.stop() : Promise.resolve(false))).pipe(Effect.asVoid),
+})
+
+const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, ...mount }))).pipe(Layer.provide(mountRuns))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),

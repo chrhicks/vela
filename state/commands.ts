@@ -16,6 +16,8 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('finishAlignment') }),
   Schema.Struct({ command: Schema.Literal('answerFilter'), filter: FilterAnswer }),
   Schema.Struct({ command: Schema.Literal('home') }),
+  Schema.Struct({ command: Schema.Literal('stop') }),
+  Schema.Struct({ command: Schema.Literal('tracking'), on: Schema.Boolean }),
 ])
 
 export type CommandRequest = typeof CommandRequest.Type

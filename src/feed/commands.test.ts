@@ -10,7 +10,7 @@ function fakeOperations(refuse?: string) {
 
   return {
     calls,
-    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: carry('home') },
+    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: carry('home'), stop: carry('stop'), tracking: (on: boolean) => carry(`tracking ${on}`) },
   }
 }
 
@@ -30,6 +30,8 @@ describe('POST /commands', () => {
     expect(await post({ command: 'startAlignment' })).toEqual({ status: 202, body: undefined, calls: ['startAlignment'] })
     expect(await post({ command: 'answerFilter', filter: 'in' })).toMatchObject({ status: 202, calls: ['answerFilter in'] })
     expect(await post({ command: 'home' })).toMatchObject({ status: 202, calls: ['home'] })
+    expect(await post({ command: 'stop' })).toMatchObject({ status: 202, calls: ['stop'] })
+    expect(await post({ command: 'tracking', on: false })).toMatchObject({ status: 202, calls: ['tracking false'] })
   })
 
   it("answers a refusal as data, with Vela's reason", async () => {
