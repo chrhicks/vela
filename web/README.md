@@ -19,15 +19,13 @@ Each route serves one moment of the night.
 - `src/routes/<route>/`: one folder per route, with its pages, the components only it uses, and its stub values.
 - `src/components/`: the pieces every route shares, each one `.tsx` file and one CSS module: `Page`, `PageHeader`, `Caption`, `Facts`, `Readings`, `Readout`, `StatusLine`, `Statement`, `Alert`, `Log`, `Chart`, `Picture`, `Choices`, `Field`, `ActionLink`, `ActionButton`, `PillLink`.
 - `src/styles/tokens.css`: the colours, type sizes and spacing. Components use these variables and no literal colours.
-- `src/stub/`: what stands in for the rig while there is no data. It is deleted when the stream arrives.
+- `src/stub/`: the sky picture and series the stubbed screens draw.
 
 ## State of the build
 
-The UI is being built first, with no data behind it. Every value on screen comes from a `stub.ts` beside its page, shaped like what the page will later receive from the rig stream, so wiring in real data changes the source and leaves the components alone.
+Every screen is drawn. Real data reaches the page through `src/rig/`: the service's event stream folded into a store by the reducers in `state/`. On real data now: the run page's header, latest frame, rig line (readings, guiding, flip) and trend charts; the link banners (no connection, rig silent); and on `/launch` the set-up checklist, bring-up, alignment, the filter question and autofocus, with their commands sent to `POST /commands`.
 
-Every screen is drawn: `/launch`, every state of the run page with the target picker, `/controls`, and the frame and stack inspect views.
-
-A state that the rig decides (devices coming up, an alignment error jumping) is a scene: the page reads `?scene=` from the address. The strip at the bottom of the window lists the scenes of the current route. Three screens move on by themselves after a few seconds, as the real ones will when the rig finishes: bring-up, autofocus and the first-frames check.
+The rest still reads a `stub.ts` beside its page, shaped like what the stream will give, so wiring it changes the source and leaves the components alone: the target picker, the capture checks and the starting and night-over views, the ready step on `/launch`, `/controls`, and the frame and stack inspect views.
 
 ## /launch
 
