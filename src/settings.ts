@@ -164,6 +164,7 @@ export const LaunchSettings = Schema.Struct({
     Schema.Number,
     2,
   ),
+  alignGoodArcmin: described("Total polar alignment error under which the page says good. Chris, 2026-11-11: 'Good alignment is under 1': anything smaller is just bonus when i feel like tuning it'", Schema.Number, 1),
   autofocusStep: described('Focuser steps between two autofocus samples. Every sweep on 11-09 and 11-10 used 50; 100 steps from best focus roughly doubled HFD on those curves, so 50 keeps samples on both sides of focus', Schema.Number, 50),
   autofocusSamples: described('Samples in one autofocus sweep. Every full sweep on 11-09 and 11-10 took 9: 34 s at 2 s exposures, 114 s at 10 s', Schema.Number, 9),
   autofocusExposureSeconds: described(

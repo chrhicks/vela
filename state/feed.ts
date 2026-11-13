@@ -15,7 +15,11 @@ export const LinkLimits = Schema.Struct({ heartbeatSeconds: Schema.Number, lostA
 
 export type LinkLimits = typeof LinkLimits.Type
 
-export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, state: RigState })
+export const LaunchLimits = Schema.Struct({ alignGoodArcmin: Schema.Number })
+
+export type LaunchLimits = typeof LaunchLimits.Type
+
+export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, launch: LaunchLimits, state: RigState })
 
 export type Bootstrap = typeof Bootstrap.Type
 
