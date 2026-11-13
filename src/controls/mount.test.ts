@@ -28,7 +28,7 @@ function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) =>
   const rates = Layer.succeed(NudgeRates, { slow: '7x', fast: '8x' })
   const centring = Layer.succeed(Centring, { centreOn: (target: string) => Effect.sync(() => (sent.push(`centre on ${target}`), `${target} found`)) })
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
-  const runs = Layer.succeed(MountRuns, { stopMoving: Effect.sync(() => void sent.push('vela run stopped')) })
+  const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('vela run stopped'), true)), idle: Effect.sync(() => void sent.push('no run')) })
   const press = (choose: (controls: Controls) => Effect.Effect<void, unknown>) =>
     Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.flip, Effect.option, Effect.provide(Layer.mergeAll(feed, runs, rates, centring, deviceCommandsFrom({ send, ask, tell, deviceIds, answerSeconds })))))
 
@@ -40,7 +40,7 @@ describe('Home', () => {
     const { sent, press } = setup(connected)
 
     expect(await press(mount => mount.home)).toMatchObject({ _tag: 'None' })
-    expect(sent).toEqual(['am5 TELESCOPE_HOME {"GO":true}'])
+    expect(sent).toEqual(['vela run stopped', 'am5 TELESCOPE_HOME {"GO":true}'])
   })
 
   it('refuses before sending anything while the mount is not connected', async () => {
@@ -66,7 +66,7 @@ describe('Home', () => {
 })
 
 describe('Stop', () => {
-  it("ends Vela's own run that moves the mount, then aborts the motion", async () => {
+  it('ends whatever run is going, then aborts the motion', async () => {
     const { sent, press } = setup(connected)
 
     expect(await press(mount => mount.stop)).toMatchObject({ _tag: 'None' })
@@ -119,12 +119,12 @@ describe('Nudge', () => {
 })
 
 describe('Slew and centre, and Flip now', () => {
-  it('starts centring on the named target once the mount is connected', async () => {
+  it('ends whatever run is going, waits for it to finish, then starts centring on the named target', async () => {
     const { sent, press } = setup(connected)
 
     await press(mount => mount.slewAndCentre('NGC 7635'))
 
-    expect(sent).toEqual(['centre on NGC 7635'])
+    expect(sent).toEqual(['vela run stopped', 'no run', 'centre on NGC 7635'])
   })
 
   it('points the mount again at where it points now, tracking, which is how the AM5 flips', async () => {

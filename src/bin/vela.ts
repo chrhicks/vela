@@ -209,14 +209,9 @@ const launchOperations = {
     ),
 }
 
-const capturingFor = (runs: ReadonlyArray<string | undefined>) => {
-  const capturing = capture.view().run?.id
-
-  return capturing !== undefined && runs.includes(capturing)
-}
-
 const mountRuns = Layer.succeed(MountRuns, {
-  stopMoving: Effect.promise(() => (capturingFor([align.view().run, centre.view().run]) ? capture.stop() : Promise.resolve(false))).pipe(Effect.asVoid),
+  endRun: Effect.promise(() => capture.stop()),
+  idle: Effect.promise(() => capture.whenIdle()),
 })
 
 const centring = Layer.succeed(Centring, {

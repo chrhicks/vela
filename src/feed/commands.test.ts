@@ -11,7 +11,7 @@ function fakeOperations(refuse?: string) {
 
   return {
     calls,
-    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: answering('home', { code: 'home' }), stop: answering('stop', { code: 'stop' }), tracking: (on: boolean) => answering(`tracking ${on}`, { code: 'tracking', on }), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => answering(`centre ${target}`, { code: 'centring', target: 'Ring Nebula' }), flipNow: answering('flip', { code: 'flip-sent' }) },
+    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: answering('home', { code: 'home', endedRun: false }), stop: answering('stop', { code: 'stop', endedRun: true }), tracking: (on: boolean) => answering(`tracking ${on}`, { code: 'tracking', on }), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => answering(`centre ${target}`, { code: 'centring', target: 'Ring Nebula', endedRun: false }), flipNow: answering('flip', { code: 'flip-sent' }) },
   }
 }
 
@@ -32,7 +32,7 @@ describe('POST /commands', () => {
   it('carries out a command and answers 200 with what was done', async () => {
     expect(await post({ command: 'startAlignment' })).toEqual({ status: 200, body: { code: 'carried-out' }, calls: ['startAlignment'] })
     expect(await post({ command: 'tracking', on: true })).toEqual({ status: 200, body: { code: 'tracking', on: true }, calls: ['tracking true'] })
-    expect(await post({ command: 'slewAndCentre', target: 'M 57' })).toEqual({ status: 200, body: { code: 'centring', target: 'Ring Nebula' }, calls: ['centre M 57'] })
+    expect(await post({ command: 'slewAndCentre', target: 'M 57' })).toEqual({ status: 200, body: { code: 'centring', target: 'Ring Nebula', endedRun: false }, calls: ['centre M 57'] })
     expect(await post({ command: 'answerFilter', filter: 'in' })).toMatchObject({ status: 200, calls: ['answerFilter in'] })
     expect(await post({ command: 'home' })).toMatchObject({ status: 200, calls: ['home'] })
     expect(await post({ command: 'stop' })).toMatchObject({ status: 200, calls: ['stop'] })

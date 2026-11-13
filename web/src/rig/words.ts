@@ -20,10 +20,10 @@ export const doneWords = (done: Done): RefusalWords =>
   Match.value(done).pipe(
     Match.discriminatorsExhaustive('code')({
       'carried-out': () => ({ happened: 'Done' }),
-      home: () => ({ happened: 'Going home' }),
-      stop: () => ({ happened: 'Stopped' }),
+      home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
+      stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       tracking: ({ on }) => ({ happened: on ? 'Tracking on' : 'Tracking off' }),
-      centring: ({ target }) => ({ happened: 'Centring', toDo: target }),
+      centring: ({ target, endedRun }) => ({ happened: `Centring ${target}`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       'flip-sent': () => ({ happened: 'Flip sent' }),
     }),
   )

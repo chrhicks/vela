@@ -37,10 +37,10 @@ export type CommandRequest = typeof CommandRequest.Type
 
 export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('carried-out') }),
-  Schema.Struct({ code: Schema.Literal('home') }),
-  Schema.Struct({ code: Schema.Literal('stop') }),
+  Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean }),
+  Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('tracking'), on: Schema.Boolean }),
-  Schema.Struct({ code: Schema.Literal('centring'), target: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('centring'), target: Schema.String, endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('flip-sent') }),
 ])
 
