@@ -22,6 +22,12 @@ describe('run', () => {
     expect(state).toMatchObject({ status: 'ended', frames: 2, failures: 1, endedAt: 1400, reason: 'stopped' })
   })
 
+  it('ends a run that stopped on failed exposures', () => {
+    const state = reduce([runStarted('r1', 1000), entry('vela.run.ended', 1400, { run: 'r1', reason: 'failures', detail: '3 exposures in a row failed', counted: 0 })])
+
+    expect(state).toMatchObject({ status: 'ended', endedAt: 1400, reason: 'failures' })
+  })
+
   it('ignores entries of another run', () => {
     const state = reduce([runStarted('r2', 1000), entry('vela.run.exposed', 1130, { run: 'r1', frame: 7 }), entry('vela.run.ended', 1200, { run: 'r1', reason: 'done' })])
 

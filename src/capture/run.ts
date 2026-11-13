@@ -4,6 +4,7 @@ import type { LateCommand, Sender } from '../commands/sender.ts'
 import { announcesFrame } from '../frames/announce.ts'
 import type { Picture } from '../rig/picture.ts'
 import type { Entry } from '../../state/entry.ts'
+import type { RunEnding } from '../../state/entries.ts'
 import { readWireBody } from '../stream/json.ts'
 import { makeChanges } from './changes.ts'
 import type { RunEvent } from './events.ts'
@@ -11,7 +12,7 @@ import { stepsFor, wantedOf, type Step, type Wanted } from './plan.ts'
 import { parseRequest, type CaptureRequest } from './request.ts'
 import type { RunFile } from './runfile.ts'
 
-export type EndReason = 'done' | 'stopped' | 'failures' | 'interrupted' | 'refused' | 'unknown'
+export type EndReason = RunEnding
 
 export interface Ending {
   readonly run: string
