@@ -40,6 +40,7 @@ export function deviceBringUp(rig: RigState, device: string): DeviceBringUp {
   return pending || missing ? { status: 'setting', changes: pendingChanges(rig, device) } : { status: 'set', changes: [] }
 }
 
-export const rigProgramHeard = (rig: RigState) => rig.heardAt !== undefined
+export const rigProgramUp = (rig: Pick<RigState, 'heardAt'>, serviceNow: number | undefined, silentAfterSeconds: number | undefined) =>
+  rig.heardAt !== undefined && serviceNow !== undefined && silentAfterSeconds !== undefined && serviceNow - rig.heardAt <= silentAfterSeconds * 1000
 
 export const guiderHeard = (rig: RigState) => rig.guiding.link === 'connected'

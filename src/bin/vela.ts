@@ -30,7 +30,8 @@ import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
 import { VelaSettings } from '../settings.ts'
 import { Feed, FeedLive } from '../feed/feed.ts'
-import { FeedServer, FeedSettings } from '../feed/route.ts'
+import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
+import { NightName } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
 import { ServiceStartNow } from '../feed/start.ts'
 import { makeReader, type Entry, type Message } from '../../state/entry.ts'
@@ -184,7 +185,11 @@ function frameSaved(entry: Entry) {
 
 const feedApp = FeedServer.pipe(
   Layer.provideMerge(FeedLive),
-  Layer.provide(Layer.mergeAll(ServiceStartNow, Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds }))),
+  Layer.provide(Layer.mergeAll(
+      ServiceStartNow,
+      Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
+      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds }),
+    )),
 )
 const servicesScope = runHandledSync(Scope.make())
 const { feed, broker } = await runHandledPromise(

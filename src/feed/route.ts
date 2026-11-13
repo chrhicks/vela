@@ -4,8 +4,11 @@ import { Clock, Context, Duration, Effect, Layer, Stream } from 'effect'
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from 'effect/http'
 import type { FeedConfig } from '../settings.ts'
 import { Feed } from './feed.ts'
+import type { NightName } from '../../state/entries.ts'
 import { feedEvent, feedPath } from '../../state/feed.ts'
 import { ServiceStart } from './start.ts'
+
+export class Tonight extends Context.Service<Tonight, { readonly nightOf: (at: number) => NightName }>()('vela/Tonight') {}
 
 export class FeedSettings extends Context.Service<FeedSettings, typeof FeedConfig.Type & { readonly rigSilentAfterSeconds: number }>()('vela/FeedSettings') {}
 
@@ -14,12 +17,13 @@ const event = (name: string, data: unknown) => `event: ${name}\ndata: ${JSON.str
 const feedEvents = Effect.gen(function* () {
   const feed = yield* Feed
   const { token } = yield* ServiceStart
+  const { nightOf } = yield* Tonight
   const { heartbeatSeconds, lostAfterSeconds, rigSilentAfterSeconds } = yield* FeedSettings
   const limits = { heartbeatSeconds, lostAfterSeconds, rigSilentAfterSeconds }
 
   const heartbeats = Stream.tick(Duration.seconds(heartbeatSeconds)).pipe(
     Stream.mapEffect(() => Clock.currentTimeMillis),
-    Stream.map(at => event(feedEvent.heartbeat, { at })),
+    Stream.map(at => event(feedEvent.heartbeat, { at, night: nightOf(at) })),
   )
 
   return Stream.unwrap(
@@ -27,7 +31,7 @@ const feedEvents = Effect.gen(function* () {
       const { state, entries } = yield* feed.subscribe
       const at = yield* Clock.currentTimeMillis
 
-      return Stream.concat(Stream.succeed(event(feedEvent.state, { token, at, limits, state })), Stream.merge(entries.pipe(Stream.map(entry => event(feedEvent.entry, entry))), heartbeats))
+      return Stream.concat(Stream.succeed(event(feedEvent.state, { token, at, night: nightOf(at), limits, state })), Stream.merge(entries.pipe(Stream.map(entry => event(feedEvent.entry, entry))), heartbeats))
     }),
   )
 })

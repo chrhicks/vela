@@ -3,19 +3,6 @@ import type { Reading } from '../../components/Readings.tsx'
 
 export const stepCount = 6
 
-export const checklist: ReadonlyArray<string> = [
-  'Pier knob tight',
-  'Power in',
-  'Ethernet in',
-  'PC button pressed',
-  'Cables clear',
-  'Cap off',
-  'Guide dew heater on',
-  'Filter out',
-]
-
-export const rigPc: Reading = { label: 'Rig PC', value: 'BOOTING 0:42' }
-
 export type DeviceState = 'waiting' | 'setting' | 'set' | 'up'
 
 export interface Change {

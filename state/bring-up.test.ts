@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deviceBringUp, guiderHeard, rigProgramHeard } from './bring-up.ts'
+import { deviceBringUp, guiderHeard, rigProgramUp } from './bring-up.ts'
 import { emptyRig, rig } from './rig.ts'
 import { entry, fold } from './testing.ts'
 import { writes, type Writes } from './writes.ts'
@@ -47,9 +47,13 @@ describe('deviceBringUp', () => {
     expect(deviceBringUp(state([connected('box')]), 'box')).toEqual({ status: 'set', changes: [] })
   })
 
-  it('hears the rig program and PHD2', () => {
-    expect(rigProgramHeard(emptyRig)).toBe(false)
-    expect(rigProgramHeard(state([entry('client.connected', 1, { run: 'r' })]))).toBe(true)
+  it('calls the rig program up only while it has been heard recently, and hears PHD2', () => {
+    const heard = state([entry('client.connected', 1000, { run: 'r' })])
+
+    expect(rigProgramUp(emptyRig, 2000, 10)).toBe(false)
+    expect(rigProgramUp(heard, 2000, 10)).toBe(true)
+    expect(rigProgramUp(heard, 1000 + 11_000, 10)).toBe(false)
+    expect(rigProgramUp(heard, undefined, 10)).toBe(false)
     expect(guiderHeard(state([entry('client.connection', 1, { target: 'phd2', status: 'connected' })]))).toBe(true)
   })
 })
