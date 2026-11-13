@@ -20,6 +20,7 @@ export const doneWords = (done: Done): RefusalWords =>
   Match.value(done).pipe(
     Match.discriminatorsExhaustive('code')({
       'carried-out': () => ({ happened: 'Done' }),
+      focusing: ({ position }) => ({ happened: `Moving to ${position}` }),
       home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       tracking: ({ on }) => ({ happened: on ? 'Tracking on' : 'Tracking off' }),
@@ -43,6 +44,7 @@ export const refusalWords = (refusal: Refusal): RefusalWords =>
       'no-answer': ({ seconds }) => ({ happened: `No answer ${seconds} s`, toDo: 'Check rig PC' }),
       'rig-refused': ({ text }) => ({ happened: 'Rig refused', toDo: text }),
       'unknown-target': ({ text }) => ({ happened: `${text} not found`, toDo: 'Check the name' }),
+      'out-of-range': ({ value, min, max }) => ({ happened: `${value} out of range`, toDo: `${min} to ${max}` }),
       malformed: () => ({ happened: 'Not understood' }),
       unreachable: () => ({ happened: 'No answer from Vela' }),
     }),

@@ -18,6 +18,8 @@ export class Operations extends Context.Service<
     readonly releaseNudge: (id: NudgeId) => Effect.Effect<void, CommandRefused>
     readonly slewAndCentre: (target: string) => Effect.Effect<Done, CommandRefused>
     readonly flipNow: Effect.Effect<Done, CommandRefused>
+    readonly focusTo: (position: number) => Effect.Effect<Done, CommandRefused>
+    readonly focusBy: (steps: number) => Effect.Effect<Done, CommandRefused>
   }
 >()('vela/Operations') {}
 
@@ -42,6 +44,8 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         releaseNudge: ({ id }) => operations.releaseNudge(id).pipe(carriedOut),
         slewAndCentre: ({ target }) => operations.slewAndCentre(target),
         flipNow: () => operations.flipNow,
+        focusTo: ({ position }) => operations.focusTo(position),
+        focusBy: ({ steps }) => operations.focusBy(steps),
       }),
     )
   })

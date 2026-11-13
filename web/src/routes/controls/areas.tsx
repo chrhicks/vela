@@ -5,7 +5,7 @@ import type { NudgeRate } from '../../../../state/commands.ts'
 import { CommandButton } from '../../components/CommandButton.tsx'
 import { PressLine, type Pressed } from '../../components/PressLine.tsx'
 import type { Answer } from '../../rig/commands.ts'
-import { useRig } from '../../rig/store.ts'
+import { useLink, useRig } from '../../rig/store.ts'
 import { Choices } from '../../components/Choices.tsx'
 import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
@@ -94,24 +94,35 @@ export function GuidingArea() {
 }
 
 export function FocusArea() {
-  const [position, setPosition] = useState(defaults.focusPosition)
+  const current = useRig(rig => rig.devices.focuser.ABS_FOCUS_POSITION?.values.FOCUS_ABSOLUTE_POSITION)
+  const steps = useLink().controls?.focusSteps ?? []
+  const [typed, setTyped] = useState<string | undefined>(undefined)
+  const position = typed ?? (current === undefined ? '' : String(current))
+  const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
+  const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
+  const stepsShown = [...steps.map(step => -step).reverse(), ...steps]
 
   return (
     <Area id="focus">
+      <PressLine pressed={pressed} />
+
       <ActionRow>
         <ActionButton>Run autofocus</ActionButton>
       </ActionRow>
 
       <ActionRow>
-        <ActionButton>Move to</ActionButton>
-        <Field name="Focuser position" kind="number" value={position} onChange={setPosition} />
+        <CommandButton request={{ command: 'focusTo', position: Number.parseInt(position, 10) }} onAnswer={answered}>
+          Move to
+        </CommandButton>
+        <Field name="Focuser position" kind="number" value={position} onChange={setTyped} />
       </ActionRow>
 
       <ActionRow label="Step">
-        <ActionButton>-50</ActionButton>
-        <ActionButton>-10</ActionButton>
-        <ActionButton>+10</ActionButton>
-        <ActionButton>+50</ActionButton>
+        {stepsShown.map(step => (
+          <CommandButton key={step} request={{ command: 'focusBy', steps: step }} onAnswer={answered}>
+            {step > 0 ? `+${step}` : String(step)}
+          </CommandButton>
+        ))}
       </ActionRow>
     </Area>
   )

@@ -65,7 +65,7 @@ export function makeReader(stream: Stream) {
   }
 }
 
-const Limits = Schema.Struct({ min: Schema.Number, max: Schema.Number })
+export const Limits = Schema.Struct({ min: Schema.Number, max: Schema.Number })
 
 const Elements = Schema.Record(Schema.String, Value)
 

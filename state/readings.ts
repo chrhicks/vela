@@ -1,10 +1,11 @@
 import { Schema } from 'effect'
 import type { RigEntry } from './entries.ts'
-import { PropertyState, Value, type WireBody } from './entry.ts'
+import { Limits, PropertyState, Value, type WireBody } from './entry.ts'
 
 export const Reading = Schema.Struct({
   state: Schema.optional(PropertyState),
   values: Schema.Record(Schema.String, Value),
+  limits: Schema.optionalKey(Schema.Record(Schema.String, Limits)),
   at: Schema.Number,
 })
 
@@ -23,10 +24,12 @@ function withReading(state: Readings, wire: WireBody, property: string, at: numb
   const device: DeviceReadings = state[wire.device] ?? {}
   const before = device[property]
   const values = { ...before?.values, ...wire.elements }
+  const defined = Object.keys(wire.numbers).length > 0
+  const limits = defined ? wire.numbers : before?.limits
 
-  if (before !== undefined && before.state === wire.state && sameValues(before.values, values)) return state
+  if (before !== undefined && !defined && before.state === wire.state && sameValues(before.values, values)) return state
 
-  return { ...state, [wire.device]: { ...device, [property]: { state: wire.state, values, at } } }
+  return { ...state, [wire.device]: { ...device, [property]: { state: wire.state, values, at, ...(limits === undefined ? {} : { limits }) } } }
 }
 
 function withoutReading(state: Readings, wire: WireBody): Readings {

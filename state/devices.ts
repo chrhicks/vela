@@ -1,5 +1,5 @@
 import { Result, Schema } from 'effect'
-import { MalformedReading, PropertyState, type StreamPosition } from './entry.ts'
+import { Limits, MalformedReading, PropertyState, type StreamPosition } from './entry.ts'
 import type { Readings } from './readings.ts'
 
 const property = <Values extends Schema.Top>(values: Values) =>
@@ -7,6 +7,7 @@ const property = <Values extends Schema.Top>(values: Values) =>
     Schema.Struct({
       state: Schema.optionalKey(PropertyState),
       values,
+      limits: Schema.optionalKey(Schema.Record(Schema.String, Limits)),
       at: Schema.Number,
     }),
   )

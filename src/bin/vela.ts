@@ -33,6 +33,7 @@ import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
+import { focusControls } from '../controls/focus.ts'
 import { Centring, mountControls, MountRuns, MountSettings } from '../controls/mount.ts'
 import { searchCatalog } from '../catalog/search.ts'
 import { operationObjects } from '../../state/entries.ts'
@@ -227,7 +228,7 @@ const centring = Layer.succeed(Centring, {
     }),
 })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, ...mount }))).pipe(Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
+const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls]), ([mount, focus]) => ({ ...launchOperations, ...mount, ...focus }))).pipe(Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),
@@ -236,7 +237,7 @@ const feedApp = FeedServer.pipe(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
       deviceCommandsFrom({ send: (command, signal) => sender.send(command, signal), ask: (request, signal) => sender.ask(request, signal), tell: (device, body) => sender.tell(device, body), deviceIds: settings.devices, answerSeconds: settings.capture.commandAnswerSeconds }),
-      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs } }),
+      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs, focusSteps: settings.controls.focusSteps } }),
     )),
 )
 const servicesScope = runHandledSync(Scope.make())

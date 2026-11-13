@@ -21,7 +21,7 @@ export const LaunchLimits = Schema.Struct({ alignGoodArcmin: Schema.Number, alig
 
 export type LaunchLimits = typeof LaunchLimits.Type
 
-export const ControlsLimits = Schema.Struct({ nudgeHoldMs: Schema.Number })
+export const ControlsLimits = Schema.Struct({ nudgeHoldMs: Schema.Number, focusSteps: Schema.Array(Schema.Int) })
 
 export type ControlsLimits = typeof ControlsLimits.Type
 
