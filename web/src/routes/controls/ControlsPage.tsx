@@ -6,7 +6,9 @@ import { PageHeader } from '../../components/PageHeader.tsx'
 import { CalibrationArea, CameraArea, DewArea, FocusArea, GuidingArea, MountArea, SystemArea } from './areas.tsx'
 import styles from './ControlsPage.module.css'
 import { ShutDown } from './ShutDown.tsx'
-import { areaIds, areas, run } from './stub.ts'
+import { useRig } from '../../rig/store.ts'
+import { areaIds, runFacts } from './live.ts'
+import { useAreas } from './use-areas.ts'
 
 export function ControlsPage() {
   const { area } = useParams()
@@ -16,10 +18,12 @@ export function ControlsPage() {
   const setAsking = (ask: boolean) => setSearch(ask ? { ask: 'shut-down' } : {})
 
   const opened = areaIds.find(id => id === area)
+  const areas = useAreas()
+  const run = useRig(rig => rig.run)
 
   return (
     <Page width="wide">
-      <PageHeader title="Controls" facts={run}>
+      <PageHeader title="Controls" facts={runFacts(run)}>
         <ShutDown asking={asking} onAsk={setAsking} />
       </PageHeader>
 

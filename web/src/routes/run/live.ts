@@ -1,8 +1,7 @@
-import { Match } from 'effect'
-import { flip, type Flip } from '../../../../state/flip.ts'
+import { flip } from '../../../../state/flip.ts'
 import type { Frame } from '../../../../state/frames.ts'
-import type { GuiderActivity, Guiding } from '../../../../state/guiding.ts'
-import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type MountActivity, type Readings } from '../../../../state/readings.ts'
+import type { Guiding } from '../../../../state/guiding.ts'
+import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Readings } from '../../../../state/readings.ts'
 import type { Run } from '../../../../state/run.ts'
 import type { Span } from '../../components/Chart.tsx'
 import type { Reading } from '../../components/Readings.tsx'
@@ -10,8 +9,7 @@ import { niceTicks } from '../../components/ticks.ts'
 import type { Point, Trends } from '../../../../state/trends.ts'
 import type { TrendWindowName } from './TrendWindow.tsx'
 import type { Capturing, Trend, TrendView } from './stub.ts'
-
-const unknown = '—'
+import { flipWord, guidingWord, mountWords, unknown } from '../../rig/words.ts'
 
 const clock = (at: number, withSeconds = false) =>
   new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(withSeconds ? { second: '2-digit' } : {}), hour12: false })
@@ -32,42 +30,6 @@ function latestStats(frame: Frame | undefined): ReadonlyArray<Reading> {
     { label: 'Vs baseline', value: unknown },
   ]
 }
-
-const mountWords: Readonly<Record<MountActivity, string>> = { parked: 'Parked', slewing: 'Slewing', tracking: 'Tracking', idle: 'Idle' }
-
-const guiderWords: Readonly<Record<GuiderActivity, string>> = {
-  guiding: 'On',
-  looping: 'Looping',
-  calibrating: 'Calibrating',
-  starPicked: 'Star picked',
-  starLost: 'Star lost',
-  paused: 'Paused',
-  stopped: 'Off',
-}
-
-function guidingWord({ link, activity, averagePixels }: Guiding): string {
-  if (link === 'closed') return 'PHD2 off'
-  if (activity === undefined) return unknown
-  if (activity === 'guiding' && averagePixels !== undefined) return `${guiderWords.guiding} ${averagePixels.toFixed(2)} px`
-
-  return guiderWords[activity]
-}
-
-function duration(seconds: number): string {
-  const minutes = Math.round(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-
-  return hours === 0 ? `${minutes} min` : `${hours} h ${String(minutes % 60).padStart(2, '0')}`
-}
-
-const flipWord = (time: Flip): string =>
-  Match.valueTags(time, {
-    Unknown: () => unknown,
-    NotTracking: () => 'Not tracking',
-    NoneThisSide: () => 'None',
-    In: ({ seconds }) => `In ${duration(seconds)}`,
-    Past: ({ seconds }) => `Past ${duration(seconds)}`,
-  })
 
 function rigLine(readings: Readings, guiding: Guiding, now: number | undefined): ReadonlyArray<Reading> {
   const activity = mountActivity(readings)
