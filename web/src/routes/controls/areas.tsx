@@ -141,19 +141,32 @@ export function FocusArea() {
 
 export function CameraArea() {
   const [exposure, setExposure] = useState(defaults.testFrame)
-  const [setpoint, setSetpoint] = useState(defaults.coolerSetpoint)
+  const offered = useLink().controls?.coolerCelsius
+  const [typedSetpoint, setTypedSetpoint] = useState<string | undefined>(undefined)
+  const setpoint = typedSetpoint ?? (offered === undefined ? '' : String(offered))
+  const coolerOn = useRig(rig => rig.devices.primary.CCD_COOLER?.values.COOLER_ON)
+  const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
+  const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
 
   return (
     <Area id="camera">
+      <PressLine said={pressed === undefined ? undefined : saidOf(pressed)} />
+
       <ActionRow>
         <ActionButton>Test frame</ActionButton>
         <Field name="Test frame exposure" kind="number" value={exposure} onChange={setExposure} />
       </ActionRow>
 
       <ActionRow>
-        <ActionButton>Cooler off</ActionButton>
-        <ActionButton>Set to</ActionButton>
-        <Field name="Cooler setpoint" kind="number" value={setpoint} onChange={setSetpoint} />
+        {coolerOn === true ? (
+          <CommandButton request={{ command: 'coolerOff' }} onAnswer={answered}>
+            Cooler off
+          </CommandButton>
+        ) : null}
+        <CommandButton request={{ command: 'coolTo', celsius: Number(setpoint) }} onAnswer={answered}>
+          Set to
+        </CommandButton>
+        <Field name="Cooler setpoint, degrees Celsius" kind="number" value={setpoint} onChange={setTypedSetpoint} />
       </ActionRow>
 
       <ActionRow>
