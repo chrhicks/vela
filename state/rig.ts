@@ -10,6 +10,7 @@ import { Alignment, alignment, noAlignment } from './alignment.ts'
 import { Autofocus, autofocus, noAutofocus } from './autofocus.ts'
 import { noOperations, Operations, operations } from './operations.ts'
 import { Writes, writes } from './writes.ts'
+import { CalibrationSet, calibration } from './calibration.ts'
 
 export const RigState = Schema.Struct({
   position: Schema.optional(StreamPosition),
@@ -19,15 +20,17 @@ export const RigState = Schema.Struct({
   guiding: Guiding,
   trends: Trends,
   heardAt: Schema.optional(Schema.Number),
+  connectedAt: Schema.optional(Schema.Number),
   writes: Writes,
   operations: Operations,
   alignment: Alignment,
   autofocus: Autofocus,
+  calibration: Schema.optional(CalibrationSet),
 })
 
 export type RigState = typeof RigState.Type
 
-export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, guiding: unknownGuiding, trends: noTrends, writes: {}, operations: noOperations, alignment: noAlignment, autofocus: noAutofocus }
+export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, guiding: unknownGuiding, trends: noTrends, writes: {}, operations: noOperations, alignment: noAlignment, autofocus: noAutofocus, calibration: undefined }
 
 const fromRig = (entry: RigEntry) => entry.kind === 'wire' || entry.kind === 'client.connected' || entry.kind === 'client.connection' || entry.kind.startsWith('phd2.')
 
@@ -40,10 +43,12 @@ export function rig(state: RigState, entry: RigEntry): RigState {
     guiding: guiding(state.guiding, entry),
     trends: trends(state.trends, entry),
     heardAt: fromRig(entry) ? entry.at : state.heardAt,
+    connectedAt: entry.kind === 'client.connected' ? entry.at : state.connectedAt,
     writes: writes(state.writes, entry),
     operations: operations(state.operations, entry),
     alignment: alignment(state.alignment, entry),
     autofocus: autofocus(state.autofocus, entry),
+    calibration: calibration(state.calibration, entry),
   }
 }
 

@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 
 import { Readings } from '../../components/Readings.tsx'
 import styles from './Area.module.css'
-import { areas, type AreaId } from './stub.ts'
+import type { AreaId } from './live.ts'
+import { useAreas } from './use-areas.ts'
 
 interface AreaProps {
   readonly id: AreaId
@@ -10,7 +11,7 @@ interface AreaProps {
 }
 
 export function Area({ id, children }: AreaProps) {
-  const area = areas[id]
+  const area = useAreas()[id]
 
   return (
     <section className={styles.area} data-area={id}>

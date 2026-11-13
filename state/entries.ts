@@ -72,6 +72,7 @@ export const GuiderReported = Schema.Struct({
   body: Schema.Struct({
     Event: Schema.Literals(guiderEvents),
     AvgDist: Schema.optionalKey(Schema.Number),
+    SNR: Schema.optionalKey(Schema.Number),
     RADistanceRaw: Schema.optionalKey(Schema.Number),
     DECDistanceRaw: Schema.optionalKey(Schema.Number),
   }),

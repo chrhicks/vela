@@ -11,6 +11,7 @@ export const Guiding = Schema.Struct({
   link: GuiderLink,
   activity: Schema.optional(GuiderActivity),
   averagePixels: Schema.optional(Schema.Number),
+  starSnr: Schema.optional(Schema.Number),
   at: Schema.optional(Schema.Number),
 })
 
@@ -37,16 +38,23 @@ function guiderLinkChanged(state: Guiding, status: string): Guiding {
   return state.link === 'closed' && state.activity === undefined ? state : { link: 'closed' }
 }
 
-function guiderReported(state: Guiding, event: GuiderEvent, averagePixels: number | undefined, at: number): Guiding {
-  const activity = activityOf[event]
+function guiderReported(state: Guiding, report: GuiderReport['body'], at: number): Guiding {
+  const activity = activityOf[report.Event]
+  const guided = activity === 'guiding'
 
-  return { link: 'connected', activity, averagePixels: activity === 'guiding' ? (averagePixels ?? state.averagePixels) : undefined, at }
+  return {
+    link: 'connected',
+    activity,
+    averagePixels: guided ? (report.AvgDist ?? state.averagePixels) : undefined,
+    starSnr: guided ? (report.SNR ?? state.starSnr) : undefined,
+    at,
+  }
 }
 
 const isGuiderReport = (entry: RigEntry): entry is GuiderReport => entry.kind.startsWith('phd2.')
 
 export function guiding(state: Guiding, entry: RigEntry): Guiding {
-  if (isGuiderReport(entry)) return guiderReported(state, entry.body.Event, entry.body.AvgDist, entry.at)
+  if (isGuiderReport(entry)) return guiderReported(state, entry.body, entry.at)
   if (entry.kind === 'client.connected') return unknownGuiding
   if (entry.kind === 'client.connection' && entry.body.target === 'phd2') return guiderLinkChanged(state, entry.body.status)
 

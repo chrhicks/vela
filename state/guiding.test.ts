@@ -7,12 +7,12 @@ const guider = (event: string, at: number, extra: Readonly<Record<string, unknow
 const reduce = (entries: Parameters<typeof fold>[2]) => fold<Guiding>(guiding, unknownGuiding, entries)
 
 describe('guiding', () => {
-  it("keeps PHD2's own smoothed guide error while it guides", () => {
-    expect(reduce([guider('StartGuiding', 1), guider('GuideStep', 2, { AvgDist: 0.16, RADistanceRaw: 0.18 })])).toEqual({ link: 'connected', activity: 'guiding', averagePixels: 0.16, at: 2 })
+  it("keeps PHD2's own smoothed guide error and the guide star's SNR while it guides", () => {
+    expect(reduce([guider('StartGuiding', 1), guider('GuideStep', 2, { AvgDist: 0.16, RADistanceRaw: 0.18, SNR: 42.3 })])).toEqual({ link: 'connected', activity: 'guiding', averagePixels: 0.16, starSnr: 42.3, at: 2 })
   })
 
   it('says when the star is lost or guiding stops, and drops the guide error then', () => {
-    expect(reduce([guider('GuideStep', 1, { AvgDist: 0.2 }), guider('StarLost', 2)])).toEqual({ link: 'connected', activity: 'starLost', averagePixels: undefined, at: 2 })
+    expect(reduce([guider('GuideStep', 1, { AvgDist: 0.2 }), guider('StarLost', 2)])).toEqual({ link: 'connected', activity: 'starLost', averagePixels: undefined, starSnr: undefined, at: 2 })
     expect(reduce([guider('GuideStep', 1, { AvgDist: 0.2 }), guider('GuidingStopped', 2)])).toMatchObject({ activity: 'stopped' })
   })
 
