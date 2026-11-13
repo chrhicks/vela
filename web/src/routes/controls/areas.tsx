@@ -126,7 +126,7 @@ export function FocusArea() {
 
       <ActionRow label="Step">
         {stepsShown.map(step => (
-          <CommandButton key={step} request={{ command: 'focusBy', steps: step }} onAnswer={answered}>
+          <CommandButton key={step} request={{ command: 'focusBy', steps: step }} alwaysReady onAnswer={answered}>
             {step > 0 ? `+${step}` : String(step)}
           </CommandButton>
         ))}

@@ -1,11 +1,10 @@
-import { Context, Duration, Effect, Option, Result, Stream } from 'effect'
-import { readRigEntry } from '../../state/entries.ts'
-import type { Entry, PropertyState } from '../../state/entry.ts'
+import { Context, Effect, Option } from 'effect'
 import type { Done, NudgeDirection, NudgeId, NudgeRate } from '../../state/commands.ts'
 import type { RigState } from '../../state/rig.ts'
 import { Feed } from '../feed/feed.ts'
 import { CommandRefused } from '../feed/commands.ts'
 import { DeviceCommands } from './device-commands.ts'
+import { endOfMove } from './settle.ts'
 
 export class MountRuns extends Context.Service<
   MountRuns,
@@ -20,22 +19,6 @@ export class MountRuns extends Context.Service<
 export class Centring extends Context.Service<Centring, { readonly centreOn: (target: string) => Effect.Effect<string, CommandRefused> }>()('vela/Centring') {}
 
 export class MountSettings extends Context.Service<MountSettings, { readonly nudgeRates: Readonly<Record<NudgeRate, string>>; readonly flipSettleSeconds: number }>()('vela/MountSettings') {}
-
-interface Settling {
-  readonly seenBusy: boolean
-  readonly settled: boolean
-}
-
-const pointingStateOf = (entry: Entry): Result.Result<PropertyState, Entry> =>
-  Result.match(readRigEntry(entry), {
-    onFailure: () => Result.fail(entry),
-    onSuccess: found => {
-      const rigEntry = Option.getOrUndefined(found)
-      const state = rigEntry?.kind === 'wire' && rigEntry.body.dir === 'in' && rigEntry.body.device === 'mount' && rigEntry.body.property === 'EQUATORIAL_EOD_COORD' ? rigEntry.body.state : undefined
-
-      return state === undefined ? Result.fail(entry) : Result.succeed(state)
-    },
-  })
 
 const pierSideOf = (rig: RigState) => {
   const side = rig.devices.mount.TELESCOPE_PIER_SIDE?.values
@@ -105,22 +88,7 @@ export const mountControls = Effect.gen(function* () {
           Effect.tapError(() => runs.resume),
         )
 
-        const settled = yield* entries.pipe(
-          Stream.filterMap(pointingStateOf),
-          Stream.scan(
-            (): Settling => ({ seenBusy: false, settled: false }),
-            (was, state): Settling => {
-              const busy = state === 'Busy'
-              const seenBusy = was.seenBusy || busy
-
-              return { seenBusy, settled: seenBusy && !busy }
-            },
-          ),
-          Stream.filter(settling => settling.settled),
-          Stream.runHead,
-          Effect.timeoutOption(Duration.seconds(flipSettleSeconds)),
-          Effect.map(found => Option.isSome(Option.flatten(found))),
-        )
+        const settled = Option.isSome(yield* endOfMove(entries, 'mount', 'EQUATORIAL_EOD_COORD', flipSettleSeconds))
 
         yield* runs.resume
 

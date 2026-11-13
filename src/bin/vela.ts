@@ -33,7 +33,7 @@ import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
-import { Autofocusing, focusControls } from '../controls/focus.ts'
+import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
 import { Centring, mountControls, MountRuns, MountSettings } from '../controls/mount.ts'
 import { searchCatalog } from '../catalog/search.ts'
 import { operationObjects } from '../../state/entries.ts'
@@ -232,7 +232,7 @@ const autofocusing = Layer.succeed(Autofocusing, {
   start: exposureSeconds => Effect.suspend(() => started(autofocus.start({ step: settings.launch.autofocusStep, samples: settings.launch.autofocusSamples, exposureSeconds }))),
 })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls]), ([mount, focus]) => ({ ...launchOperations, ...mount, ...focus }))).pipe(Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
+const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls]), ([mount, focus]) => ({ ...launchOperations, ...mount, ...focus }))).pipe(Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),
