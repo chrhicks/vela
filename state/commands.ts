@@ -41,6 +41,7 @@ export type CommandRequest = typeof CommandRequest.Type
 export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('carried-out') }),
   Schema.Struct({ code: Schema.Literal('focusing'), position: Schema.Number }),
+  Schema.Struct({ code: Schema.Literal('focused'), position: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('autofocusing'), exposureSeconds: Schema.Number, endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean }),
@@ -57,6 +58,7 @@ export const Refusal = Schema.Union([
   Schema.Struct({ code: Schema.Literal('no-answer'), seconds: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('rig-refused'), text: Schema.String }),
   Schema.Struct({ code: Schema.Literal('unknown-target'), text: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('move-failed'), device: DeviceName }),
   Schema.Struct({ code: Schema.Literal('out-of-range'), value: Schema.Number, min: Schema.Number, max: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('malformed') }),
   Schema.Struct({ code: Schema.Literal('unreachable') }),

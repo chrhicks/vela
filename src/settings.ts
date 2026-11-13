@@ -168,6 +168,7 @@ export const ControlsSettings = Schema.Struct({
   nudgeSlowRate: described("The mount's TELESCOPE_SLEW_RATE element for a slow nudge", Schema.NonEmptyString, '8x'),
   nudgeFastRate: described("The mount's TELESCOPE_SLEW_RATE element for a fast nudge", Schema.NonEmptyString, '9x'),
   centreExposureSeconds: described('Seconds of exposure for each slew and centre frame', Schema.Number, 2),
+  focusMoveSeconds: described('How long one focuser move may take before its answer says the focuser is still moving, in seconds', Schema.Number, 300),
   focusSteps: described('Focuser steps for the Step buttons on the controls page, each shown inward and outward', Schema.Array(Schema.Int), [10, 50]),
   flipSettleSeconds: described('How long Flip now waits for the mount to finish its goto before answering, in seconds', Schema.Number, 120),
 })
