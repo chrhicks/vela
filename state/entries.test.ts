@@ -21,6 +21,21 @@ describe('readRigEntry', () => {
     expect(Result.isFailure(read) && read.failure).toMatchObject({ _tag: 'MalformedEntry', kind: 'vela.run.ended' })
   })
 
+  it('reads a run started for alignment, focus or centring as that operation, and any other object as a target', () => {
+    const objectOf = (object: string) => {
+      const read = Option.getOrThrow(Result.getOrThrow(readRigEntry(entry('vela.run.started', 1, { run: 'r1', object, frameType: 'light', exposureSeconds: 2 }))))
+
+      return read.kind === 'vela.run.started' ? read.body.object : undefined
+    }
+
+    expect(['polar-align', 'autofocus', 'centre', 'M 31'].map(objectOf)).toEqual([
+      { _tag: 'Operation', operation: 'align' },
+      { _tag: 'Operation', operation: 'focus' },
+      { _tag: 'Operation', operation: 'centre' },
+      { _tag: 'Target', name: 'M 31' },
+    ])
+  })
+
   it('reads a run start only with a frame type Vela takes', () => {
     expect(Result.isFailure(readRigEntry(entry('vela.run.started', 1, { run: 'r1', object: 'M 31', frameType: 'twilight', exposureSeconds: 1 })))).toBe(true)
   })

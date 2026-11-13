@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { isOperationObject, RunId, type RigEntry } from './entries.ts'
+import { RunId, type RigEntry } from './entries.ts'
 
 export const CalibrationType = Schema.Literals(['dark', 'flat', 'bias'])
 
@@ -13,7 +13,7 @@ export function calibration(state: CalibrationSet | undefined, entry: RigEntry):
   if (entry.kind === 'vela.run.started') {
     const { run, object, frameType, exposureSeconds } = entry.body
 
-    return frameType !== 'light' && !isOperationObject(object) ? { run, frameType, exposureSeconds, frames: 0, startedAt: entry.at } : state
+    return frameType !== 'light' && object._tag === 'Target' ? { run, frameType, exposureSeconds, frames: 0, startedAt: entry.at } : state
   }
 
   if (entry.kind === 'vela.run.exposed' && entry.body.run === state?.run) return { ...state, frames: state.frames + 1 }
