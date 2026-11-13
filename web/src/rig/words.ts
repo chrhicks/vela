@@ -1,9 +1,30 @@
 import { Match } from 'effect'
+import type { Refusal } from '../../../state/commands.ts'
+import type { DeviceName } from '../../../state/devices.ts'
 import type { Flip } from '../../../state/flip.ts'
 import type { GuiderActivity, Guiding } from '../../../state/guiding.ts'
 import type { MountActivity } from '../../../state/devices.ts'
 
 export const unknown = '—'
+
+export const deviceWords: Readonly<Record<DeviceName, string>> = { mount: 'Mount', primary: 'Camera', focuser: 'Focuser', box: 'Power box', guide: 'Guide cam' }
+
+export interface RefusalWords {
+  readonly happened: string
+  readonly toDo?: string
+}
+
+export const refusalWords = (refusal: Refusal): RefusalWords =>
+  Match.value(refusal).pipe(
+    Match.discriminatorsExhaustive('code')({
+      refused: ({ text }) => ({ happened: text }),
+      'not-connected': ({ device }) => ({ happened: `${deviceWords[device]} not connected` }),
+      'no-answer': ({ seconds }) => ({ happened: `No answer ${seconds} s`, toDo: 'Check rig PC' }),
+      'rig-refused': ({ text }) => ({ happened: 'Rig refused', toDo: text }),
+      malformed: () => ({ happened: 'Not understood' }),
+      unreachable: () => ({ happened: 'No answer from Vela' }),
+    }),
+  )
 
 export const mountWords: Readonly<Record<MountActivity, string>> = { parked: 'Parked', slewing: 'Slewing', tracking: 'Tracking', idle: 'Idle' }
 

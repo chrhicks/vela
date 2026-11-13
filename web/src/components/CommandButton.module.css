@@ -1,0 +1,9 @@
+.command {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sending {
+  color: var(--rule);
+}

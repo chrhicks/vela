@@ -14,6 +14,7 @@ export class Feed extends Context.Service<
   {
     readonly receive: (entry: Entry) => Effect.Effect<void, MalformedEntry | MalformedReading>
     readonly subscribe: Effect.Effect<FeedSubscription, never, Scope.Scope>
+    readonly current: Effect.Effect<RigState>
   }
 >()('vela/Feed') {}
 
@@ -47,6 +48,6 @@ export const FeedLive = Layer.effect(
       }
     })
 
-    return { receive, subscribe }
+    return { receive, subscribe, current: Ref.get(state) }
   }),
 )

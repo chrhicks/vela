@@ -32,6 +32,8 @@ import { VelaSettings } from '../settings.ts'
 import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
+import { deviceCommandsFrom } from '../controls/device-commands.ts'
+import { mountControls } from '../controls/mount.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -187,14 +189,14 @@ function frameSaved(entry: Entry) {
 }
 
 const started = (result: { readonly ok: true } | { readonly ok: false; readonly reason: string }) =>
-  result.ok ? Effect.void : Effect.fail(new CommandRefused({ text: result.reason }))
+  result.ok ? Effect.void : Effect.fail(new CommandRefused({ refusal: { code: 'refused', text: result.reason } }))
 
 const launchOperations = {
   startAlignment: Effect.suspend(() => started(align.start({ exposureSeconds: settings.launch.alignExposureSeconds }))),
   finishAlignment: Effect.suspend(() =>
     capture.view().run?.object === operationObjects.align
       ? Effect.promise(() => capture.stop()).pipe(Effect.asVoid)
-      : Effect.fail(new CommandRefused({ text: 'no alignment is running' })),
+      : Effect.fail(new CommandRefused({ refusal: { code: 'refused', text: 'no alignment is running' } })),
   ),
   answerFilter: (filter: 'in' | 'out') =>
     Effect.sync(() => publishEntry(stream.vela('filter'), 'vela.filter', filter, { filter })).pipe(
@@ -206,12 +208,15 @@ const launchOperations = {
     ),
 }
 
+const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, home: mount.home })))
+
 const feedApp = FeedServer.pipe(
+  Layer.provide(OperationsLive),
   Layer.provideMerge(FeedLive),
   Layer.provide(Layer.mergeAll(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
-      Layer.succeed(Operations, launchOperations),
+      deviceCommandsFrom({ send: (command, signal) => sender.send(command, signal), deviceIds: settings.devices, answerSeconds: settings.capture.commandAnswerSeconds }),
       Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin } }),
     )),
 )
