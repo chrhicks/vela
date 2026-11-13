@@ -26,6 +26,7 @@ export const doneWords = (done: Done): RefusalWords =>
       cooling: ({ celsius }) => ({ happened: `Cooling to ${celsius} °C` }),
       'cooler-off': () => ({ happened: 'Cooler off' }),
       'test-frame': ({ exposureSeconds }) => ({ happened: `Test frame ${exposureSeconds} s` }),
+      darks: ({ frames, exposureSeconds, celsius }) => ({ happened: `Darks ${frames} × ${exposureSeconds} s`, toDo: `at ${celsius} °C` }),
       autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),

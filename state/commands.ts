@@ -35,6 +35,7 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('focusBy'), steps: Schema.Int }),
   Schema.Struct({ command: Schema.Literal('coolTo'), celsius: Schema.Number }),
   Schema.Struct({ command: Schema.Literal('coolerOff') }),
+  Schema.Struct({ command: Schema.Literal('takeDarks'), frames: Schema.Int.check(Schema.isGreaterThan(0)), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), celsius: Schema.Number }),
   Schema.Struct({ command: Schema.Literal('testFrame'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
   Schema.Struct({ command: Schema.Literal('autofocus'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
 ])
@@ -47,6 +48,7 @@ export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('focused'), position: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('cooling'), celsius: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('cooler-off') }),
+  Schema.Struct({ code: Schema.Literal('darks'), frames: Schema.Number, exposureSeconds: Schema.Number, celsius: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('test-frame'), exposureSeconds: Schema.Number, sequence: Schema.String }),
   Schema.Struct({ code: Schema.Literal('autofocusing'), exposureSeconds: Schema.Number, endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean }),

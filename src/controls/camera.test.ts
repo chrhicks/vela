@@ -69,4 +69,16 @@ describe('Test frame', () => {
     expect(await press(controls => controls.testFrame(2))).toMatchObject({ failure: { refusal: { code: 'run-active' } } })
     expect(sent).toEqual([])
   })
+
+  it("takes darks at the given exposure and temperature, the camera's gain and offset, cooler on", async () => {
+    const { sent, press } = setup(camera)
+
+    expect(await press(controls => controls.takeDarks(30, 120, -10))).toMatchObject({ success: { code: 'darks', frames: 30, exposureSeconds: 120, celsius: -10 } })
+    expect(sent).toEqual(['capture {"object":"dark","frameType":"dark","exposureSeconds":120,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10}'])
+  })
+
+  it('refuses darks while a run is capturing, or at a temperature the camera cannot reach', async () => {
+    expect(await setup(camera, true).press(controls => controls.takeDarks(30, 120, -10))).toMatchObject({ failure: { refusal: { code: 'run-active' } } })
+    expect(await setup(camera).press(controls => controls.takeDarks(30, 120, -60))).toMatchObject({ failure: { refusal: { code: 'out-of-range' } } })
+  })
 })

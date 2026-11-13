@@ -230,10 +230,22 @@ export function DewArea() {
 
 export function CalibrationArea() {
   const [type, setType] = useState<CalibrationType>('darks')
-  const [frames, setFrames] = useState(defaults.calibrationFrames)
+  const controls = useLink().controls
+  const lastLight = useRig(rig => (rig.run?.frameType === 'light' ? rig.run.exposureSeconds : undefined))
+  const runActive = useRig(rig => rig.run?.status === 'capturing')
+  const [typedFrames, setTypedFrames] = useState<string | undefined>(undefined)
+  const [typedExposure, setTypedExposure] = useState<string | undefined>(undefined)
+  const [typedCelsius, setTypedCelsius] = useState<string | undefined>(undefined)
+  const frames = typedFrames ?? (controls === undefined ? '' : String(controls.calibrationFrames))
+  const exposure = typedExposure ?? (lastLight === undefined ? '' : String(lastLight))
+  const celsius = typedCelsius ?? (controls === undefined ? '' : String(controls.coolerCelsius))
+  const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
+  const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
 
   return (
     <Area id="calibration">
+      <PressLine said={pressed === undefined ? undefined : saidOf(pressed)} />
+
       <ActionRow>
         <Choices
           name="Calibration type"
@@ -249,12 +261,27 @@ export function CalibrationArea() {
       </ActionRow>
 
       <ActionRow label="Frames">
-        <Field name="Calibration frames" kind="number" value={frames} onChange={setFrames} />
+        <Field name="Calibration frames" kind="number" value={frames} onChange={setTypedFrames} />
         <Facts items={[calibrationFirstStep[type]]} />
       </ActionRow>
 
+      {type === 'darks' ? (
+        <ActionRow label="Exposure">
+          <Field name="Dark exposure, seconds" kind="number" value={exposure} onChange={setTypedExposure} />
+          <span className={styles.note}>at</span>
+          <Field name="Dark temperature, degrees Celsius" kind="number" value={celsius} onChange={setTypedCelsius} />
+        </ActionRow>
+      ) : null}
+
       <ActionRow>
-        <ActionButton>Start set</ActionButton>
+        <CommandButton
+          request={{ command: 'takeDarks', frames: Number.parseInt(frames, 10), exposureSeconds: Number(exposure), celsius: Number(celsius) }}
+          disabled={type !== 'darks' || runActive}
+          onAnswer={answered}
+        >
+          Start set
+        </CommandButton>
+        {runActive ? <span className={styles.note}>Run active</span> : type === 'darks' ? null : <span className={styles.note}>Not built yet</span>}
       </ActionRow>
     </Area>
   )
