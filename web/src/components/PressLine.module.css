@@ -1,0 +1,19 @@
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75em;
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--ember);
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.refused {
+  color: var(--amber);
+}
+
+.detail {
+  color: var(--ember-quiet);
+}

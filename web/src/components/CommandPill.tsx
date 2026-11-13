@@ -14,7 +14,7 @@ interface CommandPillProps {
 }
 
 export function CommandPill({ request, waiting = false, onCarriedOut, children }: CommandPillProps) {
-  const { sending, refusal, press } = useCommand(request, onCarriedOut)
+  const { sending, answer, press } = useCommand(request, received => (received.result === 'done' ? onCarriedOut?.() : undefined))
   const busy = sending || waiting
 
   return (
@@ -23,7 +23,7 @@ export function CommandPill({ request, waiting = false, onCarriedOut, children }
         {children}
       </button>
 
-      {refusal === undefined ? null : <RefusalLine refusal={refusal} />}
+      {answer?.result === 'refused' ? <RefusalLine refusal={answer.refusal} /> : null}
     </span>
   )
 }

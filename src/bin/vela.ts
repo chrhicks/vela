@@ -226,7 +226,7 @@ const centring = Layer.succeed(Centring, {
 
       if (found === undefined) return Effect.fail(new CommandRefused({ refusal: { code: 'unknown-target', text: target } }))
 
-      return started(centre.start({ id: found.id, exposureSeconds: settings.controls.centreExposureSeconds }))
+      return started(centre.start({ id: found.id, exposureSeconds: settings.controls.centreExposureSeconds })).pipe(Effect.as(found.commonName ?? found.name))
     }),
 })
 

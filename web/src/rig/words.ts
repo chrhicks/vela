@@ -1,5 +1,5 @@
 import { Match } from 'effect'
-import type { NudgeDirection, Refusal } from '../../../state/commands.ts'
+import type { Done, NudgeDirection, Refusal } from '../../../state/commands.ts'
 import type { DeviceName } from '../../../state/devices.ts'
 import type { Flip } from '../../../state/flip.ts'
 import type { GuiderActivity, Guiding } from '../../../state/guiding.ts'
@@ -15,6 +15,18 @@ export interface RefusalWords {
   readonly happened: string
   readonly toDo?: string
 }
+
+export const doneWords = (done: Done): RefusalWords =>
+  Match.value(done).pipe(
+    Match.discriminatorsExhaustive('code')({
+      'carried-out': () => ({ happened: 'Done' }),
+      home: () => ({ happened: 'Going home' }),
+      stop: () => ({ happened: 'Stopped' }),
+      tracking: ({ on }) => ({ happened: on ? 'Tracking on' : 'Tracking off' }),
+      centring: ({ target }) => ({ happened: 'Centring', toDo: target }),
+      'flip-sent': () => ({ happened: 'Flip sent' }),
+    }),
+  )
 
 export const refusalWords = (refusal: Refusal): RefusalWords =>
   Match.value(refusal).pipe(

@@ -35,6 +35,17 @@ export const CommandRequest = Schema.Union([
 
 export type CommandRequest = typeof CommandRequest.Type
 
+export const Done = Schema.Union([
+  Schema.Struct({ code: Schema.Literal('carried-out') }),
+  Schema.Struct({ code: Schema.Literal('home') }),
+  Schema.Struct({ code: Schema.Literal('stop') }),
+  Schema.Struct({ code: Schema.Literal('tracking'), on: Schema.Boolean }),
+  Schema.Struct({ code: Schema.Literal('centring'), target: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('flip-sent') }),
+])
+
+export type Done = typeof Done.Type
+
 export const Refusal = Schema.Union([
   Schema.Struct({ code: Schema.Literal('refused'), text: Schema.String }),
   Schema.Struct({ code: Schema.Literal('not-connected'), device: DeviceName }),

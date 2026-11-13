@@ -1,27 +1,27 @@
 import { useState } from 'react'
 
-import type { CommandRequest, Refusal } from '../../../state/commands.ts'
-import { sendCommand } from './commands.ts'
+import type { CommandRequest } from '../../../state/commands.ts'
+import { sendCommand, type Answer } from './commands.ts'
 
 export interface Command {
   readonly sending: boolean
-  readonly refusal: Refusal | undefined
+  readonly answer: Answer | undefined
   readonly press: () => void
 }
 
-export function useCommand(request: CommandRequest, onCarriedOut?: () => void): Command {
+export function useCommand(request: CommandRequest, onAnswer?: (answer: Answer) => void): Command {
   const [sending, setSending] = useState(false)
-  const [refusal, setRefusal] = useState<Refusal | undefined>(undefined)
+  const [answer, setAnswer] = useState<Answer | undefined>(undefined)
 
   function press() {
     setSending(true)
-    setRefusal(undefined)
-    void sendCommand(request).then(answer => {
+    setAnswer(undefined)
+    void sendCommand(request).then(received => {
       setSending(false)
-      setRefusal(answer)
-      if (answer === undefined) onCarriedOut?.()
+      setAnswer(received)
+      onAnswer?.(received)
     })
   }
 
-  return { sending, refusal, press }
+  return { sending, answer, press }
 }
