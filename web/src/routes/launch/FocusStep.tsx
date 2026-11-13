@@ -58,7 +58,7 @@ export function FocusStep() {
           { label: 'Best', value: state.best === undefined ? unknown : String(state.best) },
           { label: 'HFD', value: check?.hfd == null ? unknown : `${check.hfd.toFixed(1)} px` },
           { label: 'Stars', value: check === undefined ? unknown : String(check.stars) },
-          { label: 'Temp', value: typeof focuserCelsius === 'number' ? `${focuserCelsius.toFixed(0)} °C` : unknown },
+          { label: 'Temp', value: focuserCelsius === undefined ? unknown : `${focuserCelsius.toFixed(0)} °C` },
         ]}
       />
 
