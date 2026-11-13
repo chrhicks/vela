@@ -33,7 +33,7 @@ import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
-import { Centring, mountControls, MountRuns, NudgeRates } from '../controls/mount.ts'
+import { Centring, mountControls, MountRuns, MountSettings } from '../controls/mount.ts'
 import { searchCatalog } from '../catalog/search.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName } from '../../state/entries.ts'
@@ -212,6 +212,8 @@ const launchOperations = {
 const mountRuns = Layer.succeed(MountRuns, {
   endRun: Effect.promise(() => capture.stop()),
   idle: Effect.promise(() => capture.whenIdle()),
+  pause: Effect.sync(() => capture.pause()),
+  resume: Effect.sync(() => capture.resume()),
 })
 
 const centring = Layer.succeed(Centring, {
@@ -225,7 +227,7 @@ const centring = Layer.succeed(Centring, {
     }),
 })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, ...mount }))).pipe(Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(Layer.succeed(NudgeRates, { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate })))
+const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, ...mount }))).pipe(Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),

@@ -41,7 +41,7 @@ export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('tracking'), on: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('centring'), target: Schema.String, endedRun: Schema.Boolean }),
-  Schema.Struct({ code: Schema.Literal('flip-sent') }),
+  Schema.Struct({ code: Schema.Literal('flip'), settled: Schema.Boolean, flipped: Schema.Boolean, pierSide: Schema.optionalKey(Schema.Literals(['east', 'west'])), pausedRun: Schema.Boolean }),
 ])
 
 export type Done = typeof Done.Type
