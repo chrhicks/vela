@@ -37,7 +37,7 @@ export const noTrends: Trends = {
   dewHeaters: {},
 }
 
-const added = (line: Line, x: number, y: number | null | undefined): Line => (typeof y === 'number' ? [...line, { x, y }] : line)
+const added = (line: Line, x: number, y: number | null | undefined): Line => (y == null ? line : [...line, { x, y }])
 
 function startedOver(state: Trends, object: string, at: number): Trends {
   return state.target === object ? state : { ...noTrends, target: object, since: at }
