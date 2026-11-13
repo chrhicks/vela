@@ -15,6 +15,7 @@ export const wanted: Wanted = {
     'vela.align.*',
     'vela.filter',
     'vela.focus.best',
+    'vela.focus.sample',
     'vela.centre.*',
     'phd2.*',
     'client.connected',

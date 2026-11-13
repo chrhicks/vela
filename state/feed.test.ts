@@ -15,7 +15,7 @@ describe('the feed messages', () => {
   })
 
   it('decode the empty state of a service that has read nothing', () => {
-    expect(Schema.decodeUnknownSync(Bootstrap)(overTheWire({ token: '1', at: 1, night: '2026-11-08', limits: { heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10 }, launch: { alignGoodArcmin: 1 }, state: emptyRig })).state).toEqual({ frames: [], readings: {}, guiding: { link: 'unknown' }, trends: { hfd: [], stars: [], guideRa: [], guideDec: [], airTemperature: [], focuserTemperature: [], humidity: [], dewHeaters: {} }, writes: {}, operations: {}, alignment: { errors: [] } })
+    expect(Schema.decodeUnknownSync(Bootstrap)(overTheWire({ token: '1', at: 1, night: '2026-11-08', limits: { heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10 }, launch: { alignGoodArcmin: 1 }, state: emptyRig })).state).toEqual({ frames: [], readings: {}, guiding: { link: 'unknown' }, trends: { hfd: [], stars: [], guideRa: [], guideDec: [], airTemperature: [], focuserTemperature: [], humidity: [], dewHeaters: {} }, writes: {}, operations: {}, alignment: { errors: [] }, autofocus: { positions: [], samples: [] } })
   })
 
   it('decode an entry, and refuse one without a stream position', () => {
