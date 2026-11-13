@@ -144,7 +144,7 @@ export class MalformedEntry extends Data.TaggedError('MalformedEntry')<{
   readonly issue: string
 }> {}
 
-const rigKinds: ReadonlySet<string> = new Set(members.flatMap(member => ('literal' in member.fields.kind ? [member.fields.kind.literal] : member.fields.kind.literals)))
+export const rigKinds: ReadonlySet<string> = new Set(members.flatMap(member => ('literal' in member.fields.kind ? [member.fields.kind.literal] : member.fields.kind.literals)))
 
 const decodeRigEntry = Schema.decodeUnknownResult(RigEntry)
 

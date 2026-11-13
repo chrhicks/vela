@@ -4,17 +4,14 @@ import { isWanted } from './wanted.ts'
 import { entry, runStarted, wire } from './testing.ts'
 
 describe('isWanted', () => {
-  it('takes the kinds on the list, by name or by family', () => {
+  it('takes exactly the kinds the reducers decode', () => {
     expect(Result.getOrThrow(isWanted(runStarted('r1', 0)))).toBe(true)
     expect(Result.getOrThrow(isWanted(entry('vela.frame.stats', 0, {})))).toBe(true)
     expect(Result.getOrThrow(isWanted(entry('phd2.GuideStep', 0, {})))).toBe(true)
-    expect(Result.getOrThrow(isWanted(entry('command', 0, {})))).toBe(true)
   })
 
-  it('leaves out kinds that are not on the list', () => {
-    expect(Result.getOrThrow(isWanted(entry('vela.copy.left', 0, {})))).toBe(false)
-    expect(Result.getOrThrow(isWanted(entry('vela.copy', 0, {})))).toBe(false)
-    expect(Result.getOrThrow(isWanted(entry('journal', 0, {})))).toBe(false)
+  it('leaves out kinds no reducer decodes', () => {
+    for (const kind of ['command', 'client.command', 'vela.centre.pass', 'phd2.Version', 'vela.copy', 'journal']) expect(Result.getOrThrow(isWanted(entry(kind, 0, {})))).toBe(false)
   })
 
   it('takes a device reading only when its property is on the list for that device', () => {
