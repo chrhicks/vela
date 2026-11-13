@@ -1,5 +1,6 @@
 import { altitudeDegrees } from '../../../../state/altitude.ts'
-import type { CalibrationSet, CalibrationType } from '../../../../state/calibration.ts'
+import type { CalibrationSet } from '../../../../state/calibration.ts'
+import type { CalibrationType } from '../../../../state/entries.ts'
 import { flip } from '../../../../state/flip.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Box, type Mount, type Primary } from '../../../../state/devices.ts'

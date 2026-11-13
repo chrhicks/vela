@@ -36,7 +36,11 @@ const objectOf = (subject: RunObject) => (subject._tag === 'Operation' ? operati
 
 const RunObjectName = Schema.String.pipe(Schema.decodeTo(RunObject, SchemaTransformation.transform<RunObject, string>({ decode: runObjectOf, encode: objectOf })))
 
-export const FrameType = Schema.Literals(['light', 'dark', 'flat', 'bias'])
+export const CalibrationType = Schema.Literals(['dark', 'flat', 'bias'])
+
+export type CalibrationType = typeof CalibrationType.Type
+
+export const FrameType = Schema.Union([Schema.Literal('light'), CalibrationType])
 
 export type FrameType = typeof FrameType.Type
 
