@@ -1,11 +1,13 @@
 import { Match } from 'effect'
-import type { Refusal } from '../../../state/commands.ts'
+import type { NudgeDirection, Refusal } from '../../../state/commands.ts'
 import type { DeviceName } from '../../../state/devices.ts'
 import type { Flip } from '../../../state/flip.ts'
 import type { GuiderActivity, Guiding } from '../../../state/guiding.ts'
 import type { MountActivity } from '../../../state/devices.ts'
 
 export const unknown = '—'
+
+export const nudgeWords: Readonly<Record<NudgeDirection, 'N' | 'S' | 'E' | 'W'>> = { north: 'N', south: 'S', east: 'E', west: 'W' }
 
 export const deviceWords: Readonly<Record<DeviceName, string>> = { mount: 'Mount', primary: 'Camera', focuser: 'Focuser', box: 'Power box', guide: 'Guide cam' }
 

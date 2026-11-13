@@ -1,5 +1,5 @@
+import { Option, Schema } from 'effect'
 import type { Entry, Value } from '../../state/entry.ts'
-import { recordOf } from '../stream/json.ts'
 
 export const answerKind = 'client.command'
 
@@ -29,25 +29,59 @@ export interface LateCommand {
   readonly seconds: number
 }
 
-interface Answer {
+const Answer = Schema.Struct({ id: Schema.String, result: Schema.Literals(['written', 'refused']), reason: Schema.optionalKey(Schema.String) })
+
+type Answer = typeof Answer.Type
+
+const decodeAnswer = Schema.decodeUnknownOption(Answer)
+
+export const readAnswer = (entry: Entry): Answer | undefined => (entry.kind === answerKind ? Option.getOrUndefined(decodeAnswer(entry.body)) : undefined)
+
+export interface Request {
+  readonly device: string
+  readonly label: string
   readonly id: string
-  readonly result: 'written' | 'refused'
-  readonly reason: string | undefined
-}
-
-export function readAnswer(entry: Entry): Answer | undefined {
-  if (entry.kind !== answerKind) return undefined
-
-  const body = recordOf(entry.body)
-  const result = body?.['result']
-
-  if (body === undefined || typeof body['id'] !== 'string' || (result !== 'written' && result !== 'refused')) return undefined
-
-  return { id: body['id'], result, reason: typeof body['reason'] === 'string' ? body['reason'] : undefined }
+  readonly body: Readonly<Record<string, unknown>>
 }
 
 export function makeSender({ subjectOf, publish, newId, answerTimeoutMs, by, now }: SenderOptions) {
-  const waiting = new Map<string, { readonly command: Command; readonly sentAt: number; readonly resolve: (answer: Answer) => void }>()
+  const waiting = new Map<string, { readonly device: string; readonly label: string; readonly sentAt: number; readonly resolve: (answer: Answer) => void }>()
+
+  async function ask({ device, label, id, body }: Request, signal?: AbortSignal): Promise<Outcome> {
+    if (signal?.aborted) return { result: 'unknown', reason: 'Stop pressed before it was sent' }
+
+    const answer = new Promise<Answer | undefined>(resolve => {
+      const stopped = () => resolve(undefined)
+
+      signal?.addEventListener('abort', stopped, { once: true })
+      waiting.set(id, {
+        device,
+        label,
+        sentAt: now(),
+        resolve: received => {
+          signal?.removeEventListener('abort', stopped)
+          resolve(received)
+        },
+      })
+    })
+
+    try {
+      publish(subjectOf(device), JSON.stringify({ ...body, id, by }))
+    } catch (error) {
+      waiting.delete(id)
+
+      return { result: 'refused', reason: `could not publish: ${error instanceof Error ? error.message : String(error)}` }
+    }
+
+    const received = await answer
+
+    waiting.delete(id)
+
+    if (received === undefined) return { result: 'unknown', reason: 'Stop pressed before the rig program answered' }
+    if (received.result === 'refused') return { result: 'refused', reason: received.reason ?? 'no reason given' }
+
+    return { result: 'written' }
+  }
 
   return {
     answered(entry: Entry) {
@@ -57,43 +91,15 @@ export function makeSender({ subjectOf, publish, newId, answerTimeoutMs, by, now
     },
 
     late(at: number): ReadonlyArray<LateCommand> {
-      return [...waiting.values()].filter(sent => at - sent.sentAt >= answerTimeoutMs).map(sent => ({ device: sent.command.device, property: sent.command.property, seconds: Math.round((at - sent.sentAt) / 1000) }))
+      return [...waiting.values()].filter(sent => at - sent.sentAt >= answerTimeoutMs).map(sent => ({ device: sent.device, property: sent.label, seconds: Math.round((at - sent.sentAt) / 1000) }))
     },
 
-    async send(command: Command, signal?: AbortSignal): Promise<Outcome> {
-      if (signal?.aborted) return { result: 'unknown', reason: 'Stop pressed before it was sent' }
+    send: (command: Command, signal?: AbortSignal): Promise<Outcome> => ask({ device: command.device, label: command.property, id: newId(), body: { property: command.property, values: command.values } }, signal),
 
-      const id = newId()
-      const answer = new Promise<Answer | undefined>(resolve => {
-        const stopped = () => resolve(undefined)
+    ask,
 
-        signal?.addEventListener('abort', stopped, { once: true })
-        waiting.set(id, {
-          command,
-          sentAt: now(),
-          resolve: received => {
-            signal?.removeEventListener('abort', stopped)
-            resolve(received)
-          },
-        })
-      })
-
-      try {
-        publish(subjectOf(command.device), JSON.stringify({ id, property: command.property, values: command.values, by }))
-      } catch (error) {
-        waiting.delete(id)
-
-        return { result: 'refused', reason: `could not publish: ${error instanceof Error ? error.message : String(error)}` }
-      }
-
-      const received = await answer
-
-      waiting.delete(id)
-
-      if (received === undefined) return { result: 'unknown', reason: 'Stop pressed before the rig program answered' }
-      if (received.result === 'refused') return { result: 'refused', reason: received.reason ?? 'no reason given' }
-
-      return { result: 'written' }
+    tell(device: string, body: Readonly<Record<string, unknown>>): void {
+      publish(subjectOf(device), JSON.stringify({ ...body, id: newId(), by }))
     },
   }
 }

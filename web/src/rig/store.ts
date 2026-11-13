@@ -1,7 +1,7 @@
 import { Effect, Match, Result, Stream } from 'effect'
 import { useSyncExternalStore } from 'react'
 import type { NightName } from '../../../state/entries.ts'
-import type { LaunchLimits, LinkLimits, StartToken } from '../../../state/feed.ts'
+import type { ControlsLimits, LaunchLimits, LinkLimits, StartToken } from '../../../state/feed.ts'
 import { advance, emptyRig, type RigState } from '../../../state/rig.ts'
 import { feedEvents, type FeedEvent } from './feed.ts'
 
@@ -16,6 +16,7 @@ export interface Link {
   readonly limits: LinkLimits | undefined
   readonly night: NightName | undefined
   readonly launch: LaunchLimits | undefined
+  readonly controls: ControlsLimits | undefined
   readonly openedAt: number
 }
 
@@ -25,7 +26,7 @@ interface Store {
   readonly link: Link
 }
 
-let store: Store = { startToken: undefined, rig: emptyRig, link: { status: 'connecting', beat: undefined, limits: undefined, night: undefined, launch: undefined, openedAt: Date.now() } }
+let store: Store = { startToken: undefined, rig: emptyRig, link: { status: 'connecting', beat: undefined, limits: undefined, night: undefined, launch: undefined, controls: undefined, openedAt: Date.now() } }
 
 const changeListeners = new Set<() => void>()
 
@@ -45,7 +46,7 @@ const applyFeedEvent = (event: FeedEvent): Effect.Effect<void> =>
       Effect.suspend(() =>
         store.startToken !== undefined && store.startToken !== bootstrap.token
           ? reloadPage
-          : updateStore(current => ({ startToken: bootstrap.token, rig: bootstrap.state, link: { ...current.link, status: 'open', limits: bootstrap.limits, night: bootstrap.night, launch: bootstrap.launch, beat: { at: bootstrap.at, receivedAt } } })),
+          : updateStore(current => ({ startToken: bootstrap.token, rig: bootstrap.state, link: { ...current.link, status: 'open', limits: bootstrap.limits, night: bootstrap.night, launch: bootstrap.launch, controls: bootstrap.controls, beat: { at: bootstrap.at, receivedAt } } })),
       ),
     Entry: ({ entry }) =>
       Effect.suspend(() => Effect.fromResult(advance(store.rig, entry))).pipe(

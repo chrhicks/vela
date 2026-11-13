@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { ActionButton } from '../../components/ActionButton.tsx'
+import type { NudgeRate } from '../../../../state/commands.ts'
 import { CommandButton } from '../../components/CommandButton.tsx'
 import { useRig } from '../../rig/store.ts'
 import { Choices } from '../../components/Choices.tsx'
@@ -18,7 +19,7 @@ function TrackingButton() {
 
 export function MountArea() {
   const [target, setTarget] = useState(defaults.slewTarget)
-  const [rate, setRate] = useState<'slow' | 'fast'>('slow')
+  const [rate, setRate] = useState<NudgeRate>('slow')
 
   return (
     <Area id="mount">
@@ -36,7 +37,7 @@ export function MountArea() {
         <Field name="Target" kind="text" value={target} onChange={setTarget} />
       </ActionRow>
 
-      <NudgePad />
+      <NudgePad rate={rate} />
 
       <ActionRow label="Rate">
         <Choices

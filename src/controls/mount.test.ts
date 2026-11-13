@@ -2,10 +2,11 @@ import { Effect, Layer } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { foldRig, wire } from '../../state/testing.ts'
 import type { RigState } from '../../state/rig.ts'
-import type { Command, Outcome } from '../commands/sender.ts'
+import type { Command, Outcome, Request } from '../commands/sender.ts'
 import { Feed } from '../feed/feed.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
-import { mountControls, MountRuns } from './mount.ts'
+import { NudgeId } from '../../state/commands.ts'
+import { mountControls, MountRuns, NudgeRates } from './mount.ts'
 
 const deviceIds = { mount: 'am5', primary: 'primary', focuser: 'focuser', box: 'box', guide: 'guide' }
 
@@ -20,10 +21,13 @@ type Controls = Effect.Success<typeof mountControls>
 function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) => Promise<Outcome> = written, answerSeconds = 10) {
   const sent: Array<string> = []
   const send = (command: Command, signal: AbortSignal) => (sent.push(`${command.device} ${command.property} ${JSON.stringify(command.values)}`), answer(command, signal))
+  const ask = (request: Request, signal: AbortSignal) => (sent.push(`${request.device} ${request.id} ${JSON.stringify(request.body)}`), answer({ device: request.device, property: request.label, values: {} }, signal))
+  const tell = (device: string, body: Readonly<Record<string, unknown>>) => void sent.push(`${device} told ${JSON.stringify(body)}`)
+  const rates = Layer.succeed(NudgeRates, { slow: '7x', fast: '8x' })
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
   const runs = Layer.succeed(MountRuns, { stopMoving: Effect.sync(() => void sent.push('vela run stopped')) })
   const press = (choose: (controls: Controls) => Effect.Effect<void, unknown>) =>
-    Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.flip, Effect.option, Effect.provide(Layer.mergeAll(feed, runs, deviceCommandsFrom({ send, deviceIds, answerSeconds })))))
+    Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.flip, Effect.option, Effect.provide(Layer.mergeAll(feed, runs, rates, deviceCommandsFrom({ send, ask, tell, deviceIds, answerSeconds })))))
 
   return { sent, press }
 }
@@ -83,5 +87,30 @@ describe('Tracking', () => {
     await press(mount => mount.tracking(true))
 
     expect(sent).toEqual(['am5 TELESCOPE_TRACK_STATE {"TRACK_ON":false,"TRACK_OFF":true}', 'am5 TELESCOPE_TRACK_STATE {"TRACK_ON":true,"TRACK_OFF":false}'])
+  })
+})
+
+describe('Nudge', () => {
+  const id = NudgeId.make('6f1c0e2a-4b3d-4e5f-8a9b-0c1d2e3f4a5b')
+
+  it("asks the rig program to move at the mount's element for the rate, holds without waiting, and releases", async () => {
+    const { sent, press } = setup(connected)
+
+    expect(await press(mount => mount.nudge(id, 'north', 'fast'))).toMatchObject({ _tag: 'None' })
+    await press(mount => mount.holdNudge(id))
+    await press(mount => mount.releaseNudge(id))
+
+    expect(sent).toEqual([
+      `am5 nudge-${id} {"nudge":"north","rate":"8x"}`,
+      `am5 told {"hold":"nudge-${id}"}`,
+      `am5 nudge-${id}-release {"release":"nudge-${id}"}`,
+    ])
+  })
+
+  it('refuses to start while the mount is not connected, and sends nothing', async () => {
+    const { sent, press } = setup(notConnected)
+
+    expect(await press(mount => mount.nudge(id, 'east', 'slow'))).toMatchObject({ value: { refusal: { code: 'not-connected', device: 'mount' } } })
+    expect(sent).toEqual([])
   })
 })
