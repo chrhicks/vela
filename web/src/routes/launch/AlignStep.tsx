@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router'
 
-import { instruction, trend, type Instruction, type Trend } from '../../../../state/alignment.ts'
+import { instruction, sinceLastRun, trend, type Instruction, type Trend } from '../../../../state/alignment.ts'
 import { cutShort, isRunning } from '../../../../state/operations.ts'
+import { Alert } from '../../components/Alert.tsx'
 import { Chart } from '../../components/Chart.tsx'
 import { CommandPill } from '../../components/CommandPill.tsx'
 import { Readings } from '../../components/Readings.tsx'
@@ -36,10 +37,13 @@ export function AlignStep() {
   const operation = useRig(rig => rig.operations.align)
   const aligning = isRunning(operation)
   const stopped = cutShort(operation)
-  const { errors, lastFrame, lastFrameAt } = useRig(rig => rig.alignment)
+  const alignment = useRig(rig => rig.alignment)
+  const { errors, lastFrame, lastFrameAt } = alignment
+  const sinceLast = sinceLastRun(alignment)
   const filterOut = useChecklist(link.night).done.has('Filter out')
   const now = serviceNow(link, useLocalNow(secondsBetweenRedraws * 1000))
   const goodArcmin = link.launch?.alignGoodArcmin ?? 0
+  const moved = sinceLast !== undefined && link.launch !== undefined && sinceLast.apartArcmin >= link.launch.alignMovedArcmin
   const latest = errors.at(-1)
   const said = instruction(latest, goodArcmin)
   const totals = errors.map(error => ({ x: error.frame, y: error.totalArcmin }))
@@ -59,6 +63,8 @@ export function AlignStep() {
     <LaunchStep step={3} title="Polar align" facts={facts} action={action}>
       {stopped === undefined ? null : <StoppedAlert what="Alignment" ended={stopped} />}
 
+      {moved ? <Alert title={`Moved ${arcmin(sinceLast.apartArcmin)}`} facts={['Since last run', 'Check pier knob']} /> : null}
+
       <Readout
         items={[
           { label: 'Alt', value: arcmin(latest?.altitudeArcmin) },
@@ -72,6 +78,12 @@ export function AlignStep() {
         rows={[
           { label: 'Total', value: arcmin(latest?.totalArcmin) },
           said === 'good' ? { label: 'Good under', value: `${goodArcmin}′` } : { label: 'Trend', value: shownTrend === undefined ? '—' : trendWords[shownTrend] },
+          ...(sinceLast === undefined
+            ? []
+            : [
+                { label: 'Last run', value: arcmin(sinceLast.before.totalArcmin) },
+                { label: 'Apart', value: arcmin(sinceLast.apartArcmin), attention: moved },
+              ]),
         ]}
       />
 

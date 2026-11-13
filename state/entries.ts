@@ -84,6 +84,7 @@ export const AlignStarted = entryOf('vela.align.started', { run: RunId })
 export const AlignSolved = entryOf('vela.align.solve', {
   run: RunId,
   frame: Count,
+  solved: Schema.optionalKey(Schema.Boolean),
   altitudeArcmin: Schema.optionalKey(Schema.Number),
   azimuthArcmin: Schema.optionalKey(Schema.Number),
   totalArcmin: Schema.optionalKey(Schema.Number),

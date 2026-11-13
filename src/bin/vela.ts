@@ -212,7 +212,7 @@ const feedApp = FeedServer.pipe(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
       Layer.succeed(Operations, launchOperations),
-      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, alignGoodArcmin: settings.launch.alignGoodArcmin }),
+      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin } }),
     )),
 )
 const servicesScope = runHandledSync(Scope.make())
