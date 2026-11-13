@@ -35,7 +35,7 @@ const baseline: ReadonlyArray<readonly [string, Readonly<Record<string, Value>>,
 
 export const spoolDir = '/spool'
 
-export const fastSettings: CaptureSettings = { device: 'primary', spoolDir, measureDir: `${spoolDir}/measure`, settleMs: 60, exposureSilenceMs: 40, failuresInRow: 3, telescope: undefined }
+export const fastSettings: CaptureSettings = { device: 'primary', spoolDir, measureDir: `${spoolDir}/measure`, settleMs: 60, exposureSilenceMs: 40, failuresInRow: 3, telescope: undefined, filterNames: { in: 'Example band', out: 'None' } }
 
 export function fakeCamera(options: { exposures?: Exposure[]; settings?: Partial<CaptureSettings>; omit?: string[]; onEvent?: (event: RunEvent) => void } = {}) {
   const picture = makePicture()

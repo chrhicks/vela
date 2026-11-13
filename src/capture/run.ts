@@ -4,7 +4,9 @@ import type { LateCommand, Sender } from '../commands/sender.ts'
 import { announcesFrame } from '../frames/announce.ts'
 import type { Picture } from '../rig/picture.ts'
 import type { Entry } from '../../state/entry.ts'
-import type { RunEnding } from '../../state/entries.ts'
+import { Result, Schema } from 'effect'
+import type { FilterAnswer } from '../../state/commands.ts'
+import { FilterAnswered, type RunEnding } from '../../state/entries.ts'
 import { readWireBody } from '../stream/json.ts'
 import { makeChanges } from './changes.ts'
 import type { RunEvent } from './events.ts'
@@ -13,6 +15,8 @@ import { parseRequest, type CaptureRequest } from './request.ts'
 import type { RunFile } from './runfile.ts'
 
 export type EndReason = RunEnding
+
+const decodeFilterAnswered = Schema.decodeUnknownResult(FilterAnswered)
 
 export interface Ending {
   readonly run: string
@@ -31,6 +35,7 @@ export interface CaptureSettings {
   readonly exposureSilenceMs: number
   readonly failuresInRow: number
   readonly telescope: string | undefined
+  readonly filterNames: Readonly<Record<FilterAnswer, string>>
 }
 
 export interface CaptureOptions {
@@ -106,6 +111,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   const changes = makeChanges()
   const labels = new Map<string, FrameLabel>()
   let active: Active | undefined
+  let filter: FilterAnswer | undefined
   let last: Ending | undefined
 
   const read = (property: string) => picture.property(settings.device, property)
@@ -313,7 +319,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
       if (!parsed.ok) return parsed
 
-      const wanted = wantedOf(parsed.request, parsed.sequence, measure === undefined ? settings.spoolDir : settings.measureDir, settings.telescope)
+      const wanted = wantedOf(parsed.request, parsed.sequence, measure === undefined ? settings.spoolDir : settings.measureDir, settings.telescope, filter === undefined ? undefined : settings.filterNames[filter])
       const refusal = refusalToStart(parsed.request, wanted)
 
       if (refusal !== undefined) return { ok: false, reason: refusal }
@@ -359,6 +365,8 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     },
 
     observe(entry: Entry) {
+      if (entry.kind === 'vela.filter') filter = Result.match(decodeFilterAnswered(entry), { onSuccess: answered => answered.body.filter, onFailure: () => undefined })
+
       const run = active
       const watch = run?.watch
 

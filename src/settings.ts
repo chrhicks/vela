@@ -101,6 +101,11 @@ export const CaptureSettings = Schema.Struct({
     Schema.Number,
     3,
   ),
+  filterNames: described(
+    "What the FILTER card in each frame says for each answer to the launch filter question, from the answer on. Before an answer, frames have no FILTER card",
+    Schema.Struct({ in: Schema.NonEmptyString, out: Schema.NonEmptyString }),
+    { in: 'Dual band', out: 'None' },
+  ),
   telescope: Schema.optionalKey(
     Schema.NonEmptyString.annotate({
       description:
