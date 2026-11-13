@@ -7,6 +7,9 @@ import { latestSaid, PressLine, saidOf, type Pressed, type Said } from '../../co
 import type { Answer } from '../../rig/commands.ts'
 import { useLink, useRig } from '../../rig/store.ts'
 import { autofocusEndWords } from '../../rig/words.ts'
+import type { Frame } from '../../../../state/frames.ts'
+import { ActionLink } from '../../components/ActionLink.tsx'
+import styles from './areas.module.css'
 import { Choices } from '../../components/Choices.tsx'
 import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
@@ -139,8 +142,28 @@ export function FocusArea() {
   )
 }
 
+function testFrameSaid(pressed: Pressed | undefined, frames: ReadonlyArray<Frame>): Said | undefined {
+  const done = pressed?.answer.result === 'done' ? pressed.answer.done : undefined
+
+  if (done?.code !== 'test-frame') return undefined
+
+  const frame = [...frames].reverse().find(kept => kept.file.startsWith(`${done.sequence}_`) && kept.measurements !== undefined)
+  const measured = frame?.measurements
+
+  if (frame === undefined || measured === undefined) return undefined
+
+  const stars = measured.stars === null ? 'no stars' : `${measured.stars} stars`
+  const hfd = measured.hfdPixels === null ? [] : [`HFD ${measured.hfdPixels.toFixed(2)} px`]
+
+  return { words: { happened: 'Test frame', toDo: [stars, ...hfd].join(' · ') }, troubled: false, at: frame.keptAt }
+}
+
 export function CameraArea() {
-  const [exposure, setExposure] = useState(defaults.testFrame)
+  const offeredExposure = useLink().controls?.testFrameSeconds
+  const [typedExposure, setTypedExposure] = useState<string | undefined>(undefined)
+  const exposure = typedExposure ?? (offeredExposure === undefined ? '' : String(offeredExposure))
+  const runActive = useRig(rig => rig.run?.status === 'capturing')
+  const frames = useRig(rig => rig.frames)
   const offered = useLink().controls?.coolerCelsius
   const [typedSetpoint, setTypedSetpoint] = useState<string | undefined>(undefined)
   const setpoint = typedSetpoint ?? (offered === undefined ? '' : String(offered))
@@ -150,11 +173,20 @@ export function CameraArea() {
 
   return (
     <Area id="camera">
-      <PressLine said={pressed === undefined ? undefined : saidOf(pressed)} />
+      <PressLine said={latestSaid(pressed === undefined ? undefined : saidOf(pressed), testFrameSaid(pressed, frames))} />
 
       <ActionRow>
-        <ActionButton>Test frame</ActionButton>
-        <Field name="Test frame exposure" kind="number" value={exposure} onChange={setExposure} />
+        <CommandButton request={{ command: 'testFrame', exposureSeconds: Number(exposure) }} disabled={runActive} onAnswer={answered}>
+          Test frame
+        </CommandButton>
+        {runActive ? (
+          <>
+            <span className={styles.note}>Run active</span>
+            <ActionLink to="/">See latest frame</ActionLink>
+          </>
+        ) : (
+          <Field name="Test frame exposure, seconds" kind="number" value={exposure} onChange={setTypedExposure} />
+        )}
       </ActionRow>
 
       <ActionRow>

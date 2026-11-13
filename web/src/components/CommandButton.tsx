@@ -9,13 +9,14 @@ import styles from './CommandButton.module.css'
 interface CommandButtonProps {
   readonly request: CommandRequest
   readonly alwaysReady?: boolean
+  readonly disabled?: boolean
   readonly onAnswer: (answer: Answer) => void
   readonly children: ReactNode
 }
 
-export function CommandButton({ request, alwaysReady = false, onAnswer, children }: CommandButtonProps) {
+export function CommandButton({ request, alwaysReady = false, disabled = false, onAnswer, children }: CommandButtonProps) {
   const { sending, press } = useCommand(request, onAnswer)
-  const dimmed = sending && !alwaysReady
+  const dimmed = disabled || (sending && !alwaysReady)
 
   return (
     <button type="button" className={dimmed ? `${link.link} ${styles.sending}` : link.link} disabled={dimmed} onClick={press}>

@@ -4,23 +4,25 @@ import type { RigState } from '../../state/rig.ts'
 import { entry, foldRig, wire } from '../../state/testing.ts'
 import type { Command, Outcome } from '../commands/sender.ts'
 import { Feed } from '../feed/feed.ts'
-import { cameraControls } from './camera.ts'
+import { cameraControls, Capturing } from './camera.ts'
+import type { CaptureRequest } from '../capture/request.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
 
 const deviceIds = { mount: 'mount', primary: 'asi', focuser: 'focuser', box: 'box', guide: 'guide' }
 
 const temperature = entry('wire', 1, { dir: 'in', device: 'primary', type: 'def', property: 'CCD_TEMPERATURE', state: 'Idle', elements: { CCD_TEMPERATURE_VALUE: 26.1 }, numbers: { CCD_TEMPERATURE_VALUE: { min: -50, max: 50, step: 0, format: '%.2f' } } })
 
-const camera = foldRig([wire('primary', 'CONNECTION', { CONNECT: true, DISCONNECT: false }), temperature])
+const camera = foldRig([wire('primary', 'CONNECTION', { CONNECT: true, DISCONNECT: false }), temperature, wire('primary', 'CCD_CONTROLS', { Gain: 100, Offset: 50 })])
 
 type Controls = Effect.Success<typeof cameraControls>
 
-function setup(rig: RigState) {
+function setup(rig: RigState, busy = false) {
   const sent: Array<string> = []
+  const capturing = Layer.succeed(Capturing, { busy: Effect.succeed(busy), start: (request: CaptureRequest) => Effect.sync(() => void sent.push(`capture ${JSON.stringify(request)}`)) })
   const send = (command: Command) => (sent.push(`${command.device} ${command.property} ${JSON.stringify(command.values)}`), Promise.resolve<Outcome>({ result: 'written' }))
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
   const commands = deviceCommandsFrom({ send, ask: () => Promise.resolve({ result: 'written' }), tell: () => undefined, deviceIds, answerSeconds: 10 })
-  const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(cameraControls, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands))))
+  const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(cameraControls, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands, capturing))))
 
   return { sent, press }
 }
@@ -50,5 +52,21 @@ describe('Camera cooler', () => {
 
     expect(await off.press(controls => controls.coolerOff)).toMatchObject({ failure: { refusal: { code: 'not-connected', device: 'primary' } } })
     expect(await off.press(controls => controls.coolTo(-10))).toMatchObject({ failure: { refusal: { code: 'not-connected' } } })
+  })
+})
+
+describe('Test frame', () => {
+  it("takes one frame named as a test frame, at the camera's gain and offset, with the cooler left as it is", async () => {
+    const { sent, press } = setup(camera)
+
+    expect(await press(controls => controls.testFrame(2))).toMatchObject({ success: { code: 'test-frame', exposureSeconds: 2, sequence: 'test-frame_light' } })
+    expect(sent).toEqual(['capture {"object":"test-frame","frameType":"light","exposureSeconds":2,"count":1,"gain":100,"offset":50,"cooler":"keep"}'])
+  })
+
+  it('refuses while a run is capturing, and starts nothing', async () => {
+    const { sent, press } = setup(camera, true)
+
+    expect(await press(controls => controls.testFrame(2))).toMatchObject({ failure: { refusal: { code: 'run-active' } } })
+    expect(sent).toEqual([])
   })
 })

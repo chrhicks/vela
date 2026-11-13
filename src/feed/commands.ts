@@ -23,6 +23,7 @@ export class Operations extends Context.Service<
     readonly autofocus: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
     readonly coolTo: (celsius: number) => Effect.Effect<Done, CommandRefused>
     readonly coolerOff: Effect.Effect<Done, CommandRefused>
+    readonly testFrame: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
   }
 >()('vela/Operations') {}
 
@@ -52,6 +53,7 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         autofocus: ({ exposureSeconds }) => operations.autofocus(exposureSeconds),
         coolTo: ({ celsius }) => operations.coolTo(celsius),
         coolerOff: () => operations.coolerOff,
+        testFrame: ({ exposureSeconds }) => operations.testFrame(exposureSeconds),
       }),
     )
   })
