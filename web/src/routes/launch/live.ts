@@ -2,10 +2,11 @@ import { deviceBringUp, guiderHeard, rigProgramUp, type Change as PendingChange 
 import { checkOf } from '../../../../state/autofocus.ts'
 import type { FilterAnswer } from '../../../../state/commands.ts'
 import type { Value } from '../../../../state/entry.ts'
+import type { DeviceName } from '../../../../state/devices.ts'
 import type { RigState } from '../../../../state/rig.ts'
 import type { Change, Device } from './stub.ts'
 
-const devices: ReadonlyArray<readonly [name: string, id: string]> = [
+const devices: ReadonlyArray<readonly [name: string, id: DeviceName]> = [
   ['Mount', 'mount'],
   ['Focuser', 'focuser'],
   ['Power box', 'box'],
