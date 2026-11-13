@@ -165,8 +165,8 @@ export const AlignSettings = Schema.Struct({
 
 export const ControlsSettings = Schema.Struct({
   nudgeHoldMs: described('How often the page tells the rig program a nudge is still held, in milliseconds', Schema.Number, 250),
-  nudgeSlowRate: described("The mount's TELESCOPE_SLEW_RATE element for a slow nudge", Schema.NonEmptyString, '7x'),
-  nudgeFastRate: described("The mount's TELESCOPE_SLEW_RATE element for a fast nudge", Schema.NonEmptyString, '8x'),
+  nudgeSlowRate: described("The mount's TELESCOPE_SLEW_RATE element for a slow nudge", Schema.NonEmptyString, '8x'),
+  nudgeFastRate: described("The mount's TELESCOPE_SLEW_RATE element for a fast nudge", Schema.NonEmptyString, '9x'),
   centreExposureSeconds: described('Seconds of exposure for each slew and centre frame', Schema.Number, 2),
 })
 
