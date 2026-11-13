@@ -28,10 +28,25 @@ describe('run', () => {
     expect(state).toMatchObject({ status: 'capturing', id: 'r2', frames: 0 })
   })
 
-  it('starts an open-ended run, such as alignment, with no count', () => {
-    const state = reduce([entry('vela.run.started', 1000, { run: 'a1', object: 'polar-align', frameType: 'light', exposureSeconds: 2, gain: 100, offset: 50, cooler: 'keep', sequence: 'polar-align_light' })])
+  it('starts a run until stopped, which has no count', () => {
+    const state = reduce([entry('vela.run.started', 1000, { run: 'u1', object: 'NGC 7635', frameType: 'light', exposureSeconds: 60, gain: 100, offset: 50, cooler: 'keep', sequence: 'NGC-7635_light' })])
 
-    expect(state).toMatchObject({ status: 'capturing', id: 'a1', object: 'polar-align', count: undefined })
+    expect(state).toMatchObject({ status: 'capturing', id: 'u1', object: 'NGC 7635', count: undefined })
+  })
+
+  it("keeps the target's run while Vela centres, aligns or focuses, which are runs of their own", () => {
+    const operation = (object: string, id: string) => entry('vela.run.started', 2000, { run: id, object, frameType: 'light', exposureSeconds: 2 })
+    const state = reduce([
+      runStarted('r1', 1000, 'M 42'),
+      entry('vela.run.ended', 1900, { run: 'r1', reason: 'stopped' }),
+      operation('centre', 'c1'),
+      entry('vela.run.exposed', 2010, { run: 'c1', frame: 1 }),
+      entry('vela.run.ended', 2020, { run: 'c1', reason: 'done' }),
+      operation('autofocus', 'f1'),
+      operation('polar-align', 'a1'),
+    ])
+
+    expect(state).toMatchObject({ id: 'r1', object: 'M 42', status: 'ended', reason: 'stopped' })
   })
 
   it('replaces an ended run when the next one starts', () => {

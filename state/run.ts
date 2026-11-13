@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { RunEnding, RunId, type RigEntry } from './entries.ts'
+import { isOperationObject, RunEnding, RunId, type RigEntry } from './entries.ts'
 
 const runFacts = {
   id: RunId,
@@ -21,6 +21,8 @@ export type Run = typeof Run.Type
 
 export function run(state: Run | undefined, entry: RigEntry): Run | undefined {
   if (entry.kind === 'vela.run.started') {
+    if (isOperationObject(entry.body.object)) return state
+
     const { run: id, object, frameType, exposureSeconds, count } = entry.body
 
     return { status: 'capturing', id, object, frameType, exposureSeconds, count, startedAt: entry.at, frames: 0, failures: 0 }
