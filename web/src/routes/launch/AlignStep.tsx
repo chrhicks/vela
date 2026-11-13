@@ -1,21 +1,34 @@
 import { Alert } from '../../components/Alert.tsx'
 import { Chart } from '../../components/Chart.tsx'
-import { PillLink } from '../../components/PillLink.tsx'
+import { useNavigate } from 'react-router'
+
+import { CommandPill } from '../../components/CommandPill.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { Readout } from '../../components/Readout.tsx'
 import { Statement } from '../../components/Statement.tsx'
+import { isRunning } from '../../../../state/operations.ts'
+import { useRig } from '../../rig/store.ts'
 import { LaunchStep } from './LaunchStep.tsx'
 import { alignErrorTicks, alignGoodBand, alignment } from './stub.ts'
 
 export function AlignStep() {
   const align = alignment.adjusting
+  const navigate = useNavigate()
+  const aligning = isRunning(useRig(rig => rig.operations.align))
+  const action = aligning ? (
+    <CommandPill request={{ command: 'finishAlignment' }} onCarriedOut={() => navigate('/launch/filter')}>
+      Done
+    </CommandPill>
+  ) : (
+    <CommandPill request={{ command: 'startAlignment' }}>Start</CommandPill>
+  )
 
   return (
     <LaunchStep
       step={3}
       title="Polar align"
       facts={align.facts}
-      action={<PillLink to={align.action.to}>{align.action.label}</PillLink>}
+      action={action}
     >
       {align.alert === undefined ? null : <Alert title={align.alert.title} facts={align.alert.facts} />}
 

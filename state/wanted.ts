@@ -12,6 +12,8 @@ export const wanted: Wanted = {
     'vela.frame',
     'vela.frame.stats',
     'vela.focus.started',
+    'vela.align.*',
+    'vela.filter',
     'vela.focus.best',
     'vela.centre.*',
     'phd2.*',

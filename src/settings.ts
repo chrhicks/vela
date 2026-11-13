@@ -158,6 +158,21 @@ export const AlignSettings = Schema.Struct({
   ),
 })
 
+export const LaunchSettings = Schema.Struct({
+  alignExposureSeconds: described(
+    'Exposure of each polar alignment frame. All 24 alignments on the nights of 11-09 and 11-10 used 2 s, and solved through the dual-band filter as well as without it',
+    Schema.Number,
+    2,
+  ),
+  autofocusStep: described('Focuser steps between two autofocus samples. Every sweep on 11-09 and 11-10 used 50; 100 steps from best focus roughly doubled HFD on those curves, so 50 keeps samples on both sides of focus', Schema.Number, 50),
+  autofocusSamples: described('Samples in one autofocus sweep. Every full sweep on 11-09 and 11-10 took 9: 34 s at 2 s exposures, 114 s at 10 s', Schema.Number, 9),
+  autofocusExposureSeconds: described(
+    'Exposure of each autofocus sample, by the filter answer at launch. Out: 2 s, used on 11-09 and 11-11. In: 10 s, used on 11-10; Chris called it arbitrary, a guess to let more light through the dual-band filter',
+    Schema.Struct({ in: Schema.Number, out: Schema.Number }),
+    { in: 10, out: 2 },
+  ),
+})
+
 export const CentreSettings = Schema.Struct({
   toleranceArcmin: described(
     'How far, in arcminutes, the solved centre of a centring frame may be from the target for slew and centre to finish. 1 arcminute is 31 pixels at the FRA400 and ASI2600 scale of 1.94 arcseconds per pixel, under 1% of the 6248-pixel frame width, so frames centred within it stack with no crop worth noticing. Not yet checked against how closely the AM5 repeats a goto after a sync (to measure on 2026-11-10): if passes never get under it, this is the number to change',
@@ -211,6 +226,7 @@ export const VelaSettings = Schema.Struct({
   align: described('Settings for polar alignment', AlignSettings, {}),
   stars: Schema.optionalKey(StarSettings.annotate({ description: 'Counting and sizing the stars of each kept imaging frame. Without it, kept frames get only their sky level and noise' })),
   autofocus: described('Settings for autofocus', AutofocusSettings, {}),
+  launch: described('What the launch steps start on a tap: alignment, and autofocus after the filter answer', LaunchSettings, {}),
   centre: described('Settings for slew and centre', CentreSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({

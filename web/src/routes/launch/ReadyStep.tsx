@@ -12,7 +12,7 @@ export function ReadyStep() {
     <LaunchStep step={6} title="Rig ready" facts={[rigReady.at]} action={<PillLink to="/?pick">Pick target</PillLink>}>
       <Statement size="verdict">Go inside</Statement>
 
-      <Readings rows={[...rigReady.summary, { label: 'Filter', value: filter.toUpperCase() }]} />
+      <Readings rows={[...rigReady.summary, { label: 'Filter', value: filter?.toUpperCase() ?? '—' }]} />
     </LaunchStep>
   )
 }
