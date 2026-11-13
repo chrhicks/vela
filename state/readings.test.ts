@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dewHeaters, focusPosition, mountActivity, readings, sensorCelsius, type Readings } from './readings.ts'
+import { readings, type Readings } from './readings.ts'
 import { entry, fold } from './testing.ts'
 
 const reported = (device: string, property: string | undefined, elements: Readonly<Record<string, number | boolean | string>>, state = 'Ok', type = 'set', at = 1) =>
@@ -32,30 +32,5 @@ describe('readings', () => {
 
   it('leaves the rig program own writes out', () => {
     expect(reduce([entry('wire', 1, { dir: 'out', device: 'focuser', type: 'new', property: 'ABS_FOCUS_POSITION', elements: { FOCUS_ABSOLUTE_POSITION: 1 } })])).toEqual({})
-  })
-})
-
-describe('the rig line selectors', () => {
-  const rig = reduce([
-    reported('mount', 'TELESCOPE_PARK', { PARK: false, UNPARK: true }),
-    reported('mount', 'TELESCOPE_TRACK_STATE', { TRACK_ON: true, TRACK_OFF: false }),
-    reported('mount', 'EQUATORIAL_EOD_COORD', { RA: 2.3, DEC: 45 }, 'Ok'),
-    reported('primary', 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: -10 }),
-    reported('focuser', 'ABS_FOCUS_POSITION', { FOCUS_ABSOLUTE_POSITION: 32562 }),
-    reported('box', 'DEW_LABELS', { DEW_CHANNEL_1: 'Dew A', DEW_CHANNEL_2: '' }, 'Idle', 'def'),
-    reported('box', 'DEW_DUTY_CYCLES', { DEW_CHANNEL_2: 40, DEW_CHANNEL_1: 60 }),
-  ])
-
-  it('read the mount, sensor, focuser and dew heaters', () => {
-    expect(mountActivity(rig)).toBe('tracking')
-    expect(sensorCelsius(rig)).toBe(-10)
-    expect(focusPosition(rig)).toBe(32562)
-    expect(dewHeaters(rig)).toEqual([{ label: 'Dew A', percent: 60 }, { label: 'DEW_CHANNEL_2', percent: 40 }])
-  })
-
-  it('call the mount parked before slewing, slewing before tracking, and say nothing before it has reported', () => {
-    expect(mountActivity(fold(readings, rig, [reported('mount', 'EQUATORIAL_EOD_COORD', { RA: 3 }, 'Busy')]))).toBe('slewing')
-    expect(mountActivity(fold(readings, rig, [reported('mount', 'TELESCOPE_PARK', { PARK: true, UNPARK: false })]))).toBe('parked')
-    expect(mountActivity({})).toBeUndefined()
   })
 })

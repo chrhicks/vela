@@ -1,19 +1,16 @@
 import { greenwichSiderealHours } from './flip.ts'
-import type { Readings } from './readings.ts'
+import type { Mount } from './devices.ts'
 
 const radians = (degrees: number) => (degrees * Math.PI) / 180
 
-export function altitudeDegrees(readings: Readings, at: number | undefined): number | undefined {
-  const mount = readings['mount']
-  const ra = mount?.['EQUATORIAL_EOD_COORD']?.values['RA']
-  const dec = mount?.['EQUATORIAL_EOD_COORD']?.values['DEC']
-  const latitude = mount?.['GEOGRAPHIC_COORD']?.values['LAT']
-  const longitude = mount?.['GEOGRAPHIC_COORD']?.values['LONG']
+export function altitudeDegrees(mount: Mount, at: number | undefined): number | undefined {
+  const pointing = mount.EQUATORIAL_EOD_COORD?.values
+  const site = mount.GEOGRAPHIC_COORD?.values
 
-  if (at === undefined || typeof ra !== 'number' || typeof dec !== 'number' || typeof latitude !== 'number' || typeof longitude !== 'number') return undefined
+  if (at === undefined || pointing === undefined || site === undefined) return undefined
 
-  const hourAngle = radians((greenwichSiderealHours(at) + longitude / 15 - ra) * 15)
-  const sine = Math.sin(radians(latitude)) * Math.sin(radians(dec)) + Math.cos(radians(latitude)) * Math.cos(radians(dec)) * Math.cos(hourAngle)
+  const hourAngle = radians((greenwichSiderealHours(at) + site.LONG / 15 - pointing.RA) * 15)
+  const sine = Math.sin(radians(site.LAT)) * Math.sin(radians(pointing.DEC)) + Math.cos(radians(site.LAT)) * Math.cos(radians(pointing.DEC)) * Math.cos(hourAngle)
 
   return (Math.asin(Math.max(-1, Math.min(1, sine))) * 180) / Math.PI
 }

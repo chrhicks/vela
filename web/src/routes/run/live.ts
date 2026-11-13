@@ -1,7 +1,7 @@
 import { flip } from '../../../../state/flip.ts'
 import type { Frame } from '../../../../state/frames.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
-import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Readings } from '../../../../state/readings.ts'
+import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Devices } from '../../../../state/devices.ts'
 import type { Run } from '../../../../state/run.ts'
 import type { Span } from '../../components/Chart.tsx'
 import type { Reading } from '../../components/Readings.tsx'
@@ -31,11 +31,11 @@ function latestStats(frame: Frame | undefined): ReadonlyArray<Reading> {
   ]
 }
 
-function rigLine(readings: Readings, guiding: Guiding, now: number | undefined): ReadonlyArray<Reading> {
-  const activity = mountActivity(readings)
-  const sensor = sensorCelsius(readings)
-  const focus = focusPosition(readings)
-  const heaters = dewHeaters(readings)
+function rigLine(devices: Devices, guiding: Guiding, now: number | undefined): ReadonlyArray<Reading> {
+  const activity = mountActivity(devices.mount)
+  const sensor = sensorCelsius(devices.primary)
+  const focus = focusPosition(devices.focuser)
+  const heaters = dewHeaters(devices.box)
 
   return [
     { label: 'Mount', value: activity === undefined ? unknown : mountWords[activity] },
@@ -43,7 +43,7 @@ function rigLine(readings: Readings, guiding: Guiding, now: number | undefined):
     { label: 'Sensor', value: sensor === undefined ? unknown : `${sensor.toFixed(1)} °C` },
     { label: 'Focus', value: focus === undefined ? unknown : `${focus}` },
     { label: 'Dew', value: heaters.length === 0 ? unknown : `${heaters.map(heater => heater.percent.toFixed(0)).join(' / ')} %` },
-    { label: 'Flip', value: flipWord(flip(readings, now)) },
+    { label: 'Flip', value: flipWord(flip(devices.mount, now)) },
   ]
 }
 
@@ -100,14 +100,14 @@ function trendWindows(trends: Trends, now: number): Readonly<Record<TrendWindowN
 export interface Live {
   readonly run: Run | undefined
   readonly frames: ReadonlyArray<Frame>
-  readonly readings: Readings
+  readonly devices: Devices
   readonly guiding: Guiding
   readonly now: number | undefined
   readonly trends: Trends
 }
 
-export function liveCapturing({ run, frames, readings, guiding, now, trends }: Live, placeholder: Capturing): Capturing {
-  const live = { ...placeholder, rig: rigLine(readings, guiding, now), trendWindows: now === undefined ? placeholder.trendWindows : trendWindows(trends, now) }
+export function liveCapturing({ run, frames, devices, guiding, now, trends }: Live, placeholder: Capturing): Capturing {
+  const live = { ...placeholder, rig: rigLine(devices, guiding, now), trendWindows: now === undefined ? placeholder.trendWindows : trendWindows(trends, now) }
 
   if (run === undefined) return live
 
