@@ -21,7 +21,10 @@ function written(state: Writes, wire: WireBody, property: string, at: number): W
 function answered(state: Writes, wire: WireBody, property: string): Writes {
   const device = state[wire.device]
 
-  if (device?.[property] === undefined || wire.state === 'Busy') return state
+  const write = device?.[property]
+
+  if (device === undefined || write === undefined) return state
+  if (wire.state === 'Busy' && !Object.entries(write.values).every(([element, value]) => wire.elements[element] === value)) return state
 
   return { ...state, [wire.device]: without(device, property) }
 }

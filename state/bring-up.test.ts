@@ -14,12 +14,18 @@ const connected = (device: string) => reported(device, 'CONNECTION', { CONNECT: 
 describe('writes', () => {
   const reduce = (entries: Parameters<typeof fold>[2]) => fold<Writes>(writes, {}, entries)
 
-  it("keeps the rig program's write until the device answers it, through a busy answer", () => {
-    const pending = reduce([written('primary', 'CCD_CONTROLS', { Gain: 100 }, 5)])
+  it("keeps the rig program's write until the device answers it, through a busy answer that does not show it yet", () => {
+    const pending = reduce([written('primary', 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: -10 }, 5)])
 
-    expect(pending).toEqual({ primary: { CCD_CONTROLS: { values: { Gain: 100 }, at: 5 } } })
-    expect(fold(writes, pending, [reported('primary', 'CCD_CONTROLS', { Gain: 100 }, 6, 'set', 'Busy')])).toBe(pending)
-    expect(fold(writes, pending, [reported('primary', 'CCD_CONTROLS', { Gain: 100 }, 7)])).toEqual({ primary: {} })
+    expect(pending).toEqual({ primary: { CCD_TEMPERATURE: { values: { CCD_TEMPERATURE_VALUE: -10 }, at: 5 } } })
+    expect(fold(writes, pending, [reported('primary', 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: 4.2 }, 6, 'set', 'Busy')])).toBe(pending)
+    expect(fold(writes, pending, [reported('primary', 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: -10 }, 7)])).toEqual({ primary: {} })
+  })
+
+  it('takes a busy answer that already shows the written values as done, as the camera answers its cooler while it runs', () => {
+    const pending = reduce([written('primary', 'CCD_COOLER', { COOLER_ON: true, COOLER_OFF: false }, 5)])
+
+    expect(fold(writes, pending, [reported('primary', 'CCD_COOLER', { COOLER_ON: true, COOLER_OFF: false }, 6, 'set', 'Busy')])).toEqual({ primary: {} })
   })
 
   it('forgets everything when the rig program reconnects', () => {
