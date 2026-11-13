@@ -6,11 +6,11 @@ import { CommandRefused, CommandsRoute, Operations } from './commands.ts'
 
 function fakeOperations(refuse?: string) {
   const calls: Array<string> = []
-  const carry = (name: string) => Effect.suspend(() => (calls.push(name), refuse === undefined ? Effect.void : Effect.fail(new CommandRefused({ text: refuse }))))
+  const carry = (name: string) => Effect.suspend(() => (calls.push(name), refuse === undefined ? Effect.void : Effect.fail(new CommandRefused({ refusal: { code: 'refused', text: refuse } }))))
 
   return {
     calls,
-    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`) },
+    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: carry('home') },
   }
 }
 
@@ -29,6 +29,7 @@ describe('POST /commands', () => {
   it('carries out a command and answers 202', async () => {
     expect(await post({ command: 'startAlignment' })).toEqual({ status: 202, body: undefined, calls: ['startAlignment'] })
     expect(await post({ command: 'answerFilter', filter: 'in' })).toMatchObject({ status: 202, calls: ['answerFilter in'] })
+    expect(await post({ command: 'home' })).toMatchObject({ status: 202, calls: ['home'] })
   })
 
   it("answers a refusal as data, with Vela's reason", async () => {

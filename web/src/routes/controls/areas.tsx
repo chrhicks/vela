@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { ActionButton } from '../../components/ActionButton.tsx'
+import { CommandButton } from '../../components/CommandButton.tsx'
 import { Choices } from '../../components/Choices.tsx'
 import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
@@ -15,7 +16,7 @@ export function MountArea() {
   return (
     <Area id="mount">
       <ActionRow>
-        <ActionButton>Home</ActionButton>
+        <CommandButton request={{ command: 'home' }}>Home</CommandButton>
         <ActionButton>Stop</ActionButton>
         <ActionButton>Tracking off</ActionButton>
         <ActionButton>Flip now</ActionButton>

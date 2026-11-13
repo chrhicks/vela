@@ -103,7 +103,7 @@ describe('starting the event stream', () => {
     const port = typeof address === 'object' && address !== null ? address.port : 0
     const app = FeedServer.pipe(
       Layer.provideMerge(FeedLive),
-      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(Tonight, { nightOf: () => NightName.make('2026-11-08') }), Layer.succeed(Operations, { startAlignment: Effect.void, finishAlignment: Effect.void, answerFilter: () => Effect.void }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port, webRoot: '.', heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10, launch: { alignGoodArcmin: 1, alignMovedArcmin: 10 } }))),
+      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(Tonight, { nightOf: () => NightName.make('2026-11-08') }), Layer.succeed(Operations, { startAlignment: Effect.void, finishAlignment: Effect.void, answerFilter: () => Effect.void, home: Effect.void }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port, webRoot: '.', heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10, launch: { alignGoodArcmin: 1, alignMovedArcmin: 10 } }))),
     )
     const error = await Effect.runPromise(Effect.scoped(Effect.flip(Layer.build(app))))
 
@@ -120,7 +120,7 @@ describe('starting the event stream', () => {
 
     const app = FeedServer.pipe(
       Layer.provideMerge(FeedLive),
-      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(Tonight, { nightOf: () => NightName.make('2026-11-08') }), Layer.succeed(Operations, { startAlignment: Effect.void, finishAlignment: Effect.void, answerFilter: () => Effect.void }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port: 0, webRoot, heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10, launch: { alignGoodArcmin: 1, alignMovedArcmin: 10 } }))),
+      Layer.provide(Layer.mergeAll(Layer.succeed(ServiceStart, { token: StartToken.make('1794500000000') }), Layer.succeed(Tonight, { nightOf: () => NightName.make('2026-11-08') }), Layer.succeed(Operations, { startAlignment: Effect.void, finishAlignment: Effect.void, answerFilter: () => Effect.void, home: Effect.void }), Layer.succeed(FeedSettings, { host: '127.0.0.1', port: 0, webRoot, heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10, launch: { alignGoodArcmin: 1, alignMovedArcmin: 10 } }))),
     )
     const pages = await Effect.runPromise(
       Effect.scoped(

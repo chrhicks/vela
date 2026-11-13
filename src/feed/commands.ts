@@ -2,7 +2,7 @@ import { Context, Data, Effect, Match } from 'effect'
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
 import { commandsPath, CommandRequest, type FilterAnswer, type Refusal } from '../../state/commands.ts'
 
-export class CommandRefused extends Data.TaggedError('CommandRefused')<{ readonly text: string }> {}
+export class CommandRefused extends Data.TaggedError('CommandRefused')<{ readonly refusal: Refusal }> {}
 
 export class Operations extends Context.Service<
   Operations,
@@ -10,6 +10,7 @@ export class Operations extends Context.Service<
     readonly startAlignment: Effect.Effect<void, CommandRefused>
     readonly finishAlignment: Effect.Effect<void, CommandRefused>
     readonly answerFilter: (filter: FilterAnswer) => Effect.Effect<void, CommandRefused>
+    readonly home: Effect.Effect<void, CommandRefused>
   }
 >()('vela/Operations') {}
 
@@ -24,6 +25,7 @@ const carryOut = (request: CommandRequest) =>
         startAlignment: () => operations.startAlignment,
         finishAlignment: () => operations.finishAlignment,
         answerFilter: ({ filter }) => operations.answerFilter(filter),
+        home: () => operations.home,
       }),
     )
   })
@@ -35,7 +37,7 @@ export const CommandsRoute = HttpRouter.add(
     Effect.flatMap(carryOut),
     Effect.as(HttpServerResponse.empty({ status: 202 })),
     Effect.catchTags({
-      CommandRefused: ({ text }) => refused(409, { code: 'refused', text }),
+      CommandRefused: ({ refusal }) => refused(409, refusal),
       SchemaError: () => refused(400, { code: 'malformed' }),
       HttpServerError: () => refused(400, { code: 'malformed' }),
     }),

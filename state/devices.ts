@@ -74,9 +74,11 @@ export const Devices = Schema.Struct({
 
 export type Devices = typeof Devices.Type
 
-export type DeviceName = keyof Devices
+export const DeviceName = Schema.Literals(['mount', 'primary', 'focuser', 'box', 'guide'])
 
-export const deviceNames: ReadonlyArray<DeviceName> = ['mount', 'primary', 'focuser', 'box', 'guide']
+export type DeviceName = typeof DeviceName.Type
+
+export const deviceNames = DeviceName.literals
 
 export const deviceProperties: Readonly<Record<DeviceName, ReadonlyArray<string>>> = {
   mount: Object.keys(Mount.fields),
