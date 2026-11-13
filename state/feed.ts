@@ -9,7 +9,9 @@ export type StartToken = typeof StartToken.Type
 
 export const feedPath = '/feed'
 
-export const feedEvent = { state: 'state', entry: 'entry', heartbeat: 'heartbeat' } as const
+export const FeedEventName = Schema.Literals(['state', 'entry', 'heartbeat'])
+
+export type FeedEventName = typeof FeedEventName.Type
 
 export const LinkLimits = Schema.Struct({ heartbeatSeconds: Schema.Number, lostAfterSeconds: Schema.Number, rigSilentAfterSeconds: Schema.Number })
 
