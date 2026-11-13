@@ -14,11 +14,11 @@ export const FrameFile = Schema.NonEmptyString.pipe(Schema.brand('FrameFile'))
 
 export type FrameFile = typeof FrameFile.Type
 
-export const operationObjects = { align: 'polar-align', focus: 'autofocus', centre: 'centre' } as const
-
 export const Operation = Schema.Literals(['align', 'focus', 'centre'])
 
 export type Operation = typeof Operation.Type
+
+export const operationObjects: Readonly<Record<Operation, string>> = { align: 'polar-align', focus: 'autofocus', centre: 'centre' }
 
 export const RunObject = Schema.Union([Schema.TaggedStruct('Operation', { operation: Operation }), Schema.TaggedStruct('Target', { name: Schema.String })])
 
@@ -91,16 +91,16 @@ export type LinkStatus = typeof LinkStatus.Type
 
 export const RigLink = entryOf('client.connection', { target: LinkTarget, status: LinkStatus })
 
-export const guiderEvents = ['GuideStep', 'StartGuiding', 'GuidingStopped', 'LoopingExposures', 'LoopingExposuresStopped', 'StartCalibration', 'StarSelected', 'StarLost', 'Paused', 'Resumed'] as const
+export const GuiderEvent = Schema.Literals(['GuideStep', 'StartGuiding', 'GuidingStopped', 'LoopingExposures', 'LoopingExposuresStopped', 'StartCalibration', 'StarSelected', 'StarLost', 'Paused', 'Resumed'])
 
-export type GuiderEvent = (typeof guiderEvents)[number]
+export type GuiderEvent = typeof GuiderEvent.Type
 
 export const GuiderReported = Schema.Struct({
   seq: StreamPosition,
   at: Schema.Number,
-  kind: Schema.Literals(guiderEvents.map(event => `phd2.${event}` as const)),
+  kind: Schema.TemplateLiteral(['phd2.', GuiderEvent]),
   body: Schema.Struct({
-    Event: Schema.Literals(guiderEvents),
+    Event: GuiderEvent,
     AvgDist: Schema.optionalKey(Schema.Number),
     SNR: Schema.optionalKey(Schema.Number),
     RADistanceRaw: Schema.optionalKey(Schema.Number),
@@ -136,9 +136,7 @@ export const FocusBest = entryOf('vela.focus.best', { run: RunId, position: Sche
 
 export const FilterAnswered = entryOf('vela.filter', { filter: FilterAnswer })
 
-const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered] as const
-
-export const RigEntry = Schema.Union(members)
+export const RigEntry = Schema.Union([RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered])
 
 export type RigEntry = typeof RigEntry.Type
 
@@ -148,12 +146,12 @@ export class MalformedEntry extends Data.TaggedError('MalformedEntry')<{
   readonly issue: string
 }> {}
 
-export const rigKinds: ReadonlySet<string> = new Set(members.flatMap(member => ('literal' in member.fields.kind ? [member.fields.kind.literal] : member.fields.kind.literals)))
+export const isRigKind = Schema.is(Schema.Union(RigEntry.members.map(member => member.fields.kind)))
 
 const decodeRigEntry = Schema.decodeUnknownResult(RigEntry)
 
 export function readRigEntry(entry: Entry): Result.Result<Option.Option<RigEntry>, MalformedEntry> {
-  if (!rigKinds.has(entry.kind)) return Result.succeed(Option.none())
+  if (!isRigKind(entry.kind)) return Result.succeed(Option.none())
 
   return decodeRigEntry(entry).pipe(
     Result.map(Option.some),
