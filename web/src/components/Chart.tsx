@@ -65,6 +65,7 @@ export function Chart({ title, current, lines, yTicks, xLabels, band, marker, sp
   const ys = rangeOf(yTicks)
   const left = (x: number) => along(x, xs)
   const top = (y: number) => 100 - along(y, ys)
+  const inPlot = (y: number) => Math.min(Math.max(y, ys.min), ys.max)
 
   return (
     <figure className={styles.chart}>
@@ -85,8 +86,8 @@ export function Chart({ title, current, lines, yTicks, xLabels, band, marker, sp
 
         <div className={styles.plot}>
           <svg className={styles.drawing} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            {band === undefined ? null : (
-              <rect className={styles.band} x="0" width="100" y={top(band.to)} height={top(band.from) - top(band.to)} />
+            {band === undefined || yTicks.length === 0 ? null : (
+              <rect className={styles.band} x="0" width="100" y={top(inPlot(band.to))} height={top(inPlot(band.from)) - top(inPlot(band.to))} />
             )}
 
             {yTicks.length === 0 ? null : shown.map((line, index) => (
