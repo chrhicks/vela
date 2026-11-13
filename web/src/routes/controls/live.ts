@@ -2,7 +2,7 @@ import { altitudeDegrees } from '../../../../state/altitude.ts'
 import type { CalibrationSet, CalibrationType } from '../../../../state/calibration.ts'
 import { flip } from '../../../../state/flip.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
-import { focusPosition, mountActivity, sensorCelsius, type Readings } from '../../../../state/readings.ts'
+import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Box, type Mount, type Primary } from '../../../../state/devices.ts'
 import type { RigState } from '../../../../state/rig.ts'
 import type { Run } from '../../../../state/run.ts'
 import type { Reading } from '../../components/Readings.tsx'
@@ -20,14 +20,6 @@ export interface AreaState {
   readonly readings: ReadonlyArray<Reading>
 }
 
-const valueOf = (readings: Readings, device: string, property: string, element: string) => readings[device]?.[property]?.values[element]
-
-const numberOf = (readings: Readings, device: string, property: string, element: string) => {
-  const value = valueOf(readings, device, property, element)
-
-  return typeof value === 'number' ? value : undefined
-}
-
 const upper = (text: string) => text.toUpperCase()
 
 const sexagesimal = (value: number, withSeconds: boolean) => {
@@ -38,22 +30,22 @@ const sexagesimal = (value: number, withSeconds: boolean) => {
   return units.map(unit => String(unit).padStart(2, '0')).join(' ')
 }
 
-const onOff = (value: unknown) => (value === true ? 'ON' : value === false ? 'OFF' : unknown)
+const onOff = (value: boolean | undefined) => (value === true ? 'ON' : value === false ? 'OFF' : unknown)
 
-function mountArea(readings: Readings, now: number | undefined): AreaState {
-  const activity = mountActivity(readings)
-  const ra = numberOf(readings, 'mount', 'EQUATORIAL_EOD_COORD', 'RA')
-  const dec = numberOf(readings, 'mount', 'EQUATORIAL_EOD_COORD', 'DEC')
-  const altitude = altitudeDegrees(readings, now)
-  const pier = readings['mount']?.['TELESCOPE_PIER_SIDE']?.values
-  const toFlip = flip(readings, now)
+function mountArea(mount: Mount, now: number | undefined): AreaState {
+  const activity = mountActivity(mount)
+  const ra = mount.EQUATORIAL_EOD_COORD?.values.RA
+  const dec = mount.EQUATORIAL_EOD_COORD?.values.DEC
+  const altitude = altitudeDegrees(mount, now)
+  const pier = mount.TELESCOPE_PIER_SIDE?.values
+  const toFlip = flip(mount, now)
 
   return {
     heading: 'Mount',
     summary: activity === undefined ? unknown : mountWords[activity],
     readings: [
-      { label: 'Tracking', value: onOff(valueOf(readings, 'mount', 'TELESCOPE_TRACK_STATE', 'TRACK_ON')) },
-      { label: 'Pier side', value: pier?.['PIER_WEST'] === true ? 'WEST' : pier?.['PIER_EAST'] === true ? 'EAST' : unknown },
+      { label: 'Tracking', value: onOff(mount.TELESCOPE_TRACK_STATE?.values.TRACK_ON) },
+      { label: 'Pier side', value: pier?.PIER_WEST === true ? 'WEST' : pier?.PIER_EAST === true ? 'EAST' : unknown },
       { label: 'RA', value: ra === undefined ? unknown : sexagesimal(ra, true) },
       { label: 'Dec', value: dec === undefined ? unknown : `${dec < 0 ? '-' : '+'}${sexagesimal(dec, false)}` },
       { label: 'Alt', value: altitude === undefined ? unknown : `${Math.round(altitude)}°` },
@@ -77,8 +69,8 @@ function guidingArea(guiding: Guiding): AreaState {
 }
 
 function focusArea(rig: RigState): AreaState {
-  const position = focusPosition(rig.readings)
-  const celsius = numberOf(rig.readings, 'focuser', 'FOCUS_TEMPERATURE', 'TEMPERATURE')
+  const position = focusPosition(rig.devices.focuser)
+  const celsius = rig.devices.focuser.FOCUS_TEMPERATURE?.values.TEMPERATURE
   const hfd = [...rig.frames].reverse().find(frame => frame.measurements?.hfdPixels != null)?.measurements?.hfdPixels
 
   return {
@@ -92,12 +84,12 @@ function focusArea(rig: RigState): AreaState {
   }
 }
 
-function cameraArea(readings: Readings): AreaState {
-  const sensor = sensorCelsius(readings)
-  const cooler = valueOf(readings, 'primary', 'CCD_COOLER', 'COOLER_ON')
-  const power = numberOf(readings, 'primary', 'CCD_COOLER_POWER', 'CCD_COOLER_VALUE')
-  const gain = numberOf(readings, 'primary', 'CCD_CONTROLS', 'Gain')
-  const offset = numberOf(readings, 'primary', 'CCD_CONTROLS', 'Offset')
+function cameraArea(primary: Primary): AreaState {
+  const sensor = sensorCelsius(primary)
+  const cooler = primary.CCD_COOLER?.values.COOLER_ON
+  const power = primary.CCD_COOLER_POWER?.values.CCD_COOLER_VALUE
+  const gain = primary.CCD_CONTROLS?.values['Gain']
+  const offset = primary.CCD_CONTROLS?.values['Offset']
 
   return {
     heading: 'Camera',
@@ -111,21 +103,11 @@ function cameraArea(readings: Readings): AreaState {
   }
 }
 
-function dewArea(readings: Readings): AreaState {
-  const box = readings['box']
-  const duty = box?.['DEW_DUTY_CYCLES']?.values ?? {}
-  const labels = box?.['DEW_LABELS']?.values ?? {}
-  const auto = box?.['AUTO_DEW_CONTROL']?.values ?? {}
-  const heaters = Object.keys(duty)
-    .sort()
-    .flatMap(channel => {
-      const percent = duty[channel]
-      const label = labels[channel]
-
-      return typeof percent === 'number' ? [{ label: typeof label === 'string' && label !== '' ? label : channel, value: `${auto[channel] === true ? 'AUTO ' : ''}${percent.toFixed(0)} %` }] : []
-    })
-  const air = numberOf(readings, 'box', 'WEATHER_PARAMETERS', 'WEATHER_TEMPERATURE')
-  const humidity = numberOf(readings, 'box', 'WEATHER_PARAMETERS', 'WEATHER_HUMIDITY')
+function dewArea(box: Box): AreaState {
+  const heaters = dewHeaters(box).map(heater => ({ label: heater.label, value: `${heater.auto ? 'AUTO ' : ''}${heater.percent.toFixed(0)} %` }))
+  const weather = box.WEATHER_PARAMETERS?.values
+  const air = weather?.WEATHER_TEMPERATURE
+  const humidity = weather?.WEATHER_HUMIDITY
 
   return {
     heading: 'Dew heater',
@@ -164,11 +146,11 @@ function systemArea(rig: RigState, rigUp: boolean, now: number | undefined): Are
 
 export function liveAreas(rig: RigState, rigUp: boolean, now: number | undefined): Readonly<Record<AreaId, AreaState>> {
   return {
-    mount: mountArea(rig.readings, now),
+    mount: mountArea(rig.devices.mount, now),
     guiding: guidingArea(rig.guiding),
     focus: focusArea(rig),
-    camera: cameraArea(rig.readings),
-    dew: dewArea(rig.readings),
+    camera: cameraArea(rig.devices.primary),
+    dew: dewArea(rig.devices.box),
     calibration: calibrationArea(rig.calibration),
     system: systemArea(rig, rigUp, now),
   }

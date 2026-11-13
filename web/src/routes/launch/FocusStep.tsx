@@ -19,7 +19,7 @@ export function FocusStep() {
   const filter = useFilterAnswer()
   const focus = useRig(rig => rig.operations.focus)
   const state = useRig(rig => rig.autofocus)
-  const focuserCelsius = useRig(rig => rig.readings['focuser']?.['FOCUS_TEMPERATURE']?.values['TEMPERATURE'])
+  const focuserCelsius = useRig(rig => rig.devices.focuser.FOCUS_TEMPERATURE?.values.TEMPERATURE)
   const navigate = useNavigate()
   const seenRunning = useRef<string | undefined>(undefined)
 

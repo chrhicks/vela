@@ -1,7 +1,7 @@
 import { Match } from 'effect'
 import type { Flip } from '../../../state/flip.ts'
 import type { GuiderActivity, Guiding } from '../../../state/guiding.ts'
-import type { MountActivity } from '../../../state/readings.ts'
+import type { MountActivity } from '../../../state/devices.ts'
 
 export const unknown = '—'
 

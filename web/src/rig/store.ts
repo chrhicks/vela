@@ -50,7 +50,10 @@ const applyFeedEvent = (event: FeedEvent): Effect.Effect<void> =>
     Entry: ({ entry }) =>
       Effect.suspend(() => Effect.fromResult(advance(store.rig, entry))).pipe(
         Effect.flatMap(rig => updateStore(current => ({ ...current, rig }))),
-        Effect.catchTag('MalformedEntry', error => logProblem(`${error.kind} #${error.seq} is malformed: ${error.issue}`)),
+        Effect.catchTags({
+          MalformedEntry: error => logProblem(`${error.kind} #${error.seq} is malformed: ${error.issue}`),
+          MalformedReading: error => logProblem(`device reading #${error.seq} is malformed: ${error.issue}`),
+        }),
       ),
     Heartbeat: ({ at, night, receivedAt }) => updateStore(current => ({ ...current, link: { ...current.link, night, beat: { at, receivedAt } } })),
     Lost: () => updateStore(current => ({ ...current, link: { ...current.link, status: 'lost' } })),

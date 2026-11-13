@@ -1,8 +1,8 @@
 import { SiderealTime } from 'astronomy-engine'
 import { describe, expect, it } from 'vitest'
 import { flip, greenwichSiderealHours } from './flip.ts'
-import { readings, type Readings } from './readings.ts'
-import { entry, fold } from './testing.ts'
+import type { Mount } from './devices.ts'
+import { entry, foldRig } from './testing.ts'
 
 const phoenixLongitude = 360 - 112.07
 
@@ -10,15 +10,15 @@ const at = Date.UTC(2026, 10, 8, 5, 0, 0)
 
 const mountReported = (property: string, elements: Readonly<Record<string, number | boolean>>) => entry('wire', at, { dir: 'in', device: 'mount', type: 'set', property, state: 'Ok', elements })
 
-const rig = (raHours: number, extra: ReadonlyArray<ReturnType<typeof entry>> = []): Readings =>
-  fold(readings, {}, [
+const rig = (raHours: number, extra: ReadonlyArray<ReturnType<typeof entry>> = []): Mount =>
+  foldRig([
     mountReported('TELESCOPE_TRACK_STATE', { TRACK_ON: true, TRACK_OFF: false }),
     mountReported('EQUATORIAL_EOD_COORD', { RA: raHours, DEC: 60 }),
     mountReported('GEOGRAPHIC_COORD', { LAT: 33.45, LONG: phoenixLongitude, ELEV: 331 }),
     mountReported('MERIDIAN_LIMIT', { LIMIT: 1 }),
     mountReported('TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false }),
     ...extra,
-  ])
+  ]).devices.mount
 
 const localSiderealHours = (greenwichSiderealHours(at) + phoenixLongitude / 15) % 24
 

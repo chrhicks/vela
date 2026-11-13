@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
 import { isOperationObject, type GuiderReport, type RigEntry } from './entries.ts'
+import type { Devices } from './devices.ts'
 import type { WireBody } from './entry.ts'
 
 export const Point = Schema.Struct({ x: Schema.Number, y: Schema.Number })
@@ -48,30 +49,28 @@ function guided(state: Trends, report: GuiderReport): Trends {
   return { ...state, guideRa: added(state.guideRa, report.at, report.body.RADistanceRaw), guideDec: added(state.guideDec, report.at, report.body.DECDistanceRaw) }
 }
 
-function dewHeatersReported(state: Trends, wire: WireBody, at: number): Trends {
-  const dewHeaters = Object.fromEntries(Object.entries(wire.elements).map(([channel, percent]) => [channel, added(state.dewHeaters[channel] ?? [], at, typeof percent === 'number' ? percent : undefined)]))
+function dewHeatersReported(state: Trends, duty: Readonly<Record<string, number>> | undefined, at: number): Trends {
+  const dewHeaters = Object.fromEntries(Object.entries(duty ?? {}).map(([channel, percent]) => [channel, added(state.dewHeaters[channel] ?? [], at, percent)]))
 
   return { ...state, dewHeaters: { ...state.dewHeaters, ...dewHeaters } }
 }
 
-const boxHasRead = (elements: WireBody['elements']) => Object.values(elements).some(value => value !== 0)
+function weatherReported(state: Trends, weather: NonNullable<Devices['box']['WEATHER_PARAMETERS']>['values'] | undefined, at: number): Trends {
+  if (weather === undefined || Object.values(weather).every(value => value === 0)) return state
 
-function deviceReported(state: Trends, wire: WireBody, at: number): Trends {
+  return { ...state, airTemperature: added(state.airTemperature, at, weather.WEATHER_TEMPERATURE), humidity: added(state.humidity, at, weather.WEATHER_HUMIDITY) }
+}
+
+function deviceReported(state: Trends, wire: WireBody, at: number, devices: Devices): Trends {
   if (wire.dir !== 'in' || wire.type !== 'set') return state
-
-  const number = (element: string) => {
-    const value = wire.elements[element]
-
-    return typeof value === 'number' ? value : undefined
-  }
 
   switch (`${wire.device} ${wire.property}`) {
     case 'box WEATHER_PARAMETERS':
-      return !boxHasRead(wire.elements) ? state : { ...state, airTemperature: added(state.airTemperature, at, number('WEATHER_TEMPERATURE')), humidity: added(state.humidity, at, number('WEATHER_HUMIDITY')) }
+      return weatherReported(state, devices.box.WEATHER_PARAMETERS?.values, at)
     case 'focuser FOCUS_TEMPERATURE':
-      return { ...state, focuserTemperature: added(state.focuserTemperature, at, number('TEMPERATURE')) }
+      return { ...state, focuserTemperature: added(state.focuserTemperature, at, devices.focuser.FOCUS_TEMPERATURE?.values.TEMPERATURE) }
     case 'box DEW_DUTY_CYCLES':
-      return dewHeatersReported(state, wire, at)
+      return dewHeatersReported(state, devices.box.DEW_DUTY_CYCLES?.values, at)
     default:
       return state
   }
@@ -79,7 +78,7 @@ function deviceReported(state: Trends, wire: WireBody, at: number): Trends {
 
 const isGuiderReport = (entry: RigEntry): entry is GuiderReport => entry.kind.startsWith('phd2.')
 
-export function trends(state: Trends, entry: RigEntry): Trends {
+export function trends(state: Trends, entry: RigEntry, devices: Devices): Trends {
   if (isGuiderReport(entry)) return guided(state, entry)
 
   switch (entry.kind) {
@@ -88,7 +87,7 @@ export function trends(state: Trends, entry: RigEntry): Trends {
     case 'vela.frame.stats':
       return { ...state, hfd: added(state.hfd, entry.at, entry.body.hfdPixels), stars: added(state.stars, entry.at, entry.body.stars) }
     case 'wire':
-      return deviceReported(state, entry.body, entry.at)
+      return deviceReported(state, entry.body, entry.at, devices)
     default:
       return state
   }

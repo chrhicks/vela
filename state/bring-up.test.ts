@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { deviceBringUp, guiderHeard, rigProgramUp } from './bring-up.ts'
-import { emptyRig, rig } from './rig.ts'
-import { entry, fold } from './testing.ts'
+import { emptyRig } from './rig.ts'
+import { entry, fold, foldRig } from './testing.ts'
 import { writes, type Writes } from './writes.ts'
 
 const reported = (device: string, property: string, elements: Readonly<Record<string, number | boolean | string>>, at = 1, type = 'set', state = 'Ok') =>
@@ -34,7 +34,7 @@ describe('writes', () => {
 })
 
 describe('deviceBringUp', () => {
-  const state = (entries: Parameters<typeof fold>[2]) => fold(rig, emptyRig, entries)
+  const state = (entries: Parameters<typeof fold>[2]) => foldRig(entries)
 
   it('is waiting until the device is connected', () => {
     expect(deviceBringUp(state([reported('focuser', 'CONNECTION', { CONNECT: false, DISCONNECT: true })]), 'focuser')).toEqual({ status: 'waiting', changes: [] })

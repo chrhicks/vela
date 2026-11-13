@@ -1,6 +1,7 @@
 import { Option, Result } from 'effect'
 import { readRigEntry, type RigEntry } from './entries.ts'
 import { StreamPosition, type Entry } from './entry.ts'
+import { advance, emptyRig, type RigState } from './rig.ts'
 
 let seq = 0
 
@@ -32,4 +33,8 @@ export function read(source: Entry): Option.Option<RigEntry> {
 
 export function fold<S>(reduce: (state: S, entry: RigEntry) => S, initial: S, entries: ReadonlyArray<Entry>): S {
   return entries.reduce((state, source) => Option.match(read(source), { onNone: () => state, onSome: rigEntry => reduce(state, rigEntry) }), initial)
+}
+
+export function foldRig(entries: ReadonlyArray<Entry>, initial: RigState = emptyRig): RigState {
+  return entries.reduce((state, source) => Result.getOrThrow(advance(state, source)), initial)
 }

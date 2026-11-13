@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { noTrends, trends, type Trends } from './trends.ts'
-import { entry, fold, frameMeasured, runStarted } from './testing.ts'
+import { noTrends, type Trends } from './trends.ts'
+import { entry, foldRig, frameMeasured, runStarted } from './testing.ts'
+import type { Entry } from './entry.ts'
+import type { RigState } from './rig.ts'
 
 const reported = (device: string, property: string, elements: Readonly<Record<string, number>>, at: number, type = 'set') => entry('wire', at, { dir: 'in', device, type, property, state: 'Ok', elements })
 
 const guideStep = (at: number, ra: number, dec: number) => entry('phd2.GuideStep', at, { Event: 'GuideStep', RADistanceRaw: ra, DECDistanceRaw: dec, AvgDist: 0.2 })
 
-const reduce = (entries: Parameters<typeof fold>[2]) => fold<Trends>(trends, noTrends, entries)
+const reduce = (entries: ReadonlyArray<Entry>): Trends => foldRig(entries).trends
+
+const then = (before: RigState, entries: ReadonlyArray<Entry>): Trends => foldRig(entries, before).trends
 
 describe('trends', () => {
   it('keeps a point per measured frame, guide step and weather report, in the chart shape', () => {
@@ -39,18 +43,18 @@ describe('trends', () => {
   })
 
   it('leaves out a definition, whose values are placeholders, and a frame with no stars found', () => {
-    const state = reduce([reported('box', 'WEATHER_PARAMETERS', { WEATHER_TEMPERATURE: 0, WEATHER_HUMIDITY: 0 }, 1, 'def'), frameMeasured('a.fits', 2, { hfdPixels: null, stars: null })])
+    const state = reduce([reported('box', 'WEATHER_PARAMETERS', { WEATHER_TEMPERATURE: 9.1, WEATHER_HUMIDITY: 74, WEATHER_DEWPOINT: 4.6 }, 1, 'def'), frameMeasured('a.fits', 2, { hfdPixels: null, stars: null })])
 
     expect(state).toEqual(noTrends)
   })
 
   it('starts over when a light run starts on another target, not for the same target or for alignment, focus and centring', () => {
-    const before = reduce([runStarted('r1', 100, 'M 31'), frameMeasured('m31_001.fits', 200, {})])
+    const before = foldRig([runStarted('r1', 100, 'M 31'), frameMeasured('m31_001.fits', 200, {})])
     const operation = (object: string) => entry('vela.run.started', 300, { run: `op-${object}`, object, frameType: 'light', exposureSeconds: 2 })
 
-    expect(fold(trends, before, [runStarted('r2', 300, 'M 31')])).toBe(before)
-    expect(fold(trends, before, [operation('polar-align'), operation('autofocus'), operation('centre')])).toBe(before)
-    expect(fold(trends, before, [runStarted('r3', 300, 'M 42')])).toEqual({ ...noTrends, target: 'M 42', since: 300 })
-    expect(fold(trends, before, [entry('vela.run.started', 300, { run: 'd', object: 'dark', frameType: 'dark', exposureSeconds: 60, count: 20 })])).toBe(before)
+    expect(then(before, [runStarted('r2', 300, 'M 31')])).toBe(before.trends)
+    expect(then(before, [operation('polar-align'), operation('autofocus'), operation('centre')])).toBe(before.trends)
+    expect(then(before, [runStarted('r3', 300, 'M 42')])).toEqual({ ...noTrends, target: 'M 42', since: 300 })
+    expect(then(before, [entry('vela.run.started', 300, { run: 'd', object: 'dark', frameType: 'dark', exposureSeconds: 60, count: 20 })])).toBe(before.trends)
   })
 })

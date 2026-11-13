@@ -1,4 +1,5 @@
 import { Result } from 'effect'
+import { deviceProperties } from './devices.ts'
 import { readWire, type Entry, type MalformedReading } from './entry.ts'
 
 interface Wanted {
@@ -23,13 +24,7 @@ export const wanted: Wanted = {
     'command',
     'client.command',
   ],
-  properties: {
-    mount: ['CONNECTION', 'EQUATORIAL_EOD_COORD', 'TELESCOPE_TRACK_STATE', 'TELESCOPE_PIER_SIDE', 'TELESCOPE_PARK', 'MERIDIAN_LIMIT', 'GEOGRAPHIC_COORD', 'TIME_UTC', 'DEBUG', 'DEBUG_LEVEL'],
-    primary: ['CONNECTION', 'CCD_TEMPERATURE', 'CCD_COOLER', 'CCD_COOLER_POWER', 'CCD_CONTROLS', 'UPLOAD_MODE', 'SCOPE_INFO'],
-    focuser: ['CONNECTION', 'ABS_FOCUS_POSITION', 'FOCUS_TEMPERATURE'],
-    box: ['CONNECTION', 'DEW_DUTY_CYCLES', 'DEW_LABELS', 'AUTO_DEW_CONTROL', 'WEATHER_PARAMETERS'],
-    guide: ['CONNECTION'],
-  },
+  properties: deviceProperties,
 }
 
 const kindMatches = (kind: string) => (pattern: string) => (pattern.endsWith('.*') ? kind.startsWith(pattern.slice(0, -1)) : kind === pattern)
