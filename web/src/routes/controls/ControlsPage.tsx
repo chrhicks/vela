@@ -7,17 +7,16 @@ import { CalibrationArea, CameraArea, DewArea, FocusArea, GuidingArea, MountArea
 import styles from './ControlsPage.module.css'
 import { ShutDown } from './ShutDown.tsx'
 import { useRig } from '../../rig/store.ts'
-import { areaIds, runFacts } from './live.ts'
+import { AreaId, controlsAddress, runFacts } from './live.ts'
 import { useAreas } from './use-areas.ts'
 
 export function ControlsPage() {
   const { area } = useParams()
   const [search, setSearch] = useSearchParams()
 
-  const asking = search.get('ask') === 'shut-down'
+  const { opened, asking } = controlsAddress(area, search.get('ask'))
   const setAsking = (ask: boolean) => setSearch(ask ? { ask: 'shut-down' } : {})
 
-  const opened = areaIds.find(id => id === area)
   const areas = useAreas()
   const run = useRig(rig => rig.run)
 
@@ -29,7 +28,7 @@ export function ControlsPage() {
 
       <div className={styles.controls} data-opened={opened ?? 'none'}>
         <nav className={styles.summary} aria-label="Areas">
-          {areaIds.map(id => (
+          {AreaId.literals.map(id => (
             <Link key={id} to={`/controls/${id}`} className={styles.entry}>
               <span className={styles.heading}>{areas[id].heading}</span>
               <span className={styles.state}>{areas[id].summary}</span>
