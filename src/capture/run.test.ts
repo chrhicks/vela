@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { StreamPosition } from '../../state/entry.ts'
 import { fakeCamera, request, spoolDir } from '../testing/camera.ts'
 
 function kinds(events: ReadonlyArray<{ kind: string }>) {
@@ -60,6 +61,23 @@ describe('a capture run on a scripted camera', () => {
 
     expect(telescopes).toHaveLength(3)
     expect(telescopes[0]?.values['KEYWORD_VALUE']).toBe('Example 400')
+  })
+
+  it('writes FILTER before every frame once the filter question is answered, and none before', async () => {
+    const unanswered = fakeCamera()
+
+    await runToEnd(unanswered)
+
+    expect(unanswered.script.sent.filter(sent => sent.values['KEYWORD_NAME'] === 'FILTER')).toEqual([])
+
+    const answered = fakeCamera()
+
+    answered.feed({ seq: StreamPosition.make(0), kind: 'vela.filter', at: 1, body: { filter: 'in' } })
+    await runToEnd(answered)
+
+    const filters = answered.script.sent.filter(sent => sent.property === 'FITS_HEADER' && sent.values['KEYWORD_NAME'] === 'FILTER')
+
+    expect(filters.map(sent => sent.values['KEYWORD_VALUE'])).toEqual(['Example band', 'Example band', 'Example band'])
   })
 
   it('labels each saved file with the run, the sequence and the frame number', async () => {
