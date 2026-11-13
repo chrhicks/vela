@@ -1,10 +1,13 @@
+import type { DeviceName, Devices } from './devices.ts'
 import type { Value } from './entry.ts'
 import type { RigState } from './rig.ts'
 
-export const neededReadings: Readonly<Record<string, ReadonlyArray<string>>> = {
+export const neededReadings: { readonly [Name in DeviceName]: ReadonlyArray<keyof Devices[Name]> } = {
   mount: ['GEOGRAPHIC_COORD', 'TIME_UTC', 'EQUATORIAL_EOD_COORD'],
   primary: ['CCD_CONTROLS', 'CCD_TEMPERATURE', 'CCD_COOLER'],
   focuser: ['ABS_FOCUS_POSITION'],
+  box: [],
+  guide: [],
 }
 
 export type BringUpStatus = 'waiting' | 'setting' | 'set'
@@ -21,7 +24,7 @@ export interface DeviceBringUp {
   readonly changes: ReadonlyArray<Change>
 }
 
-function pendingChanges(rig: RigState, device: string): ReadonlyArray<Change> {
+function pendingChanges(rig: RigState, device: DeviceName): ReadonlyArray<Change> {
   return Object.entries(rig.writes[device] ?? {}).flatMap(([property, write]) => {
     const now = rig.readings[device]?.[property]?.values ?? {}
 
@@ -29,13 +32,14 @@ function pendingChanges(rig: RigState, device: string): ReadonlyArray<Change> {
   })
 }
 
-export function deviceBringUp(rig: RigState, device: string): DeviceBringUp {
-  const readings = rig.readings[device]
+export function deviceBringUp<Name extends DeviceName>(rig: RigState, device: Name): DeviceBringUp {
+  const reported: Devices[Name] = rig.devices[device]
 
-  if (readings?.['CONNECTION']?.values['CONNECT'] !== true) return { status: 'waiting', changes: [] }
+  if (reported.CONNECTION?.values.CONNECT !== true) return { status: 'waiting', changes: [] }
 
   const pending = Object.keys(rig.writes[device] ?? {}).length > 0
-  const missing = (neededReadings[device] ?? []).some(property => readings[property] === undefined)
+  const needed: ReadonlyArray<keyof Devices[Name]> = neededReadings[device]
+  const missing = needed.some(property => reported[property] === undefined)
 
   return pending || missing ? { status: 'setting', changes: pendingChanges(rig, device) } : { status: 'set', changes: [] }
 }
