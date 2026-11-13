@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router'
 
 import { instruction, trend, type Instruction, type Trend } from '../../../../state/alignment.ts'
-import { isRunning } from '../../../../state/operations.ts'
+import { cutShort, isRunning } from '../../../../state/operations.ts'
 import { Chart } from '../../components/Chart.tsx'
 import { CommandPill } from '../../components/CommandPill.tsx'
 import { Readings } from '../../components/Readings.tsx'
@@ -12,6 +12,7 @@ import { useLocalNow } from '../../rig/clock.ts'
 import { serviceNow } from '../../rig/service-clock.ts'
 import { useLink, useRig } from '../../rig/store.ts'
 import { LaunchStep } from './LaunchStep.tsx'
+import { StoppedAlert } from './StoppedAlert.tsx'
 import { useChecklist } from './use-checklist.ts'
 
 const secondsBetweenRedraws = 1
@@ -32,7 +33,9 @@ const arcmin = (value: number | undefined) => (value === undefined ? '—' : `${
 export function AlignStep() {
   const navigate = useNavigate()
   const link = useLink()
-  const aligning = isRunning(useRig(rig => rig.operations.align))
+  const operation = useRig(rig => rig.operations.align)
+  const aligning = isRunning(operation)
+  const stopped = cutShort(operation)
   const { errors, lastFrame, lastFrameAt } = useRig(rig => rig.alignment)
   const filterOut = useChecklist(link.night).done.has('Filter out')
   const now = serviceNow(link, useLocalNow(secondsBetweenRedraws * 1000))
@@ -54,6 +57,8 @@ export function AlignStep() {
 
   return (
     <LaunchStep step={3} title="Polar align" facts={facts} action={action}>
+      {stopped === undefined ? null : <StoppedAlert what="Alignment" ended={stopped} />}
+
       <Readout
         items={[
           { label: 'Alt', value: arcmin(latest?.altitudeArcmin) },

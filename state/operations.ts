@@ -1,8 +1,16 @@
 import { Schema } from 'effect'
 import { FilterAnswer } from './commands.ts'
-import { RunId, type RigEntry } from './entries.ts'
+import { RunEnding, RunId, type RigEntry } from './entries.ts'
 
-export const Operation = Schema.Struct({ run: RunId, startedAt: Schema.Number, status: Schema.Literals(['running', 'ended']) })
+const started = { run: RunId, startedAt: Schema.Number }
+
+export const Running = Schema.Struct({ status: Schema.Literal('running'), ...started })
+
+export const Ended = Schema.Struct({ status: Schema.Literal('ended'), ...started, endedAt: Schema.Number, ending: RunEnding, detail: Schema.optionalKey(Schema.String) })
+
+export type Ended = typeof Ended.Type
+
+export const Operation = Schema.Union([Running, Ended])
 
 export type Operation = typeof Operation.Type
 
@@ -16,19 +24,24 @@ export type Operations = typeof Operations.Type
 
 export const noOperations: Operations = {}
 
-const ended = (operation: Operation | undefined, run: RunId): Operation | undefined => (operation?.run === run && operation.status === 'running' ? { ...operation, status: 'ended' } : operation)
+type RunEnd = Extract<RigEntry, { readonly kind: 'vela.run.ended' }>
+
+const ended = (operation: Operation | undefined, end: RunEnd): Operation | undefined =>
+  operation?.run === end.body.run && operation.status === 'running'
+    ? { status: 'ended', run: operation.run, startedAt: operation.startedAt, endedAt: end.at, ending: end.body.reason, ...(end.body.detail === undefined ? {} : { detail: end.body.detail }) }
+    : operation
 
 export function operations(state: Operations, entry: RigEntry): Operations {
   switch (entry.kind) {
     case 'vela.align.started':
-      return { ...state, align: { run: entry.body.run, startedAt: entry.at, status: 'running' } }
+      return { ...state, align: { status: 'running', run: entry.body.run, startedAt: entry.at } }
     case 'vela.focus.started':
-      return { ...state, focus: { run: entry.body.run, startedAt: entry.at, status: 'running' } }
+      return { ...state, focus: { status: 'running', run: entry.body.run, startedAt: entry.at } }
     case 'vela.filter':
       return { ...state, filter: entry.body.filter }
     case 'vela.run.ended': {
-      const align = ended(state.align, entry.body.run)
-      const focus = ended(state.focus, entry.body.run)
+      const align = ended(state.align, entry)
+      const focus = ended(state.focus, entry)
 
       return align === state.align && focus === state.focus ? state : { ...state, align, focus }
     }
@@ -38,3 +51,7 @@ export function operations(state: Operations, entry: RigEntry): Operations {
 }
 
 export const isRunning = (operation: Operation | undefined) => operation?.status === 'running'
+
+const finished: ReadonlySet<RunEnding> = new Set(['done', 'stopped'])
+
+export const cutShort = (operation: Operation | undefined): Ended | undefined => (operation?.status === 'ended' && !finished.has(operation.ending) ? operation : undefined)

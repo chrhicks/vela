@@ -2,12 +2,15 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 
 import { checkOf, sweepOf } from '../../../../state/autofocus.ts'
+import { cutShort } from '../../../../state/operations.ts'
+import { ActionLink } from '../../components/ActionLink.tsx'
 import { Chart } from '../../components/Chart.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { Statement } from '../../components/Statement.tsx'
 import { niceTicks } from '../../components/ticks.ts'
 import { useRig } from '../../rig/store.ts'
 import { LaunchStep } from './LaunchStep.tsx'
+import { StoppedAlert } from './StoppedAlert.tsx'
 import { useFilterAnswer } from './use-filter-answer.ts'
 
 const unknown = '—'
@@ -22,9 +25,10 @@ export function FocusStep() {
 
   useEffect(() => {
     if (focus?.status === 'running') seenRunning.current = focus.run
-    if (focus?.status === 'ended' && seenRunning.current === focus.run) navigate('/launch/ready')
+    if (focus?.status === 'ended' && cutShort(focus) === undefined && seenRunning.current === focus.run) navigate('/launch/ready')
   }, [focus, navigate])
 
+  const stopped = cutShort(focus)
   const sweep = sweepOf(state)
   const check = checkOf(state)
   const measured = sweep.flatMap(sample => (sample.hfd === null ? [] : [{ x: -sample.position, y: sample.hfd }]))
@@ -35,6 +39,12 @@ export function FocusStep() {
 
   return (
     <LaunchStep step={5} title="Autofocus" facts={[state.samples.length === 0 ? 'Starting' : `Sample ${state.samples.length} of ${total}`, `Filter ${filter ?? unknown}`]}>
+      {stopped === undefined ? null : (
+        <StoppedAlert what="Autofocus" ended={stopped}>
+          <ActionLink to="/launch/filter">Try again</ActionLink>
+        </StoppedAlert>
+      )}
+
       <Chart
         title="HFD by position"
         lines={[measured]}
@@ -52,7 +62,7 @@ export function FocusStep() {
         ]}
       />
 
-      <Statement size="instruction">Walk in</Statement>
+      {stopped === undefined ? <Statement size="instruction">Walk in</Statement> : null}
     </LaunchStep>
   )
 }
