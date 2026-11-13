@@ -53,6 +53,11 @@ describe('readWire', () => {
     for (const odd of [null, { nested: 1 }, [1]]) expect(Result.isFailure(readWire(entry('wire', 0, { dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: odd } })))).toBe(true)
   })
 
+  it('fails a body with a message type or property state the rig program does not send', () => {
+    expect(Result.isFailure(readWire(entry('wire', 0, { dir: 'in', device: 'mount', type: 'update', property: 'P', state: 'Ok', elements: {} })))).toBe(true)
+    expect(Result.isFailure(readWire(entry('wire', 0, { dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Paused', elements: {} })))).toBe(true)
+  })
+
   it('reads the elements and the number limits', () => {
     const wire = readWire(entry('wire', 0, { dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x' }, perm: 'rw', numbers: { A: { min: 0, max: 1, step: 1, format: '%g' } } }))
 

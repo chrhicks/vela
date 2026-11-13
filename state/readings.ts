@@ -1,9 +1,9 @@
 import { Schema } from 'effect'
 import type { RigEntry } from './entries.ts'
-import { Value, type WireBody } from './entry.ts'
+import { PropertyState, Value, type WireBody } from './entry.ts'
 
 export const Reading = Schema.Struct({
-  state: Schema.optional(Schema.String),
+  state: Schema.optional(PropertyState),
   values: Schema.Record(Schema.String, Value),
   at: Schema.Number,
 })
