@@ -23,6 +23,8 @@ export const doneWords = (done: Done): RefusalWords =>
       'carried-out': () => ({ happened: 'Done' }),
       focusing: ({ position }) => ({ happened: `Moving to ${position}`, toDo: 'still moving' }),
       focused: ({ position }) => ({ happened: `At ${position}` }),
+      cooling: ({ celsius }) => ({ happened: `Cooling to ${celsius} °C` }),
+      'cooler-off': () => ({ happened: 'Cooler off' }),
       autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),

@@ -1,6 +1,5 @@
 interface ControlDefaults {
   readonly testFrame: string
-  readonly coolerSetpoint: string
   readonly dewLevel: string
   readonly calibrationFrames: string
   readonly resetDevice: string
@@ -8,7 +7,6 @@ interface ControlDefaults {
 
 export const defaults: ControlDefaults = {
   testFrame: '2 s',
-  coolerSetpoint: '-10 °C',
   dewLevel: '60 %',
   calibrationFrames: '30',
   resetDevice: 'Camera',

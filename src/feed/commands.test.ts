@@ -11,7 +11,7 @@ function fakeOperations(refuse?: string) {
 
   return {
     calls,
-    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: answering('home', { code: 'home', endedRun: false }), stop: answering('stop', { code: 'stop', endedRun: true }), tracking: (on: boolean) => answering(`tracking ${on}`, { code: 'tracking', on }), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => answering(`centre ${target}`, { code: 'centring', target: 'Ring Nebula', endedRun: false }), flipNow: answering('flip', { code: 'flip', settled: true, flipped: false, pierSide: 'west', pausedRun: false }), focusTo: (position: number) => answering(`focus to ${position}`, { code: 'focusing', position }), focusBy: (steps: number) => answering(`focus by ${steps}`, { code: 'focusing', position: 32562 + steps }), autofocus: (exposureSeconds: number) => answering(`autofocus ${exposureSeconds}`, { code: 'autofocusing', exposureSeconds, endedRun: true }) },
+    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: answering('home', { code: 'home', endedRun: false }), stop: answering('stop', { code: 'stop', endedRun: true }), tracking: (on: boolean) => answering(`tracking ${on}`, { code: 'tracking', on }), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => answering(`centre ${target}`, { code: 'centring', target: 'Ring Nebula', endedRun: false }), flipNow: answering('flip', { code: 'flip', settled: true, flipped: false, pierSide: 'west', pausedRun: false }), focusTo: (position: number) => answering(`focus to ${position}`, { code: 'focusing', position }), focusBy: (steps: number) => answering(`focus by ${steps}`, { code: 'focusing', position: 32562 + steps }), autofocus: (exposureSeconds: number) => answering(`autofocus ${exposureSeconds}`, { code: 'autofocusing', exposureSeconds, endedRun: true }), coolTo: (celsius: number) => answering(`cool to ${celsius}`, { code: 'cooling', celsius }), coolerOff: answering('cooler off', { code: 'cooler-off' }) },
   }
 }
 
@@ -44,6 +44,8 @@ describe('POST /commands', () => {
     expect(await post({ command: 'flipNow' })).toMatchObject({ status: 200, calls: ['flip'] })
     expect(await post({ command: 'focusTo', position: 32000 })).toEqual({ status: 200, body: { code: 'focusing', position: 32000 }, calls: ['focus to 32000'] })
     expect(await post({ command: 'focusBy', steps: -50 })).toMatchObject({ status: 200, calls: ['focus by -50'] })
+    expect(await post({ command: 'coolTo', celsius: -10 })).toEqual({ status: 200, body: { code: 'cooling', celsius: -10 }, calls: ['cool to -10'] })
+    expect(await post({ command: 'coolerOff' })).toMatchObject({ status: 200, calls: ['cooler off'] })
     expect(await post({ command: 'autofocus', exposureSeconds: 10 })).toEqual({ status: 200, body: { code: 'autofocusing', exposureSeconds: 10, endedRun: true }, calls: ['autofocus 10'] })
   })
 
