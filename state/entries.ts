@@ -81,11 +81,19 @@ export type GuiderReport = typeof GuiderReported.Type
 
 export const AlignStarted = entryOf('vela.align.started', { run: RunId })
 
+export const AlignSolved = entryOf('vela.align.solve', {
+  run: RunId,
+  frame: Count,
+  altitudeArcmin: Schema.optionalKey(Schema.Number),
+  azimuthArcmin: Schema.optionalKey(Schema.Number),
+  totalArcmin: Schema.optionalKey(Schema.Number),
+})
+
 export const FocusStarted = entryOf('vela.focus.started', { run: RunId })
 
 export const FilterAnswered = entryOf('vela.filter', { filter: FilterAnswer })
 
-const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, FocusStarted, FilterAnswered] as const
+const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FilterAnswered] as const
 
 export const RigEntry = Schema.Union(members)
 
