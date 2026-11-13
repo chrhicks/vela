@@ -138,10 +138,18 @@ interface LastUsed {
 
 const lastUsed: LastUsed = { exposure: '60', otherSeconds: 180, frames: 300 }
 
-export const ready = {
+interface Ready {
+  readonly facts: ReadonlyArray<string>
+  readonly frame: string
+  readonly now: string
+  readonly dawn: string
+  readonly lastUsed: LastUsed
+}
+
+export const ready: Ready = {
   facts: ['Rig set 18:42', 'Filter in', 'Dark until 05:03', 'Moon 2 %'],
   frame: 'Frame 3.3 × 2.2°',
   now: '20:48',
   dawn: '05:03',
   lastUsed,
-} as const
+}
