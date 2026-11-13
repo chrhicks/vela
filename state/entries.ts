@@ -41,7 +41,7 @@ export const RunExposed = entryOf('vela.run.exposed', { run: RunId, frame: Count
 
 export const RunFailed = entryOf('vela.run.failed', { run: RunId })
 
-export const RunEnded = entryOf('vela.run.ended', { run: RunId, reason: RunEnding })
+export const RunEnded = entryOf('vela.run.ended', { run: RunId, reason: RunEnding, detail: Schema.optionalKey(Schema.String) })
 
 export const FrameKept = entryOf('vela.frame', { night: NightName, file: FrameFile })
 

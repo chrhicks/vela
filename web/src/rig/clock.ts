@@ -11,3 +11,5 @@ export function useLocalNow(everyMilliseconds: number): number {
 
   return now
 }
+
+export const clockTime = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
