@@ -71,12 +71,18 @@ const Elements = Schema.Record(Schema.String, Value)
 
 const withEmpty = <S extends Schema.Top>(schema: S) => Schema.withDecodingDefaultKey<S['Rebuild']>(Effect.succeed({}))(schema)
 
+export const WireType = Schema.Literals(['def', 'set', 'new', 'del', 'message', 'other', 'unreadable'])
+
+export const PropertyState = Schema.Literals(['Idle', 'Ok', 'Busy', 'Alert'])
+
+export type PropertyState = typeof PropertyState.Type
+
 export const WireBody = Schema.Struct({
   dir: Schema.Literals(['in', 'out']),
   device: Schema.String,
-  type: Schema.String,
+  type: WireType,
   property: Schema.optionalKey(Schema.String),
-  state: Schema.optionalKey(Schema.String),
+  state: Schema.optionalKey(PropertyState),
   elements: withEmpty(Elements),
   numbers: withEmpty(Schema.Record(Schema.String, Limits)),
 })

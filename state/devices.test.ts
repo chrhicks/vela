@@ -27,9 +27,8 @@ describe('devices', () => {
   it('fails the entry when a reading does not have the shape the schema names, and keeps the state before it', () => {
     const wrongType = advance(rig, reported('mount', 'EQUATORIAL_EOD_COORD', { RA: '02:18:00', DEC: 45 }))
     const missing = advance(rig, reported('focuser', 'FOCUS_TEMPERATURE', {}, 'Ok', 'def'))
-    const unknownState = advance(rig, reported('mount', 'MERIDIAN_LIMIT', { LIMIT: 1 }, 'Paused'))
 
-    for (const result of [wrongType, missing, unknownState]) expect(Result.isFailure(result) && result.failure._tag).toBe('MalformedReading')
+    for (const result of [wrongType, missing]) expect(Result.isFailure(result) && result.failure._tag).toBe('MalformedReading')
   })
 
   it('leaves a property the schema does not name, and a device it does not name, out', () => {

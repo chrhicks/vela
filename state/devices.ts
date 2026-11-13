@@ -1,8 +1,6 @@
 import { Result, Schema } from 'effect'
-import { MalformedReading, type StreamPosition } from './entry.ts'
+import { MalformedReading, PropertyState, type StreamPosition } from './entry.ts'
 import type { Readings } from './readings.ts'
-
-const PropertyState = Schema.Literals(['Idle', 'Ok', 'Busy', 'Alert'])
 
 const property = <Values extends Schema.Top>(values: Values) =>
   Schema.optionalKey(
