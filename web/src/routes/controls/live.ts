@@ -1,3 +1,4 @@
+import { Schema } from 'effect'
 import { altitudeDegrees } from '../../../../state/altitude.ts'
 import type { CalibrationSet } from '../../../../state/calibration.ts'
 import type { CalibrationType } from '../../../../state/entries.ts'
@@ -11,9 +12,20 @@ import { clockTime } from '../../rig/clock.ts'
 import { duration, flipWord, guiderWords, guidingWord, mountWords, unknown } from '../../rig/words.ts'
 import { liveBringUp } from '../launch/live.ts'
 
-export const areaIds = ['mount', 'guiding', 'focus', 'camera', 'dew', 'calibration', 'system'] as const
+export const AreaId = Schema.Literals(['mount', 'guiding', 'focus', 'camera', 'dew', 'calibration', 'system'])
 
-export type AreaId = (typeof areaIds)[number]
+export type AreaId = typeof AreaId.Type
+
+const isAreaId = Schema.is(AreaId)
+
+const isShutDownAsked = Schema.is(Schema.Literal('shut-down'))
+
+export interface ControlsAddress {
+  readonly opened: AreaId | undefined
+  readonly asking: boolean
+}
+
+export const controlsAddress = (area: string | undefined, ask: string | null): ControlsAddress => ({ opened: isAreaId(area) ? area : undefined, asking: isShutDownAsked(ask) })
 
 export interface AreaState {
   readonly heading: string

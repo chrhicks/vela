@@ -6,6 +6,10 @@ export const FilterAnswer = Schema.Literals(['in', 'out'])
 
 export type FilterAnswer = typeof FilterAnswer.Type
 
+export const NudgeDirection = Schema.Literals(['N', 'S', 'E', 'W'])
+
+export type NudgeDirection = typeof NudgeDirection.Type
+
 export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('startAlignment') }),
   Schema.Struct({ command: Schema.Literal('finishAlignment') }),
