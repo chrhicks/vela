@@ -9,7 +9,7 @@ export function StackPage() {
     <Page width="wide">
       <PageHeader title="Stack" facts={stackFacts}>
         <ActionLink to={`/frame/${latestFrame}`}>Frame {latestFrame}</ActionLink>
-        <ActionLink to="/?scene=capturing">Close</ActionLink>
+        <ActionLink to="/">Close</ActionLink>
       </PageHeader>
 
       <Inspector seed={7} glow="bright" />

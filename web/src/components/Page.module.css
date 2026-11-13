@@ -5,7 +5,7 @@
   min-height: 100dvh;
   margin: 0 auto;
   padding: var(--gap-page);
-  padding-bottom: calc(var(--gap-page) + var(--scene-bar, 0rem) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--gap-page) + env(safe-area-inset-bottom));
 }
 
 .phone {

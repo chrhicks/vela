@@ -121,11 +121,11 @@ export function TargetPanel({ target }: TargetPanelProps) {
       </div>
 
       <div className={styles.start}>
-        <PillLink to="/?scene=starting">Start</PillLink>
+        <PillLink to="/" waiting>Start</PillLink>
       </div>
 
       <div className={styles.back}>
-        <ActionLink to="/?scene=ready">Targets</ActionLink>
+        <ActionLink to="/?pick">Targets</ActionLink>
       </div>
     </section>
   )

@@ -7,21 +7,18 @@ import { Picture } from '../../components/Picture.tsx'
 import { PillLink } from '../../components/PillLink.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { StubSky } from '../../stub/StubSky.tsx'
-import { useStubAdvance } from '../../stub/useStubAdvance.ts'
 import { Checks } from './Checks.tsx'
 import layout from './layout.module.css'
-import { starting, startingSeconds } from './stub.ts'
+import { starting } from './stub.ts'
 
 export function StartingView() {
-  useStubAdvance('/?scene=capturing', startingSeconds)
-
   return (
     <Page width="wide">
       <PageHeader title="Leave the screen" facts={starting.facts}>
         <ActionLink to="/controls">Controls</ActionLink>
 
         <span className={layout.wideOnly}>
-          <PillLink to="/?scene=over">Stop for the night</PillLink>
+          <PillLink to="/" waiting>Stop for the night</PillLink>
         </span>
       </PageHeader>
 
@@ -59,7 +56,7 @@ export function StartingView() {
         </div>
 
         <div className={`${layout.phoneOnly} ${layout.last}`}>
-          <PillLink to="/?scene=over">Stop for the night</PillLink>
+          <PillLink to="/" waiting>Stop for the night</PillLink>
         </div>
       </div>
     </Page>

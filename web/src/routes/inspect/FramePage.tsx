@@ -21,7 +21,7 @@ export function FramePage() {
         {frame > 1 ? <ActionLink to={`/frame/${frame - 1}`}>← {frame - 1}</ActionLink> : null}
         {frame < latestFrame ? <ActionLink to={`/frame/${frame + 1}`}>{frame + 1} →</ActionLink> : null}
         <ActionLink to="/stack">Stack</ActionLink>
-        <ActionLink to="/?scene=capturing">Close</ActionLink>
+        <ActionLink to="/">Close</ActionLink>
       </PageHeader>
 
       <Inspector key={frame} seed={frame} glow="faint" />
