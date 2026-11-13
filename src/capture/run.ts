@@ -113,6 +113,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   let active: Active | undefined
   let filter: FilterAnswer | undefined
   let last: Ending | undefined
+  const idleWaiters = new Set<() => void>()
 
   const read = (property: string) => picture.property(settings.device, property)
 
@@ -139,6 +140,8 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     last = ending
     emit({ kind: 'ended', run: run.id, body: { reason: ending.reason, detail: ending.detail, counted: ending.counted, failed: ending.failed } })
     onChange()
+    for (const idle of idleWaiters) idle()
+    idleWaiters.clear()
 
     return ending
   }
@@ -409,6 +412,10 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     },
 
     labelOf: (file: string) => labels.get(file),
+
+    whenIdle(): Promise<void> {
+      return active === undefined ? Promise.resolve() : new Promise(resolve => void idleWaiters.add(resolve))
+    },
 
     view(): CaptureView {
       const at = now()

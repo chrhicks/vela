@@ -221,6 +221,28 @@ describe('a capture run on a scripted camera', () => {
     expect(await fakeCamera().capture.stop()).toBe(false)
   })
 
+  it('says when no run is left, at once when idle and only after a stopped run has ended', async () => {
+    const camera = fakeCamera({ exposures: ['file', 'nothing'] })
+
+    await camera.capture.whenIdle()
+
+    const started = camera.capture.start({ ...request, count: 5, exposureSeconds: 5 })
+
+    if (!started.ok) throw new Error(started.reason)
+
+    while (camera.capture.view().run?.secondsLeft === undefined) await new Promise(resolve => setTimeout(resolve, 2))
+
+    let idle = false
+    const waiting = camera.capture.whenIdle().then(() => (idle = true))
+
+    expect(idle).toBe(false)
+    await camera.capture.stop()
+    await waiting
+
+    expect(idle).toBe(true)
+    expect(camera.capture.view().run).toBeUndefined()
+  })
+
   it('marks a run found in the run file as interrupted, once, and clears the file', () => {
     const camera = fakeCamera()
 
