@@ -24,7 +24,14 @@ export const doneWords = (done: Done): RefusalWords =>
       stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       tracking: ({ on }) => ({ happened: on ? 'Tracking on' : 'Tracking off' }),
       centring: ({ target, endedRun }) => ({ happened: `Centring ${target}`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
-      'flip-sent': () => ({ happened: 'Flip sent' }),
+      flip: ({ settled, flipped, pierSide, pausedRun }) => {
+        const side = pierSide === undefined ? [] : [`pier ${pierSide}`]
+        const run = pausedRun ? ['run resumed'] : []
+
+        if (!settled) return { happened: 'Flip sent', toDo: ['mount still moving', ...run].join(' · ') }
+
+        return { happened: flipped ? 'Flipped' : 'No flip', toDo: [...side, ...run].join(' · ') }
+      },
     }),
   )
 

@@ -101,6 +101,7 @@ interface Active {
   watch: { alerted: boolean; file: string | undefined; previous: string | undefined; exposureHeardAt: number } | undefined
   waiting: { readonly what: string; readonly since: () => number; readonly alertAfterMs: number } | undefined
   readonly refused: Map<string, string>
+  paused: boolean
 }
 
 type Stop = { readonly reason: EndReason; readonly detail: string }
@@ -220,7 +221,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     return undefined
   }
 
-  type Frame = { readonly frame: 'file'; readonly path: string } | { readonly frame: 'failed'; readonly why: 'alert' } | { readonly frame: 'stop'; readonly stop: Stop }
+  type Frame = { readonly frame: 'file'; readonly path: string } | { readonly frame: 'failed'; readonly why: 'alert' } | { readonly frame: 'stop'; readonly stop: Stop } | { readonly frame: 'paused' }
 
   async function expose(run: Active): Promise<Frame> {
     const watch = { alerted: false, file: undefined as string | undefined, previous: read('CCD_FILE_PATH')?.values['FILE_PATH'] as string | undefined, exposureHeardAt: now() }
@@ -247,13 +248,14 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     run.exposureEndsAt = now() + exposureMs
     onChange()
 
-    await wait(run, 'word from the camera during the exposure', settings.exposureSilenceMs, () => watch.file !== undefined || watch.alerted, () => watch.exposureHeardAt)
+    await wait(run, 'word from the camera during the exposure', settings.exposureSilenceMs, () => watch.file !== undefined || watch.alerted || run.paused, () => watch.exposureHeardAt)
 
     run.watch = undefined
     run.exposureEndsAt = undefined
 
     if (watch.file !== undefined) return { frame: 'file', path: watch.file }
     if (run.abort.signal.aborted) return { frame: 'stop', stop: { reason: 'stopped', detail: 'Stop pressed' } }
+    if (run.paused) return { frame: 'paused' }
 
     await sender.send(abortCommand(settings.device), run.abort.signal)
 
@@ -284,9 +286,18 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
       if (typeof next === 'string') return finishWith(run, { reason: 'refused', detail: next })
       if (next !== undefined) return finishWith(run, { reason: 'done', detail: next.done })
 
+      if (run.paused) {
+        await changes.until(() => !run.paused, undefined, run.abort.signal)
+
+        if (run.abort.signal.aborted) return finishWith(run, { reason: 'stopped', detail: 'Stop pressed' })
+
+        await sender.send(abortCommand(settings.device), run.abort.signal)
+      }
+
       const result = await expose(run)
 
       if (result.frame === 'stop') return finishWith(run, result.stop)
+      if (result.frame === 'paused') continue
 
       if (result.frame === 'file') {
         run.named = false
@@ -346,6 +357,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         watch: undefined,
         waiting: undefined,
         refused: new Map(),
+        paused: false,
       }
 
       active = run
@@ -412,6 +424,29 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     },
 
     labelOf: (file: string) => labels.get(file),
+
+    pause(): boolean {
+      const run = active
+
+      if (run === undefined) return false
+
+      run.paused = true
+      if (run.phase === 'exposing') void sender.send(abortCommand(settings.device), run.abort.signal)
+      changes.announce()
+      onChange()
+
+      return true
+    },
+
+    resume(): void {
+      const run = active
+
+      if (run === undefined || !run.paused) return
+
+      run.paused = false
+      changes.announce()
+      onChange()
+    },
 
     whenIdle(): Promise<void> {
       return active === undefined ? Promise.resolve() : new Promise(resolve => void idleWaiters.add(resolve))

@@ -221,6 +221,26 @@ describe('a capture run on a scripted camera', () => {
     expect(await fakeCamera().capture.stop()).toBe(false)
   })
 
+  it('pauses: aborts the frame being exposed without counting it, waits, and retakes it after resume', async () => {
+    const camera = fakeCamera({ exposures: ['nothing', 'file', 'file'] })
+    const started = camera.capture.start({ ...request, count: 2, exposureSeconds: 5 })
+
+    if (!started.ok) throw new Error(started.reason)
+
+    while (camera.capture.view().run?.secondsLeft === undefined) await new Promise(resolve => setTimeout(resolve, 2))
+
+    expect(camera.capture.pause()).toBe(true)
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    expect(camera.script.sent.at(-1)).toEqual({ property: 'CCD_ABORT_EXPOSURE', values: { ABORT: true } })
+    expect(camera.capture.view().run).toMatchObject({ counted: 0, failed: 0 })
+
+    camera.capture.resume()
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'done', counted: 2, failed: 0 })
+  })
+
   it('says when no run is left, at once when idle and only after a stopped run has ended', async () => {
     const camera = fakeCamera({ exposures: ['file', 'nothing'] })
 

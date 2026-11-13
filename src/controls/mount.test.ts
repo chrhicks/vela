@@ -1,12 +1,13 @@
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { foldRig, wire } from '../../state/testing.ts'
+import { entry, foldRig, wire } from '../../state/testing.ts'
 import type { RigState } from '../../state/rig.ts'
+import type { Entry } from '../../state/entry.ts'
 import type { Command, Outcome, Request } from '../commands/sender.ts'
 import { Feed } from '../feed/feed.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
 import { NudgeId } from '../../state/commands.ts'
-import { Centring, mountControls, MountRuns, NudgeRates } from './mount.ts'
+import { Centring, mountControls, MountRuns, MountSettings } from './mount.ts'
 
 const deviceIds = { mount: 'am5', primary: 'primary', focuser: 'focuser', box: 'box', guide: 'guide' }
 
@@ -16,23 +17,31 @@ const pointing = foldRig([wire('mount', 'CONNECTION', { CONNECT: true, DISCONNEC
 
 const notConnected = foldRig([wire('mount', 'CONNECTION', { CONNECT: false, DISCONNECT: true })])
 
+const pointingNow = (state: string) => entry('wire', 2, { dir: 'in', device: 'mount', type: 'set', property: 'EQUATORIAL_EOD_COORD', state, elements: { RA: 23.3, DEC: 61.2 } })
+
+const step = (rig: RigState, state: string) => ({ rig: foldRig([pointingNow(state)], rig), entry: pointingNow(state) })
+
 const written = () => Promise.resolve<Outcome>({ result: 'written' })
 
 type Controls = Effect.Success<typeof mountControls>
 
-function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) => Promise<Outcome> = written, answerSeconds = 10) {
+function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) => Promise<Outcome> = written, answerSeconds = 10, later: ReadonlyArray<{ readonly rig: RigState; readonly entry: Entry }> = []) {
+  let now = rig
   const sent: Array<string> = []
   const send = (command: Command, signal: AbortSignal) => (sent.push(`${command.device} ${command.property} ${JSON.stringify(command.values)}`), answer(command, signal))
   const ask = (request: Request, signal: AbortSignal) => (sent.push(`${request.device} ${request.id} ${JSON.stringify(request.body)}`), answer({ device: request.device, property: request.label, values: {} }, signal))
   const tell = (device: string, body: Readonly<Record<string, unknown>>) => void sent.push(`${device} told ${JSON.stringify(body)}`)
-  const rates = Layer.succeed(NudgeRates, { slow: '7x', fast: '8x' })
+  const settings = Layer.succeed(MountSettings, { nudgeRates: { slow: '7x', fast: '8x' }, flipSettleSeconds: 5 })
   const centring = Layer.succeed(Centring, { centreOn: (target: string) => Effect.sync(() => (sent.push(`centre on ${target}`), `${target} found`)) })
-  const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
-  const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('vela run stopped'), true)), idle: Effect.sync(() => void sent.push('no run')) })
-  const press = (choose: (controls: Controls) => Effect.Effect<void, unknown>) =>
-    Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.flip, Effect.option, Effect.provide(Layer.mergeAll(feed, runs, rates, centring, deviceCommandsFrom({ send, ask, tell, deviceIds, answerSeconds })))))
+  const entries = Stream.fromIterable(later).pipe(Stream.map(next => ((now = next.rig), next.entry)))
+  const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.succeed({ state: rig, entries }), current: Effect.sync(() => now) })
+  const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('vela run stopped'), true)), idle: Effect.sync(() => void sent.push('no run')), pause: Effect.sync(() => (sent.push('run paused'), true)), resume: Effect.sync(() => void sent.push('run resumed')) })
+  const services = Layer.mergeAll(feed, runs, settings, centring, deviceCommandsFrom({ send, ask, tell, deviceIds, answerSeconds }))
+  const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) =>
+    Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.flip, Effect.option, Effect.provide(services)))
+  const done = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.option, Effect.provide(services)))
 
-  return { sent, press }
+  return { sent, press, done }
 }
 
 describe('Home', () => {
@@ -127,11 +136,19 @@ describe('Slew and centre, and Flip now', () => {
     expect(sent).toEqual(['vela run stopped', 'no run', 'centre on NGC 7635'])
   })
 
-  it('points the mount again at where it points now, tracking, which is how the AM5 flips', async () => {
-    const { sent, press } = setup(pointing)
+  it('pauses the run, points the mount again where it points now, waits for it to settle, resumes, and says it flipped', async () => {
+    const west = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false })], pointing)
+    const eastSettled = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: false, PIER_EAST: true })], pointing)
+    const { sent, done } = setup(west, written, 10, [step(west, 'Busy'), step(eastSettled, 'Ok')])
 
-    expect(await press(mount => mount.flipNow)).toMatchObject({ _tag: 'None' })
-    expect(sent).toEqual(['am5 ON_COORD_SET {"SLEW":false,"TRACK":true,"SYNC":false}', 'am5 EQUATORIAL_EOD_COORD {"RA":23.3,"DEC":61.2}'])
+    expect(await done(mount => mount.flipNow)).toMatchObject({ value: { code: 'flip', settled: true, flipped: true, pierSide: 'east', pausedRun: true } })
+    expect(sent).toEqual(['run paused', 'am5 ON_COORD_SET {"SLEW":false,"TRACK":true,"SYNC":false}', 'am5 EQUATORIAL_EOD_COORD {"RA":23.3,"DEC":61.2}', 'run resumed'])
+  })
+
+  it('says no flip when the pier side stays, and not settled when the mount never reports its goto ending', async () => {
+    const west = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false })], pointing)
+    expect(await setup(west, written, 10, [step(west, 'Busy'), step(west, 'Ok')]).done(mount => mount.flipNow)).toMatchObject({ value: { flipped: false, settled: true, pierSide: 'west' } })
+    expect(await setup(west, written, 10, [step(west, 'Busy')]).done(mount => mount.flipNow)).toMatchObject({ value: { settled: false } })
   })
 
   it('refuses both while the mount is not connected', async () => {

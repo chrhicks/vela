@@ -11,7 +11,7 @@ function fakeOperations(refuse?: string) {
 
   return {
     calls,
-    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: answering('home', { code: 'home', endedRun: false }), stop: answering('stop', { code: 'stop', endedRun: true }), tracking: (on: boolean) => answering(`tracking ${on}`, { code: 'tracking', on }), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => answering(`centre ${target}`, { code: 'centring', target: 'Ring Nebula', endedRun: false }), flipNow: answering('flip', { code: 'flip-sent' }) },
+    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: answering('home', { code: 'home', endedRun: false }), stop: answering('stop', { code: 'stop', endedRun: true }), tracking: (on: boolean) => answering(`tracking ${on}`, { code: 'tracking', on }), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => answering(`centre ${target}`, { code: 'centring', target: 'Ring Nebula', endedRun: false }), flipNow: answering('flip', { code: 'flip', settled: true, flipped: false, pierSide: 'west', pausedRun: false }) },
   }
 }
 
