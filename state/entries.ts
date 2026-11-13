@@ -20,7 +20,7 @@ const operationObjectNames: ReadonlySet<string> = new Set(Object.values(operatio
 
 export const isOperationObject = (object: string) => operationObjectNames.has(object)
 
-export const RunEnding = Schema.Literals(['done', 'stopped', 'refused', 'interrupted', 'unknown'])
+export const RunEnding = Schema.Literals(['done', 'stopped', 'failures', 'refused', 'interrupted', 'unknown'])
 
 export type RunEnding = typeof RunEnding.Type
 
