@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { ActionButton } from '../../components/ActionButton.tsx'
 import type { NudgeRate } from '../../../../state/commands.ts'
 import { CommandButton } from '../../components/CommandButton.tsx'
-import { PressLine, type Pressed } from '../../components/PressLine.tsx'
+import { latestSaid, PressLine, saidOf, type Pressed, type Said } from '../../components/PressLine.tsx'
 import type { Answer } from '../../rig/commands.ts'
 import { useLink, useRig } from '../../rig/store.ts'
+import { autofocusEndWords } from '../../rig/words.ts'
 import { Choices } from '../../components/Choices.tsx'
 import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
@@ -37,7 +38,7 @@ export function MountArea() {
 
   return (
     <Area id="mount">
-      <PressLine pressed={pressed} />
+      <PressLine said={pressed === undefined ? undefined : saidOf(pressed)} />
 
       <ActionRow>
         <CommandButton request={{ command: 'home' }} onAnswer={answered}>
@@ -105,10 +106,13 @@ export function FocusArea() {
   const exposures = useLink().controls?.autofocusExposureSeconds
   const [typedExposure, setTypedExposure] = useState<string | undefined>(undefined)
   const exposure = typedExposure ?? (exposures === undefined ? '' : String(exposures[filter ?? 'in']))
+  const autofocus = useRig(rig => rig.operations.focus)
+  const best = useRig(rig => rig.autofocus.best)
+  const autofocusEnd: Said | undefined = autofocus?.status === 'ended' ? { words: autofocusEndWords(autofocus.ending, best, current), troubled: autofocus.ending !== 'done', at: autofocus.endedAt } : undefined
 
   return (
     <Area id="focus">
-      <PressLine pressed={pressed} />
+      <PressLine said={latestSaid(pressed === undefined ? undefined : saidOf(pressed), autofocusEnd)} />
 
       <ActionRow>
         <CommandButton request={{ command: 'autofocus', exposureSeconds: Number(exposure) }} onAnswer={answered}>

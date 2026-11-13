@@ -1,6 +1,7 @@
 import { Match } from 'effect'
 import type { Done, NudgeDirection, Refusal } from '../../../state/commands.ts'
 import type { DeviceName } from '../../../state/devices.ts'
+import type { RunEnding } from '../../../state/entries.ts'
 import type { Flip } from '../../../state/flip.ts'
 import type { GuiderActivity, Guiding } from '../../../state/guiding.ts'
 import type { MountActivity } from '../../../state/devices.ts'
@@ -36,6 +37,14 @@ export const doneWords = (done: Done): RefusalWords =>
         return { happened: flipped ? 'Flipped' : 'No flip', toDo: [...side, ...run].join(' · ') }
       },
     }),
+  )
+
+export const autofocusEndWords = (ending: RunEnding, best: number | undefined, current: number | undefined): RefusalWords =>
+  Match.value(ending).pipe(
+    Match.when('done', () => ({ happened: 'Autofocus done', ...(best === undefined ? {} : { toDo: `at ${best}` }) })),
+    Match.when('refused', () => ({ happened: 'Autofocus found no focus', ...(current === undefined ? {} : { toDo: `back at ${current}` }) })),
+    Match.when('stopped', () => ({ happened: 'Autofocus stopped' })),
+    Match.orElse(() => ({ happened: 'Autofocus ended', toDo: ending })),
   )
 
 export const refusalWords = (refusal: Refusal): RefusalWords =>

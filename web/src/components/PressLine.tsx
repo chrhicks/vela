@@ -1,6 +1,6 @@
 import type { Answer } from '../rig/commands.ts'
 import { clockSeconds } from '../rig/clock.ts'
-import { doneWords, refusalWords } from '../rig/words.ts'
+import { doneWords, refusalWords, type RefusalWords } from '../rig/words.ts'
 import styles from './PressLine.module.css'
 
 export interface Pressed {
@@ -8,16 +8,27 @@ export interface Pressed {
   readonly at: number
 }
 
-export function PressLine({ pressed }: { readonly pressed: Pressed | undefined }) {
-  if (pressed === undefined) return <p className={styles.line} aria-live="polite" />
+export interface Said {
+  readonly words: RefusalWords
+  readonly troubled: boolean
+  readonly at: number
+}
 
-  const { answer, at } = pressed
-  const { happened, toDo } = answer.result === 'done' ? doneWords(answer.done) : refusalWords(answer.refusal)
+export const saidOf = ({ answer, at }: Pressed): Said =>
+  answer.result === 'done' ? { words: doneWords(answer.done), troubled: false, at } : { words: refusalWords(answer.refusal), troubled: true, at }
+
+export const latestSaid = (...said: ReadonlyArray<Said | undefined>): Said | undefined =>
+  said.reduce<Said | undefined>((latest, next) => (next !== undefined && (latest === undefined || next.at >= latest.at) ? next : latest), undefined)
+
+export function PressLine({ said }: { readonly said: Said | undefined }) {
+  if (said === undefined) return <p className={styles.line} aria-live="polite" />
+
+  const { words, troubled, at } = said
 
   return (
-    <p className={answer.result === 'done' ? styles.line : `${styles.line} ${styles.refused}`} aria-live="polite">
-      <span>{happened}</span>
-      {toDo === undefined ? null : <span className={styles.detail}>{toDo}</span>}
+    <p className={troubled ? `${styles.line} ${styles.refused}` : styles.line} aria-live="polite">
+      <span>{words.happened}</span>
+      {words.toDo === undefined ? null : <span className={styles.detail}>{words.toDo}</span>}
       <span className={styles.detail}>{clockSeconds(at)}</span>
     </p>
   )
