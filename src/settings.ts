@@ -170,6 +170,11 @@ export const LaunchSettings = Schema.Struct({
     2,
   ),
   alignGoodArcmin: described('Total polar alignment error, in arcminutes, under which the page says good', Schema.Number, 1),
+  alignMovedArcmin: described(
+    'How far apart, in arcminutes, a new alignment run\'s first reading and the last reading of the run before must be for the page to say the rig moved',
+    Schema.Number,
+    10,
+  ),
   autofocusStep: described('Focuser steps between two autofocus samples', Schema.Number, 50),
   autofocusSamples: described('Samples in one autofocus sweep', Schema.Number, 9),
   autofocusExposureSeconds: described(

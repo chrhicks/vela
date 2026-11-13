@@ -15,7 +15,9 @@ export const Alignment = Schema.Struct({
   run: Schema.optional(RunId),
   lastFrame: Schema.optional(Schema.Number),
   lastFrameAt: Schema.optional(Schema.Number),
+  lastSolved: Schema.optional(Schema.Boolean),
   errors: Schema.Array(AlignmentError),
+  before: Schema.optional(AlignmentError),
 })
 
 export type Alignment = typeof Alignment.Type
@@ -23,14 +25,32 @@ export type Alignment = typeof Alignment.Type
 export const noAlignment: Alignment = { errors: [] }
 
 export function alignment(state: Alignment, entry: RigEntry): Alignment {
-  if (entry.kind === 'vela.align.started') return { run: entry.body.run, errors: [] }
+  if (entry.kind === 'vela.align.started') {
+    const before = state.lastSolved === false ? undefined : state.errors.at(-1)
+
+    return { run: entry.body.run, errors: [], ...(before === undefined ? {} : { before }) }
+  }
   if (entry.kind !== 'vela.align.solve' || entry.body.run !== state.run) return state
 
   const { frame, altitudeArcmin, azimuthArcmin, totalArcmin } = entry.body
   const measured = altitudeArcmin !== undefined && azimuthArcmin !== undefined && totalArcmin !== undefined
   const errors = measured ? [...state.errors, { frame, at: entry.at, altitudeArcmin, azimuthArcmin, totalArcmin }] : state.errors
 
-  return { ...state, lastFrame: frame, lastFrameAt: entry.at, errors }
+  return { ...state, lastFrame: frame, lastFrameAt: entry.at, lastSolved: entry.body.solved !== false, errors }
+}
+
+export interface SinceLastRun {
+  readonly before: AlignmentError
+  readonly now: AlignmentError
+  readonly apartArcmin: number
+}
+
+export function sinceLastRun({ before, errors }: Alignment): SinceLastRun | undefined {
+  const now = errors[0]
+
+  if (before === undefined || now === undefined) return undefined
+
+  return { before, now, apartArcmin: Math.hypot(now.altitudeArcmin - before.altitudeArcmin, now.azimuthArcmin - before.azimuthArcmin) }
 }
 
 export type Instruction = 'measuring' | 'good' | 'raise' | 'lower' | 'turnEast' | 'turnWest'

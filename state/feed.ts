@@ -15,7 +15,7 @@ export const LinkLimits = Schema.Struct({ heartbeatSeconds: Schema.Number, lostA
 
 export type LinkLimits = typeof LinkLimits.Type
 
-export const LaunchLimits = Schema.Struct({ alignGoodArcmin: Schema.Number })
+export const LaunchLimits = Schema.Struct({ alignGoodArcmin: Schema.Number, alignMovedArcmin: Schema.Number })
 
 export type LaunchLimits = typeof LaunchLimits.Type
 
