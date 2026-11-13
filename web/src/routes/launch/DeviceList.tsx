@@ -15,8 +15,8 @@ export function DeviceList({ devices }: DeviceListProps) {
             <dd className={styles.state}>{device.state}</dd>
           </div>
 
-          {device.changes.map(change => (
-            <div key={change.property} className={`${styles.row} ${styles.change}`}>
+          {device.changes.map((change, index) => (
+            <div key={`${change.property}-${index}`} className={`${styles.row} ${styles.change}`}>
               <dt>{change.property}</dt>
               <dd>
                 {change.from} → {change.to}

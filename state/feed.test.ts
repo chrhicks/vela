@@ -15,7 +15,7 @@ describe('the feed messages', () => {
   })
 
   it('decode the empty state of a service that has read nothing', () => {
-    expect(Schema.decodeUnknownSync(Bootstrap)(overTheWire({ token: '1', at: 1, limits: { heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10 }, state: emptyRig })).state).toEqual({ frames: [], readings: {}, guiding: { link: 'unknown' }, trends: { hfd: [], stars: [], guideRa: [], guideDec: [], airTemperature: [], focuserTemperature: [], humidity: [], dewHeaters: {} } })
+    expect(Schema.decodeUnknownSync(Bootstrap)(overTheWire({ token: '1', at: 1, limits: { heartbeatSeconds: 5, lostAfterSeconds: 15, rigSilentAfterSeconds: 10 }, state: emptyRig })).state).toEqual({ frames: [], readings: {}, guiding: { link: 'unknown' }, trends: { hfd: [], stars: [], guideRa: [], guideDec: [], airTemperature: [], focuserTemperature: [], humidity: [], dewHeaters: {} }, writes: {} })
   })
 
   it('decode an entry, and refuse one without a stream position', () => {
