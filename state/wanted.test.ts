@@ -13,7 +13,7 @@ describe('isWanted', () => {
 
   it('leaves out kinds that are not on the list', () => {
     expect(Result.getOrThrow(isWanted(entry('vela.copy.left', 0, {})))).toBe(false)
-    expect(Result.getOrThrow(isWanted(entry('vela.focus.sample', 0, {})))).toBe(false)
+    expect(Result.getOrThrow(isWanted(entry('vela.copy', 0, {})))).toBe(false)
     expect(Result.getOrThrow(isWanted(entry('journal', 0, {})))).toBe(false)
   })
 

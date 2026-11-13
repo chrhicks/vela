@@ -89,11 +89,15 @@ export const AlignSolved = entryOf('vela.align.solve', {
   totalArcmin: Schema.optionalKey(Schema.Number),
 })
 
-export const FocusStarted = entryOf('vela.focus.started', { run: RunId })
+export const FocusStarted = entryOf('vela.focus.started', { run: RunId, positions: Schema.Array(Schema.Number) })
+
+export const FocusSampled = entryOf('vela.focus.sample', { run: RunId, frame: Count, position: Schema.Number, hfd: Schema.NullOr(Schema.Number), stars: Count })
+
+export const FocusBest = entryOf('vela.focus.best', { run: RunId, position: Schema.Number })
 
 export const FilterAnswered = entryOf('vela.filter', { filter: FilterAnswer })
 
-const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FilterAnswered] as const
+const members = [RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered] as const
 
 export const RigEntry = Schema.Union(members)
 
