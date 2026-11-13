@@ -20,6 +20,7 @@ export class Operations extends Context.Service<
     readonly flipNow: Effect.Effect<Done, CommandRefused>
     readonly focusTo: (position: number) => Effect.Effect<Done, CommandRefused>
     readonly focusBy: (steps: number) => Effect.Effect<Done, CommandRefused>
+    readonly autofocus: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
   }
 >()('vela/Operations') {}
 
@@ -46,6 +47,7 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         flipNow: () => operations.flipNow,
         focusTo: ({ position }) => operations.focusTo(position),
         focusBy: ({ steps }) => operations.focusBy(steps),
+        autofocus: ({ exposureSeconds }) => operations.autofocus(exposureSeconds),
       }),
     )
   })

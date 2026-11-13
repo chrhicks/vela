@@ -101,13 +101,20 @@ export function FocusArea() {
   const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
   const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
   const stepsShown = [...steps.map(step => -step).reverse(), ...steps]
+  const filter = useRig(rig => rig.operations.filter)
+  const exposures = useLink().controls?.autofocusExposureSeconds
+  const [typedExposure, setTypedExposure] = useState<string | undefined>(undefined)
+  const exposure = typedExposure ?? (exposures === undefined ? '' : String(exposures[filter ?? 'in']))
 
   return (
     <Area id="focus">
       <PressLine pressed={pressed} />
 
       <ActionRow>
-        <ActionButton>Run autofocus</ActionButton>
+        <CommandButton request={{ command: 'autofocus', exposureSeconds: Number(exposure) }} onAnswer={answered}>
+          Run autofocus
+        </CommandButton>
+        <Field name="Autofocus exposure, seconds" kind="number" value={exposure} onChange={setTypedExposure} />
       </ActionRow>
 
       <ActionRow>

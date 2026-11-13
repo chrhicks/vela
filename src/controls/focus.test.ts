@@ -5,7 +5,8 @@ import type { RigState } from '../../state/rig.ts'
 import type { Command, Outcome } from '../commands/sender.ts'
 import { Feed } from '../feed/feed.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
-import { focusControls } from './focus.ts'
+import { Autofocusing, focusControls } from './focus.ts'
+import { MountRuns } from './mount.ts'
 
 const deviceIds = { mount: 'mount', primary: 'primary', focuser: 'eaf', box: 'box', guide: 'guide' }
 
@@ -20,7 +21,9 @@ function setup(rig: RigState) {
   const send = (command: Command) => (sent.push(`${command.device} ${command.property} ${JSON.stringify(command.values)}`), Promise.resolve<Outcome>({ result: 'written' }))
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
   const commands = deviceCommandsFrom({ send, ask: () => Promise.resolve({ result: 'written' }), tell: () => undefined, deviceIds, answerSeconds: 10 })
-  const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(focusControls, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands))))
+  const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('run ended'), true)), idle: Effect.sync(() => void sent.push('no run')), pause: Effect.succeed(false), resume: Effect.void })
+  const autofocusing = Layer.succeed(Autofocusing, { start: (exposureSeconds: number) => Effect.sync(() => void sent.push(`autofocus at ${exposureSeconds} s`)) })
+  const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(focusControls, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands, runs, autofocusing))))
 
   return { sent, press }
 }
@@ -50,5 +53,12 @@ describe('Focus', () => {
     const { press } = setup(foldRig([wire('focuser', 'CONNECTION', { CONNECT: false, DISCONNECT: true })]))
 
     expect(await press(focus => focus.focusTo(100))).toMatchObject({ failure: { refusal: { code: 'not-connected', device: 'focuser' } } })
+  })
+
+  it('ends the running run, waits for it, then starts autofocus at the chosen exposure', async () => {
+    const { sent, press } = setup(focuser)
+
+    expect(await press(focus => focus.autofocus(7))).toMatchObject({ success: { code: 'autofocusing', exposureSeconds: 7, endedRun: true } })
+    expect(sent).toEqual(['run ended', 'no run', 'autofocus at 7 s'])
   })
 })
