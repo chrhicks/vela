@@ -1,4 +1,4 @@
-import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effect'
+import { Data, Effect, Option, Result, Schema } from 'effect'
 import type { Stream } from './stream.ts'
 
 export const StreamPosition = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand('StreamPosition'))
@@ -67,12 +67,7 @@ export function makeReader(stream: Stream) {
 
 const Limits = Schema.Struct({ min: Schema.Number, max: Schema.Number })
 
-const keepValues = (elements: Readonly<Record<string, unknown>>): Readonly<Record<string, Value>> =>
-  Object.fromEntries(Object.entries(elements).filter((pair): pair is [string, Value] => Schema.is(Value)(pair[1])))
-
-const Elements = Schema.Record(Schema.String, Schema.Unknown).pipe(
-  Schema.decodeTo(Schema.Record(Schema.String, Value), SchemaTransformation.transform<Readonly<Record<string, Value>>, Readonly<Record<string, unknown>>>({ decode: keepValues, encode: elements => elements })),
-)
+const Elements = Schema.Record(Schema.String, Value)
 
 const withEmpty = <S extends Schema.Top>(schema: S) => Schema.withDecodingDefaultKey<S['Rebuild']>(Effect.succeed({}))(schema)
 

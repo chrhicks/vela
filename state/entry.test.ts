@@ -49,8 +49,12 @@ describe('streamOf', () => {
 })
 
 describe('readWire', () => {
-  it('keeps the elements that are numbers, switches or text and drops the rest', () => {
-    const wire = readWire(entry('wire', 0, { dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x', D: null, E: { nested: 1 } }, perm: 'rw', numbers: { A: { min: 0, max: 1, step: 1, format: '%g' } } }))
+  it('fails a body with an element that is not a number, switch or text', () => {
+    for (const odd of [null, { nested: 1 }, [1]]) expect(Result.isFailure(readWire(entry('wire', 0, { dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: odd } })))).toBe(true)
+  })
+
+  it('reads the elements and the number limits', () => {
+    const wire = readWire(entry('wire', 0, { dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x' }, perm: 'rw', numbers: { A: { min: 0, max: 1, step: 1, format: '%g' } } }))
 
     expect(Result.getOrThrow(wire)).toEqual({ dir: 'in', device: 'mount', type: 'set', property: 'P', state: 'Ok', elements: { A: 1, B: true, C: 'x' }, numbers: { A: { min: 0, max: 1 } } })
   })
