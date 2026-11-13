@@ -6,6 +6,7 @@ import { Guiding, guiding, unknownGuiding } from './guiding.ts'
 import { Readings, readings } from './readings.ts'
 import { Run, run } from './run.ts'
 import { noTrends, Trends, trends } from './trends.ts'
+import { Writes, writes } from './writes.ts'
 
 export const RigState = Schema.Struct({
   position: Schema.optional(StreamPosition),
@@ -15,11 +16,12 @@ export const RigState = Schema.Struct({
   guiding: Guiding,
   trends: Trends,
   heardAt: Schema.optional(Schema.Number),
+  writes: Writes,
 })
 
 export type RigState = typeof RigState.Type
 
-export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, guiding: unknownGuiding, trends: noTrends }
+export const emptyRig: RigState = { position: undefined, run: undefined, frames: [], readings: {}, guiding: unknownGuiding, trends: noTrends, writes: {} }
 
 const fromRig = (entry: RigEntry) => entry.kind === 'wire' || entry.kind === 'client.connected' || entry.kind === 'client.connection' || entry.kind.startsWith('phd2.')
 
@@ -32,6 +34,7 @@ export function rig(state: RigState, entry: RigEntry): RigState {
     guiding: guiding(state.guiding, entry),
     trends: trends(state.trends, entry),
     heardAt: fromRig(entry) ? entry.at : state.heardAt,
+    writes: writes(state.writes, entry),
   }
 }
 

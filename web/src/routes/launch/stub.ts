@@ -30,32 +30,6 @@ export interface Device {
   readonly changes: ReadonlyArray<Change>
 }
 
-const cameraChanges: ReadonlyArray<Change> = [
-  { property: 'Gain', from: '200', to: '100' },
-  { property: 'Offset', from: '1', to: '50' },
-  { property: 'Cooler', from: 'OFF', to: '-10 °C' },
-]
-
-export const bringUp: Readonly<Record<'setting' | 'set', ReadonlyArray<Device>>> = {
-  setting: [
-    { name: 'Rig PC', state: 'up', changes: [] },
-    { name: 'Mount', state: 'set', changes: [] },
-    { name: 'Focuser', state: 'set', changes: [] },
-    { name: 'Power box', state: 'set', changes: [] },
-    { name: 'Camera', state: 'setting', changes: cameraChanges },
-    { name: 'Guide cam', state: 'waiting', changes: [] },
-    { name: 'PHD2', state: 'waiting', changes: [] },
-  ],
-  set: [
-    { name: 'Rig PC', state: 'up', changes: [] },
-    { name: 'Mount', state: 'set', changes: [] },
-    { name: 'Focuser', state: 'set', changes: [] },
-    { name: 'Power box', state: 'set', changes: [] },
-    { name: 'Camera', state: 'set', changes: [] },
-    { name: 'Guide cam', state: 'set', changes: [] },
-    { name: 'PHD2', state: 'set', changes: [] },
-  ],
-}
 
 
 interface AlignAlert {
