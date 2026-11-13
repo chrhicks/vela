@@ -11,7 +11,7 @@ function fakeOperations(refuse?: string) {
 
   return {
     calls,
-    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: answering('home', { code: 'home', endedRun: false }), stop: answering('stop', { code: 'stop', endedRun: true }), tracking: (on: boolean) => answering(`tracking ${on}`, { code: 'tracking', on }), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => answering(`centre ${target}`, { code: 'centring', target: 'Ring Nebula', endedRun: false }), flipNow: answering('flip', { code: 'flip', settled: true, flipped: false, pierSide: 'west', pausedRun: false }) },
+    operations: { startAlignment: carry('startAlignment'), finishAlignment: carry('finishAlignment'), answerFilter: (filter: 'in' | 'out') => carry(`answerFilter ${filter}`), home: answering('home', { code: 'home', endedRun: false }), stop: answering('stop', { code: 'stop', endedRun: true }), tracking: (on: boolean) => answering(`tracking ${on}`, { code: 'tracking', on }), nudge: (_id: unknown, direction: string, rate: string) => carry(`nudge ${direction} ${rate}`), holdNudge: () => Effect.sync(() => void calls.push('hold')), releaseNudge: () => carry('release'), slewAndCentre: (target: string) => answering(`centre ${target}`, { code: 'centring', target: 'Ring Nebula', endedRun: false }), flipNow: answering('flip', { code: 'flip', settled: true, flipped: false, pierSide: 'west', pausedRun: false }), focusTo: (position: number) => answering(`focus to ${position}`, { code: 'focusing', position }), focusBy: (steps: number) => answering(`focus by ${steps}`, { code: 'focusing', position: 32562 + steps }) },
   }
 }
 
@@ -42,6 +42,8 @@ describe('POST /commands', () => {
     expect(await post({ command: 'releaseNudge', id: nudgeId })).toMatchObject({ status: 200, calls: ['release'] })
     expect(await post({ command: 'slewAndCentre', target: 'NGC 7635' })).toMatchObject({ status: 200, calls: ['centre NGC 7635'] })
     expect(await post({ command: 'flipNow' })).toMatchObject({ status: 200, calls: ['flip'] })
+    expect(await post({ command: 'focusTo', position: 32000 })).toEqual({ status: 200, body: { code: 'focusing', position: 32000 }, calls: ['focus to 32000'] })
+    expect(await post({ command: 'focusBy', steps: -50 })).toMatchObject({ status: 200, calls: ['focus by -50'] })
   })
 
   it("answers a refusal as data, with Vela's reason", async () => {
@@ -51,6 +53,7 @@ describe('POST /commands', () => {
   it('refuses a request it cannot read, and carries out nothing', async () => {
     expect(await post({ command: 'answerFilter', filter: 'sideways' })).toEqual({ status: 400, body: { code: 'malformed' }, calls: [] })
     expect(await post({ command: 'launchRocket' })).toEqual({ status: 400, body: { code: 'malformed' }, calls: [] })
+    expect(await post({ command: 'focusTo', position: 3.5 })).toEqual({ status: 400, body: { code: 'malformed' }, calls: [] })
     expect(await post({ command: 'nudge', id: 'not-a-uuid', direction: 'north', rate: 'fast' })).toEqual({ status: 400, body: { code: 'malformed' }, calls: [] })
   })
 })

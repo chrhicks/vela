@@ -1,5 +1,4 @@
 interface ControlDefaults {
-  readonly focusPosition: string
   readonly testFrame: string
   readonly coolerSetpoint: string
   readonly dewLevel: string
@@ -8,7 +7,6 @@ interface ControlDefaults {
 }
 
 export const defaults: ControlDefaults = {
-  focusPosition: '32332',
   testFrame: '2 s',
   coolerSetpoint: '-10 °C',
   dewLevel: '60 %',

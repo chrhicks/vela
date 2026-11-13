@@ -31,12 +31,15 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('releaseNudge'), id: NudgeId }),
   Schema.Struct({ command: Schema.Literal('slewAndCentre'), target: Schema.NonEmptyString }),
   Schema.Struct({ command: Schema.Literal('flipNow') }),
+  Schema.Struct({ command: Schema.Literal('focusTo'), position: Schema.Int }),
+  Schema.Struct({ command: Schema.Literal('focusBy'), steps: Schema.Int }),
 ])
 
 export type CommandRequest = typeof CommandRequest.Type
 
 export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('carried-out') }),
+  Schema.Struct({ code: Schema.Literal('focusing'), position: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('tracking'), on: Schema.Boolean }),
@@ -52,6 +55,7 @@ export const Refusal = Schema.Union([
   Schema.Struct({ code: Schema.Literal('no-answer'), seconds: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('rig-refused'), text: Schema.String }),
   Schema.Struct({ code: Schema.Literal('unknown-target'), text: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('out-of-range'), value: Schema.Number, min: Schema.Number, max: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('malformed') }),
   Schema.Struct({ code: Schema.Literal('unreachable') }),
 ])

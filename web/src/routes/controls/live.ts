@@ -88,7 +88,7 @@ function focusArea(rig: RigState): AreaState {
 
   return {
     heading: 'Focus',
-    summary: position === undefined ? unknown : String(position),
+    summary: rig.devices.focuser.ABS_FOCUS_POSITION?.state === 'Busy' ? 'Moving' : position === undefined ? unknown : String(position),
     readings: [
       { label: 'Position', value: position === undefined ? unknown : String(position) },
       { label: 'Temp', value: celsius === undefined ? unknown : `${celsius.toFixed(0)} °C` },
