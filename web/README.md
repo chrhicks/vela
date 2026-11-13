@@ -37,7 +37,7 @@ Six steps, one address each, on a phone: `set-up` (the checklist), `bring-up` (t
 
 One address whose content follows the run: no run, the target picker (`READY`), the first-frames check (`LEAVE THE SCREEN`), capturing, capturing with an alert, and the night over (`READY TO CARRY IN`). On a desktop it is three columns to glance at; on a phone the same pieces are one column in a different order, with one picture and a switch between the latest frame and the stack. `routes/run/layout.module.css` holds both arrangements.
 
-The picker (`routes/run/picker/`) lists what is best placed now, filters as you type on any of a target's names, and shows the chosen target with the camera's frame drawn over it. Two things are set there, the exposure and when the run stops; the end time is worked out from them (`endsBy.ts`). The chosen target is in the address (`&target=`), so on a phone the list and the chosen target are two screens.
+The picker (`routes/run/picker/`) lists what is best placed now, filters as you type on any of a target's names, and shows the chosen target with the camera's frame drawn over it. Two things are set there, the exposure and when the run stops; the end time is worked out from them (`ends-by.ts`). The chosen target is in the address (`&target=`), so on a phone the list and the chosen target are two screens.
 
 Amber appears only in the alert and on the readings it concerns, so a page with no amber is a night that needs nothing.
 

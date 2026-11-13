@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deviceBringUp, guiderHeard, rigProgramHeard } from './bringUp.ts'
+import { deviceBringUp, guiderHeard, rigProgramHeard } from './bring-up.ts'
 import { emptyRig, rig } from './rig.ts'
 import { entry, fold } from './testing.ts'
 import { writes, type Writes } from './writes.ts'

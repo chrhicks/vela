@@ -1,4 +1,4 @@
-import { deviceBringUp, guiderHeard, rigProgramHeard, type Change as PendingChange } from '../../../../state/bringUp.ts'
+import { deviceBringUp, guiderHeard, rigProgramHeard, type Change as PendingChange } from '../../../../state/bring-up.ts'
 import type { Value } from '../../../../state/entry.ts'
 import type { RigState } from '../../../../state/rig.ts'
 import type { Change, Device } from './stub.ts'

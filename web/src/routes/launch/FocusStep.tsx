@@ -3,7 +3,7 @@ import { Readings } from '../../components/Readings.tsx'
 import { Statement } from '../../components/Statement.tsx'
 import { LaunchStep } from './LaunchStep.tsx'
 import { autofocus } from './stub.ts'
-import { useFilterAnswer } from './useFilterAnswer.ts'
+import { useFilterAnswer } from './use-filter-answer.ts'
 
 export function FocusStep() {
   const filter = useFilterAnswer()
