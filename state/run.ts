@@ -1,10 +1,10 @@
 import { Schema } from 'effect'
-import { isOperationObject, RunEnding, RunId, type RigEntry } from './entries.ts'
+import { FrameType, isOperationObject, RunEnding, RunId, type RigEntry } from './entries.ts'
 
 const runFacts = {
   id: RunId,
   object: Schema.String,
-  frameType: Schema.String,
+  frameType: FrameType,
   exposureSeconds: Schema.Number,
   count: Schema.optional(Schema.Number),
   startedAt: Schema.Number,

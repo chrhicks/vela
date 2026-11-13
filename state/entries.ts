@@ -20,6 +20,10 @@ const operationObjectNames: ReadonlySet<string> = new Set(Object.values(operatio
 
 export const isOperationObject = (object: string) => operationObjectNames.has(object)
 
+export const FrameType = Schema.Literals(['light', 'dark', 'flat', 'bias'])
+
+export type FrameType = typeof FrameType.Type
+
 export const RunEnding = Schema.Literals(['done', 'stopped', 'failures', 'refused', 'interrupted', 'unknown'])
 
 export type RunEnding = typeof RunEnding.Type
@@ -32,7 +36,7 @@ const entryOf = <const Kind extends string, const Body extends Schema.Struct.Fie
 export const RunStarted = entryOf('vela.run.started', {
   run: RunId,
   object: Schema.String,
-  frameType: Schema.String,
+  frameType: FrameType,
   exposureSeconds: Schema.Number,
   count: Schema.optionalKey(Count),
 })
@@ -85,6 +89,8 @@ export const GuiderReported = Schema.Struct({
 })
 
 export type GuiderReport = typeof GuiderReported.Type
+
+export const isGuiderReport = Schema.is(GuiderReported)
 
 export const AlignStarted = entryOf('vela.align.started', { run: RunId })
 
