@@ -29,7 +29,7 @@ export const refusalWords = (refusal: Refusal): RefusalWords =>
     }),
   )
 
-export const mountWords: Readonly<Record<MountActivity, string>> = { parked: 'Parked', slewing: 'Slewing', tracking: 'Tracking', idle: 'Idle' }
+export const mountWords: Readonly<Record<MountActivity, string>> = { parked: 'Parked', homing: 'Homing', slewing: 'Slewing', moving: 'Moving', tracking: 'Tracking', idle: 'Idle' }
 
 export const guiderWords: Readonly<Record<GuiderActivity, string>> = {
   guiding: 'On',

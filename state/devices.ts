@@ -19,6 +19,9 @@ export const Mount = Schema.Struct({
   TELESCOPE_TRACK_STATE: property(Schema.Struct({ TRACK_ON: Schema.Boolean, TRACK_OFF: Schema.Boolean })),
   TELESCOPE_PIER_SIDE: property(Schema.Struct({ PIER_WEST: Schema.Boolean, PIER_EAST: Schema.Boolean })),
   TELESCOPE_PARK: property(Schema.Struct({ PARK: Schema.Boolean, UNPARK: Schema.Boolean })),
+  TELESCOPE_HOME: property(Schema.Struct({ GO: Schema.Boolean })),
+  TELESCOPE_MOTION_NS: property(Schema.Struct({ MOTION_NORTH: Schema.Boolean, MOTION_SOUTH: Schema.Boolean })),
+  TELESCOPE_MOTION_WE: property(Schema.Struct({ MOTION_WEST: Schema.Boolean, MOTION_EAST: Schema.Boolean })),
   MERIDIAN_LIMIT: property(Schema.Struct({ LIMIT: Schema.Number })),
   GEOGRAPHIC_COORD: property(Schema.Struct({ LAT: Schema.Number, LONG: Schema.Number, ELEV: Schema.Number })),
   TIME_UTC: property(Schema.Struct({ UTC: Schema.String, OFFSET: Schema.String })),
@@ -116,12 +119,14 @@ export function devices(state: Devices, before: Readings, after: Readings, seq: 
   return Result.succeed(next)
 }
 
-export type MountActivity = 'parked' | 'slewing' | 'tracking' | 'idle'
+export type MountActivity = 'parked' | 'homing' | 'slewing' | 'moving' | 'tracking' | 'idle'
 
 export function mountActivity(mount: Mount): MountActivity | undefined {
   if (Object.keys(mount).length === 0) return undefined
   if (mount.TELESCOPE_PARK?.values.PARK === true) return 'parked'
+  if (mount.TELESCOPE_HOME?.state === 'Busy') return 'homing'
   if (mount.EQUATORIAL_EOD_COORD?.state === 'Busy') return 'slewing'
+  if (mount.TELESCOPE_MOTION_NS?.state === 'Busy' || mount.TELESCOPE_MOTION_WE?.state === 'Busy') return 'moving'
   if (mount.TELESCOPE_TRACK_STATE?.values.TRACK_ON === true) return 'tracking'
 
   return 'idle'

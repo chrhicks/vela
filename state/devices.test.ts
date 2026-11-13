@@ -59,4 +59,10 @@ describe('the rig line selectors', () => {
     expect(mountActivity(foldRig([reported('mount', 'TELESCOPE_PARK', { PARK: true, UNPARK: false })], rig).devices.mount)).toBe('parked')
     expect(mountActivity(noDevices.mount)).toBeUndefined()
   })
+
+  it('call the mount homing while Home runs, and moving while a nudge holds it, before tracking', () => {
+    expect(mountActivity(foldRig([reported('mount', 'TELESCOPE_HOME', { GO: true }, 'Busy')], rig).devices.mount)).toBe('homing')
+    expect(mountActivity(foldRig([reported('mount', 'TELESCOPE_MOTION_NS', { MOTION_NORTH: true, MOTION_SOUTH: false }, 'Busy')], rig).devices.mount)).toBe('moving')
+    expect(mountActivity(foldRig([reported('mount', 'TELESCOPE_MOTION_WE', { MOTION_WEST: false, MOTION_EAST: false }, 'Idle')], rig).devices.mount)).toBe('tracking')
+  })
 })
