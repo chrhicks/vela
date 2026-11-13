@@ -5,7 +5,6 @@ import { FramePage } from './routes/inspect/FramePage.tsx'
 import { StackPage } from './routes/inspect/StackPage.tsx'
 import { LaunchRoutes } from './routes/launch/LaunchRoutes.tsx'
 import { RunPage } from './routes/run/RunPage.tsx'
-import { SceneBar } from './stub/SceneBar.tsx'
 
 export function App() {
   return (
@@ -19,7 +18,6 @@ export function App() {
         <Route path="/stack" element={<StackPage />} />
       </Routes>
 
-      <SceneBar />
     </BrowserRouter>
   )
 }

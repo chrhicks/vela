@@ -15,7 +15,7 @@ export function ShutDown({ asking, onAsk }: ShutDownProps) {
           Shut down rig PC
         </ActionButton>
 
-        <ActionLink to="/?scene=capturing">Back to run</ActionLink>
+        <ActionLink to="/">Back to run</ActionLink>
       </>
     )
   }

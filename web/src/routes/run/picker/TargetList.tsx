@@ -22,7 +22,7 @@ export function TargetList({ targets, chosen }: TargetListProps) {
       {targets.map(target => (
         <Link
           key={target.id}
-          to={`/?scene=ready&target=${target.id}`}
+          to={`/?target=${target.id}`}
           className={[styles.row, target.id === chosen ? styles.chosen : '', target.up ? '' : styles.down].join(' ')}
           aria-current={target.id === chosen}
         >

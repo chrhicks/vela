@@ -30,11 +30,11 @@ export function CapturingView({ run }: CapturingViewProps) {
   return (
     <Page width="wide">
       <PageHeader title={`Capturing ${run.frame}`} facts={run.facts}>
-        <ActionLink to="/?scene=ready">Change target</ActionLink>
+        <ActionLink to="/?pick">Change target</ActionLink>
         <ActionLink to="/controls">Controls</ActionLink>
 
         <span className={layout.wideOnly}>
-          <PillLink to="/?scene=over">Stop for the night</PillLink>
+          <PillLink to="/" waiting>Stop for the night</PillLink>
         </span>
       </PageHeader>
 
@@ -110,7 +110,7 @@ export function CapturingView({ run }: CapturingViewProps) {
         </div>
 
         <div className={`${layout.phoneOnly} ${layout.last}`}>
-          <PillLink to="/?scene=over">Stop for the night</PillLink>
+          <PillLink to="/" waiting>Stop for the night</PillLink>
         </div>
       </div>
     </Page>

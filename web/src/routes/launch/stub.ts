@@ -57,7 +57,6 @@ export const bringUp: Readonly<Record<'setting' | 'set', ReadonlyArray<Device>>>
   ],
 }
 
-export const bringUpSeconds = 5
 
 interface AlignAlert {
   readonly title: string
@@ -164,7 +163,6 @@ export const autofocus: Autofocus = {
   ],
 }
 
-export const autofocusSeconds = 6
 
 export interface RigReady {
   readonly at: string

@@ -304,7 +304,6 @@ export const starting: Starting = {
   baseline: 'Baseline set from frames 3 to 5',
 }
 
-export const startingSeconds = 8
 
 export interface NightOver {
   readonly facts: ReadonlyArray<string>

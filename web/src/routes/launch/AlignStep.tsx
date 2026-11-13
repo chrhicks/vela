@@ -4,13 +4,11 @@ import { PillLink } from '../../components/PillLink.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { Readout } from '../../components/Readout.tsx'
 import { Statement } from '../../components/Statement.tsx'
-import { useScene } from '../../stub/useScene.ts'
 import { LaunchStep } from './LaunchStep.tsx'
 import { alignErrorTicks, alignGoodBand, alignment } from './stub.ts'
 
 export function AlignStep() {
-  const scene = useScene(['adjusting', 'moved', 'good'])
-  const align = alignment[scene]
+  const align = alignment.adjusting
 
   return (
     <LaunchStep

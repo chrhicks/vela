@@ -1,15 +1,12 @@
 import { Chart } from '../../components/Chart.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { Statement } from '../../components/Statement.tsx'
-import { useStubAdvance } from '../../stub/useStubAdvance.ts'
 import { LaunchStep } from './LaunchStep.tsx'
-import { autofocus, autofocusSeconds } from './stub.ts'
+import { autofocus } from './stub.ts'
 import { useFilterAnswer } from './useFilterAnswer.ts'
 
 export function FocusStep() {
   const filter = useFilterAnswer()
-
-  useStubAdvance(`/launch/ready?filter=${filter}`, autofocusSeconds)
 
   return (
     <LaunchStep step={5} title="Autofocus" facts={[autofocus.sample, `Filter ${filter}`]}>
