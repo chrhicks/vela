@@ -32,11 +32,10 @@ export function alignment(state: Alignment, entry: RigEntry): Alignment {
   }
   if (entry.kind !== 'vela.align.solve' || entry.body.run !== state.run) return state
 
-  const { frame, altitudeArcmin, azimuthArcmin, totalArcmin } = entry.body
-  const measured = altitudeArcmin !== undefined && azimuthArcmin !== undefined && totalArcmin !== undefined
-  const errors = measured ? [...state.errors, { frame, at: entry.at, altitudeArcmin, azimuthArcmin, totalArcmin }] : state.errors
+  const solve = entry.body
+  const errors = solve._tag === 'Measured' ? [...state.errors, { frame: solve.frame, at: entry.at, altitudeArcmin: solve.altitudeArcmin, azimuthArcmin: solve.azimuthArcmin, totalArcmin: solve.totalArcmin }] : state.errors
 
-  return { ...state, lastFrame: frame, lastFrameAt: entry.at, lastSolved: entry.body.solved !== false, errors }
+  return { ...state, lastFrame: solve.frame, lastFrameAt: entry.at, lastSolved: solve._tag !== 'Failed', errors }
 }
 
 export interface SinceLastRun {

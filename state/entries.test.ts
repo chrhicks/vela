@@ -36,6 +36,20 @@ describe('readRigEntry', () => {
     ])
   })
 
+  it('reads an alignment solve as measured, solved before there is an error, or failed with its reason', () => {
+    const solveOf = (body: object) => {
+      const read = Result.map(readRigEntry(entry('vela.align.solve', 1, { run: 'a1', frame: 4, file: 'x', ...body })), Option.getOrThrow)
+
+      return Result.isSuccess(read) && read.success.kind === 'vela.align.solve' ? read.success.body._tag : 'unreadable'
+    }
+
+    expect(solveOf({ solved: true, raDegrees: 1, decDegrees: 80, altitudeArcmin: 3, azimuthArcmin: -4, totalArcmin: 5 })).toBe('Measured')
+    expect(solveOf({ solved: true, raDegrees: 1, decDegrees: 80 })).toBe('Solved')
+    expect(solveOf({ solved: false, reason: 'no stars' })).toBe('Failed')
+    expect(solveOf({ solved: false })).toBe('unreadable')
+    expect(solveOf({ altitudeArcmin: 3, azimuthArcmin: -4, totalArcmin: 5 })).toBe('unreadable')
+  })
+
   it('reads a run start only with a frame type Vela takes', () => {
     expect(Result.isFailure(readRigEntry(entry('vela.run.started', 1, { run: 'r1', object: 'M 31', frameType: 'twilight', exposureSeconds: 1 })))).toBe(true)
   })

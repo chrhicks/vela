@@ -1,4 +1,4 @@
-import { Data, Option, Result, Schema, SchemaTransformation } from 'effect'
+import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effect'
 import { FilterAnswer } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
 
@@ -110,14 +110,19 @@ export const isGuiderReport = Schema.is(GuiderReported)
 
 export const AlignStarted = entryOf('vela.align.started', { run: RunId })
 
-export const AlignSolved = entryOf('vela.align.solve', {
-  run: RunId,
-  frame: Count,
-  solved: Schema.optionalKey(Schema.Boolean),
-  altitudeArcmin: Schema.optionalKey(Schema.Number),
-  azimuthArcmin: Schema.optionalKey(Schema.Number),
-  totalArcmin: Schema.optionalKey(Schema.Number),
-})
+const solveOutcome = <const Tag extends string>(tag: Tag) => Schema.withDecodingDefaultKey<Schema.Literal<Tag>>(Effect.succeed(tag))(Schema.Literal(tag))
+
+const solveOf = <const Fields extends Schema.Struct.Fields>(fields: Fields) => Schema.Struct({ run: RunId, frame: Count, ...fields })
+
+export const AlignSolve = Schema.Union([
+  solveOf({ _tag: solveOutcome('Measured'), solved: Schema.Literal(true), altitudeArcmin: Schema.Number, azimuthArcmin: Schema.Number, totalArcmin: Schema.Number }),
+  solveOf({ _tag: solveOutcome('Solved'), solved: Schema.Literal(true) }),
+  solveOf({ _tag: solveOutcome('Failed'), solved: Schema.Literal(false), reason: Schema.String }),
+])
+
+export type AlignSolve = typeof AlignSolve.Type
+
+export const AlignSolved = Schema.Struct({ seq: StreamPosition, at: Schema.Number, kind: Schema.Literal('vela.align.solve'), body: AlignSolve })
 
 export const FocusStarted = entryOf('vela.focus.started', { run: RunId, positions: Schema.Array(Schema.Number) })
 
