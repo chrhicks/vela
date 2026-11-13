@@ -20,4 +20,10 @@ describe('readRigEntry', () => {
     expect(Result.isFailure(read)).toBe(true)
     expect(Result.isFailure(read) && read.failure).toMatchObject({ _tag: 'MalformedEntry', kind: 'vela.run.ended' })
   })
+
+  it('reads a connection change only for the links the rig program reports, with the statuses it sends', () => {
+    expect(Result.isSuccess(readRigEntry(entry('client.connection', 1, { target: 'phd2', status: 'failed', error: 'refused' })))).toBe(true)
+    expect(Result.isFailure(readRigEntry(entry('client.connection', 1, { target: 'broker', status: 'connected' })))).toBe(true)
+    expect(Result.isFailure(readRigEntry(entry('client.connection', 1, { target: 'indiserver', status: 'reconnecting' })))).toBe(true)
+  })
 })

@@ -59,7 +59,13 @@ export const DeviceReported = entryOf('wire', WireBody.fields)
 
 export const RigConnected = entryOf('client.connected', {})
 
-export const RigLink = entryOf('client.connection', { target: Schema.String, status: Schema.String })
+export const LinkTarget = Schema.Literals(['indiserver', 'phd2'])
+
+export const LinkStatus = Schema.Literals(['connected', 'closed', 'failed'])
+
+export type LinkStatus = typeof LinkStatus.Type
+
+export const RigLink = entryOf('client.connection', { target: LinkTarget, status: LinkStatus })
 
 export const guiderEvents = ['GuideStep', 'StartGuiding', 'GuidingStopped', 'LoopingExposures', 'LoopingExposuresStopped', 'StartCalibration', 'StarSelected', 'StarLost', 'Paused', 'Resumed'] as const
 
