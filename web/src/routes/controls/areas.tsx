@@ -18,7 +18,9 @@ function TrackingButton() {
 }
 
 export function MountArea() {
-  const [target, setTarget] = useState(defaults.slewTarget)
+  const runTarget = useRig(rig => rig.run?.object)
+  const [typed, setTyped] = useState<string | undefined>(undefined)
+  const target = typed ?? runTarget ?? ''
   const [rate, setRate] = useState<NudgeRate>('slow')
 
   return (
@@ -29,12 +31,12 @@ export function MountArea() {
           Stop
         </CommandButton>
         <TrackingButton />
-        <ActionButton>Flip now</ActionButton>
+        <CommandButton request={{ command: 'flipNow' }}>Flip now</CommandButton>
       </ActionRow>
 
       <ActionRow>
-        <ActionButton>Slew and centre</ActionButton>
-        <Field name="Target" kind="text" value={target} onChange={setTarget} />
+        <CommandButton request={{ command: 'slewAndCentre', target }}>Slew and centre</CommandButton>
+        <Field name="Target" kind="text" value={target} onChange={setTyped} />
       </ActionRow>
 
       <NudgePad rate={rate} />

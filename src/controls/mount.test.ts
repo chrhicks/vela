@@ -6,11 +6,13 @@ import type { Command, Outcome, Request } from '../commands/sender.ts'
 import { Feed } from '../feed/feed.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
 import { NudgeId } from '../../state/commands.ts'
-import { mountControls, MountRuns, NudgeRates } from './mount.ts'
+import { Centring, mountControls, MountRuns, NudgeRates } from './mount.ts'
 
 const deviceIds = { mount: 'am5', primary: 'primary', focuser: 'focuser', box: 'box', guide: 'guide' }
 
 const connected = foldRig([wire('mount', 'CONNECTION', { CONNECT: true, DISCONNECT: false })])
+
+const pointing = foldRig([wire('mount', 'CONNECTION', { CONNECT: true, DISCONNECT: false }), wire('mount', 'EQUATORIAL_EOD_COORD', { RA: 23.3, DEC: 61.2 })])
 
 const notConnected = foldRig([wire('mount', 'CONNECTION', { CONNECT: false, DISCONNECT: true })])
 
@@ -24,10 +26,11 @@ function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) =>
   const ask = (request: Request, signal: AbortSignal) => (sent.push(`${request.device} ${request.id} ${JSON.stringify(request.body)}`), answer({ device: request.device, property: request.label, values: {} }, signal))
   const tell = (device: string, body: Readonly<Record<string, unknown>>) => void sent.push(`${device} told ${JSON.stringify(body)}`)
   const rates = Layer.succeed(NudgeRates, { slow: '7x', fast: '8x' })
+  const centring = Layer.succeed(Centring, { centreOn: (target: string) => Effect.sync(() => void sent.push(`centre on ${target}`)) })
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
   const runs = Layer.succeed(MountRuns, { stopMoving: Effect.sync(() => void sent.push('vela run stopped')) })
   const press = (choose: (controls: Controls) => Effect.Effect<void, unknown>) =>
-    Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.flip, Effect.option, Effect.provide(Layer.mergeAll(feed, runs, rates, deviceCommandsFrom({ send, ask, tell, deviceIds, answerSeconds })))))
+    Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.flip, Effect.option, Effect.provide(Layer.mergeAll(feed, runs, rates, centring, deviceCommandsFrom({ send, ask, tell, deviceIds, answerSeconds })))))
 
   return { sent, press }
 }
@@ -111,6 +114,31 @@ describe('Nudge', () => {
     const { sent, press } = setup(notConnected)
 
     expect(await press(mount => mount.nudge(id, 'east', 'slow'))).toMatchObject({ value: { refusal: { code: 'not-connected', device: 'mount' } } })
+    expect(sent).toEqual([])
+  })
+})
+
+describe('Slew and centre, and Flip now', () => {
+  it('starts centring on the named target once the mount is connected', async () => {
+    const { sent, press } = setup(connected)
+
+    await press(mount => mount.slewAndCentre('NGC 7635'))
+
+    expect(sent).toEqual(['centre on NGC 7635'])
+  })
+
+  it('points the mount again at where it points now, tracking, which is how the AM5 flips', async () => {
+    const { sent, press } = setup(pointing)
+
+    expect(await press(mount => mount.flipNow)).toMatchObject({ _tag: 'None' })
+    expect(sent).toEqual(['am5 ON_COORD_SET {"SLEW":false,"TRACK":true,"SYNC":false}', 'am5 EQUATORIAL_EOD_COORD {"RA":23.3,"DEC":61.2}'])
+  })
+
+  it('refuses both while the mount is not connected', async () => {
+    const { sent, press } = setup(notConnected)
+
+    expect(await press(mount => mount.flipNow)).toMatchObject({ value: { refusal: { code: 'not-connected' } } })
+    expect(await press(mount => mount.slewAndCentre('M 31'))).toMatchObject({ value: { refusal: { code: 'not-connected' } } })
     expect(sent).toEqual([])
   })
 })

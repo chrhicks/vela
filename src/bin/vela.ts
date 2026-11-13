@@ -33,7 +33,8 @@ import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
-import { mountControls, MountRuns, NudgeRates } from '../controls/mount.ts'
+import { Centring, mountControls, MountRuns, NudgeRates } from '../controls/mount.ts'
+import { searchCatalog } from '../catalog/search.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -218,7 +219,18 @@ const mountRuns = Layer.succeed(MountRuns, {
   stopMoving: Effect.promise(() => (capturingFor([align.view().run, centre.view().run]) ? capture.stop() : Promise.resolve(false))).pipe(Effect.asVoid),
 })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, ...mount }))).pipe(Layer.provide(mountRuns), Layer.provide(Layer.succeed(NudgeRates, { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate })))
+const centring = Layer.succeed(Centring, {
+  centreOn: target =>
+    Effect.suspend(() => {
+      const found = searchCatalog(target, 1)[0]
+
+      if (found === undefined) return Effect.fail(new CommandRefused({ refusal: { code: 'unknown-target', text: target } }))
+
+      return started(centre.start({ id: found.id, exposureSeconds: settings.controls.centreExposureSeconds }))
+    }),
+})
+
+const OperationsLive = Layer.effect(Operations, Effect.map(mountControls, mount => ({ ...launchOperations, ...mount }))).pipe(Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(Layer.succeed(NudgeRates, { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate })))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),

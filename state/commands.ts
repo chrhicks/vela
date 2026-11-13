@@ -29,6 +29,8 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('nudge'), id: NudgeId, direction: NudgeDirection, rate: NudgeRate }),
   Schema.Struct({ command: Schema.Literal('holdNudge'), id: NudgeId }),
   Schema.Struct({ command: Schema.Literal('releaseNudge'), id: NudgeId }),
+  Schema.Struct({ command: Schema.Literal('slewAndCentre'), target: Schema.NonEmptyString }),
+  Schema.Struct({ command: Schema.Literal('flipNow') }),
 ])
 
 export type CommandRequest = typeof CommandRequest.Type
@@ -38,6 +40,7 @@ export const Refusal = Schema.Union([
   Schema.Struct({ code: Schema.Literal('not-connected'), device: DeviceName }),
   Schema.Struct({ code: Schema.Literal('no-answer'), seconds: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('rig-refused'), text: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('unknown-target'), text: Schema.String }),
   Schema.Struct({ code: Schema.Literal('malformed') }),
   Schema.Struct({ code: Schema.Literal('unreachable') }),
 ])

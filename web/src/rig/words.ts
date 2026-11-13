@@ -23,6 +23,7 @@ export const refusalWords = (refusal: Refusal): RefusalWords =>
       'not-connected': ({ device }) => ({ happened: `${deviceWords[device]} not connected` }),
       'no-answer': ({ seconds }) => ({ happened: `No answer ${seconds} s`, toDo: 'Check rig PC' }),
       'rig-refused': ({ text }) => ({ happened: 'Rig refused', toDo: text }),
+      'unknown-target': ({ text }) => ({ happened: `${text} not found`, toDo: 'Check the name' }),
       malformed: () => ({ happened: 'Not understood' }),
       unreachable: () => ({ happened: 'No answer from Vela' }),
     }),

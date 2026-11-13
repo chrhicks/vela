@@ -1,5 +1,4 @@
 interface ControlDefaults {
-  readonly slewTarget: string
   readonly focusPosition: string
   readonly testFrame: string
   readonly coolerSetpoint: string
@@ -9,7 +8,6 @@ interface ControlDefaults {
 }
 
 export const defaults: ControlDefaults = {
-  slewTarget: 'NGC 7635',
   focusPosition: '32332',
   testFrame: '2 s',
   coolerSetpoint: '-10 °C',
