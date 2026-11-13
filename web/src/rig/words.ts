@@ -21,6 +21,7 @@ export const doneWords = (done: Done): RefusalWords =>
     Match.discriminatorsExhaustive('code')({
       'carried-out': () => ({ happened: 'Done' }),
       focusing: ({ position }) => ({ happened: `Moving to ${position}` }),
+      autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       tracking: ({ on }) => ({ happened: on ? 'Tracking on' : 'Tracking off' }),
