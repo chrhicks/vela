@@ -1,13 +1,14 @@
 import { Clock, Data, Effect, Queue, Result, Schema, Stream } from 'effect'
+import type { NightName } from '../../../state/entries.ts'
 import type { Entry } from '../../../state/entry.ts'
 import { Bootstrap, entryOfFeed, FeedEntry, feedEvent, Heartbeat } from '../../../state/feed.ts'
 
 export class FeedUnreadable extends Data.TaggedError('FeedUnreadable')<{ readonly event: string; readonly issue: string }> {}
 
 export type FeedEvent =
-  | { readonly _tag: 'State'; readonly bootstrap: Bootstrap }
+  | { readonly _tag: 'State'; readonly bootstrap: Bootstrap; readonly receivedAt: number }
   | { readonly _tag: 'Entry'; readonly entry: Entry }
-  | { readonly _tag: 'Heartbeat'; readonly at: number; readonly receivedAt: number }
+  | { readonly _tag: 'Heartbeat'; readonly at: number; readonly night: NightName; readonly receivedAt: number }
   | { readonly _tag: 'Lost' }
 
 interface ServerMessage {
@@ -24,11 +25,11 @@ const unreadable = (event: string) => (error: Schema.SchemaError) => new FeedUnr
 function decodeServerMessage({ name, data }: ServerMessage, receivedAt: number): Result.Result<FeedEvent, FeedUnreadable> {
   switch (name) {
     case feedEvent.state:
-      return decodeBootstrap(data).pipe(Result.map(bootstrap => ({ _tag: 'State', bootstrap }) as const), Result.mapError(unreadable(name)))
+      return decodeBootstrap(data).pipe(Result.map(bootstrap => ({ _tag: 'State', bootstrap, receivedAt }) as const), Result.mapError(unreadable(name)))
     case feedEvent.entry:
       return decodeEntry(data).pipe(Result.map(sent => ({ _tag: 'Entry', entry: entryOfFeed(sent) }) as const), Result.mapError(unreadable(name)))
     case feedEvent.heartbeat:
-      return decodeHeartbeat(data).pipe(Result.map(({ at }) => ({ _tag: 'Heartbeat', at, receivedAt }) as const), Result.mapError(unreadable(name)))
+      return decodeHeartbeat(data).pipe(Result.map(({ at, night }) => ({ _tag: 'Heartbeat', at, night, receivedAt }) as const), Result.mapError(unreadable(name)))
     default:
       return Result.succeed({ _tag: 'Lost' })
   }

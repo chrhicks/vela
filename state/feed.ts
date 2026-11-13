@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { NightName } from './entries.ts'
 import { StreamPosition, type Entry } from './entry.ts'
 import { RigState } from './rig.ts'
 
@@ -14,11 +15,11 @@ export const LinkLimits = Schema.Struct({ heartbeatSeconds: Schema.Number, lostA
 
 export type LinkLimits = typeof LinkLimits.Type
 
-export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, limits: LinkLimits, state: RigState })
+export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, state: RigState })
 
 export type Bootstrap = typeof Bootstrap.Type
 
-export const Heartbeat = Schema.Struct({ at: Schema.Number })
+export const Heartbeat = Schema.Struct({ at: Schema.Number, night: NightName })
 
 export type Heartbeat = typeof Heartbeat.Type
 

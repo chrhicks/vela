@@ -1,4 +1,4 @@
-import { deviceBringUp, guiderHeard, rigProgramHeard, type Change as PendingChange } from '../../../../state/bring-up.ts'
+import { deviceBringUp, guiderHeard, rigProgramUp, type Change as PendingChange } from '../../../../state/bring-up.ts'
 import type { Value } from '../../../../state/entry.ts'
 import type { RigState } from '../../../../state/rig.ts'
 import type { Change, Device } from './stub.ts'
@@ -15,9 +15,9 @@ const shown = (value: Value | undefined) => (value === undefined ? '—' : typeo
 
 const worded = ({ element, from, to }: PendingChange): Change => ({ property: element.replaceAll('_', ' '), from: shown(from), to: shown(to) })
 
-export function liveBringUp(rig: RigState): ReadonlyArray<Device> {
+export function liveBringUp(rig: RigState, rigUp: boolean): ReadonlyArray<Device> {
   return [
-    { name: 'Rig PC', state: rigProgramHeard(rig) ? 'up' : 'waiting', changes: [] },
+    { name: 'Rig PC', state: rigUp ? 'up' : 'waiting', changes: [] },
     ...devices.map(([name, id]) => {
       const { status, changes } = deviceBringUp(rig, id)
 
