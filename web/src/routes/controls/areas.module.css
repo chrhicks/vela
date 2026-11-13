@@ -1,0 +1,6 @@
+.note {
+  color: var(--ember-quiet);
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}

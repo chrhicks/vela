@@ -14,11 +14,11 @@ export const FrameFile = Schema.NonEmptyString.pipe(Schema.brand('FrameFile'))
 
 export type FrameFile = typeof FrameFile.Type
 
-export const Operation = Schema.Literals(['align', 'focus', 'centre'])
+export const Operation = Schema.Literals(['align', 'focus', 'centre', 'test'])
 
 export type Operation = typeof Operation.Type
 
-export const operationObjects: Readonly<Record<Operation, string>> = { align: 'polar-align', focus: 'autofocus', centre: 'centre' }
+export const operationObjects: Readonly<Record<Operation, string>> = { align: 'polar-align', focus: 'autofocus', centre: 'centre', test: 'test-frame' }
 
 export const RunObject = Schema.Union([Schema.TaggedStruct('Operation', { operation: Operation }), Schema.TaggedStruct('Target', { name: Schema.String })])
 
