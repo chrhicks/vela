@@ -1,5 +1,5 @@
 import { Option, Result, Schema } from 'effect'
-import { readRigEntry } from '../../state/entries.ts'
+import { operationObjects, readRigEntry } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
 import { angularDistance, type EquatorialPosition } from '../sky/coordinates.ts'
 
@@ -51,8 +51,22 @@ function passed(state: Remembered, entry: Entry): Remembered {
   })
 }
 
+const CentringSolve = Schema.Struct({
+  header: Schema.Struct({ OBJECT: Schema.Literal(operationObjects.centre) }),
+  solve: Schema.Struct({ solved: Schema.Literal(true), wcs: Schema.Struct({ CROTA2: Schema.Finite }) }),
+})
+
+const decodeCentringSolve = Schema.decodeUnknownResult(CentringSolve)
+
+const solvedForCentring = (state: Remembered, entry: Entry): Remembered =>
+  Result.match(decodeCentringSolve(entry.body), {
+    onFailure: () => state,
+    onSuccess: ({ solve }) => ({ ...state, cameraAngle: later(state.cameraAngle, { degrees: solve.wcs.CROTA2, at: entry.at }) }),
+  })
+
 export function remember(state: Remembered, entry: Entry): Remembered {
   if (entry.kind === 'vela.centre.pass') return passed(state, entry)
+  if (entry.kind === 'client.measure') return solvedForCentring(state, entry)
 
   const read = Result.match(readRigEntry(entry), { onFailure: () => undefined, onSuccess: Option.getOrUndefined })
 

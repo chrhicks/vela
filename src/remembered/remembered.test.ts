@@ -34,6 +34,13 @@ describe('what Vela remembers from the stream', () => {
     expect(state.cameraAngle).toEqual({ degrees: 109.4, at: 200 })
   })
 
+  it("takes the camera angle from the rig's solve of a centring frame, and not from an alignment frame near the pole", () => {
+    const solved = (at: number, object: string, angle: number) => entry('client.measure', at, { by: 'vela', file: 'a.fits', result: 'measured', solve: { solved: true, raDegrees: 83.8, decDegrees: -5.4, wcs: { CROTA2: angle } }, header: { OBJECT: object } })
+    const state = fold([solved(100, 'centre', 109.34), solved(200, 'polar-align', -69.3), entry('client.measure', 300, { by: 'vela', file: 'b.fits', result: 'measured', solve: { solved: false, reason: 'Not enough stars.' }, header: { OBJECT: 'centre' } })])
+
+    expect(state.cameraAngle).toEqual({ degrees: 109.34, at: 100 })
+  })
+
   it('finds the last centre reached near a position, and not one from a centring that was stopped', () => {
     const state = fold([
       pass(100, 'c1', 349.2, 61.0),

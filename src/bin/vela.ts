@@ -404,7 +404,7 @@ const handleFollowed = (followed: Followed) =>
   })
 
 remembered = await runHandledPromise(
-  readHistory({ stream, subjects: [stream.vela('run'), stream.vela('centre')], readBatch: settings.historyReadBatch, read: readMessage }).pipe(
+  readHistory({ stream, subjects: [stream.vela('run'), stream.vela('centre'), stream.client], readBatch: settings.historyReadBatch, read: readMessage }).pipe(
     Effect.map(entries => entries.reduce(remember, remembered)),
     Effect.provideService(Broker, broker),
     Effect.catchTag('StreamUnreadable', error => logProblem(`what was used last could not be read from ${error.stream}: ${error.issue}`).pipe(Effect.as(remembered))),
