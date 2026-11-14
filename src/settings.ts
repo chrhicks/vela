@@ -134,6 +134,16 @@ export const PointingSettings = Schema.Struct({
     Schema.Number,
     30,
   ),
+  bestPlacedRows: described(
+    'Targets listed as best placed when nothing is typed',
+    Schema.Number,
+    30,
+  ),
+  bestPlacedMinArcminutes: described(
+    'The size, in arcminutes along its long side, a target needs to be listed as best placed',
+    Schema.Number,
+    10,
+  ),
 })
 
 export const StarSettings = Schema.Struct({

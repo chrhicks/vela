@@ -66,5 +66,5 @@ export function positionTarget(text: string): CatalogTarget | undefined {
 
   const id = TargetId.make(`${position.raDegrees.toFixed(6)} ${position.decDegrees < 0 ? '' : '+'}${position.decDegrees.toFixed(6)}`)
 
-  return { id, name: positionName(position), commonName: null, type: 'J2000 position', ...position, majorAxisArcminutes: null, minorAxisArcminutes: null }
+  return { id, name: positionName(position), commonName: null, type: 'J2000 position', ...position, majorAxisArcminutes: null, minorAxisArcminutes: null, nameCitations: 0 }
 }

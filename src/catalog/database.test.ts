@@ -72,3 +72,14 @@ test('the database records each source and each file it was built from', async (
   expect(database.prepare('SELECT id, name, license, pulledAt FROM sources').all()).toEqual([{ id: 'stellarium', name: stellarium.name, license: 'GPL-2.0-or-later', pulledAt: '2026-01-01T00:00:00.000Z' }])
   expect(database.prepare('SELECT source, name, address, sha256 FROM source_files').all()).toEqual([{ source: 'stellarium', name: 'catalog.txt', address: 'https://example.test/catalog.txt', sha256: 'abc' }])
 })
+
+test('a target counts the references cited across its names', async () => {
+  const cited = (await written()).prepare('SELECT name, nameCitations FROM targets ORDER BY id').all()
+
+  expect(cited).toEqual([
+    { name: 'M 42', nameCitations: 4 },
+    { name: 'Sh2-132', nameCitations: 0 },
+    { name: 'Cygnus Star Cloud', nameCitations: 1 },
+    { name: 'NGC 6000', nameCitations: 0 },
+  ])
+})

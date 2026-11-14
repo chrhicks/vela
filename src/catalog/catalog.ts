@@ -9,6 +9,7 @@ import { CatalogTarget, TargetName } from './types.ts'
 export interface Catalog {
   readonly search: (text: string, limit: number) => ReadonlyArray<TargetSummary>
   readonly find: (id: string) => CatalogTarget | undefined
+  readonly mostCited: ReadonlyArray<CatalogTarget>
 }
 
 export class CatalogUnreadable extends Data.TaggedError('CatalogUnreadable')<{ readonly database: string; readonly reason: string }> {}
@@ -51,6 +52,8 @@ const constellationOf = ({ raDegrees, decDegrees }: CatalogTarget) => Constellat
 
 export const summaryOf = (target: CatalogTarget, constellation: string | null): TargetSummary => ({ id: target.id, name: target.name, commonName: target.commonName, type: target.type, constellation })
 
+export const summarised = (target: CatalogTarget): TargetSummary => summaryOf(target, constellationOf(target))
+
 export function catalogOf(targets: ReadonlyArray<CatalogTarget>, names: ReadonlyArray<TargetName>): Catalog {
   const byId = new Map<string, CatalogTarget>(targets.map(target => [target.id, target]))
   const namesOf = new Map<string, Array<string>>()
@@ -65,6 +68,8 @@ export function catalogOf(targets: ReadonlyArray<CatalogTarget>, names: Readonly
   })
 
   return {
+    mostCited: targets.filter(target => target.nameCitations > 0).sort((a, b) => b.nameCitations - a.nameCitations || a.id.localeCompare(b.id)),
+
     find: id => byId.get(id) ?? positionTarget(id),
 
     search: (text, limit) => {
@@ -84,7 +89,7 @@ export function catalogOf(targets: ReadonlyArray<CatalogTarget>, names: Readonly
         })
         .sort((a, b) => better(a.match, b.match) || a.target.id.localeCompare(b.target.id))
         .slice(0, limit)
-        .map(({ target }) => summaryOf(target, constellationOf(target)))
+        .map(({ target }) => summarised(target))
     },
   }
 }
@@ -102,7 +107,7 @@ export const readCatalog = Effect.gen(function* () {
 
       try {
         return {
-          targets: opened.prepare('SELECT id, name, commonName, type, raDegrees, decDegrees, majorAxisArcminutes, minorAxisArcminutes FROM targets WHERE name IS NOT NULL').all(),
+          targets: opened.prepare('SELECT id, name, commonName, type, raDegrees, decDegrees, majorAxisArcminutes, minorAxisArcminutes, nameCitations FROM targets WHERE name IS NOT NULL').all(),
           names: opened.prepare('SELECT target, name FROM target_names').all(),
         }
       } finally {

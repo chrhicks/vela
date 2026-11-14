@@ -10,6 +10,7 @@ export const CatalogTarget = Schema.Struct({
   decDegrees: Schema.Finite,
   majorAxisArcminutes: Schema.NullOr(Schema.Finite),
   minorAxisArcminutes: Schema.NullOr(Schema.Finite),
+  nameCitations: Schema.Finite,
 })
 
 export type CatalogTarget = typeof CatalogTarget.Type

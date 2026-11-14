@@ -20,7 +20,6 @@ import { makeSsh } from '../frames/ssh.ts'
 import { makeFrameStats, saveStats } from '../frames/stats.ts'
 import { makePointing } from '../pointing/pointing.ts'
 import { siteOf } from '../pointing/target.ts'
-import { moonPosition, placementOf } from '../sky/placement.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
 import { makeAutofocus } from '../focus/autofocus.ts'
@@ -44,6 +43,7 @@ import { guidingControls, GuidingSettings } from '../controls/guiding.ts'
 import { Centring, mountControls, MountRuns, MountSettings } from '../controls/mount.ts'
 import { catalogOf, readCatalog } from '../catalog/catalog.ts'
 import { CatalogSettings } from '../catalog/database.ts'
+import { makePlacedTargets } from '../catalog/placed.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -94,6 +94,7 @@ const catalog = runHandledSync(
     ),
   ),
 )
+const placedTargets = makePlacedTargets({ catalog, site: () => siteOf(picture, settings.devices.mount), settings: settings.pointing })
 const pointing = makePointing({ picture, catalog, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
 const capture = makeCapture({
   picture,
@@ -269,17 +270,8 @@ const feedApp = FeedServer.pipe(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
       Layer.succeed(Targets, {
-        search: text =>
-          Effect.map(Clock.currentTimeMillis, at => {
-            const site = siteOf(picture, settings.devices.mount)
-            const moon = site === undefined ? undefined : moonPosition(site, at)
-
-            return catalog.search(text, settings.pointing.searchResults).map(found => {
-              const target = catalog.find(found.id)
-
-              return { ...found, placement: site === undefined || moon === undefined || target === undefined ? null : placementOf(target, site, at, settings.pointing.upLineDegrees, moon) }
-            })
-          }),
+        search: text => Effect.map(Clock.currentTimeMillis, at => placedTargets.search(text, at)),
+        bestPlaced: Effect.map(Clock.currentTimeMillis, at => placedTargets.bestPlaced(at)),
       }),
       deviceCommandsFrom({ send: (command, signal) => sender.send(command, signal), ask: (request, signal) => sender.ask(request, signal), tell: (device, body) => sender.tell(device, body), deviceIds: settings.devices, answerSeconds: settings.capture.commandAnswerSeconds }),
       Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs, focusSteps: settings.controls.focusSteps, autofocusExposureSeconds: settings.launch.autofocusExposureSeconds, coolerCelsius: settings.controls.coolerCelsius, dewChannel: settings.controls.dewChannel, dewPercent: settings.controls.dewPercent, testFrameSeconds: settings.controls.testFrameSeconds, calibrationFrames: settings.controls.calibrationFrames } }),
