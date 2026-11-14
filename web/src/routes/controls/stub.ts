@@ -1,10 +1,8 @@
 interface ControlDefaults {
-  readonly dewLevel: string
   readonly resetDevice: string
 }
 
 export const defaults: ControlDefaults = {
-  dewLevel: '60 %',
   resetDevice: 'Camera',
 }
 

@@ -23,6 +23,9 @@ export class Operations extends Context.Service<
     readonly autofocus: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
     readonly coolTo: (celsius: number) => Effect.Effect<Done, CommandRefused>
     readonly coolerOff: Effect.Effect<Done, CommandRefused>
+    readonly dewAuto: Effect.Effect<Done, CommandRefused>
+    readonly dewFixed: (percent: number) => Effect.Effect<Done, CommandRefused>
+    readonly dewOff: Effect.Effect<Done, CommandRefused>
     readonly testFrame: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
     readonly takeDarks: (frames: number, exposureSeconds: number, celsius: number) => Effect.Effect<Done, CommandRefused>
   }
@@ -54,6 +57,9 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         autofocus: ({ exposureSeconds }) => operations.autofocus(exposureSeconds),
         coolTo: ({ celsius }) => operations.coolTo(celsius),
         coolerOff: () => operations.coolerOff,
+        dewAuto: () => operations.dewAuto,
+        dewFixed: ({ percent }) => operations.dewFixed(percent),
+        dewOff: () => operations.dewOff,
         testFrame: ({ exposureSeconds }) => operations.testFrame(exposureSeconds),
         takeDarks: ({ frames, exposureSeconds, celsius }) => operations.takeDarks(frames, exposureSeconds, celsius),
       }),

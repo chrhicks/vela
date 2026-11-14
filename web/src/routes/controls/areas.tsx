@@ -11,6 +11,7 @@ import type { Frame } from '../../../../state/frames.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import styles from './areas.module.css'
 import { Choices } from '../../components/Choices.tsx'
+import { dewHeaters } from '../../../../state/devices.ts'
 import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
 import { ActionRow, Area } from './Area.tsx'
@@ -205,24 +206,32 @@ export function CameraArea() {
 }
 
 export function DewArea() {
-  const [mode, setMode] = useState<'auto' | 'fixed' | 'off'>('auto')
-  const [level, setLevel] = useState(defaults.dewLevel)
+  const controls = useLink().controls
+  const heater = useRig(rig => dewHeaters(rig.devices.box).find(found => found.channel === controls?.dewChannel))
+  const [typed, setTyped] = useState<string | undefined>(undefined)
+  const percent = typed ?? (heater !== undefined && heater.on && !heater.auto ? String(heater.percent) : controls === undefined ? '' : String(controls.dewPercent))
+  const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
+  const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
 
   return (
     <Area id="dew">
-      <ActionRow>
-        <Choices
-          name="Dew heater"
-          choices={[
-            { value: 'auto', label: 'Auto' },
-            { value: 'fixed', label: 'Fixed' },
-            { value: 'off', label: 'Off' },
-          ]}
-          chosen={mode}
-          onChoose={setMode}
-        />
+      <PressLine said={pressed === undefined ? undefined : saidOf(pressed)} />
 
-        {mode === 'fixed' ? <Field name="Dew heater level" kind="number" value={level} onChange={setLevel} /> : null}
+      <ActionRow>
+        {heater?.auto === true ? null : (
+          <CommandButton request={{ command: 'dewAuto' }} onAnswer={answered}>
+            Auto
+          </CommandButton>
+        )}
+        {heater?.on === false ? null : (
+          <CommandButton request={{ command: 'dewOff' }} onAnswer={answered}>
+            Off
+          </CommandButton>
+        )}
+        <CommandButton request={{ command: 'dewFixed', percent: Number(percent) }} onAnswer={answered}>
+          Set to
+        </CommandButton>
+        <Field name="Dew heater level, percent" kind="number" value={percent} onChange={setTyped} />
       </ActionRow>
     </Area>
   )

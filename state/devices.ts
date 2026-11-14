@@ -54,6 +54,7 @@ export type Focuser = typeof Focuser.Type
 
 export const Box = Schema.Struct({
   CONNECTION: Connection,
+  DEW_CHANNELS: property(Schema.Record(Schema.String, Schema.Boolean)),
   DEW_DUTY_CYCLES: property(Schema.Record(Schema.String, Schema.Number)),
   DEW_LABELS: property(Schema.Record(Schema.String, Schema.String)),
   AUTO_DEW_CONTROL: property(Schema.Record(Schema.String, Schema.Boolean)),
@@ -141,15 +142,17 @@ export interface DewHeater {
   readonly channel: string
   readonly label: string
   readonly percent: number
+  readonly on: boolean
   readonly auto: boolean
 }
 
 export function dewHeaters(box: Box): ReadonlyArray<DewHeater> {
   const duty = box.DEW_DUTY_CYCLES?.values ?? {}
   const labels = box.DEW_LABELS?.values ?? {}
+  const on = box.DEW_CHANNELS?.values ?? {}
   const auto = box.AUTO_DEW_CONTROL?.values ?? {}
 
   return Object.entries(duty)
     .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([channel, percent]) => ({ channel, label: labels[channel] || channel, percent, auto: auto[channel] === true }))
+    .map(([channel, percent]) => ({ channel, label: labels[channel] || channel, percent, on: on[channel] !== false, auto: auto[channel] === true }))
 }

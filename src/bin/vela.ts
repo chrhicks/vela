@@ -35,6 +35,7 @@ import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
 import { cameraControls, Capturing } from '../controls/camera.ts'
+import { dewControls, DewSettings } from '../controls/dew.ts'
 import { Centring, mountControls, MountRuns, MountSettings } from '../controls/mount.ts'
 import { searchCatalog } from '../catalog/search.ts'
 import { operationObjects } from '../../state/entries.ts'
@@ -238,7 +239,7 @@ const capturing = Layer.succeed(Capturing, {
   start: request => Effect.suspend(() => started(capture.start(request))),
 })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls]), ([mount, focus, camera]) => ({ ...launchOperations, ...mount, ...focus, ...camera }))).pipe(Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
+const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls]), ([mount, focus, camera, dew]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew }))).pipe(Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),
@@ -247,7 +248,7 @@ const feedApp = FeedServer.pipe(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
       deviceCommandsFrom({ send: (command, signal) => sender.send(command, signal), ask: (request, signal) => sender.ask(request, signal), tell: (device, body) => sender.tell(device, body), deviceIds: settings.devices, answerSeconds: settings.capture.commandAnswerSeconds }),
-      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs, focusSteps: settings.controls.focusSteps, autofocusExposureSeconds: settings.launch.autofocusExposureSeconds, coolerCelsius: settings.controls.coolerCelsius, testFrameSeconds: settings.controls.testFrameSeconds, calibrationFrames: settings.controls.calibrationFrames } }),
+      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs, focusSteps: settings.controls.focusSteps, autofocusExposureSeconds: settings.launch.autofocusExposureSeconds, coolerCelsius: settings.controls.coolerCelsius, dewChannel: settings.controls.dewChannel, dewPercent: settings.controls.dewPercent, testFrameSeconds: settings.controls.testFrameSeconds, calibrationFrames: settings.controls.calibrationFrames } }),
     )),
 )
 const servicesScope = runHandledSync(Scope.make())
