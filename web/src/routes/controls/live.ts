@@ -18,14 +18,7 @@ export type AreaId = typeof AreaId.Type
 
 const isAreaId = Schema.is(AreaId)
 
-const isShutDownAsked = Schema.is(Schema.Literal('shut-down'))
-
-export interface ControlsAddress {
-  readonly opened: AreaId | undefined
-  readonly asking: boolean
-}
-
-export const controlsAddress = (area: string | undefined, ask: string | null): ControlsAddress => ({ opened: isAreaId(area) ? area : undefined, asking: isShutDownAsked(ask) })
+export const openedArea = (area: string | undefined): AreaId | undefined => (isAreaId(area) ? area : undefined)
 
 export interface AreaState {
   readonly heading: string

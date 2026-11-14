@@ -16,7 +16,7 @@ import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
 import { ActionRow, Area } from './Area.tsx'
 import { NudgePad } from './NudgePad.tsx'
-import { calibrationFirstStep, type CalibrationType, defaults } from './stub.ts'
+import { calibrationFirstStep, type CalibrationType } from './stub.ts'
 
 function TrackingButton({ onAnswer }: { readonly onAnswer: (answer: Answer) => void }) {
   const tracking = useRig(rig => rig.devices.mount.TELESCOPE_TRACK_STATE?.values.TRACK_ON)
@@ -87,7 +87,6 @@ export function GuidingArea() {
       <ActionRow>
         <ActionButton>Start</ActionButton>
         <ActionButton>Stop</ActionButton>
-        <ActionButton>Restart PHD2</ActionButton>
       </ActionRow>
 
       <ActionRow>
@@ -315,18 +314,5 @@ export function CalibrationArea() {
 }
 
 export function SystemArea() {
-  const [device, setDevice] = useState(defaults.resetDevice)
-
-  return (
-    <Area id="system">
-      <ActionRow>
-        <ActionButton>Restart rig software</ActionButton>
-      </ActionRow>
-
-      <ActionRow>
-        <ActionButton>Reset</ActionButton>
-        <Field name="Device to reset" kind="text" value={device} onChange={setDevice} />
-      </ActionRow>
-    </Area>
-  )
+  return <Area id="system" />
 }
