@@ -61,4 +61,11 @@ describe('Dew heater', () => {
     expect(await press(controls => controls.dewAuto)).toMatchObject({ failure: { refusal: { code: 'not-connected', device: 'box' } } })
     expect(sent).toEqual([])
   })
+
+  it('says the box does not report its auto switch when it is connected but has none on the stream', async () => {
+    const { sent, press } = setup(foldRig([wire('box', 'CONNECTION', { CONNECT: true, DISCONNECT: false })]))
+
+    expect(await press(controls => controls.dewAuto)).toMatchObject({ failure: { refusal: { code: 'not-reported', device: 'box', property: 'AUTO_DEW_CONTROL' } } })
+    expect(sent).toEqual([])
+  })
 })

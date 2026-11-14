@@ -81,6 +81,7 @@ export type Done = typeof Done.Type
 export const Refusal = Schema.Union([
   Schema.Struct({ code: Schema.Literal('refused'), text: Schema.String }),
   Schema.Struct({ code: Schema.Literal('not-connected'), device: DeviceName }),
+  Schema.Struct({ code: Schema.Literal('not-reported'), device: DeviceName, property: Schema.String }),
   Schema.Struct({ code: Schema.Literal('no-answer'), seconds: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('rig-refused'), text: Schema.String }),
   Schema.Struct({ code: Schema.Literal('guider-refused'), text: Schema.String }),

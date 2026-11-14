@@ -23,7 +23,7 @@ export const dewControls = Effect.gen(function* () {
     Effect.flatMap(box, reported => {
       const switches = Object.keys(reported.AUTO_DEW_CONTROL?.values ?? {})
 
-      return switches.length === 0 ? Effect.fail(notConnected) : commands.write('box', 'AUTO_DEW_CONTROL', Object.fromEntries(switches.map(name => [name, on])))
+      return switches.length === 0 ? Effect.fail(new CommandRefused({ refusal: { code: 'not-reported', device: 'box', property: 'AUTO_DEW_CONTROL' } })) : commands.write('box', 'AUTO_DEW_CONTROL', Object.fromEntries(switches.map(name => [name, on])))
     })
 
   const output = (on: boolean) => commands.write('box', 'DEW_CHANNELS', { [channel]: on })
