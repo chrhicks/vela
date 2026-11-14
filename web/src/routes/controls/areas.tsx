@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { ActionButton } from '../../components/ActionButton.tsx'
-import type { NudgeRate } from '../../../../state/commands.ts'
+import type { CommandRequest, NudgeRate } from '../../../../state/commands.ts'
 import { CommandButton } from '../../components/CommandButton.tsx'
 import { latestSaid, PressLine, saidOf, type Pressed, type Said } from '../../components/PressLine.tsx'
 import type { Answer } from '../../rig/commands.ts'
@@ -247,10 +247,26 @@ export function CalibrationArea() {
   const [typedExposure, setTypedExposure] = useState<string | undefined>(undefined)
   const [typedCelsius, setTypedCelsius] = useState<string | undefined>(undefined)
   const frames = typedFrames ?? (controls === undefined ? '' : String(controls.calibrationFrames))
-  const exposure = typedExposure ?? (lastLight === undefined ? '' : String(lastLight))
+  const lastFlat = useRig(rig => (rig.calibration?.frameType === 'flat' ? rig.calibration.exposureSeconds : undefined))
+  const offered = type === 'dark-flats' ? lastFlat : lastLight
+  const exposure = typedExposure ?? (offered === undefined ? '' : String(offered))
   const celsius = typedCelsius ?? (controls === undefined ? '' : String(controls.coolerCelsius))
   const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
   const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
+  const set = { frames: Number.parseInt(frames, 10), celsius: Number(celsius) }
+  const request: CommandRequest | undefined =
+    type === 'darks'
+      ? { command: 'takeDarks', ...set, exposureSeconds: Number(exposure) }
+      : type === 'dark-flats'
+        ? { command: 'takeDarkFlats', ...set, exposureSeconds: Number(exposure) }
+        : type === 'bias'
+          ? { command: 'takeBias', ...set }
+          : undefined
+
+  function choose(chosen: CalibrationType) {
+    setType(chosen)
+    setTypedExposure(undefined)
+  }
 
   return (
     <Area id="calibration">
@@ -266,7 +282,7 @@ export function CalibrationArea() {
             { value: 'bias', label: 'Bias' },
           ]}
           chosen={type}
-          onChoose={setType}
+          onChoose={choose}
         />
       </ActionRow>
 
@@ -275,23 +291,27 @@ export function CalibrationArea() {
         <Facts items={[calibrationFirstStep[type]]} />
       </ActionRow>
 
-      {type === 'darks' ? (
-        <ActionRow label="Exposure">
-          <Field name="Dark exposure, seconds" kind="number" value={exposure} onChange={setTypedExposure} />
-          <span className={styles.note}>at</span>
-          <Field name="Dark temperature, degrees Celsius" kind="number" value={celsius} onChange={setTypedCelsius} />
+      {request === undefined ? null : (
+        <ActionRow label={type === 'bias' ? 'Temperature' : 'Exposure'}>
+          {type === 'bias' ? null : (
+            <>
+              <Field name="Exposure, seconds" kind="number" value={exposure} onChange={setTypedExposure} />
+              <span className={styles.note}>at</span>
+            </>
+          )}
+          <Field name="Temperature, degrees Celsius" kind="number" value={celsius} onChange={setTypedCelsius} />
         </ActionRow>
-      ) : null}
+      )}
 
       <ActionRow>
-        <CommandButton
-          request={{ command: 'takeDarks', frames: Number.parseInt(frames, 10), exposureSeconds: Number(exposure), celsius: Number(celsius) }}
-          disabled={type !== 'darks' || runActive}
-          onAnswer={answered}
-        >
-          Start set
-        </CommandButton>
-        {runActive ? <span className={styles.note}>Run active</span> : type === 'darks' ? null : <span className={styles.note}>Not built yet</span>}
+        {request === undefined ? (
+          <ActionButton>Start set</ActionButton>
+        ) : (
+          <CommandButton request={request} disabled={runActive} onAnswer={answered}>
+            Start set
+          </CommandButton>
+        )}
+        {runActive ? <span className={styles.note}>Run active</span> : request === undefined ? <span className={styles.note}>Not built yet</span> : null}
       </ActionRow>
     </Area>
   )

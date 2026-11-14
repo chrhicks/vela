@@ -4,7 +4,7 @@ import type { RigState } from '../../state/rig.ts'
 import { entry, foldRig, wire } from '../../state/testing.ts'
 import type { Command, Outcome } from '../commands/sender.ts'
 import { Feed } from '../feed/feed.ts'
-import { cameraControls, Capturing } from './camera.ts'
+import { CalibrationSettings, cameraControls, Capturing } from './camera.ts'
 import type { CaptureRequest } from '../capture/request.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
 
@@ -22,7 +22,7 @@ function setup(rig: RigState, busy = false) {
   const send = (command: Command) => (sent.push(`${command.device} ${command.property} ${JSON.stringify(command.values)}`), Promise.resolve<Outcome>({ result: 'written' }))
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
   const commands = deviceCommandsFrom({ send, ask: () => Promise.resolve({ result: 'written' }), tell: () => undefined, deviceIds, answerSeconds: 10 })
-  const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(cameraControls, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands, capturing))))
+  const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(cameraControls, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands, capturing, Layer.succeed(CalibrationSettings, { biasExposureSeconds: 0.000032 })))))
 
   return { sent, press }
 }
@@ -80,5 +80,16 @@ describe('Test frame', () => {
   it('refuses darks while a run is capturing, or at a temperature the camera cannot reach', async () => {
     expect(await setup(camera, true).press(controls => controls.takeDarks(30, 120, -10))).toMatchObject({ failure: { refusal: { code: 'run-active' } } })
     expect(await setup(camera).press(controls => controls.takeDarks(30, 120, -60))).toMatchObject({ failure: { refusal: { code: 'out-of-range' } } })
+  })
+
+  it('takes dark flats as dark frames named apart from darks, and bias at the shortest exposure', async () => {
+    const { sent, press } = setup(camera)
+
+    expect(await press(controls => controls.takeDarkFlats(30, 0.5, -10))).toMatchObject({ success: { code: 'dark-flats', frames: 30, exposureSeconds: 0.5, celsius: -10 } })
+    expect(await press(controls => controls.takeBias(30, -10))).toMatchObject({ success: { code: 'bias', frames: 30, celsius: -10 } })
+    expect(sent).toEqual([
+      'capture {"object":"dark-flat","frameType":"dark","exposureSeconds":0.5,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10}',
+      'capture {"object":"bias","frameType":"bias","exposureSeconds":0.000032,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10}',
+    ])
   })
 })

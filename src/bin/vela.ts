@@ -34,7 +34,7 @@ import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
-import { cameraControls, Capturing } from '../controls/camera.ts'
+import { CalibrationSettings, cameraControls, Capturing } from '../controls/camera.ts'
 import { dewControls, DewSettings } from '../controls/dew.ts'
 import { Centring, mountControls, MountRuns, MountSettings } from '../controls/mount.ts'
 import { searchCatalog } from '../catalog/search.ts'
@@ -239,7 +239,7 @@ const capturing = Layer.succeed(Capturing, {
   start: request => Effect.suspend(() => started(capture.start(request))),
 })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls]), ([mount, focus, camera, dew]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew }))).pipe(Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
+const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls]), ([mount, focus, camera, dew]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew }))).pipe(Layer.provide(Layer.succeed(CalibrationSettings, { biasExposureSeconds: settings.controls.biasExposureSeconds })), Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),

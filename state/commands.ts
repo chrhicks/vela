@@ -39,6 +39,8 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('dewFixed'), percent: Schema.Number }),
   Schema.Struct({ command: Schema.Literal('dewOff') }),
   Schema.Struct({ command: Schema.Literal('takeDarks'), frames: Schema.Int.check(Schema.isGreaterThan(0)), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), celsius: Schema.Number }),
+  Schema.Struct({ command: Schema.Literal('takeDarkFlats'), frames: Schema.Int.check(Schema.isGreaterThan(0)), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), celsius: Schema.Number }),
+  Schema.Struct({ command: Schema.Literal('takeBias'), frames: Schema.Int.check(Schema.isGreaterThan(0)), celsius: Schema.Number }),
   Schema.Struct({ command: Schema.Literal('testFrame'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
   Schema.Struct({ command: Schema.Literal('autofocus'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
 ])
@@ -55,6 +57,8 @@ export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('dew-fixed'), percent: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('dew-off') }),
   Schema.Struct({ code: Schema.Literal('darks'), frames: Schema.Number, exposureSeconds: Schema.Number, celsius: Schema.Number }),
+  Schema.Struct({ code: Schema.Literal('dark-flats'), frames: Schema.Number, exposureSeconds: Schema.Number, celsius: Schema.Number }),
+  Schema.Struct({ code: Schema.Literal('bias'), frames: Schema.Number, celsius: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('test-frame'), exposureSeconds: Schema.Number, sequence: Schema.String }),
   Schema.Struct({ code: Schema.Literal('autofocusing'), exposureSeconds: Schema.Number, endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean }),

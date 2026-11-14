@@ -28,6 +28,8 @@ export class Operations extends Context.Service<
     readonly dewOff: Effect.Effect<Done, CommandRefused>
     readonly testFrame: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
     readonly takeDarks: (frames: number, exposureSeconds: number, celsius: number) => Effect.Effect<Done, CommandRefused>
+    readonly takeDarkFlats: (frames: number, exposureSeconds: number, celsius: number) => Effect.Effect<Done, CommandRefused>
+    readonly takeBias: (frames: number, celsius: number) => Effect.Effect<Done, CommandRefused>
   }
 >()('vela/Operations') {}
 
@@ -62,6 +64,8 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         dewOff: () => operations.dewOff,
         testFrame: ({ exposureSeconds }) => operations.testFrame(exposureSeconds),
         takeDarks: ({ frames, exposureSeconds, celsius }) => operations.takeDarks(frames, exposureSeconds, celsius),
+        takeDarkFlats: ({ frames, exposureSeconds, celsius }) => operations.takeDarkFlats(frames, exposureSeconds, celsius),
+        takeBias: ({ frames, celsius }) => operations.takeBias(frames, celsius),
       }),
     )
   })
