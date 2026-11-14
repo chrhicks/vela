@@ -3,6 +3,7 @@ export interface KeptFrame {
   readonly night: string
   readonly bytes: number
   readonly sha256: string
+  readonly sequence?: string
 }
 
 export function frameEntry(frame: KeptFrame, rig: string, at: number) {

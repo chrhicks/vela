@@ -162,7 +162,7 @@ export function makeKeeper({ ssh, settings, labelOf, now, sleep, onKept, onProbl
 
         await writeAtomically(join(directory, sidecarName(file.name)), JSON.stringify(sidecar, null, 2))
         left.delete(file.name)
-        onKept({ file: file.name, night, bytes: file.bytes, sha256 })
+        onKept({ file: file.name, night, bytes: file.bytes, sha256, ...(label === undefined ? {} : { sequence: label.sequence }) })
         await removeOriginal(remote)
 
         return

@@ -151,7 +151,7 @@ const page = makePage({
 const measureStats = makeFrameStats(settings.stars)
 let statsQueue: Promise<void> = Promise.resolve()
 
-function measureKept(frame: { readonly night: string; readonly file: string }) {
+function measureKept(frame: { readonly night: string; readonly file: string; readonly sequence?: string }) {
   const path = join(frames.keepDir, frame.night, frame.file)
 
   statsQueue = statsQueue
@@ -160,7 +160,7 @@ function measureKept(frame: { readonly night: string; readonly file: string }) {
 
       await saveStats(path, stats)
       page.framesChanged()
-      publishEntry(stream.vela('frame'), 'vela.frame.stats', frame.file, { night: frame.night, file: frame.file, ...stats })
+      publishEntry(stream.vela('frame'), 'vela.frame.stats', frame.file, { night: frame.night, file: frame.file, ...(frame.sequence === undefined ? {} : { sequence: frame.sequence }), ...stats })
     })
     .catch((error: unknown) => console.error(`vela: could not measure ${frame.file}: ${String(error)}`))
 }
