@@ -10,6 +10,7 @@ export interface Catalog {
   readonly search: (text: string, limit: number) => ReadonlyArray<TargetSummary>
   readonly find: (id: string) => CatalogTarget | undefined
   readonly mostCited: ReadonlyArray<CatalogTarget>
+  readonly namesOf: (target: CatalogTarget) => ReadonlyArray<string>
 }
 
 export class CatalogUnreadable extends Data.TaggedError('CatalogUnreadable')<{ readonly database: string; readonly reason: string }> {}
@@ -48,7 +49,18 @@ function bestMatch({ ownKeys, otherKeys }: Entry, query: string): Match | undefi
   return [...matchesOf(ownKeys, true, query), ...matchesOf(otherKeys, false, query)].sort(better)[0]
 }
 
-const constellationOf = ({ raDegrees, decDegrees }: CatalogTarget) => Constellation(raDegrees / 15, decDegrees).name
+const constellationSpellings: Readonly<Record<string, string>> = {
+  Antila: 'Antlia',
+  Bootes: 'Boötes',
+  Camelopardis: 'Camelopardalis',
+  'Pisces Austrinus': 'Piscis Austrinus',
+}
+
+function constellationOf({ raDegrees, decDegrees }: CatalogTarget) {
+  const { name } = Constellation(raDegrees / 15, decDegrees)
+
+  return constellationSpellings[name] ?? name
+}
 
 export const summaryOf = (target: CatalogTarget, constellation: string | null): TargetSummary => ({ id: target.id, name: target.name, commonName: target.commonName, type: target.type, constellation })
 
@@ -71,6 +83,8 @@ export function catalogOf(targets: ReadonlyArray<CatalogTarget>, names: Readonly
     mostCited: targets.filter(target => target.nameCitations > 0).sort((a, b) => b.nameCitations - a.nameCitations || a.id.localeCompare(b.id)),
 
     find: id => byId.get(id) ?? positionTarget(id),
+
+    namesOf: target => namesOf.get(target.id) ?? [],
 
     search: (text, limit) => {
       const position = positionTarget(text)
@@ -107,8 +121,8 @@ export const readCatalog = Effect.gen(function* () {
 
       try {
         return {
-          targets: opened.prepare('SELECT id, name, commonName, type, raDegrees, decDegrees, majorAxisArcminutes, minorAxisArcminutes, nameCitations FROM targets WHERE name IS NOT NULL').all(),
-          names: opened.prepare('SELECT target, name FROM target_names').all(),
+          targets: opened.prepare('SELECT id, name, commonName, type, raDegrees, decDegrees, majorAxisArcminutes, minorAxisArcminutes, nameCitations, inHydrogenRegionCatalog FROM targets WHERE name IS NOT NULL').all(),
+          names: opened.prepare('SELECT target, name FROM target_names ORDER BY target, common, place').all(),
         }
       } finally {
         opened.close()

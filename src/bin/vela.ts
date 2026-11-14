@@ -272,6 +272,7 @@ const feedApp = FeedServer.pipe(
       Layer.succeed(Targets, {
         search: text => Effect.map(Clock.currentTimeMillis, at => placedTargets.search(text, at)),
         bestPlaced: Effect.map(Clock.currentTimeMillis, at => placedTargets.bestPlaced(at)),
+        facts: id => Effect.map(Clock.currentTimeMillis, at => placedTargets.facts(id, at)),
       }),
       deviceCommandsFrom({ send: (command, signal) => sender.send(command, signal), ask: (request, signal) => sender.ask(request, signal), tell: (device, body) => sender.tell(device, body), deviceIds: settings.devices, answerSeconds: settings.capture.commandAnswerSeconds }),
       Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs, focusSteps: settings.controls.focusSteps, autofocusExposureSeconds: settings.launch.autofocusExposureSeconds, coolerCelsius: settings.controls.coolerCelsius, dewChannel: settings.controls.dewChannel, dewPercent: settings.controls.dewPercent, testFrameSeconds: settings.controls.testFrameSeconds, calibrationFrames: settings.controls.calibrationFrames } }),

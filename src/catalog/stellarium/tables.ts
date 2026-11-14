@@ -9,7 +9,7 @@ const present = ({ column, numbered }: Designation) => (numbered ? `${column} > 
 const identifier = ({ column, numbered }: Designation) => (numbered ? `CAST(${column} AS TEXT)` : column)
 
 const designationRows = designationsInNamingOrder
-  .map(designation => `SELECT dso, ${quoted(designation.prefix)} AS prefix, ${identifier(designation)} AS identifier, ${quoted(designation.label)} || ${designation.column} AS name FROM stellarium_objects WHERE ${present(designation)}`)
+  .map((designation, place) => `SELECT dso, ${quoted(designation.prefix)} AS prefix, ${identifier(designation)} AS identifier, ${quoted(designation.label)} || ${designation.column} AS name, ${place} AS place FROM stellarium_objects WHERE ${present(designation)}`)
   .join('\nUNION ALL\n')
 
 const firstDesignation = designationsInNamingOrder.map(designation => `WHEN ${present(designation)} THEN ${quoted(designation.label)} || ${designation.column}`).join('\n    ')
@@ -64,6 +64,7 @@ SELECT
   ) AS name,
   preferred.name AS commonName,
   COALESCE(cited.citations, 0) AS nameCitations,
+  CASE WHEN sh2 > 0 OR rcw > 0 THEN 1 ELSE 0 END AS inHydrogenRegionCatalog,
   type,
   ra AS raDegrees,
   dec AS decDegrees,
@@ -76,7 +77,7 @@ LEFT JOIN stellarium_preferred_names AS preferred ON preferred.dso = object.dso
 LEFT JOIN stellarium_citations AS cited ON cited.dso = object.dso;
 
 CREATE VIEW stellarium_target_names AS
-SELECT 'stellarium-' || dso AS target, name, 0 AS common FROM stellarium_designations
+SELECT 'stellarium-' || dso AS target, name, 0 AS common, place FROM stellarium_designations
 UNION ALL
-SELECT 'stellarium-' || dso, name, 1 FROM stellarium_common_names;
+SELECT 'stellarium-' || dso, name, 1, line FROM stellarium_common_names;
 `
