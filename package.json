@@ -1,6 +1,7 @@
 {
   "name": "vela",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Vela: the observing program that reads the rig from its stream",
   "scripts": {
