@@ -129,6 +129,11 @@ export const PointingSettings = Schema.Struct({
     Schema.Number,
     10,
   ),
+  upLineDegrees: described(
+    'The altitude, in degrees, a target must be above for the target list to count it as up',
+    Schema.Number,
+    30,
+  ),
 })
 
 export const StarSettings = Schema.Struct({
