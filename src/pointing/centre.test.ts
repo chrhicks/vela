@@ -32,7 +32,7 @@ function scriptedMount(options: { errorDegrees: number; unsolved?: ReadonlyArray
         const sky = fromMount({ raDegrees: pointed.raDegrees, decDegrees: pointed.decDegrees + errorDegrees }, new Date(startedAt))
 
         setTimeout(() => {
-          const solve = options.unsolved?.includes(frame) ? { solved: false as const, reason: 'Not enough stars.' } : { solved: true as const, ...sky }
+          const solve = options.unsolved?.includes(frame) ? { solved: false as const, reason: 'Not enough stars.' } : { solved: true as const, ...sky, rotationDegrees: 109.3 }
 
           holder.centre?.measured({ file, result: 'measured', solve, stars: undefined, header: { 'DATE-OBS': new Date(startedAt).toISOString().slice(0, 23), EXPTIME: 0 } })
         }, 2)
@@ -136,6 +136,7 @@ describe('slew and centre on a scripted mount that points 24 arcminutes off', ()
     expect(passes[0]!.solved && passes[0]!.offsetArcmin).toBeCloseTo(24, 0)
     expect(passes[0]!.solved && passes[0]!.northArcmin).toBeCloseTo(24, 0)
     expect(passes[0]!.solved && passes[0]!.mountArcmin).toBeCloseTo(24, 0)
+    expect(passes[0]!.solved && passes[0]!.rotationDegrees).toBe(109.3)
     expect(passes[1]!.solved && passes[1]!.offsetArcmin).toBeLessThan(0.01)
     expect(passes[1]!.solved && passes[1]!.mountArcmin).toBeLessThan(0.01)
     expect(coordinateModes(sent)).toEqual(['TRACK', 'SYNC', 'TRACK', 'TRACK'])

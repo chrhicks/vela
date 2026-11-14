@@ -1,3 +1,4 @@
+import { Result, Schema } from 'effect'
 import type { Entry } from '../../state/entry.ts'
 import { recordOf } from '../stream/json.ts'
 
@@ -5,7 +6,7 @@ export type Measurement = 'solve' | 'stars'
 
 export type HeaderValue = string | number | boolean
 
-export type RigSolve = { readonly solved: true; readonly raDegrees: number; readonly decDegrees: number } | { readonly solved: false; readonly reason: string }
+export type RigSolve = { readonly solved: true; readonly raDegrees: number; readonly decDegrees: number; readonly rotationDegrees: number | undefined } | { readonly solved: false; readonly reason: string }
 
 export type RigStars = { readonly measured: true; readonly hfd: number; readonly count: number } | { readonly measured: false; readonly reason: string }
 
@@ -15,13 +16,24 @@ export type Measured =
 
 const text = (value: unknown) => (typeof value === 'string' ? value : undefined)
 
+const Solved = Schema.Struct({
+  solved: Schema.Literal(true),
+  raDegrees: Schema.Finite,
+  decDegrees: Schema.Finite,
+  wcs: Schema.optionalKey(Schema.Struct({ CROTA2: Schema.optionalKey(Schema.Finite) })),
+})
+
+const decodeSolved = Schema.decodeUnknownResult(Solved)
+
 function solveOf(value: unknown): RigSolve | undefined {
   const solve = recordOf(value)
 
   if (solve === undefined) return undefined
-  if (solve['solved'] === true && typeof solve['raDegrees'] === 'number' && typeof solve['decDegrees'] === 'number') return { solved: true, raDegrees: solve['raDegrees'], decDegrees: solve['decDegrees'] }
 
-  return { solved: false, reason: text(solve['reason']) ?? 'no solution' }
+  return Result.match(decodeSolved(solve), {
+    onSuccess: ({ raDegrees, decDegrees, wcs }): RigSolve => ({ solved: true, raDegrees, decDegrees, rotationDegrees: wcs?.CROTA2 }),
+    onFailure: (): RigSolve => ({ solved: false, reason: text(solve['reason']) ?? 'no solution' }),
+  })
 }
 
 function starsOf(value: unknown): RigStars | undefined {

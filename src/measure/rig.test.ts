@@ -18,7 +18,7 @@ describe("asking the rig program to measure a frame, and reading its answer", ()
     expect(measuredOf(answer({ id: 'vela-1', by: 'vela', file: 'a_001.fits', result: 'measured', seconds: 0.39, solve: { solved: true, raDegrees: 340.5, decDegrees: 79.6, wcs: { CROTA2: -69.3 } }, header: { 'DATE-OBS': '2026-11-08T03:30:00.000', EXPTIME: 2, BAD: { x: 1 } }, remove: 'after this entry' }), 'vela')).toEqual({
       file: 'a_001.fits',
       result: 'measured',
-      solve: { solved: true, raDegrees: 340.5, decDegrees: 79.6 },
+      solve: { solved: true, raDegrees: 340.5, decDegrees: 79.6, rotationDegrees: -69.3 },
       stars: undefined,
       header: { 'DATE-OBS': '2026-11-08T03:30:00.000', EXPTIME: 2 },
     })
