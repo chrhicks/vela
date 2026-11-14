@@ -207,7 +207,8 @@ export function CameraArea() {
 
 export function DewArea() {
   const controls = useLink().controls
-  const heater = useRig(rig => dewHeaters(rig.devices.box).find(found => found.channel === controls?.dewChannel))
+  const box = useRig(rig => rig.devices.box)
+  const heater = dewHeaters(box).find(found => found.channel === controls?.dewChannel)
   const [typed, setTyped] = useState<string | undefined>(undefined)
   const percent = typed ?? (heater !== undefined && heater.on && !heater.auto ? String(heater.percent) : controls === undefined ? '' : String(controls.dewPercent))
   const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
