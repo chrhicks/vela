@@ -1,4 +1,4 @@
-import { Context, Duration, Effect, Option, Result, Stream } from 'effect'
+import { Context, Duration, Effect, Option, Result, Schema, Stream } from 'effect'
 import type { Done } from '../../state/commands.ts'
 import { readRigEntry } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
@@ -50,7 +50,12 @@ export const guidingControls = Effect.gen(function* () {
       }),
     )
 
-  const connected = call('get_connected').pipe(Effect.flatMap(isConnected => (isConnected === true ? Effect.void : call('set_connected', { connected: true }, connectSeconds))))
+  const equipmentConnected = call('get_connected').pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Boolean)),
+    Effect.catchTag('SchemaError', () => Effect.fail(new CommandRefused({ refusal: { code: 'guider-refused', text: 'its answer to get_connected was not yes or no' } }))),
+  )
+
+  const connected = equipmentConnected.pipe(Effect.flatMap(isConnected => (isConnected ? Effect.void : call('set_connected', { connected: true }, connectSeconds))))
 
   const guide = (recalibrate: boolean) => connected.pipe(Effect.andThen(call('guide', { settle, recalibrate })), Effect.as<Done>({ code: 'guiding-starting', recalibrate }))
 
