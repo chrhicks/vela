@@ -8,6 +8,7 @@ import { Feed } from './feed.ts'
 import type { NightName } from '../../state/entries.ts'
 import { feedPath, type ControlsLimits, type FeedEventName, type LaunchLimits } from '../../state/feed.ts'
 import { ServiceStart } from './start.ts'
+import { TargetsRoute } from './targets.ts'
 
 export class Tonight extends Context.Service<Tonight, { readonly nightOf: (at: number) => NightName }>()('vela/Tonight') {}
 
@@ -45,7 +46,7 @@ export const FeedRoute = HttpRouter.add(
 
 export const WebApp = Layer.unwrap(Effect.map(FeedSettings, ({ webRoot }) => HttpStaticServer.layer({ root: webRoot, spa: true, cacheControl: 'no-cache' })))
 
-export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, CommandsRoute, WebApp), { disableLogger: true }).pipe(
+export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, CommandsRoute, TargetsRoute, WebApp), { disableLogger: true }).pipe(
   Layer.provideMerge(
     Layer.unwrap(
       Effect.map(FeedSettings, ({ host, port }) => NodeHttpServer.layer(createServer, { port, host })),

@@ -3,7 +3,8 @@ import { Constellation } from 'astronomy-engine'
 import { Data, Effect, Schema } from 'effect'
 import { CatalogSettings } from './database.ts'
 import { positionTarget } from './position.ts'
-import { CatalogTarget, TargetName, type TargetSummary } from './types.ts'
+import type { TargetSummary } from '../../state/targets.ts'
+import { CatalogTarget, TargetName } from './types.ts'
 
 export interface Catalog {
   readonly search: (text: string, limit: number) => ReadonlyArray<TargetSummary>
@@ -51,7 +52,7 @@ const constellationOf = ({ raDegrees, decDegrees }: CatalogTarget) => Constellat
 export const summaryOf = (target: CatalogTarget, constellation: string | null): TargetSummary => ({ id: target.id, name: target.name, commonName: target.commonName, type: target.type, constellation })
 
 export function catalogOf(targets: ReadonlyArray<CatalogTarget>, names: ReadonlyArray<TargetName>): Catalog {
-  const byId = new Map(targets.map(target => [target.id, target]))
+  const byId = new Map<string, CatalogTarget>(targets.map(target => [target.id, target]))
   const namesOf = new Map<string, Array<string>>()
 
   for (const { target, name } of names) namesOf.set(target, [...(namesOf.get(target) ?? []), name])

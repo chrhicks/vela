@@ -1,3 +1,4 @@
+import { TargetId } from '../../state/targets.ts'
 import type { CatalogTarget } from './types.ts'
 
 export interface Position {
@@ -63,7 +64,7 @@ export function positionTarget(text: string): CatalogTarget | undefined {
 
   if (position === undefined) return undefined
 
-  const id = `${position.raDegrees.toFixed(6)} ${position.decDegrees < 0 ? '' : '+'}${position.decDegrees.toFixed(6)}`
+  const id = TargetId.make(`${position.raDegrees.toFixed(6)} ${position.decDegrees < 0 ? '' : '+'}${position.decDegrees.toFixed(6)}`)
 
   return { id, name: positionName(position), commonName: null, type: 'J2000 position', ...position, majorAxisArcminutes: null, minorAxisArcminutes: null }
 }
