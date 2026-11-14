@@ -67,11 +67,12 @@ export const RunFailed = entryOf('vela.run.failed', { run: RunId })
 
 export const RunEnded = entryOf('vela.run.ended', { run: RunId, reason: RunEnding, detail: Schema.optionalKey(Schema.String) })
 
-export const FrameKept = entryOf('vela.frame', { night: NightName, file: FrameFile })
+export const FrameKept = entryOf('vela.frame', { night: NightName, file: FrameFile, sequence: Schema.optionalKey(Schema.String) })
 
 export const FrameMeasured = entryOf('vela.frame.stats', {
   night: NightName,
   file: FrameFile,
+  sequence: Schema.optionalKey(Schema.String),
   stars: Schema.NullOr(Count),
   hfdPixels: Schema.NullOr(Schema.Number),
   elongation: Schema.NullOr(Schema.Number),

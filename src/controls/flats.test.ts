@@ -1,7 +1,7 @@
 import { Effect, Layer, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 import type { RunEnding } from '../../state/entries.ts'
-import { foldRig, frameMeasured, wire } from '../../state/testing.ts'
+import { entry, foldRig, wire } from '../../state/testing.ts'
 import type { CaptureRequest } from '../capture/request.ts'
 import { Feed } from '../feed/feed.ts'
 import { Capturing } from './camera.ts'
@@ -9,7 +9,7 @@ import { flatControls, FlatSettings, FlatsLog, type FlatTry } from './flats.ts'
 
 const camera = foldRig([wire('primary', 'CONNECTION', { CONNECT: true, DISCONNECT: false }), wire('primary', 'CCD_CONTROLS', { Gain: 100, Offset: 50 })])
 
-const measured = (sky: number) => frameMeasured('flat-exposure_flat_001.fits', 1, { stars: null, hfdPixels: null, elongation: null, sky, noise: 10 })
+const measured = (sky: number) => entry('vela.frame.stats', 1, { night: '2026-11-08', file: 'renamed_001.fits', sequence: 'flat-exposure_flat', stars: null, hfdPixels: null, elongation: null, sky, noise: 10 })
 
 async function until(check: () => boolean) {
   while (!check()) await new Promise(resolve => setTimeout(resolve, 2))

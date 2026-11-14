@@ -160,7 +160,7 @@ function testFrameSaid(pressed: Pressed | undefined, frames: ReadonlyArray<Frame
 
   if (done?.code !== 'test-frame') return undefined
 
-  const frame = [...frames].reverse().find(kept => kept.file.startsWith(`${done.sequence}_`) && kept.measurements !== undefined)
+  const frame = [...frames].reverse().find(kept => kept.sequence === done.sequence && kept.measurements !== undefined)
   const measured = frame?.measurements
 
   if (frame === undefined || measured === undefined) return undefined

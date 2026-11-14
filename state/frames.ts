@@ -14,6 +14,7 @@ export type Measurements = typeof Measurements.Type
 export const Frame = Schema.Struct({
   night: NightName,
   file: FrameFile,
+  sequence: Schema.optionalKey(Schema.String),
   keptAt: Schema.Number,
   measurements: Schema.optional(Measurements),
 })
@@ -25,11 +26,11 @@ const sameFrame = (night: NightName, file: FrameFile) => (frame: Frame) => frame
 export function frames(state: ReadonlyArray<Frame>, entry: RigEntry): ReadonlyArray<Frame> {
   switch (entry.kind) {
     case 'vela.frame': {
-      const { night, file } = entry.body
+      const { night, file, sequence } = entry.body
 
       if (state.some(sameFrame(night, file))) return state
 
-      return [...state, { night, file, keptAt: entry.at, measurements: undefined }]
+      return [...state, { night, file, ...(sequence === undefined ? {} : { sequence }), keptAt: entry.at, measurements: undefined }]
     }
     case 'vela.frame.stats': {
       const { night, file, stars, hfdPixels, elongation, sky, noise } = entry.body

@@ -31,7 +31,7 @@ const skyOfTest = (entry: Entry): Result.Result<number, Entry> =>
     onSuccess: found => {
       const measured = Option.getOrUndefined(found)
 
-      return measured?.kind === 'vela.frame.stats' && measured.body.file.startsWith(`${testSequence}_`) ? Result.succeed(measured.body.sky) : Result.fail(entry)
+      return measured?.kind === 'vela.frame.stats' && measured.body.sequence !== undefined && measured.body.sequence === testSequence ? Result.succeed(measured.body.sky) : Result.fail(entry)
     },
   })
 
