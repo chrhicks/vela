@@ -1,11 +1,3 @@
-interface ControlDefaults {
-  readonly resetDevice: string
-}
-
-export const defaults: ControlDefaults = {
-  resetDevice: 'Camera',
-}
-
 export type CalibrationType = 'darks' | 'flats' | 'dark-flats' | 'bias'
 
 export const calibrationFirstStep: Readonly<Record<CalibrationType, string>> = {

@@ -7,7 +7,7 @@ import { useAreas } from './use-areas.ts'
 
 interface AreaProps {
   readonly id: AreaId
-  readonly children: ReactNode
+  readonly children?: ReactNode
 }
 
 export function Area({ id, children }: AreaProps) {
@@ -17,7 +17,7 @@ export function Area({ id, children }: AreaProps) {
     <section className={styles.area} data-area={id}>
       <Readings heading={area.heading} rows={area.readings} />
 
-      <div className={styles.actions}>{children}</div>
+      {children === undefined ? null : <div className={styles.actions}>{children}</div>}
     </section>
   )
 }

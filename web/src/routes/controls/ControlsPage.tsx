@@ -1,21 +1,17 @@
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 
 import { ActionLink } from '../../components/ActionLink.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { CalibrationArea, CameraArea, DewArea, FocusArea, GuidingArea, MountArea, SystemArea } from './areas.tsx'
 import styles from './ControlsPage.module.css'
-import { ShutDown } from './ShutDown.tsx'
 import { useRig } from '../../rig/store.ts'
-import { AreaId, controlsAddress, runFacts } from './live.ts'
+import { AreaId, openedArea, runFacts } from './live.ts'
 import { useAreas } from './use-areas.ts'
 
 export function ControlsPage() {
   const { area } = useParams()
-  const [search, setSearch] = useSearchParams()
-
-  const { opened, asking } = controlsAddress(area, search.get('ask'))
-  const setAsking = (ask: boolean) => setSearch(ask ? { ask: 'shut-down' } : {})
+  const opened = openedArea(area)
 
   const areas = useAreas()
   const run = useRig(rig => rig.run)
@@ -23,7 +19,7 @@ export function ControlsPage() {
   return (
     <Page width="wide">
       <PageHeader title="Controls" facts={runFacts(run)}>
-        <ShutDown asking={asking} onAsk={setAsking} />
+        <ActionLink to="/">Back to run</ActionLink>
       </PageHeader>
 
       <div className={styles.controls} data-opened={opened ?? 'none'}>

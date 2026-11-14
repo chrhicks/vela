@@ -17,10 +17,6 @@ export function NightOverView() {
     <Page width="wide">
       <PageHeader title="Ready to carry in" facts={nightOver.facts}>
         <ActionLink to="/controls">Controls</ActionLink>
-
-        <span className={layout.wideOnly}>
-          <PillLink to="/controls?ask=shut-down">Shut down rig PC</PillLink>
-        </span>
       </PageHeader>
 
       <div className={layout.night}>
@@ -52,10 +48,6 @@ export function NightOverView() {
 
         <div className={`${layout.column} ${layout.wideOnly}`}>
           <Trends trends={nightOver.trends} span={nightOver.span} />
-        </div>
-
-        <div className={`${layout.phoneOnly} ${layout.last}`}>
-          <PillLink to="/controls?ask=shut-down">Shut down rig PC</PillLink>
         </div>
       </div>
     </Page>
