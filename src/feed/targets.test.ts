@@ -9,7 +9,7 @@ const placement: Placement = { altitudeDegrees: 71.2, lineDegrees: 30, moonDegre
 
 async function get(address: string) {
   const asked: Array<string> = []
-  const facts: TargetFacts = { ...testCatalog.search('m 42', 1)[0]!, placement, dualBandHint: true, otherNames: ['NGC 1976'], sizeArcminutes: { long: 90, short: 60 } }
+  const facts: TargetFacts = { ...testCatalog.search('m 42', 1)[0]!, placement, dualBandHint: true, otherNames: ['NGC 1976'], sizeArcminutes: { long: 90, short: 60 }, lastCentre: null }
   const targets = { facts: (id: string) => Effect.succeed(id === 'orion' ? facts : undefined), bestPlaced: Effect.succeed([{ ...testCatalog.search('m 42', 1)[0]!, placement, dualBandHint: true }]), search: (text: string) => Effect.sync(() => (asked.push(text), testCatalog.search(text, 2).map(found => ({ ...found, placement: found.id === 'andromeda' ? placement : null, dualBandHint: false })))) }
   const { handler, dispose } = HttpRouter.toWebHandler(Layer.mergeAll(BestPlacedRoute, TargetRoute, TargetsRoute), { disableLogger: true })
   const response = await handler(new Request(`http://localhost${address}`), Context.make(Targets, targets))

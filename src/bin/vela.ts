@@ -55,6 +55,9 @@ import { makeReader, type Entry, type Message } from '../../state/entry.ts'
 import { streamOf } from '../../state/stream.ts'
 import { readWireBody } from '../stream/json.ts'
 import { Broker, brokerOf, followRig, type Followed } from '../stream/follow.ts'
+import { readHistory } from '../stream/history.ts'
+import { lastCentreNear, nothingRemembered, remember } from '../remembered/remembered.ts'
+import { Recalled } from '../feed/remembered.ts'
 
 const settings = readConfig(VelaSettings, process.argv[2])
 const stream = streamOf(settings.environment)
@@ -97,7 +100,14 @@ const catalog = runHandledSync(
     ),
   ),
 )
-const placedTargets = makePlacedTargets({ catalog, site: () => siteOf(picture, settings.devices.mount), settings: settings.pointing })
+let remembered = nothingRemembered
+
+const placedTargets = makePlacedTargets({
+  catalog,
+  site: () => siteOf(picture, settings.devices.mount),
+  lastCentreNear: position => lastCentreNear(remembered, position, settings.pointing.sameFramingDegrees),
+  settings: settings.pointing,
+})
 const pointing = makePointing({ picture, catalog, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
 const capture = makeCapture({
   picture,
@@ -308,6 +318,12 @@ const feedApp = FeedServer.pipe(
   Layer.provide(Layer.mergeAll(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
+      Layer.succeed(Recalled, {
+        now: Effect.sync(() => ({
+          lastLight: remembered.lastLight === undefined ? null : { exposureSeconds: remembered.lastLight.exposureSeconds, frames: remembered.lastLight.frames ?? null },
+          cameraAngleDegrees: remembered.cameraAngle?.degrees ?? null,
+        })),
+      }),
       Layer.succeed(SkyNow, {
         tonight: Effect.map(Clock.currentTimeMillis, at => {
           const site = siteOf(picture, settings.devices.mount)
@@ -371,6 +387,11 @@ const handleMessage = (message: Message) =>
         }),
       ),
     ),
+    Effect.tap(entry =>
+      Effect.sync(() => {
+        remembered = remember(remembered, entry)
+      }),
+    ),
     Effect.tap(entry => Effect.sync(() => observe(entry))),
     Effect.catchTag('UnreadableMessage', error => logProblem(`${error.subject} #${error.seq} could not be read: ${error.issue}`)),
     Effect.asVoid,
@@ -381,6 +402,14 @@ const handleFollowed = (followed: Followed) =>
     Message: ({ message }) => handleMessage(message),
     CaughtUp: () => Effect.sync(() => picture.caughtUp()),
   })
+
+remembered = await runHandledPromise(
+  readHistory({ stream, subjects: [stream.vela('run'), stream.vela('centre')], readBatch: settings.historyReadBatch, read: readMessage }).pipe(
+    Effect.map(entries => entries.reduce(remember, remembered)),
+    Effect.provideService(Broker, broker),
+    Effect.catchTag('StreamUnreadable', error => logProblem(`what was used last could not be read from ${error.stream}: ${error.issue}`).pipe(Effect.as(remembered))),
+  ),
+)
 
 void keeper.requestScan()
 
