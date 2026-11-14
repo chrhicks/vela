@@ -18,6 +18,10 @@ export class Operations extends Context.Service<
     readonly releaseNudge: (id: NudgeId) => Effect.Effect<void, CommandRefused>
     readonly slewAndCentre: (target: string) => Effect.Effect<Done, CommandRefused>
     readonly flipNow: Effect.Effect<Done, CommandRefused>
+    readonly startGuiding: Effect.Effect<Done, CommandRefused>
+    readonly stopGuiding: Effect.Effect<Done, CommandRefused>
+    readonly pickGuideStar: Effect.Effect<Done, CommandRefused>
+    readonly calibrateGuiding: Effect.Effect<Done, CommandRefused>
     readonly focusTo: (position: number) => Effect.Effect<Done, CommandRefused>
     readonly focusBy: (steps: number) => Effect.Effect<Done, CommandRefused>
     readonly autofocus: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
@@ -55,6 +59,10 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         releaseNudge: ({ id }) => operations.releaseNudge(id).pipe(carriedOut),
         slewAndCentre: ({ target }) => operations.slewAndCentre(target),
         flipNow: () => operations.flipNow,
+        startGuiding: () => operations.startGuiding,
+        stopGuiding: () => operations.stopGuiding,
+        pickGuideStar: () => operations.pickGuideStar,
+        calibrateGuiding: () => operations.calibrateGuiding,
         focusTo: ({ position }) => operations.focusTo(position),
         focusBy: ({ steps }) => operations.focusBy(steps),
         autofocus: ({ exposureSeconds }) => operations.autofocus(exposureSeconds),

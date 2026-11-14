@@ -1,5 +1,6 @@
 import { Context, Duration, Effect, Layer, Option } from 'effect'
 import type { DeviceName } from '../../state/devices.ts'
+import { guiderDevice } from '../../state/entries.ts'
 import type { Value } from '../../state/entry.ts'
 import type { Command, Outcome, Request } from '../commands/sender.ts'
 import { CommandRefused } from '../feed/commands.ts'
@@ -10,6 +11,7 @@ export class DeviceCommands extends Context.Service<
     readonly write: (device: DeviceName, property: string, values: Readonly<Record<string, Value>>) => Effect.Effect<void, CommandRefused>
     readonly ask: (device: DeviceName, label: string, id: string, body: Readonly<Record<string, unknown>>) => Effect.Effect<void, CommandRefused>
     readonly tell: (device: DeviceName, body: Readonly<Record<string, unknown>>) => Effect.Effect<void>
+    readonly askGuider: (id: string, method: string, params: unknown) => Effect.Effect<void, CommandRefused>
   }
 >()('vela/DeviceCommands') {}
 
@@ -45,5 +47,6 @@ export const deviceCommandsFrom = ({ send, ask, tell, deviceIds, answerSeconds }
     write: (device, property, values) => awaited(signal => send({ device: deviceIds[device], property, values }, signal)),
     ask: (device, label, id, body) => awaited(signal => ask({ device: deviceIds[device], label, id, body }, signal)),
     tell: (device, body) => Effect.sync(() => tell(deviceIds[device], body)).pipe(Effect.ignore),
+    askGuider: (id, method, params) => awaited(signal => ask({ device: guiderDevice, label: method, id, body: { method, ...(params === undefined ? {} : { params }) } }, signal)),
   })
 }

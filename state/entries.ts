@@ -112,6 +112,10 @@ export type GuiderReport = typeof GuiderReported.Type
 
 export const isGuiderReport = Schema.is(GuiderReported)
 
+export const guiderDevice = 'phd2'
+
+export const GuiderReplied = entryOf('phd2.reply', { id: Schema.String, result: Schema.optionalKey(Schema.Unknown), error: Schema.optionalKey(Schema.Struct({ message: Schema.String })) })
+
 export const AlignStarted = entryOf('vela.align.started', { run: RunId })
 
 const solveOutcome = <const Tag extends string>(tag: Tag) => Schema.withDecodingDefaultKey<Schema.Literal<Tag>>(Effect.succeed(tag))(Schema.Literal(tag))
@@ -142,7 +146,7 @@ export const FlatExposureTried = entryOf('vela.flats.exposure', { exposureSecond
 
 export const FilterAnswered = entryOf('vela.filter', { filter: FilterAnswer })
 
-export const RigEntry = Schema.Union([RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried])
+export const RigEntry = Schema.Union([RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 
