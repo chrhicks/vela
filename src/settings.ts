@@ -2,6 +2,7 @@ import { Schema } from 'effect'
 import { Environment } from '../state/stream.ts'
 import { described } from './config.ts'
 import { BrokerSettings } from './stream/broker.ts'
+import { CatalogConfig } from './catalog/database.ts'
 
 export const FrameSettings = Schema.Struct({
   rig: described("The rig's id on the entries Vela publishes, the same id the rig program's entries carry", Schema.String, 'fra-cria'),
@@ -261,6 +262,7 @@ export const VelaSettings = Schema.Struct({
   capture: CaptureSettings,
   prepare: described('Settings for the focuser and dew controls', PrepareSettings, {}),
   pointing: described('Settings for choosing a target and pointing the mount', PointingSettings, {}),
+  catalog: described('The target catalog', CatalogConfig, {}),
   align: described('Settings for polar alignment', AlignSettings, {}),
   stars: Schema.optionalKey(StarSettings.annotate({ description: 'Counting and sizing the stars of each kept imaging frame. Without it, kept frames get only their sky level and noise' })),
   autofocus: described('Settings for autofocus', AutofocusSettings, {}),
