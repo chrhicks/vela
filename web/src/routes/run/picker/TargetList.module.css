@@ -16,6 +16,13 @@
   text-transform: uppercase;
 }
 
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .head {
   color: var(--ember-quiet);
   font-size: var(--size-label);

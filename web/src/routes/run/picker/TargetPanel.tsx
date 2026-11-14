@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { endsBy } from '../../../../../state/ends-by.ts'
+import type { Run } from '../../../../../state/run.ts'
 import { ActionLink } from '../../../components/ActionLink.tsx'
 import { Caption } from '../../../components/Caption.tsx'
 import { Choices } from '../../../components/Choices.tsx'
@@ -7,16 +9,59 @@ import { Field } from '../../../components/Field.tsx'
 import { Picture } from '../../../components/Picture.tsx'
 import { PillLink } from '../../../components/PillLink.tsx'
 import { Readings } from '../../../components/Readings.tsx'
-import { endsBy } from './ends-by.ts'
+import { Statement } from '../../../components/Statement.tsx'
+import { useLocalNow } from '../../../rig/clock.ts'
+import { serviceNow } from '../../../rig/service-clock.ts'
+import { useLink, useRig } from '../../../rig/store.ts'
+import { targetFacts } from '../../../rig/targets.ts'
+import { useAsked } from '../../../rig/use-asked.ts'
 import { FramedSky } from './FramedSky.tsx'
-import { type Exposure, ready, type Target } from './stub.ts'
 import styles from './TargetPanel.module.css'
+import { endsByWords, sizeOf, typeOf, unknown } from './words.ts'
 
 interface TargetPanelProps {
-  readonly target: Target
+  readonly id: string
+  readonly darkUntil: number | undefined
+  readonly refreshed: number
 }
 
+type Preset = '60' | '90' | '120'
+
+type ExposureChoice = Preset | 'other'
+
 type Stop = 'said' | 'frames'
+
+interface Choice {
+  readonly exposure: ExposureChoice
+  readonly otherSeconds: number
+  readonly stop: Stop
+  readonly frames: number
+}
+
+const presetSeconds: Readonly<Record<Preset, number>> = { '60': 60, '90': 90, '120': 120 }
+
+const firstChoice: Choice = { exposure: '60', otherSeconds: 180, stop: 'said', frames: 300 }
+
+const frame = 'Frame 3.4 × 2.3°'
+
+const tickMilliseconds = 30_000
+
+const namesShown = 3
+
+const presetOf = (seconds: number): Preset | undefined => (seconds === 60 ? '60' : seconds === 90 ? '90' : seconds === 120 ? '120' : undefined)
+
+function lastChoice(run: Run | undefined): Choice {
+  if (run === undefined || run.frameType !== 'light') return firstChoice
+
+  const preset = presetOf(run.exposureSeconds)
+
+  return {
+    exposure: preset ?? 'other',
+    otherSeconds: preset === undefined ? run.exposureSeconds : firstChoice.otherSeconds,
+    stop: run.count === undefined ? 'said' : 'frames',
+    frames: run.count ?? firstChoice.frames,
+  }
+}
 
 const wholeNumber = (typed: string, fallback: number) => {
   const value = Number.parseInt(typed, 10)
@@ -24,25 +69,30 @@ const wholeNumber = (typed: string, fallback: number) => {
   return Number.isFinite(value) && value > 0 ? value : fallback
 }
 
-export function TargetPanel({ target }: TargetPanelProps) {
-  const [exposure, setExposure] = useState<Exposure>(ready.lastUsed.exposure)
-  const [otherSeconds, setOtherSeconds] = useState(String(ready.lastUsed.otherSeconds))
-  const [stop, setStop] = useState<Stop>('said')
-  const [frames, setFrames] = useState(String(ready.lastUsed.frames))
+export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
+  const last = lastChoice(useRig(rig => rig.run))
+  const [exposure, setExposure] = useState<ExposureChoice>(last.exposure)
+  const [otherSeconds, setOtherSeconds] = useState(String(last.otherSeconds))
+  const [stop, setStop] = useState<Stop>(last.stop)
+  const [frames, setFrames] = useState(String(last.frames))
+  const answer = useAsked(() => targetFacts(id), id, refreshed)
+  const now = serviceNow(useLink(), useLocalNow(tickMilliseconds))
 
-  const exposureSeconds = exposure === 'other' ? wholeNumber(otherSeconds, ready.lastUsed.otherSeconds) : Number(exposure)
+  if (answer === undefined) return null
 
-  const ends = endsBy({
-    now: ready.now,
-    dawn: ready.dawn,
-    targetUntil: target.until,
-    exposureSeconds,
-    frames: stop === 'frames' ? wholeNumber(frames, ready.lastUsed.frames) : undefined,
-  })
+  if (answer.status !== 'found') return <Statement size="instruction">{answer.status === 'unknown' ? 'That target is not in the catalog' : 'Vela did not answer'}</Statement>
+
+  const target = answer.facts
+  const exposureSeconds = exposure === 'other' ? wholeNumber(otherSeconds, last.otherSeconds) : presetSeconds[exposure]
+
+  const ends =
+    now === undefined
+      ? unknown
+      : endsByWords(endsBy({ now, exposureSeconds, frames: stop === 'frames' ? wholeNumber(frames, last.frames) : undefined, line: target.placement?.line, darkUntil }), now)
 
   return (
     <section className={styles.panel}>
-      <Picture label="Chosen" detail={ready.frame}>
+      <Picture label="Chosen" detail={frame}>
         <FramedSky seed={target.name.length * 13} />
       </Picture>
 
@@ -50,10 +100,10 @@ export function TargetPanel({ target }: TargetPanelProps) {
 
       <Readings
         rows={[
-          { label: 'Also', value: target.also.join(' · ').toUpperCase() },
-          { label: 'Type', value: target.type.toUpperCase() },
-          { label: 'In', value: target.constellation.toUpperCase() },
-          { label: 'Size', value: target.size },
+          { label: 'Also', value: [...(target.commonName === null ? [] : [target.commonName]), ...target.otherNames].slice(0, namesShown).join(' · ').toUpperCase() || unknown },
+          { label: 'Type', value: typeOf(target.type).toUpperCase() },
+          { label: 'In', value: target.constellation?.toUpperCase() ?? unknown },
+          { label: 'Size', value: sizeOf(target.sizeArcminutes) },
         ]}
       />
 
