@@ -19,8 +19,8 @@ export function RunPage() {
   const trends = useRig(rig => rig.trends)
   const starting = useRig(rig => rig.starting)
 
-  if (search.has('pick') || search.has('target')) return <ReadyView />
   if (starting !== undefined && isStarting(starting)) return <StartView starting={starting} />
+  if (search.has('pick') || search.has('target')) return <ReadyView />
   if (run?.status === 'capturing') return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends }, capturing.steady)} />
 
   return <IdleView />
