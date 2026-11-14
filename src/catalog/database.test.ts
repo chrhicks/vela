@@ -12,7 +12,7 @@ import { nameLine, objectLine } from './stellarium/testing.ts'
 
 const objectsText = [
   objectLine({ dso: '1', ra: '83.82', dec: '-5.39', vMag: '4', type: 'HII', majorAxis: '90', minorAxis: '60', ngc: '1976', m: '42' }),
-  objectLine({ dso: '2', ra: '334.75', dec: '55.98', type: 'HII', majorAxis: '80', sh2: '132' }),
+  objectLine({ dso: '2', ra: '334.75', dec: '55.98', type: 'HII', majorAxis: '80', sh2: '132', lbn: '473' }),
   objectLine({ dso: '3', ra: '305', dec: '40', type: 'SC' }),
   objectLine({ dso: '4', ra: '10', dec: '20', type: 'PN', pk: '64+5.1', ngc: '6000' }),
 ].join('\n')
@@ -49,8 +49,8 @@ test('each object is one target, named by its first designation and its most cit
   ])
 })
 
-test('a target is listed under every designation and every common name', async () => {
-  const names = (await written()).prepare('SELECT target, name, common FROM target_names ORDER BY target, common, name').all()
+test('a target is listed under every designation, in naming order, then every common name, in file order', async () => {
+  const names = (await written()).prepare('SELECT target, name, common FROM target_names ORDER BY target, common, place').all()
 
   expect(names).toEqual([
     { target: 'stellarium-1', name: 'M 42', common: 0 },
@@ -58,6 +58,7 @@ test('a target is listed under every designation and every common name', async (
     { target: 'stellarium-1', name: 'Great Orion Nebula', common: 1 },
     { target: 'stellarium-1', name: 'Orion Nebula', common: 1 },
     { target: 'stellarium-2', name: 'Sh2-132', common: 0 },
+    { target: 'stellarium-2', name: 'LBN 473', common: 0 },
     { target: 'stellarium-2', name: 'Cepheus Cloud', common: 1 },
     { target: 'stellarium-2', name: 'Lion Nebula', common: 1 },
     { target: 'stellarium-3', name: 'Cygnus Star Cloud', common: 1 },
@@ -81,5 +82,16 @@ test('a target counts the references cited across its names', async () => {
     { name: 'Sh2-132', nameCitations: 0 },
     { name: 'Cygnus Star Cloud', nameCitations: 1 },
     { name: 'NGC 6000', nameCitations: 0 },
+  ])
+})
+
+test('a target says whether it is in a catalogue of hydrogen regions', async () => {
+  const listed = (await written()).prepare('SELECT name, inHydrogenRegionCatalog FROM targets ORDER BY id').all()
+
+  expect(listed).toEqual([
+    { name: 'M 42', inHydrogenRegionCatalog: 0 },
+    { name: 'Sh2-132', inHydrogenRegionCatalog: 1 },
+    { name: 'Cygnus Star Cloud', inHydrogenRegionCatalog: 0 },
+    { name: 'NGC 6000', inHydrogenRegionCatalog: 0 },
   ])
 })

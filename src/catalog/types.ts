@@ -11,6 +11,7 @@ export const CatalogTarget = Schema.Struct({
   majorAxisArcminutes: Schema.NullOr(Schema.Finite),
   minorAxisArcminutes: Schema.NullOr(Schema.Finite),
   nameCitations: Schema.Finite,
+  inHydrogenRegionCatalog: Schema.Literals([0, 1]),
 })
 
 export type CatalogTarget = typeof CatalogTarget.Type

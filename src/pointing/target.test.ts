@@ -6,7 +6,7 @@ import { makePicture } from '../rig/picture.ts'
 import { connected, phoenixLongitude, startedAt, wire } from '../testing/entries.ts'
 import { meridianLimitAt, siteOf, targetOf } from './target.ts'
 
-const madeUp = (raDegrees: number, decDegrees: number): CatalogTarget => ({ id: TargetId.make('made-up'), name: 'X 1', commonName: null, type: 'Galaxy', raDegrees, decDegrees, majorAxisArcminutes: null, minorAxisArcminutes: null, nameCitations: 0 })
+const madeUp = (raDegrees: number, decDegrees: number): CatalogTarget => ({ id: TargetId.make('made-up'), name: 'X 1', commonName: null, type: 'Galaxy', raDegrees, decDegrees, majorAxisArcminutes: null, minorAxisArcminutes: null, nameCitations: 0, inHydrogenRegionCatalog: 0 })
 
 const arcseconds = (degrees: number) => degrees * 3600
 
