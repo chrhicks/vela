@@ -117,7 +117,7 @@ function cameraArea(primary: Primary): AreaState {
 }
 
 function dewArea(box: Box): AreaState {
-  const heaters = dewHeaters(box).map(heater => ({ label: heater.label, value: `${heater.auto ? 'AUTO ' : ''}${heater.percent.toFixed(0)} %` }))
+  const heaters = dewHeaters(box).map(heater => ({ label: heater.label, value: heater.auto ? `AUTO ${heater.percent.toFixed(0)} %` : heater.on ? `${heater.percent.toFixed(0)} %` : 'OFF' }))
   const weather = box.WEATHER_PARAMETERS?.values
   const air = weather?.WEATHER_TEMPERATURE
   const humidity = weather?.WEATHER_HUMIDITY

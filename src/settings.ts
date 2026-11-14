@@ -170,6 +170,8 @@ export const ControlsSettings = Schema.Struct({
   centreExposureSeconds: described('Seconds of exposure for each slew and centre frame', Schema.Number, 2),
   calibrationFrames: described('The number of calibration frames the controls page offers first', Schema.Int, 30),
   testFrameSeconds: described('The test frame exposure the controls page offers first, in seconds', Schema.Number, 2),
+  dewChannel: described("The power box's dew output the controls page switches, as its DEW_CHANNELS element", Schema.NonEmptyString, 'DEW_CHANNEL_1'),
+  dewPercent: described('The fixed dew heater level the controls page offers first, in percent', Schema.Number, 60),
   coolerCelsius: described('The cooler setpoint the controls page offers first, in degrees Celsius', Schema.Number, -10),
   focusMoveSeconds: described('How long one focuser move may take before its answer says the focuser is still moving, in seconds', Schema.Number, 300),
   focusSteps: described('Focuser steps for the Step buttons on the controls page, each shown inward and outward', Schema.Array(Schema.Int), [10, 50]),

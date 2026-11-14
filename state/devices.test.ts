@@ -49,8 +49,8 @@ describe('the rig line selectors', () => {
     expect(sensorCelsius(rig.devices.primary)).toBe(-10)
     expect(focusPosition(rig.devices.focuser)).toBe(32562)
     expect(dewHeaters(rig.devices.box)).toEqual([
-      { channel: 'DEW_CHANNEL_1', label: 'Dew A', percent: 60, auto: true },
-      { channel: 'DEW_CHANNEL_2', label: 'DEW_CHANNEL_2', percent: 40, auto: false },
+      { channel: 'DEW_CHANNEL_1', label: 'Dew A', percent: 60, on: true, auto: true },
+      { channel: 'DEW_CHANNEL_2', label: 'DEW_CHANNEL_2', percent: 40, on: true, auto: false },
     ])
   })
 
