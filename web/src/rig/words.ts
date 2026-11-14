@@ -124,6 +124,7 @@ export const flatExposureWords = ({ exposureSeconds, sky, verdict, nextSeconds }
     Match.when('too-bright', () => ({ words: { happened: 'Too bright for flats', toDo: gave }, troubled: true })),
     Match.when('gave-up', () => ({ words: { happened: 'No flat exposure found', toDo: `last test ${gave}` }, troubled: true })),
     Match.when('not-measured', () => ({ words: { happened: 'Flat test was not measured', toDo: gave }, troubled: true })),
+    Match.when('set-refused', () => ({ words: { happened: 'Flat set did not start', toDo: `exposure ${exposureSeconds} s was found` }, troubled: true })),
     Match.when('stopped', () => ({ words: { happened: 'Flats stopped', toDo: `at the ${exposureSeconds} s test` }, troubled: true })),
     Match.exhaustive,
   )

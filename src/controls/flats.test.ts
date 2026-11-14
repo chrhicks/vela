@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { RunEnding } from '../../state/entries.ts'
 import { entry, foldRig, wire } from '../../state/testing.ts'
 import type { CaptureRequest } from '../capture/request.ts'
+import { CommandRefused } from '../feed/commands.ts'
 import { Feed } from '../feed/feed.ts'
 import { Capturing } from './camera.ts'
 import { flatControls, FlatSettings, FlatsLog, type FlatTry } from './flats.ts'
@@ -15,7 +16,7 @@ async function until(check: () => boolean) {
   while (!check()) await new Promise(resolve => setTimeout(resolve, 2))
 }
 
-function setup(skies: ReadonlyArray<number>, options: { readonly busy?: boolean; readonly ending?: RunEnding; readonly tries?: number } = {}) {
+function setup(skies: ReadonlyArray<number>, options: { readonly busy?: boolean; readonly ending?: RunEnding; readonly tries?: number; readonly refuseSet?: boolean } = {}) {
   const started: Array<CaptureRequest> = []
   const tried: Array<FlatTry> = []
   let next = 0
@@ -27,7 +28,7 @@ function setup(skies: ReadonlyArray<number>, options: { readonly busy?: boolean;
     return { state: camera, entries: sky === undefined ? Stream.never : Stream.make(measured(sky)) }
   })
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe, current: Effect.succeed(camera) })
-  const capturing = Layer.succeed(Capturing, { busy: Effect.succeed(options.busy ?? false), start: (request: CaptureRequest) => Effect.sync(() => void started.push(request)), finished: Effect.succeed(options.ending ?? 'done') })
+  const capturing = Layer.succeed(Capturing, { busy: Effect.succeed(options.busy ?? false), start: (request: CaptureRequest) => (options.refuseSet === true && request.object === 'flat' ? Effect.fail(new CommandRefused({ refusal: { code: 'run-active' } })) : Effect.sync(() => void started.push(request))), finished: Effect.succeed(options.ending ?? 'done') })
   const log = Layer.succeed(FlatsLog, { tried: (flatTry: FlatTry) => Effect.sync(() => void tried.push(flatTry)) })
   const settings = Layer.succeed(FlatSettings, { startSeconds: 0.5, lowAdu: 20000, highAdu: 30000, minSeconds: 0.000032, maxSeconds: 30, tries: options.tries ?? 8, measureSeconds: 0.05 })
   const press = (frames: number, celsius: number) =>
@@ -90,6 +91,15 @@ describe('Flats', () => {
     expect(wandering.started).toHaveLength(3)
     expect(stopped.tried).toEqual([{ exposureSeconds: 0.5, verdict: 'stopped' }])
     expect(unmeasured.tried).toEqual([{ exposureSeconds: 0.5, verdict: 'not-measured' }])
+  })
+
+  it('says so when the set is refused after a good exposure was found', async () => {
+    const { tried, press } = setup([24800], { refuseSet: true })
+
+    await press(30, -10)
+    await until(() => tried.length === 2)
+
+    expect(tried.map(flatTry => flatTry.verdict)).toEqual(['good', 'set-refused'])
   })
 
   it('refuses while a run is capturing', async () => {
