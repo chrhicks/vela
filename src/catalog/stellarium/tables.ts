@@ -47,6 +47,11 @@ SELECT dso, name FROM (
   FROM stellarium_common_names
 ) WHERE position = 1;
 
+CREATE VIEW stellarium_citations AS
+SELECT dso, sum(CASE WHEN citations IS NULL THEN 0 ELSE length(citations) - length(replace(citations, ',', '')) + 1 END) AS citations
+FROM stellarium_common_names
+GROUP BY dso;
+
 CREATE VIEW stellarium_targets AS
 SELECT
   'stellarium-' || object.dso AS id,
@@ -58,6 +63,7 @@ SELECT
     preferred.name
   ) AS name,
   preferred.name AS commonName,
+  COALESCE(cited.citations, 0) AS nameCitations,
   type,
   ra AS raDegrees,
   dec AS decDegrees,
@@ -66,7 +72,8 @@ SELECT
   NULLIF(vMag, 99) AS vMagnitude,
   NULLIF(bMag, 99) AS bMagnitude
 FROM stellarium_objects AS object
-LEFT JOIN stellarium_preferred_names AS preferred ON preferred.dso = object.dso;
+LEFT JOIN stellarium_preferred_names AS preferred ON preferred.dso = object.dso
+LEFT JOIN stellarium_citations AS cited ON cited.dso = object.dso;
 
 CREATE VIEW stellarium_target_names AS
 SELECT 'stellarium-' || dso AS target, name, 0 AS common FROM stellarium_designations
