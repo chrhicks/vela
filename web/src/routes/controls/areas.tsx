@@ -16,7 +16,7 @@ import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
 import { ActionRow, Area } from './Area.tsx'
 import { NudgePad } from './NudgePad.tsx'
-import { calibrationFirstStep, type CalibrationType } from './stub.ts'
+import { calibrationFirstStep, CalibrationSetKind, calibrationSetWords } from './calibration-sets.ts'
 
 function TrackingButton({ onAnswer }: { readonly onAnswer: (answer: Answer) => void }) {
   const tracking = useRig(rig => rig.devices.mount.TELESCOPE_TRACK_STATE?.values.TRACK_ON)
@@ -251,7 +251,7 @@ export function DewArea() {
 }
 
 export function CalibrationArea() {
-  const [type, setType] = useState<CalibrationType>('darks')
+  const [type, setType] = useState<CalibrationSetKind>('darks')
   const controls = useLink().controls
   const lastLight = useRig(rig => (rig.run?.frameType === 'light' ? rig.run.exposureSeconds : undefined))
   const runActive = useRig(rig => rig.run?.status === 'capturing')
@@ -278,7 +278,7 @@ export function CalibrationArea() {
           ? { command: 'takeBias', ...set }
           : { command: 'takeFlats', ...set }
 
-  function choose(chosen: CalibrationType) {
+  function choose(chosen: CalibrationSetKind) {
     setType(chosen)
     setTypedExposure(undefined)
   }
@@ -290,12 +290,7 @@ export function CalibrationArea() {
       <ActionRow>
         <Choices
           name="Calibration type"
-          choices={[
-            { value: 'darks', label: 'Darks' },
-            { value: 'flats', label: 'Flats' },
-            { value: 'dark-flats', label: 'Dark flats' },
-            { value: 'bias', label: 'Bias' },
-          ]}
+          choices={CalibrationSetKind.literals.map(kind => ({ value: kind, label: calibrationSetWords[kind] }))}
           chosen={type}
           onChoose={choose}
         />
