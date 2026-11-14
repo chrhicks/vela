@@ -39,7 +39,8 @@ import { dewControls, DewSettings } from '../controls/dew.ts'
 import { flatControls, FlatSettings, FlatsLog } from '../controls/flats.ts'
 import { guidingControls, GuidingSettings } from '../controls/guiding.ts'
 import { Centring, mountControls, MountRuns, MountSettings } from '../controls/mount.ts'
-import { searchCatalog } from '../catalog/search.ts'
+import { catalogOf, readCatalog } from '../catalog/catalog.ts'
+import { CatalogSettings } from '../catalog/database.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -78,7 +79,19 @@ const sender = makeSender({
   now: Date.now,
 })
 const prepare = makePrepare({ picture, sender, settings: { focuser: settings.devices.focuser, box: settings.devices.box, camera: settings.devices.primary, focuserNudgeSteps: settings.prepare.focuserNudgeSteps } })
-const pointing = makePointing({ picture, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
+const catalog = runHandledSync(
+  readCatalog.pipe(
+    Effect.provide(Layer.succeed(CatalogSettings, settings.catalog)),
+    Effect.catchTag('CatalogUnreadable', ({ database, reason }) =>
+      Effect.sync(() => {
+        console.error(`vela: no target catalog, only typed positions can be found: ${database}: ${reason}. Run src/bin/catalog-setup.ts`)
+
+        return catalogOf([], [])
+      }),
+    ),
+  ),
+)
+const pointing = makePointing({ picture, catalog, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
 const capture = makeCapture({
   picture,
   sender,
@@ -224,7 +237,7 @@ const mountRuns = Layer.succeed(MountRuns, {
 const centring = Layer.succeed(Centring, {
   centreOn: target =>
     Effect.suspend(() => {
-      const found = searchCatalog(target, 1)[0]
+      const found = catalog.search(target, 1)[0]
 
       if (found === undefined) return Effect.fail(new CommandRefused({ refusal: { code: 'unknown-target', text: target } }))
 

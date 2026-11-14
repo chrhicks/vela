@@ -1,4 +1,4 @@
-import type { CatalogRow } from './types.ts'
+import type { CatalogTarget } from './types.ts'
 
 export interface Position {
   readonly raDegrees: number
@@ -58,12 +58,12 @@ export function positionName({ raDegrees, decDegrees }: Position) {
   return `${hours}h${raMinutes}m${raSeconds}s ${decDegrees < 0 ? '-' : '+'}${degrees}°${decMinutes}′${decSeconds}″`
 }
 
-export function positionRow(text: string): CatalogRow | undefined {
+export function positionTarget(text: string): CatalogTarget | undefined {
   const position = parsePosition(text)
 
   if (position === undefined) return undefined
 
   const id = `${position.raDegrees.toFixed(6)} ${position.decDegrees < 0 ? '' : '+'}${position.decDegrees.toFixed(6)}`
 
-  return [id, positionName(position), null, [], position.raDegrees, position.decDegrees, 'J2000 position', null, null, null]
+  return { id, name: positionName(position), commonName: null, type: 'J2000 position', ...position, majorAxisArcminutes: null, minorAxisArcminutes: null }
 }

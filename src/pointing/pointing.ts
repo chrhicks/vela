@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
-import { findRow, searchCatalog, type TargetSummary } from '../catalog/search.ts'
+import type { Catalog } from '../catalog/catalog.ts'
+import type { TargetSummary } from '../catalog/types.ts'
 import type { Sender } from '../commands/sender.ts'
 import { decodeConfig } from '../config.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'
@@ -24,6 +25,7 @@ export interface PointingSettings {
 
 export interface PointingOptions {
   readonly picture: Pick<Picture, 'property' | 'rig'>
+  readonly catalog: Catalog
   readonly sender: Pick<Sender, 'send'>
   readonly settings: PointingSettings
   readonly now: () => number
@@ -65,7 +67,7 @@ interface Pending {
 
 const refuse = (reason: string): PrepareResult => ({ ok: false, reason })
 
-export function makePointing({ picture, sender, settings, now }: PointingOptions) {
+export function makePointing({ picture, catalog, sender, settings, now }: PointingOptions) {
   const { mount } = settings
   let pending: Pending | undefined
 
@@ -85,12 +87,12 @@ export function makePointing({ picture, sender, settings, now }: PointingOptions
   }
 
   function preview(id: string): Preview {
-    const row = findRow(id)
+    const found = catalog.find(id)
 
-    if (row === undefined) return { ok: false, reason: `no catalog target ${id}` }
+    if (found === undefined) return { ok: false, reason: `no catalog target ${id}` }
 
     const at = now()
-    const target = targetOf(row, at)
+    const target = targetOf(found, at)
 
     return { ok: true, target, meridianLimitAt: meridianLimitAt(picture, mount, target.raHours, at) }
   }
@@ -193,7 +195,7 @@ export function makePointing({ picture, sender, settings, now }: PointingOptions
   }
 
   return {
-    search: (text: string): ReadonlyArray<TargetSummary> => searchCatalog(text, settings.searchResults),
+    search: (text: string): ReadonlyArray<TargetSummary> => catalog.search(text, settings.searchResults),
 
     preview,
 

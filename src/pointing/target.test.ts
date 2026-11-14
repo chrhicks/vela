@@ -1,11 +1,11 @@
 import { SiderealTime } from 'astronomy-engine'
 import { describe, expect, it } from 'vitest'
-import type { CatalogRow } from '../catalog/types.ts'
+import type { CatalogTarget } from '../catalog/types.ts'
 import { makePicture } from '../rig/picture.ts'
 import { connected, phoenixLongitude, startedAt, wire } from '../testing/entries.ts'
 import { meridianLimitAt, siteOf, targetOf } from './target.ts'
 
-const madeUp = (raDegrees: number, decDegrees: number): CatalogRow => ['made-up', 'X 1', null, ['X 1'], raDegrees, decDegrees, 'Galaxy', null, null, null]
+const madeUp = (raDegrees: number, decDegrees: number): CatalogTarget => ({ id: 'made-up', name: 'X 1', commonName: null, type: 'Galaxy', raDegrees, decDegrees, majorAxisArcminutes: null, minorAxisArcminutes: null })
 
 const arcseconds = (degrees: number) => degrees * 3600
 

@@ -1,5 +1,5 @@
 import { toMount } from '../sky/coordinates.ts'
-import type { CatalogRow } from '../catalog/types.ts'
+import type { CatalogTarget } from '../catalog/types.ts'
 import type { Picture } from '../rig/picture.ts'
 import { secondsToMeridianLimit } from '../sky/meridian.ts'
 
@@ -8,7 +8,6 @@ export interface Target {
   readonly name: string
   readonly commonName: string | null
   readonly type: string
-  readonly constellation: string | null
   readonly raJ2000Hours: number
   readonly decJ2000Degrees: number
   readonly raHours: number
@@ -32,17 +31,16 @@ export function siteOf(picture: Pick<Picture, 'property'>, mount: string): Site 
   return { latitudeDegrees: latitude, longitudeDegrees: longitude > 180 ? longitude - 360 : longitude, elevationMeters: typeof elevation === 'number' ? elevation : 0 }
 }
 
-export function targetOf(row: CatalogRow, at: number): Target {
-  const ofDate = toMount({ raDegrees: row[4], decDegrees: row[5] }, new Date(at))
+export function targetOf(found: CatalogTarget, at: number): Target {
+  const ofDate = toMount(found, new Date(at))
 
   return {
-    id: row[0],
-    name: row[1],
-    commonName: row[2],
-    type: row[6],
-    constellation: row[9],
-    raJ2000Hours: row[4] / 15,
-    decJ2000Degrees: row[5],
+    id: found.id,
+    name: found.name,
+    commonName: found.commonName,
+    type: found.type,
+    raJ2000Hours: found.raDegrees / 15,
+    decJ2000Degrees: found.decDegrees,
     raHours: ofDate.raDegrees / 15,
     decDegrees: ofDate.decDegrees,
   }
