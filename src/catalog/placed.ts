@@ -1,4 +1,5 @@
 import type { Site } from '../pointing/target.ts'
+import type { EquatorialPosition } from '../sky/coordinates.ts'
 import { moonPosition, placementOf } from '../sky/placement.ts'
 import type { TargetFacts, TargetFound } from '../../state/targets.ts'
 import { summarised, type Catalog } from './catalog.ts'
@@ -15,10 +16,11 @@ export interface PlacedSettings {
 export interface PlacedOptions {
   readonly catalog: Catalog
   readonly site: () => Site | undefined
+  readonly lastCentreNear: (position: EquatorialPosition) => (EquatorialPosition & { readonly at: number }) | undefined
   readonly settings: PlacedSettings
 }
 
-export function makePlacedTargets({ catalog, site, settings }: PlacedOptions) {
+export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: PlacedOptions) {
   const placer = (at: number) => {
     const here = site()
 
@@ -46,6 +48,7 @@ export function makePlacedTargets({ catalog, site, settings }: PlacedOptions) {
       if (target === undefined) return undefined
 
       const summary = summarised(target)
+      const centred = lastCentreNear(target)
       const shown = [target.name, target.commonName]
 
       return {
@@ -54,6 +57,7 @@ export function makePlacedTargets({ catalog, site, settings }: PlacedOptions) {
         dualBandHint: dualBandHint(target),
         otherNames: catalog.namesOf(target).filter(name => !shown.includes(name)),
         sizeArcminutes: target.majorAxisArcminutes === null ? null : { long: target.majorAxisArcminutes, short: target.minorAxisArcminutes },
+        lastCentre: centred === undefined ? null : { raDegrees: centred.raDegrees, decDegrees: centred.decDegrees, at: centred.at },
       }
     },
 

@@ -139,6 +139,11 @@ export const PointingSettings = Schema.Struct({
     Schema.Number,
     30,
   ),
+  sameFramingDegrees: described(
+    'How far, in degrees, a centre reached before may be from a target for it to be offered as the same framing',
+    Schema.Number,
+    1.1,
+  ),
   bestPlacedMinArcminutes: described(
     'The size, in arcminutes along its long side, a target needs to be listed as best placed',
     Schema.Number,
