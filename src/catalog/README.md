@@ -15,7 +15,7 @@ No catalog data is in this repository. `node src/bin/catalog-setup.ts <config.js
 | `targets` (view) | One row per object: id, source, name, common name, type, J2000 position in degrees, size in arcminutes, magnitudes. Unknown values are null |
 | `target_names` (view) | One row per name a target can be found by: every designation and every common name |
 
-A target's `name` is its first designation in the order of `src/catalog/stellarium/designations.ts` (Messier, NGC, IC, then the others). Its `commonName` is the name `names.dat` cites the most references for; the first in the file wins a tie. `type` is Stellarium's type code.
+A target's `name` is its first designation in the order of `src/catalog/stellarium/designations.ts` (Messier, NGC, IC, then the others). Its `commonName` is the name `names.dat` cites the most references for; the last in the file wins a tie, as in Stellarium. `type` is Stellarium's type code.
 
 ## Reading it
 

@@ -43,7 +43,7 @@ SELECT CAST(identifier AS INTEGER), name, line, citations FROM stellarium_names 
 
 CREATE VIEW stellarium_preferred_names AS
 SELECT dso, name FROM (
-  SELECT dso, name, row_number() OVER (PARTITION BY dso ORDER BY length(citations) - length(replace(citations, ',', '')) DESC, line) AS position
+  SELECT dso, name, row_number() OVER (PARTITION BY dso ORDER BY length(citations) - length(replace(citations, ',', '')) DESC, line DESC) AS position
   FROM stellarium_common_names
 ) WHERE position = 1;
 
