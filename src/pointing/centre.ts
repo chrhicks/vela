@@ -46,6 +46,7 @@ export type CentrePass =
       readonly eastArcmin: number
       readonly northArcmin: number
       readonly mountArcmin: number | undefined
+      readonly rotationDegrees: number | undefined
     }
 
 export type CentreStep = 'slewing' | 'measuring' | 'syncing'
@@ -71,7 +72,7 @@ export function arcText(arcmin: number) {
   return arcmin < 1 ? `${Math.round(arcmin * 60)}″` : `${arcmin.toFixed(1)}′`
 }
 
-export function passOf(solved: EquatorialPosition, target: CentreTarget, mount: EquatorialPosition | undefined, frame: number): CentrePass & { readonly solved: true } {
+export function passOf(solved: EquatorialPosition & { readonly rotationDegrees: number | undefined }, target: CentreTarget, mount: EquatorialPosition | undefined, frame: number): CentrePass & { readonly solved: true } {
   const goal = { raDegrees: target.raJ2000Hours * 15, decDegrees: target.decJ2000Degrees }
 
   return {
@@ -83,6 +84,7 @@ export function passOf(solved: EquatorialPosition, target: CentreTarget, mount: 
     eastArcmin: arcminutes(signedDegrees(solved.raDegrees - goal.raDegrees) * Math.cos((goal.decDegrees * Math.PI) / 180)),
     northArcmin: arcminutes(solved.decDegrees - goal.decDegrees),
     mountArcmin: mount === undefined ? undefined : arcminutes(angularDistance(mount, solved)),
+    rotationDegrees: solved.rotationDegrees,
   }
 }
 
@@ -98,8 +100,9 @@ function passFrom(body: Readonly<Record<string, unknown>>): CentrePass | undefin
 
   const [raDegrees, decDegrees, offsetArcmin, eastArcmin, northArcmin] = numbers as number[]
   const mount = body['mountArcmin']
+  const rotation = body['rotationDegrees']
 
-  return { frame, solved: true, raDegrees: raDegrees!, decDegrees: decDegrees!, offsetArcmin: offsetArcmin!, eastArcmin: eastArcmin!, northArcmin: northArcmin!, mountArcmin: typeof mount === 'number' ? mount : undefined }
+  return { frame, solved: true, raDegrees: raDegrees!, decDegrees: decDegrees!, offsetArcmin: offsetArcmin!, eastArcmin: eastArcmin!, northArcmin: northArcmin!, mountArcmin: typeof mount === 'number' ? mount : undefined, rotationDegrees: typeof rotation === 'number' ? rotation : undefined }
 }
 
 export function makeCentre({ picture, pointing, capture, publish, settings, now }: CentreOptions) {
@@ -245,7 +248,7 @@ export function makeCentre({ picture, pointing, capture, publish, settings, now 
       const reading = picture.property(settings.mount, 'EQUATORIAL_EOD_COORD')?.values
       const mount = typeof reading?.['RA'] === 'number' && typeof reading['DEC'] === 'number' ? fromMount({ raDegrees: reading['RA'] * 15, decDegrees: reading['DEC'] }, new Date(at)) : undefined
 
-      publish('pass', { ...base, ...passOf({ raDegrees: answer.solve.raDegrees, decDegrees: answer.solve.decDegrees }, target, mount, label.frame) })
+      publish('pass', { ...base, ...passOf(answer.solve, target, mount, label.frame) })
     },
 
     observe(entry: Entry) {

@@ -33,7 +33,7 @@ function scriptedRun(solveFrame: (frame: number) => Solution, solveMs = 0, stopA
           const solution = solveFrame(frame)
           const header = { 'DATE-OBS': new Date(startedAt + 60_000 * frame).toISOString().slice(0, 23), EXPTIME: 2 }
 
-          holder.align?.measured({ file, result: 'measured', solve: solution.ok ? { solved: true, raDegrees: solution.raDegrees, decDegrees: solution.decDegrees } : { solved: false, reason: solution.reason }, stars: undefined, header })
+          holder.align?.measured({ file, result: 'measured', solve: solution.ok ? { solved: true, raDegrees: solution.raDegrees, decDegrees: solution.decDegrees, rotationDegrees: undefined } : { solved: false, reason: solution.reason }, stars: undefined, header })
         }, solveMs)
       }
       events.push(`${event.kind}:${String(event.body['frame'] ?? '')}`)
