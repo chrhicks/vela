@@ -95,11 +95,13 @@ export const flatControls = Effect.gen(function* () {
         if (limits !== undefined && (celsius < limits.min || celsius > limits.max)) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'out-of-range', value: celsius, ...limits } }))
         if (yield* capturing.busy) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'run-active' } }))
 
-        const set = (exposureSeconds: number) => capturing.start({ object: 'flat', frameType: 'flat', exposureSeconds, count: frames, gain, offset, cooler: 'on', setpoint: celsius, waitForSetpoint: true })
+        const set = (exposureSeconds: number) =>
+          capturing
+            .start({ object: 'flat', frameType: 'flat', exposureSeconds, count: frames, gain, offset, cooler: 'on', setpoint: celsius, waitForSetpoint: true })
+            .pipe(Effect.catchTag('CommandRefused', () => log.tried({ exposureSeconds, verdict: 'set-refused' })))
 
         yield* exposureFrom({ gain, offset }, celsius, settings.startSeconds, 0).pipe(
           Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: set })),
-          Effect.ignore,
           Effect.forkDetach,
         )
 

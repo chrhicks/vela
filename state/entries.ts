@@ -139,7 +139,7 @@ export const FocusSampled = entryOf('vela.focus.sample', { run: RunId, frame: Co
 
 export const FocusBest = entryOf('vela.focus.best', { run: RunId, position: Schema.Number })
 
-export const FlatVerdict = Schema.Literals(['trying', 'good', 'too-dark', 'too-bright', 'gave-up', 'not-measured', 'stopped'])
+export const FlatVerdict = Schema.Literals(['trying', 'good', 'too-dark', 'too-bright', 'gave-up', 'not-measured', 'stopped', 'set-refused'])
 
 export type FlatVerdict = typeof FlatVerdict.Type
 
