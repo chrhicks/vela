@@ -23,7 +23,7 @@ function frameStyle(angleDegrees: number, eastDegrees: number, northDegrees: num
     height: `${size}%`,
     left: `${50 - (eastDegrees / frameDegrees.width) * size}%`,
     top: `${50 - (northDegrees / frameDegrees.height) * size}%`,
-    transform: `translate(-50%, -50%) rotate(${-angleDegrees}deg)`,
+    transform: `translate(-50%, -50%) rotate(${angleDegrees}deg)`,
   }
 }
 
