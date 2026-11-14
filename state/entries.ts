@@ -1,5 +1,5 @@
 import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effect'
-import { FilterAnswer } from './commands.ts'
+import { FilterAnswer, Refusal } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
 import { RunTarget } from './targets.ts'
 
@@ -94,7 +94,7 @@ export type LinkStatus = typeof LinkStatus.Type
 
 export const RigLink = entryOf('client.connection', { target: LinkTarget, status: LinkStatus })
 
-export const GuiderEvent = Schema.Literals(['GuideStep', 'StartGuiding', 'GuidingStopped', 'LoopingExposures', 'LoopingExposuresStopped', 'StartCalibration', 'StarSelected', 'StarLost', 'Paused', 'Resumed'])
+export const GuiderEvent = Schema.Literals(['GuideStep', 'StartGuiding', 'GuidingStopped', 'LoopingExposures', 'LoopingExposuresStopped', 'StartCalibration', 'StarSelected', 'StarLost', 'Paused', 'Resumed', 'SettleDone'])
 
 export type GuiderEvent = typeof GuiderEvent.Type
 
@@ -108,6 +108,8 @@ export const GuiderReported = Schema.Struct({
     SNR: Schema.optionalKey(Schema.Number),
     RADistanceRaw: Schema.optionalKey(Schema.Number),
     DECDistanceRaw: Schema.optionalKey(Schema.Number),
+    Status: Schema.optionalKey(Schema.Number),
+    Error: Schema.optionalKey(Schema.String),
   }),
 })
 
@@ -149,7 +151,23 @@ export const FlatExposureTried = entryOf('vela.flats.exposure', { exposureSecond
 
 export const FilterAnswered = entryOf('vela.filter', { filter: FilterAnswer })
 
-export const RigEntry = Schema.Union([RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
+export const StartId = Schema.String.pipe(Schema.brand('StartId'))
+
+export type StartId = typeof StartId.Type
+
+export const StartStep = Schema.Literals(['home', 'stop-guiding', 'centre', 'autofocus', 'guiding', 'capture'])
+
+export type StartStep = typeof StartStep.Type
+
+export const StepOutcome = Schema.Literals(['started', 'done', 'failed', 'stopped'])
+
+export type StepOutcome = typeof StepOutcome.Type
+
+export const TargetStep = entryOf('vela.target.step', { start: StartId, target: RunTarget, step: StartStep, outcome: StepOutcome, refusal: Schema.optionalKey(Refusal) })
+
+export type TargetStepBody = typeof TargetStep.Type['body']
+
+export const RigEntry = Schema.Union([TargetStep, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 

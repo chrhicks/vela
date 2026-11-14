@@ -23,6 +23,7 @@ const activityOf: Readonly<Record<GuiderEvent, GuiderActivity>> = {
   GuideStep: 'guiding',
   StartGuiding: 'guiding',
   Resumed: 'guiding',
+  SettleDone: 'guiding',
   GuidingStopped: 'stopped',
   LoopingExposuresStopped: 'stopped',
   LoopingExposures: 'looping',

@@ -243,6 +243,11 @@ export const AutofocusSettings = Schema.Struct({
   ),
 })
 
+export const StartRoutineSettings = Schema.Struct({
+  homeSeconds: described('Seconds the start routine waits for the mount to report the end of its move home before it reports the step and goes on', Schema.Number, 120),
+  guidingSeconds: described('Seconds the start routine waits for PHD2 to report guiding settled, calibration included, before it reports the step and goes on', Schema.Number, 600),
+})
+
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the night page is served on, on 127.0.0.1 only' }),
   broker: BrokerSettings,
@@ -284,6 +289,7 @@ export const VelaSettings = Schema.Struct({
   launch: described('What the launch steps start on a tap: alignment, and autofocus after the filter answer', LaunchSettings, {}),
   controls: described('The controls page', ControlsSettings, {}),
   centre: described('Settings for slew and centre', CentreSettings, {}),
+  start: described('Starting a target from the picker: home, stop guiding, slew and centre, autofocus, guiding, then the run', StartRoutineSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({
       description: "The address of Cria's stream viewer, which shows the raw INDI wire. The Activity view links to it; without it, there is no link",
