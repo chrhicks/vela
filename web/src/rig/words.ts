@@ -65,6 +65,7 @@ export const refusalWords = (refusal: Refusal): RefusalWords =>
     Match.discriminatorsExhaustive('code')({
       refused: ({ text }) => ({ happened: text }),
       'not-connected': ({ device }) => ({ happened: `${deviceWords[device]} not connected` }),
+      'not-reported': ({ device, property }) => ({ happened: `${deviceWords[device]} does not report ${property}` }),
       'no-answer': ({ seconds }) => ({ happened: `No answer ${seconds} s`, toDo: 'Check rig PC' }),
       'rig-refused': ({ text }) => ({ happened: 'Rig refused', toDo: text }),
       'guider-refused': ({ text }) => ({ happened: 'PHD2 refused', toDo: text }),
