@@ -48,6 +48,7 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('takeBias'), frames: Schema.Int.check(Schema.isGreaterThan(0)), celsius: Schema.Number }),
   Schema.Struct({ command: Schema.Literal('testFrame'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
   Schema.Struct({ command: Schema.Literal('autofocus'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
+  Schema.Struct({ command: Schema.Literal('startTarget'), target: Schema.NonEmptyString, exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), frames: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))) }),
 ])
 
 export type CommandRequest = typeof CommandRequest.Type
@@ -68,6 +69,7 @@ export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('flats'), frames: Schema.Number, celsius: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('bias'), frames: Schema.Number, celsius: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('test-frame'), exposureSeconds: Schema.Number, sequence: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('capturing-target'), name: Schema.String, exposureSeconds: Schema.Number, frames: Schema.optionalKey(Schema.Number) }),
   Schema.Struct({ code: Schema.Literal('autofocusing'), exposureSeconds: Schema.Number, endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean }),

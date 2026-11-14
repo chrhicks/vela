@@ -50,3 +50,7 @@ export const TargetFacts = Schema.Struct({
 })
 
 export type TargetFacts = typeof TargetFacts.Type
+
+export const RunTarget = Schema.Struct({ id: TargetId, name: Schema.String, raDegrees: Schema.Number, decDegrees: Schema.Number })
+
+export type RunTarget = typeof RunTarget.Type

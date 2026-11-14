@@ -40,6 +40,13 @@ describe('run', () => {
     expect(state).toMatchObject({ status: 'capturing', id: 'u1', object: 'NGC 7635', count: undefined })
   })
 
+  it('keeps the catalog target a run was started on', () => {
+    const target = { id: 'stellarium-6839', name: 'NGC 7635', raDegrees: 350.2, decDegrees: 61.2 }
+    const state = reduce([entry('vela.run.started', 1000, { run: 't1', object: 'NGC 7635', frameType: 'light', exposureSeconds: 60, count: 300, target })])
+
+    expect(state).toMatchObject({ status: 'capturing', id: 't1', object: 'NGC 7635', target })
+  })
+
   it("keeps the target's run while Vela centres, aligns or focuses, which are runs of their own", () => {
     const operation = (object: string, id: string) => entry('vela.run.started', 2000, { run: id, object, frameType: 'light', exposureSeconds: 2 })
     const state = reduce([

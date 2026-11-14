@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
 import { FrameType } from '../../state/entries.ts'
+import { RunTarget } from '../../state/targets.ts'
 import { decodeConfig } from '../config.ts'
 
 export const frameTypeElement: Readonly<Record<FrameType, string>> = {
@@ -21,6 +22,7 @@ export const CaptureRequest = Schema.Struct({
   cooler: Schema.Literals(['keep', 'on', 'off']),
   setpoint: Schema.optionalKey(Schema.Finite),
   waitForSetpoint: Schema.optionalKey(Schema.Boolean),
+  target: Schema.optionalKey(RunTarget),
 })
 
 export type CaptureRequest = typeof CaptureRequest.Type

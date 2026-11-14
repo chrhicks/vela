@@ -32,6 +32,7 @@ export const doneWords = (done: Done): RefusalWords =>
       'dew-fixed': ({ percent }) => ({ happened: `Dew heater at ${percent} %` }),
       'dew-off': () => ({ happened: 'Dew heater off' }),
       'test-frame': ({ exposureSeconds }) => ({ happened: `Test frame ${exposureSeconds} s` }),
+      'capturing-target': ({ name, exposureSeconds, frames }) => ({ happened: `Capturing ${name}`, toDo: frames === undefined ? `${exposureSeconds} s frames until stopped` : `${frames} × ${exposureSeconds} s` }),
       darks: ({ frames, exposureSeconds, celsius }) => ({ happened: `Darks ${frames} × ${exposureSeconds} s`, toDo: `at ${celsius} °C` }),
       'dark-flats': ({ frames, exposureSeconds, celsius }) => ({ happened: `Dark flats ${frames} × ${exposureSeconds} s`, toDo: `at ${celsius} °C` }),
       flats: ({ frames, celsius }) => ({ happened: `Flats ${frames} frames`, toDo: `at ${celsius} °C · finding the exposure` }),
