@@ -3,7 +3,7 @@ import { readdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { jetstream } from '@nats-io/jetstream'
-import { Clock, Context, Effect, Layer, Match, Scope, Stream } from 'effect'
+import { Clock, Context, Effect, Fiber, Layer, Match, Scope, Stream } from 'effect'
 import { runEntry } from '../capture/events.ts'
 import { makeRunFile } from '../capture/runfile.ts'
 import { makeCapture } from '../capture/run.ts'
@@ -42,13 +42,13 @@ import { CalibrationSettings, cameraControls, Capturing } from '../controls/came
 import { dewControls, DewSettings } from '../controls/dew.ts'
 import { flatControls, FlatSettings, FlatsLog } from '../controls/flats.ts'
 import { guidingControls, GuidingSettings } from '../controls/guiding.ts'
-import { TargetCatalog, targetControls } from '../controls/target.ts'
+import { StartLog, StartRunning, StartSettings, startControls, TargetCatalog, TargetCentring } from '../controls/start.ts'
 import { Centring, mountControls, MountRuns, MountSettings } from '../controls/mount.ts'
 import { catalogOf, readCatalog } from '../catalog/catalog.ts'
 import { CatalogSettings } from '../catalog/database.ts'
 import { makePlacedTargets } from '../catalog/placed.ts'
 import { operationObjects } from '../../state/entries.ts'
-import { NightName } from '../../state/entries.ts'
+import { NightName, StartId } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
 import { ServiceStartNow } from '../feed/start.ts'
 import { makeReader, type Entry, type Message } from '../../state/entry.ts'
@@ -234,8 +234,44 @@ const launchOperations = {
     ),
 }
 
+let startRoutine: Fiber.Fiber<void> | undefined
+
+const cancelStart = Effect.suspend(() => (startRoutine === undefined ? Effect.void : Fiber.interrupt(startRoutine)))
+
+const startServices = Layer.mergeAll(
+  Layer.succeed(TargetCatalog, { find: id => catalog.find(id) }),
+  Layer.succeed(TargetCentring, { centre: id => Effect.suspend(() => started(centre.start({ id, exposureSeconds: settings.controls.centreExposureSeconds }))) }),
+  Layer.succeed(StartLog, { report: step => Effect.sync(() => publishEntry(stream.vela('target'), 'vela.target.step', `${step.start}:${step.step}:${step.outcome}`, step)) }),
+  Layer.succeed(StartRunning, {
+    busy: Effect.sync(() => startRoutine !== undefined),
+    began: routine =>
+      Effect.sync(() => {
+        startRoutine = routine
+      }).pipe(
+        Effect.andThen(
+          Effect.forkDetach(
+            Fiber.await(routine).pipe(
+              Effect.andThen(
+                Effect.sync(() => {
+                  if (startRoutine === routine) startRoutine = undefined
+                }),
+              ),
+            ),
+          ),
+        ),
+        Effect.asVoid,
+      ),
+  }),
+  Layer.succeed(StartSettings, {
+    ...settings.start,
+    rigSilentAfterSeconds: settings.silenceSeconds,
+    autofocusExposureSeconds: settings.launch.autofocusExposureSeconds,
+    newId: Effect.sync(() => StartId.make(`start-${randomUUID()}`)),
+  }),
+)
+
 const mountRuns = Layer.succeed(MountRuns, {
-  endRun: Effect.promise(() => capture.stop()),
+  endRun: cancelStart.pipe(Effect.andThen(Effect.promise(() => capture.stop()))),
   idle: Effect.promise(() => capture.whenIdle()),
   pause: Effect.sync(() => capture.pause()),
   resume: Effect.sync(() => capture.resume()),
@@ -264,7 +300,7 @@ const capturing = Layer.succeed(Capturing, {
 
 const flatsLog = Layer.succeed(FlatsLog, { tried: flatTry => Effect.sync(() => publishEntry(stream.vela('flats'), 'vela.flats.exposure', String(flatTry.exposureSeconds), { ...flatTry })) })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls, flatControls, guidingControls, targetControls]), ([mount, focus, camera, dew, flats, guiding, target]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew, ...flats, ...guiding, ...target }))).pipe(Layer.provide(Layer.succeed(TargetCatalog, { find: id => catalog.find(id) })), Layer.provide(Layer.succeed(GuidingSettings, { settle: { pixels: settings.controls.guideSettlePixels, time: settings.controls.guideSettleSeconds, timeout: settings.controls.guideSettleTimeoutSeconds }, replySeconds: settings.controls.guiderReplySeconds, connectSeconds: settings.controls.guiderConnectSeconds, newId: Effect.sync(() => `vela-guider-${randomUUID()}`) })), Layer.provide(flatsLog), Layer.provide(Layer.succeed(FlatSettings, { startSeconds: settings.controls.flatStartSeconds, lowAdu: settings.controls.flatLowAdu, highAdu: settings.controls.flatHighAdu, minSeconds: settings.controls.biasExposureSeconds, maxSeconds: settings.controls.flatMaxSeconds, tries: settings.controls.flatTries, measureSeconds: settings.controls.flatMeasureSeconds })), Layer.provide(Layer.succeed(CalibrationSettings, { biasExposureSeconds: settings.controls.biasExposureSeconds })), Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
+const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls, flatControls, guidingControls, startControls]), ([mount, focus, camera, dew, flats, guiding, start]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew, ...flats, ...guiding, ...start }))).pipe(Layer.provide(startServices), Layer.provide(Layer.succeed(GuidingSettings, { settle: { pixels: settings.controls.guideSettlePixels, time: settings.controls.guideSettleSeconds, timeout: settings.controls.guideSettleTimeoutSeconds }, replySeconds: settings.controls.guiderReplySeconds, connectSeconds: settings.controls.guiderConnectSeconds, newId: Effect.sync(() => `vela-guider-${randomUUID()}`) })), Layer.provide(flatsLog), Layer.provide(Layer.succeed(FlatSettings, { startSeconds: settings.controls.flatStartSeconds, lowAdu: settings.controls.flatLowAdu, highAdu: settings.controls.flatHighAdu, minSeconds: settings.controls.biasExposureSeconds, maxSeconds: settings.controls.flatMaxSeconds, tries: settings.controls.flatTries, measureSeconds: settings.controls.flatMeasureSeconds })), Layer.provide(Layer.succeed(CalibrationSettings, { biasExposureSeconds: settings.controls.biasExposureSeconds })), Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds })))
 
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),
