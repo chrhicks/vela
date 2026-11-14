@@ -74,7 +74,7 @@ describe('Test frame', () => {
     const { sent, press } = setup(camera)
 
     expect(await press(controls => controls.takeDarks(30, 120, -10))).toMatchObject({ success: { code: 'darks', frames: 30, exposureSeconds: 120, celsius: -10 } })
-    expect(sent).toEqual(['capture {"object":"dark","frameType":"dark","exposureSeconds":120,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10}'])
+    expect(sent).toEqual(['capture {"object":"dark","frameType":"dark","exposureSeconds":120,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10,"waitForSetpoint":true}'])
   })
 
   it('refuses darks while a run is capturing, or at a temperature the camera cannot reach', async () => {
@@ -88,8 +88,8 @@ describe('Test frame', () => {
     expect(await press(controls => controls.takeDarkFlats(30, 0.5, -10))).toMatchObject({ success: { code: 'dark-flats', frames: 30, exposureSeconds: 0.5, celsius: -10 } })
     expect(await press(controls => controls.takeBias(30, -10))).toMatchObject({ success: { code: 'bias', frames: 30, celsius: -10 } })
     expect(sent).toEqual([
-      'capture {"object":"dark-flat","frameType":"dark","exposureSeconds":0.5,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10}',
-      'capture {"object":"bias","frameType":"bias","exposureSeconds":0.000032,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10}',
+      'capture {"object":"dark-flat","frameType":"dark","exposureSeconds":0.5,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10,"waitForSetpoint":true}',
+      'capture {"object":"bias","frameType":"bias","exposureSeconds":0.000032,"count":30,"gain":100,"offset":50,"cooler":"on","setpoint":-10,"waitForSetpoint":true}',
     ])
   })
 })
