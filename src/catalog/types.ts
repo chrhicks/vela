@@ -1,7 +1,8 @@
 import { Schema } from 'effect'
+import { TargetId } from '../../state/targets.ts'
 
 export const CatalogTarget = Schema.Struct({
-  id: Schema.String,
+  id: TargetId,
   name: Schema.String,
   commonName: Schema.NullOr(Schema.String),
   type: Schema.String,
@@ -14,16 +15,8 @@ export const CatalogTarget = Schema.Struct({
 export type CatalogTarget = typeof CatalogTarget.Type
 
 export const TargetName = Schema.Struct({
-  target: Schema.String,
+  target: TargetId,
   name: Schema.String,
 })
 
 export type TargetName = typeof TargetName.Type
-
-export interface TargetSummary {
-  readonly id: string
-  readonly name: string
-  readonly commonName: string | null
-  readonly type: string
-  readonly constellation: string | null
-}

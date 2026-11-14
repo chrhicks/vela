@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import type { Catalog } from '../catalog/catalog.ts'
-import type { TargetSummary } from '../catalog/types.ts'
+import type { TargetSummary } from '../../state/targets.ts'
 import type { Sender } from '../commands/sender.ts'
 import { decodeConfig } from '../config.ts'
 import type { PrepareResult } from '../prepare/prepare.ts'

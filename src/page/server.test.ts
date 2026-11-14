@@ -1,4 +1,5 @@
 import type { AddressInfo } from 'node:net'
+import { TargetId } from '../../state/targets.ts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { makeNight, type Night } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
@@ -203,7 +204,7 @@ describe('page server', () => {
       pointing: {
         ...idlePointing,
         act: async request => (received.push(request), { ok: true }),
-        search: text => [{ id: 'ngc0224', name: text, commonName: null, type: 'Galaxy', constellation: null }],
+        search: text => [{ id: TargetId.make('ngc0224'), name: text, commonName: null, type: 'Galaxy', constellation: null }],
       },
     })
     const response = await fetch(`${base}/pointing`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"action":"stop"}' })

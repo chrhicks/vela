@@ -1,7 +1,8 @@
+import { TargetId } from '../../state/targets.ts'
 import { catalogOf } from './catalog.ts'
 import type { CatalogTarget, TargetName } from './types.ts'
 
-const target = (id: string, name: string, commonName: string | null, type: string, raDegrees: number, decDegrees: number): CatalogTarget => ({ id, name, commonName, type, raDegrees, decDegrees, majorAxisArcminutes: null, minorAxisArcminutes: null })
+const target = (id: string, name: string, commonName: string | null, type: string, raDegrees: number, decDegrees: number): CatalogTarget => ({ id: TargetId.make(id), name, commonName, type, raDegrees, decDegrees, majorAxisArcminutes: null, minorAxisArcminutes: null })
 
 export const andromeda = target('andromeda', 'M 31', 'Andromeda Galaxy', 'Gx', 10.68, 41.27)
 
@@ -20,9 +21,9 @@ export const testTargets: ReadonlyArray<CatalogTarget> = [
 export const testNames: ReadonlyArray<TargetName> = [
   ...testTargets.map(({ id, name }) => ({ target: id, name })),
   ...testTargets.flatMap(({ id, commonName }) => (commonName === null ? [] : [{ target: id, name: commonName }])),
-  { target: 'andromeda', name: 'NGC 224' },
-  { target: 'triangulum', name: 'Pinwheel Galaxy' },
-  { target: 'orion', name: 'Great Orion Nebula' },
+  { target: TargetId.make('andromeda'), name: 'NGC 224' },
+  { target: TargetId.make('triangulum'), name: 'Pinwheel Galaxy' },
+  { target: TargetId.make('orion'), name: 'Great Orion Nebula' },
 ]
 
 export const testCatalog = catalogOf(testTargets, testNames)

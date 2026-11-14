@@ -1,11 +1,12 @@
 import { SiderealTime } from 'astronomy-engine'
 import { describe, expect, it } from 'vitest'
 import type { CatalogTarget } from '../catalog/types.ts'
+import { TargetId } from '../../state/targets.ts'
 import { makePicture } from '../rig/picture.ts'
 import { connected, phoenixLongitude, startedAt, wire } from '../testing/entries.ts'
 import { meridianLimitAt, siteOf, targetOf } from './target.ts'
 
-const madeUp = (raDegrees: number, decDegrees: number): CatalogTarget => ({ id: 'made-up', name: 'X 1', commonName: null, type: 'Galaxy', raDegrees, decDegrees, majorAxisArcminutes: null, minorAxisArcminutes: null })
+const madeUp = (raDegrees: number, decDegrees: number): CatalogTarget => ({ id: TargetId.make('made-up'), name: 'X 1', commonName: null, type: 'Galaxy', raDegrees, decDegrees, majorAxisArcminutes: null, minorAxisArcminutes: null })
 
 const arcseconds = (degrees: number) => degrees * 3600
 
@@ -24,7 +25,7 @@ describe('epoch of date', () => {
   it('keeps the J2000 position beside the one of date, and the catalog names', () => {
     const target = targetOf(madeUp(90, 45), startedAt)
 
-    expect(target).toMatchObject({ id: 'made-up', name: 'X 1', commonName: null, type: 'Galaxy', raJ2000Hours: 6, decJ2000Degrees: 45 })
+    expect(target).toMatchObject({ id: TargetId.make('made-up'), name: 'X 1', commonName: null, type: 'Galaxy', raJ2000Hours: 6, decJ2000Degrees: 45 })
     expect(target.raHours).not.toBe(6)
   })
 
