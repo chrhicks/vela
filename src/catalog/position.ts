@@ -59,12 +59,12 @@ export function positionName({ raDegrees, decDegrees }: Position) {
   return `${hours}h${raMinutes}m${raSeconds}s ${decDegrees < 0 ? '-' : '+'}${degrees}°${decMinutes}′${decSeconds}″`
 }
 
+export const positionId = ({ raDegrees, decDegrees }: Position) => TargetId.make(`${raDegrees.toFixed(6)} ${decDegrees < 0 ? '' : '+'}${decDegrees.toFixed(6)}`)
+
 export function positionTarget(text: string): CatalogTarget | undefined {
   const position = parsePosition(text)
 
   if (position === undefined) return undefined
 
-  const id = TargetId.make(`${position.raDegrees.toFixed(6)} ${position.decDegrees < 0 ? '' : '+'}${position.decDegrees.toFixed(6)}`)
-
-  return { id, name: positionName(position), commonName: null, type: 'J2000 position', ...position, majorAxisArcminutes: null, minorAxisArcminutes: null, nameCitations: 0, inHydrogenRegionCatalog: 0 }
+  return { id: positionId(position), name: positionName(position), commonName: null, type: 'J2000 position', ...position, majorAxisArcminutes: null, minorAxisArcminutes: null, nameCitations: 0, inHydrogenRegionCatalog: 0 }
 }

@@ -68,8 +68,8 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
     Layer.succeed(StartSettings, { homeSeconds: 5, guidingSeconds: 5, rigSilentAfterSeconds: 10, autofocusExposureSeconds: { in: 10, out: 2 }, newId: Effect.succeed(StartId.make('start-1')) }),
   )
 
-  const press = (id: string, exposureSeconds: number, frames: number | undefined) =>
-    Effect.runPromise(Effect.flatMap(startControls, controls => controls.startTarget(id, exposureSeconds, frames)).pipe(Effect.result, Effect.provide(services)))
+  const press = (id: string, exposureSeconds: number, frames: number | undefined, centre?: { readonly raDegrees: number; readonly decDegrees: number }) =>
+    Effect.runPromise(Effect.flatMap(startControls, controls => controls.startTarget(id, exposureSeconds, frames, centre)).pipe(Effect.result, Effect.provide(services)))
 
   return { did, reported, started, press, finished: () => Effect.runPromise(Fiber.await(routine!)), stop: () => Effect.runPromise(Fiber.interrupt(routine!)), underWay: () => vi.waitFor(() => expect(reported).toContain('home started')) }
 }
@@ -114,6 +114,16 @@ describe('Start a target', () => {
 
     expect(reported).toEqual(['home started', 'home stopped'])
     expect(started).toEqual([])
+  })
+
+  it('centres on a given position while the run stays on the target', async () => {
+    const { did, started, press, finished } = setup()
+
+    await press('orion', 60, 300, { raDegrees: 83.9, decDegrees: -5.2 })
+    await finished()
+
+    expect(did).toContain('centre 83.900000 -5.200000')
+    expect(started[0]).toMatchObject({ object: 'M 42', target: { id: 'orion', raDegrees: 83.82 } })
   })
 
   it('names a typed position in plain letters, for the files and the header', async () => {

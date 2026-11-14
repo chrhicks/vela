@@ -9,7 +9,7 @@ import { PageHeader } from '../../../components/PageHeader.tsx'
 import { Statement } from '../../../components/Statement.tsx'
 import { clockTime, useLocalNow } from '../../../rig/clock.ts'
 import { useRig } from '../../../rig/store.ts'
-import { bestPlacedTargets, findTargets, skyTonight } from '../../../rig/targets.ts'
+import { bestPlacedTargets, findTargets, rememberedNow, skyTonight } from '../../../rig/targets.ts'
 import { useAsked } from '../../../rig/use-asked.ts'
 import styles from './ReadyView.module.css'
 import { TargetList } from './TargetList.tsx'
@@ -26,11 +26,13 @@ export function ReadyView() {
 
   const listing = useAsked(() => (text === '' ? bestPlacedTargets() : findTargets(text)), text, minute)
   const sky = useAsked(skyTonight, 'sky', minute)
+  const recalled = useAsked(rememberedNow, 'remembered', minute)
   const focus = useRig(rig => rig.operations.focus)
   const filter = useRig(rig => rig.operations.filter)
 
   const targets = listing?.status === 'listed' ? listing.targets : []
   const tonight = sky?.status === 'read' ? sky.sky : null
+  const remembered = recalled?.status === 'recalled' ? recalled.remembered : undefined
   const shown = search.get('target') ?? targets[0]?.id
 
   const facts = [
@@ -61,9 +63,9 @@ export function ReadyView() {
           <TargetList targets={targets} chosen={shown} />
         </div>
 
-        {shown === undefined ? null : (
+        {shown === undefined || recalled === undefined ? null : (
           <div className={styles.chosen}>
-            <TargetPanel key={shown} id={shown} darkUntil={tonight?.dark?.until} refreshed={minute} />
+            <TargetPanel key={shown} id={shown} darkUntil={tonight?.dark?.until} lastLight={remembered?.lastLight ?? null} cameraAngleDegrees={remembered?.cameraAngleDegrees ?? null} refreshed={minute} />
           </div>
         )}
       </div>

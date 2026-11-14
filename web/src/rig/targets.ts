@@ -1,4 +1,5 @@
 import { Effect, Schema } from 'effect'
+import { RememberedAnswer, rememberedPath } from '../../../state/remembered.ts'
 import { SkyAnswer, skyPath, type Sky } from '../../../state/sky.ts'
 import { bestPlacedPath, TargetFacts, targetPath, TargetsFound, targetsPath, type TargetFound } from '../../../state/targets.ts'
 
@@ -7,6 +8,8 @@ export type Listing = { readonly status: 'listed'; readonly targets: ReadonlyArr
 export type FactsAnswer = { readonly status: 'found'; readonly facts: TargetFacts } | { readonly status: 'unknown' } | { readonly status: 'unreachable' }
 
 export type SkyReading = { readonly status: 'read'; readonly sky: Sky | null } | { readonly status: 'unreachable' }
+
+export type Recalled = { readonly status: 'recalled'; readonly remembered: RememberedAnswer } | { readonly status: 'unreachable' }
 
 const unknownStatus = 404
 
@@ -49,3 +52,12 @@ export const bestPlacedTargets = (): Promise<Listing> => Effect.runPromise(listi
 export const targetFacts = (id: string): Promise<FactsAnswer> => Effect.runPromise(facts(id))
 
 export const skyTonight = (): Promise<SkyReading> => Effect.runPromise(sky)
+
+const remembered: Effect.Effect<Recalled> = asked(rememberedPath).pipe(
+  Effect.flatMap(bodyOf),
+  Effect.flatMap(Schema.decodeUnknownEffect(RememberedAnswer)),
+  Effect.map((answer): Recalled => ({ status: 'recalled', remembered: answer })),
+  Effect.catchTags({ UnknownError: () => Effect.succeed<Recalled>({ status: 'unreachable' }), SchemaError: () => Effect.succeed<Recalled>({ status: 'unreachable' }) }),
+)
+
+export const rememberedNow = (): Promise<Recalled> => Effect.runPromise(remembered)

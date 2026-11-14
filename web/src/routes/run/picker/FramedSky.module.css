@@ -10,6 +10,7 @@
 
 .frame {
   position: absolute;
-  inset: 6%;
+  top: 50%;
+  left: 50%;
   border: 1px solid var(--ember);
 }
