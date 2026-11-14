@@ -77,4 +77,11 @@ describe('Guiding', () => {
     expect(await silent.press(controls => controls.stopGuiding)).toMatchObject({ failure: { refusal: { code: 'guider-silent', seconds: 0.05 } } })
     expect(await away.press(controls => controls.stopGuiding)).toMatchObject({ failure: { refusal: { code: 'rig-refused', text: 'PHD2 is not connected' } } })
   })
+
+  it('refuses when the answer to get_connected is not yes or no, and asks PHD2 for nothing more', async () => {
+    const { asked, press } = setup(() => ({ result: 'maybe' }))
+
+    expect(await press(controls => controls.startGuiding)).toMatchObject({ failure: { refusal: { code: 'guider-refused' } } })
+    expect(asked).toEqual(['phd2 {"method":"get_connected"}'])
+  })
 })
