@@ -37,7 +37,7 @@ export const Primary = Schema.Struct({
   CCD_TEMPERATURE: property(Schema.Struct({ CCD_TEMPERATURE_VALUE: Schema.Number })),
   CCD_COOLER: property(Schema.Struct({ COOLER_ON: Schema.Boolean, COOLER_OFF: Schema.Boolean })),
   CCD_COOLER_POWER: property(Schema.Struct({ CCD_COOLER_VALUE: Schema.Number })),
-  CCD_CONTROLS: property(Schema.Record(Schema.String, Schema.Number)),
+  CCD_CONTROLS: property(Schema.Struct({ Gain: Schema.Number, Offset: Schema.Number })),
   UPLOAD_MODE: property(Schema.Struct({ UPLOAD_CLIENT: Schema.Boolean, UPLOAD_LOCAL: Schema.Boolean, UPLOAD_BOTH: Schema.Boolean })),
   SCOPE_INFO: property(Schema.Struct({ FOCAL_LENGTH: Schema.Number, APERTURE: Schema.Number })),
 })

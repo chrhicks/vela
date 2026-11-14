@@ -87,8 +87,8 @@ export const flatControls = Effect.gen(function* () {
 
         if (reported.CONNECTION?.values.CONNECT !== true) return yield* Effect.fail(notConnected)
 
-        const gain = reported.CCD_CONTROLS?.values['Gain']
-        const offset = reported.CCD_CONTROLS?.values['Offset']
+        const gain = reported.CCD_CONTROLS?.values.Gain
+        const offset = reported.CCD_CONTROLS?.values.Offset
         const limits = reported.CCD_TEMPERATURE?.limits?.['CCD_TEMPERATURE_VALUE']
 
         if (gain === undefined || offset === undefined) return yield* Effect.fail(notConnected)
