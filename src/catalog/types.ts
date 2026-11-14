@@ -1,25 +1,29 @@
-export interface CatalogTarget {
-  readonly id: string
-  readonly catalogName: string
-  readonly commonName: string | null
-  readonly aliases: readonly string[]
-  readonly raDegrees: number
-  readonly decDegrees: number
-  readonly constellation: string | null
-  readonly type: string
-  readonly majorAxisArcminutes: number | null
-  readonly minorAxisArcminutes: number | null
-}
+import { Schema } from 'effect'
 
-export type CatalogRow = readonly [
-  id: string,
-  catalogName: string,
-  commonName: string | null,
-  aliases: readonly string[],
-  raDegrees: number,
-  decDegrees: number,
-  type: string,
-  majorAxisArcminutes: number | null,
-  minorAxisArcminutes: number | null,
-  constellation: string | null,
-]
+export const CatalogTarget = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  commonName: Schema.NullOr(Schema.String),
+  type: Schema.String,
+  raDegrees: Schema.Finite,
+  decDegrees: Schema.Finite,
+  majorAxisArcminutes: Schema.NullOr(Schema.Finite),
+  minorAxisArcminutes: Schema.NullOr(Schema.Finite),
+})
+
+export type CatalogTarget = typeof CatalogTarget.Type
+
+export const TargetName = Schema.Struct({
+  target: Schema.String,
+  name: Schema.String,
+})
+
+export type TargetName = typeof TargetName.Type
+
+export interface TargetSummary {
+  readonly id: string
+  readonly name: string
+  readonly commonName: string | null
+  readonly type: string
+  readonly constellation: string | null
+}

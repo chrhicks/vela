@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { findRow, searchCatalog } from './search.ts'
 import { parsePosition, positionName } from './position.ts'
+import { testCatalog } from './testing.ts'
 
 const ra = (hours: number, minutes: number, seconds: number) => (hours + minutes / 60 + seconds / 3600) * 15
 const dec = (degrees: number, minutes: number, seconds: number) => Math.sign(degrees || 1) * (Math.abs(degrees) + minutes / 60 + seconds / 3600)
@@ -31,15 +31,15 @@ describe('a typed J2000 position', () => {
   })
 
   it('is the one search result, and its id finds the same position again', () => {
-    const [found] = searchCatalog('23h18m56s +61d33m37s', 10)
-    const row = findRow(found!.id)
+    const [found] = testCatalog.search('23h18m56s +61d33m37s', 10)
+    const again = testCatalog.find(found!.id)
 
     expect(found).toMatchObject({ name: '23h18m56s +61°33′37″', type: 'J2000 position' })
-    expect(row?.[4]).toBeCloseTo(ra(23, 18, 56), 5)
-    expect(row?.[5]).toBeCloseTo(dec(61, 33, 37), 5)
+    expect(again?.raDegrees).toBeCloseTo(ra(23, 18, 56), 5)
+    expect(again?.decDegrees).toBeCloseTo(dec(61, 33, 37), 5)
   })
 
   it('leaves catalog searches alone', () => {
-    expect(searchCatalog('M 31', 1)[0]?.id).toBe('ngc0224')
+    expect(testCatalog.search('M 31', 1)[0]?.id).toBe('andromeda')
   })
 })

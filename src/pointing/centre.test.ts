@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { testCatalog } from '../catalog/testing.ts'
 import { fromMount } from '../sky/coordinates.ts'
 import { StreamPosition, type Entry } from '../../state/entry.ts'
 import { fakeCamera } from '../testing/camera.ts'
@@ -52,6 +53,7 @@ function scriptedMount(options: { errorDegrees: number; unsolved?: ReadonlyArray
 
   const pointing = makePointing({
     picture: camera.picture,
+    catalog: testCatalog,
     sender: {
       send: async command => {
         if (command.property === 'EQUATORIAL_EOD_COORD' && mode === 'SYNC' && options.refuseSync !== undefined) {
@@ -122,13 +124,13 @@ describe('slew and centre on a scripted mount that points 24 arcminutes off', ()
   it('slews, solves, syncs the mount to the solve, slews again and ends once the solve is within the tolerance', async () => {
     const { centre, camera, published, sent } = scriptedMount({ errorDegrees: 0.4 })
 
-    expect(centre.start({ id: 'ngc0224', exposureSeconds: 0.01 })).toEqual({ ok: true })
+    expect(centre.start({ id: 'andromeda', exposureSeconds: 0.01 })).toEqual({ ok: true })
 
     await until(() => centre.view().ended !== undefined)
 
     const passes = centre.view().passes
 
-    expect(centre.view()).toMatchObject({ ended: 'done', target: { id: 'ngc0224' }, problem: undefined })
+    expect(centre.view()).toMatchObject({ ended: 'done', target: { id: 'andromeda' }, problem: undefined })
     expect(passes).toHaveLength(2)
     expect(passes[0]).toMatchObject({ frame: 1, solved: true })
     expect(passes[0]!.solved && passes[0]!.offsetArcmin).toBeCloseTo(24, 0)
@@ -144,7 +146,7 @@ describe('slew and centre on a scripted mount that points 24 arcminutes off', ()
   it('ends after the first frame when the goto already landed within the tolerance, with no sync', async () => {
     const { centre, sent } = scriptedMount({ errorDegrees: 0.01 })
 
-    expect(centre.start({ id: 'ngc0224', exposureSeconds: 0.01 })).toEqual({ ok: true })
+    expect(centre.start({ id: 'andromeda', exposureSeconds: 0.01 })).toEqual({ ok: true })
 
     await until(() => centre.view().ended !== undefined)
 
@@ -155,7 +157,7 @@ describe('slew and centre on a scripted mount that points 24 arcminutes off', ()
   it('takes another frame at the same place when one does not solve, and says so in the passes', async () => {
     const { centre, sent } = scriptedMount({ errorDegrees: 0.4, unsolved: [1] })
 
-    expect(centre.start({ id: 'ngc0224', exposureSeconds: 0.01 })).toEqual({ ok: true })
+    expect(centre.start({ id: 'andromeda', exposureSeconds: 0.01 })).toEqual({ ok: true })
 
     await until(() => centre.view().ended !== undefined)
 
@@ -166,7 +168,7 @@ describe('slew and centre on a scripted mount that points 24 arcminutes off', ()
   it('waits for Stop with the reason on the page when the mount refuses the sync, and puts the mode back to TRACK', async () => {
     const { centre, camera, sent } = scriptedMount({ errorDegrees: 0.4, refuseSync: 'not now' })
 
-    expect(centre.start({ id: 'ngc0224', exposureSeconds: 0.01 })).toEqual({ ok: true })
+    expect(centre.start({ id: 'andromeda', exposureSeconds: 0.01 })).toEqual({ ok: true })
 
     await until(() => centre.view().problem !== undefined)
 

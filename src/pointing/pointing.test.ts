@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { findRow } from '../catalog/search.ts'
+import { andromeda, testCatalog } from '../catalog/testing.ts'
 import type { Command, Outcome } from '../commands/sender.ts'
 import { makePicture } from '../rig/picture.ts'
 import { connected, phoenixLongitude, startedAt, wire } from '../testing/entries.ts'
@@ -36,6 +36,7 @@ function setup(options: { outcomes?: ReadonlyArray<Outcome>; picture?: ReturnTyp
 
   const pointing = makePointing({
     picture,
+    catalog: testCatalog,
     sender: {
       send: async command => {
         sent.push(command)
@@ -52,25 +53,25 @@ function setup(options: { outcomes?: ReadonlyArray<Outcome>; picture?: ReturnTyp
   return { pointing, sent, picture, slewState, advance: (ms: number) => (clock += ms) }
 }
 
-const m31 = findRow('ngc0224')!
+const m31 = andromeda
 
 describe('goto', () => {
   it('sets the coordinate mode to track, then writes the target in coordinates of date', async () => {
     const { pointing, sent } = setup()
     const expected = targetOf(m31, t(100))
 
-    expect(await pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: true })
+    expect(await pointing.act({ action: 'goto', id: 'andromeda' })).toEqual({ ok: true })
     expect(sent.map(each => [each.device, each.property, each.values])).toEqual([
       ['mount', 'ON_COORD_SET', { TRACK: true, SLEW: false, SYNC: false }],
       ['mount', 'EQUATORIAL_EOD_COORD', { RA: expected.raHours, DEC: expected.decDegrees }],
     ])
-    expect(expected.raHours).not.toBeCloseTo(m31[4] / 15, 3)
+    expect(expected.raHours).not.toBeCloseTo(m31.raDegrees / 15, 3)
   })
 
   it('does not write the coordinates when the coordinate mode was refused, and says so', async () => {
     const { pointing, sent } = setup({ outcomes: [{ result: 'refused', reason: 'ON_COORD_SET is read-only' }] })
 
-    expect(await pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: false, reason: 'ON_COORD_SET: ON_COORD_SET is read-only' })
+    expect(await pointing.act({ action: 'goto', id: 'andromeda' })).toEqual({ ok: false, reason: 'ON_COORD_SET: ON_COORD_SET is read-only' })
     expect(sent).toHaveLength(1)
     expect(pointing.view().goto).toMatchObject({ phase: 'failed', detail: 'ON_COORD_SET: ON_COORD_SET is read-only' })
   })
@@ -78,7 +79,7 @@ describe('goto', () => {
   it('reports a goto the rig program never answered as failed with the reason, and never writes it again', async () => {
     const { pointing, sent } = setup({ outcomes: [{ result: 'written' }, { result: 'unknown', reason: 'no answer from the rig program within 10 s' }] })
 
-    expect(await pointing.act({ action: 'goto', id: 'ngc0224' })).toMatchObject({ ok: false })
+    expect(await pointing.act({ action: 'goto', id: 'andromeda' })).toMatchObject({ ok: false })
     expect(sent).toHaveLength(2)
     expect(pointing.view().goto?.phase).toBe('failed')
   })
@@ -86,9 +87,9 @@ describe('goto', () => {
   it('shows the target, then the slew, then the arrival with the separation', async () => {
     const { pointing, slewState, advance } = setup()
 
-    await pointing.act({ action: 'goto', id: 'ngc0224' })
+    await pointing.act({ action: 'goto', id: 'andromeda' })
 
-    expect(pointing.view().goto).toMatchObject({ id: 'ngc0224', name: 'Andromeda Galaxy', phase: 'sent', sentAt: t(100) })
+    expect(pointing.view().goto).toMatchObject({ id: 'andromeda', name: 'Andromeda Galaxy', phase: 'sent', sentAt: t(100) })
 
     slewState('Busy')
 
@@ -106,7 +107,7 @@ describe('goto', () => {
 
     slewState('Busy')
     slewState('Ok')
-    await pointing.act({ action: 'goto', id: 'ngc0224' })
+    await pointing.act({ action: 'goto', id: 'andromeda' })
 
     expect(pointing.view().goto?.phase).toBe('sent')
   })
@@ -114,7 +115,7 @@ describe('goto', () => {
   it('shows an alert from the mount as a failed slew', async () => {
     const { pointing, slewState } = setup()
 
-    await pointing.act({ action: 'goto', id: 'ngc0224' })
+    await pointing.act({ action: 'goto', id: 'andromeda' })
     slewState('Busy')
     slewState('Alert')
 
@@ -126,8 +127,8 @@ describe('goto', () => {
     const away = setup({ picture: mountRig({ connected: false }) })
     const known = setup()
 
-    expect(await parked.pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: false, reason: 'mount is parked: Unpark first' })
-    expect(await away.pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: false, reason: 'mount is not connected' })
+    expect(await parked.pointing.act({ action: 'goto', id: 'andromeda' })).toEqual({ ok: false, reason: 'mount is parked: Unpark first' })
+    expect(await away.pointing.act({ action: 'goto', id: 'andromeda' })).toEqual({ ok: false, reason: 'mount is not connected' })
     expect(await known.pointing.act({ action: 'goto', id: 'nope' })).toEqual({ ok: false, reason: 'no catalog target nope' })
     expect([parked, away, known].flatMap(each => each.sent)).toEqual([])
   })
@@ -137,7 +138,7 @@ describe('stop', () => {
   it('writes the abort while a slew is in progress and marks the goto stopped', async () => {
     const { pointing, sent, slewState } = setup()
 
-    await pointing.act({ action: 'goto', id: 'ngc0224' })
+    await pointing.act({ action: 'goto', id: 'andromeda' })
     slewState('Busy')
 
     expect(pointing.view().goto?.phase).toBe('slewing')
@@ -184,7 +185,7 @@ describe('the other mount controls', () => {
   it('refuses a control the mount has not defined on the stream', async () => {
     const { pointing, sent } = setup({ picture: makePicture() })
 
-    for (const request of [{ action: 'unpark' }, { action: 'home' }, { action: 'tracking', on: true }, { action: 'goto', id: 'ngc0224' }]) expect(await pointing.act(request)).toMatchObject({ ok: false })
+    for (const request of [{ action: 'unpark' }, { action: 'home' }, { action: 'tracking', on: true }, { action: 'goto', id: 'andromeda' }]) expect(await pointing.act(request)).toMatchObject({ ok: false })
 
     expect(sent).toEqual([])
   })
@@ -205,7 +206,7 @@ describe('no Park', () => {
 
     await pointing.act({ action: 'unpark' })
     await pointing.act({ action: 'home' })
-    await pointing.act({ action: 'goto', id: 'ngc0224' })
+    await pointing.act({ action: 'goto', id: 'andromeda' })
     await pointing.act({ action: 'stop' })
 
     for (const command of sent) {
@@ -227,9 +228,9 @@ describe('no Park', () => {
 describe('the preview before the goto', () => {
   it('gives the target in both epochs and when it reaches the meridian limit', () => {
     const { pointing } = setup()
-    const preview = pointing.preview('ngc0224')
+    const preview = pointing.preview('andromeda')
 
-    expect(preview).toMatchObject({ ok: true, target: { id: 'ngc0224', raJ2000Hours: m31[4] / 15 } })
+    expect(preview).toMatchObject({ ok: true, target: { id: 'andromeda', raJ2000Hours: m31.raDegrees / 15 } })
     expect(preview.ok && typeof preview.meridianLimitAt === 'number').toBe(true)
   })
 
@@ -239,15 +240,15 @@ describe('the preview before the goto', () => {
 
   it('goes without the mount reporting its site, with no meridian limit time', async () => {
     const { pointing, sent } = setup({ picture: mountRig({ site: false }) })
-    const preview = pointing.preview('ngc0224')
+    const preview = pointing.preview('andromeda')
 
     expect(preview.ok && preview.meridianLimitAt).toBeUndefined()
-    expect(await pointing.act({ action: 'goto', id: 'ngc0224' })).toEqual({ ok: true })
+    expect(await pointing.act({ action: 'goto', id: 'andromeda' })).toEqual({ ok: true })
     expect(sent).toHaveLength(2)
   })
 
   it('lists catalog matches up to the setting', () => {
-    expect(setup().pointing.search('m31')[0]?.id).toBe('ngc0224')
+    expect(setup().pointing.search('m31')[0]?.id).toBe('andromeda')
     expect(setup().pointing.search('ngc')).toHaveLength(10)
   })
 })
