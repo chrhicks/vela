@@ -20,6 +20,7 @@ const objectsText = [
 const namesText = [
   nameLine('NGC', '1976', 'Great Orion Nebula', 'WK'),
   nameLine('NGC', '1976', 'Orion Nebula', 'WK, DSW, BCH'),
+  nameLine('SH2', '132', 'Cepheus Cloud'),
   nameLine('SH2', '132', 'Lion Nebula'),
   nameLine('', '3', 'Cygnus Star Cloud', 'S&T'),
 ].join('\n')
@@ -37,7 +38,7 @@ async function written() {
   return new DatabaseSync(await Effect.runPromise(write.pipe(Effect.provide(Layer.succeed(CatalogSettings, { database })))), { readOnly: true })
 }
 
-test('each object is one target, named by its first designation and its most cited common name', async () => {
+test('each object is one target, named by its first designation and its most cited common name, the later one on a tie', async () => {
   const targets = (await written()).prepare('SELECT id, source, name, commonName, type, raDegrees, decDegrees, majorAxisArcminutes, minorAxisArcminutes, vMagnitude, bMagnitude FROM targets ORDER BY id').all()
 
   expect(targets).toEqual([
@@ -57,6 +58,7 @@ test('a target is listed under every designation and every common name', async (
     { target: 'stellarium-1', name: 'Great Orion Nebula', common: 1 },
     { target: 'stellarium-1', name: 'Orion Nebula', common: 1 },
     { target: 'stellarium-2', name: 'Sh2-132', common: 0 },
+    { target: 'stellarium-2', name: 'Cepheus Cloud', common: 1 },
     { target: 'stellarium-2', name: 'Lion Nebula', common: 1 },
     { target: 'stellarium-3', name: 'Cygnus Star Cloud', common: 1 },
     { target: 'stellarium-4', name: 'NGC 6000', common: 0 },
