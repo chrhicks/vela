@@ -14,11 +14,11 @@ export const FrameFile = Schema.NonEmptyString.pipe(Schema.brand('FrameFile'))
 
 export type FrameFile = typeof FrameFile.Type
 
-export const Operation = Schema.Literals(['align', 'focus', 'centre', 'test'])
+export const Operation = Schema.Literals(['align', 'focus', 'centre', 'test', 'flatExposure'])
 
 export type Operation = typeof Operation.Type
 
-export const operationObjects: Readonly<Record<Operation, string>> = { align: 'polar-align', focus: 'autofocus', centre: 'centre', test: 'test-frame' }
+export const operationObjects: Readonly<Record<Operation, string>> = { align: 'polar-align', focus: 'autofocus', centre: 'centre', test: 'test-frame', flatExposure: 'flat-exposure' }
 
 export const RunObject = Schema.Union([Schema.TaggedStruct('Operation', { operation: Operation }), Schema.TaggedStruct('Target', { name: Schema.String })])
 
@@ -134,9 +134,15 @@ export const FocusSampled = entryOf('vela.focus.sample', { run: RunId, frame: Co
 
 export const FocusBest = entryOf('vela.focus.best', { run: RunId, position: Schema.Number })
 
+export const FlatVerdict = Schema.Literals(['trying', 'good', 'too-dark', 'too-bright', 'gave-up', 'not-measured', 'stopped'])
+
+export type FlatVerdict = typeof FlatVerdict.Type
+
+export const FlatExposureTried = entryOf('vela.flats.exposure', { exposureSeconds: Schema.Number, sky: Schema.optionalKey(Schema.Number), verdict: FlatVerdict, nextSeconds: Schema.optionalKey(Schema.Number) })
+
 export const FilterAnswered = entryOf('vela.filter', { filter: FilterAnswer })
 
-export const RigEntry = Schema.Union([RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered])
+export const RigEntry = Schema.Union([RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried])
 
 export type RigEntry = typeof RigEntry.Type
 

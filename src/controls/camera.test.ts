@@ -18,7 +18,7 @@ type Controls = Effect.Success<typeof cameraControls>
 
 function setup(rig: RigState, busy = false) {
   const sent: Array<string> = []
-  const capturing = Layer.succeed(Capturing, { busy: Effect.succeed(busy), start: (request: CaptureRequest) => Effect.sync(() => void sent.push(`capture ${JSON.stringify(request)}`)) })
+  const capturing = Layer.succeed(Capturing, { busy: Effect.succeed(busy), start: (request: CaptureRequest) => Effect.sync(() => void sent.push(`capture ${JSON.stringify(request)}`)), finished: Effect.succeed(undefined) })
   const send = (command: Command) => (sent.push(`${command.device} ${command.property} ${JSON.stringify(command.values)}`), Promise.resolve<Outcome>({ result: 'written' }))
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.die('not used'), current: Effect.succeed(rig) })
   const commands = deviceCommandsFrom({ send, ask: () => Promise.resolve({ result: 'written' }), tell: () => undefined, deviceIds, answerSeconds: 10 })

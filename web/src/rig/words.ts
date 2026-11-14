@@ -2,6 +2,7 @@ import { Match } from 'effect'
 import type { Done, NudgeDirection, Refusal } from '../../../state/commands.ts'
 import type { DeviceName } from '../../../state/devices.ts'
 import type { RunEnding } from '../../../state/entries.ts'
+import type { FlatExposure } from '../../../state/flats.ts'
 import type { Flip } from '../../../state/flip.ts'
 import type { GuiderActivity, Guiding } from '../../../state/guiding.ts'
 import type { MountActivity } from '../../../state/devices.ts'
@@ -31,6 +32,7 @@ export const doneWords = (done: Done): RefusalWords =>
       'test-frame': ({ exposureSeconds }) => ({ happened: `Test frame ${exposureSeconds} s` }),
       darks: ({ frames, exposureSeconds, celsius }) => ({ happened: `Darks ${frames} × ${exposureSeconds} s`, toDo: `at ${celsius} °C` }),
       'dark-flats': ({ frames, exposureSeconds, celsius }) => ({ happened: `Dark flats ${frames} × ${exposureSeconds} s`, toDo: `at ${celsius} °C` }),
+      flats: ({ frames, celsius }) => ({ happened: `Flats ${frames} frames`, toDo: `at ${celsius} °C · finding the exposure` }),
       bias: ({ frames, celsius }) => ({ happened: `Bias ${frames} frames`, toDo: `at ${celsius} °C` }),
       autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
@@ -107,3 +109,18 @@ export const flipWord = (time: Flip): string =>
     In: ({ seconds }) => `In ${duration(seconds)}`,
     Past: ({ seconds }) => `Past ${duration(seconds)}`,
   })
+
+export const flatExposureWords = ({ exposureSeconds, sky, verdict, nextSeconds }: FlatExposure): { readonly words: RefusalWords; readonly troubled: boolean } => {
+  const gave = sky === undefined ? `${exposureSeconds} s` : `${exposureSeconds} s gave ${Math.round(sky).toLocaleString('en-US')}`
+
+  return Match.value(verdict).pipe(
+    Match.when('trying', () => ({ words: { happened: `Flat test ${gave}`, ...(nextSeconds === undefined ? {} : { toDo: `trying ${nextSeconds} s` }) }, troubled: false })),
+    Match.when('good', () => ({ words: { happened: `Flat exposure ${exposureSeconds} s`, toDo: sky === undefined ? 'taking the set' : `median ${Math.round(sky).toLocaleString('en-US')} · taking the set` }, troubled: false })),
+    Match.when('too-dark', () => ({ words: { happened: 'Too dark for flats', toDo: gave }, troubled: true })),
+    Match.when('too-bright', () => ({ words: { happened: 'Too bright for flats', toDo: gave }, troubled: true })),
+    Match.when('gave-up', () => ({ words: { happened: 'No flat exposure found', toDo: `last test ${gave}` }, troubled: true })),
+    Match.when('not-measured', () => ({ words: { happened: 'Flat test was not measured', toDo: gave }, troubled: true })),
+    Match.when('stopped', () => ({ words: { happened: 'Flats stopped', toDo: `at the ${exposureSeconds} s test` }, troubled: true })),
+    Match.exhaustive,
+  )
+}

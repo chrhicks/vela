@@ -6,7 +6,7 @@ import { CommandButton } from '../../components/CommandButton.tsx'
 import { latestSaid, PressLine, saidOf, type Pressed, type Said } from '../../components/PressLine.tsx'
 import type { Answer } from '../../rig/commands.ts'
 import { useLink, useRig } from '../../rig/store.ts'
-import { autofocusEndWords } from '../../rig/words.ts'
+import { autofocusEndWords, flatExposureWords } from '../../rig/words.ts'
 import type { Frame } from '../../../../state/frames.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import styles from './areas.module.css'
@@ -249,6 +249,7 @@ export function CalibrationArea() {
   const frames = typedFrames ?? (controls === undefined ? '' : String(controls.calibrationFrames))
   const cooling = useRig(rig => rig.devices.primary.CCD_TEMPERATURE?.state === 'Busy')
   const sensor = useRig(rig => sensorCelsius(rig.devices.primary))
+  const flatTried = useRig(rig => rig.flatExposure)
   const lastFlat = useRig(rig => (rig.calibration?.frameType === 'flat' ? rig.calibration.exposureSeconds : undefined))
   const offered = type === 'dark-flats' ? lastFlat : lastLight
   const exposure = typedExposure ?? (offered === undefined ? '' : String(offered))
@@ -256,14 +257,14 @@ export function CalibrationArea() {
   const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
   const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
   const set = { frames: Number.parseInt(frames, 10), celsius: Number(celsius) }
-  const request: CommandRequest | undefined =
+  const request: CommandRequest =
     type === 'darks'
       ? { command: 'takeDarks', ...set, exposureSeconds: Number(exposure) }
       : type === 'dark-flats'
         ? { command: 'takeDarkFlats', ...set, exposureSeconds: Number(exposure) }
         : type === 'bias'
           ? { command: 'takeBias', ...set }
-          : undefined
+          : { command: 'takeFlats', ...set }
 
   function choose(chosen: CalibrationType) {
     setType(chosen)
@@ -272,7 +273,7 @@ export function CalibrationArea() {
 
   return (
     <Area id="calibration">
-      <PressLine said={pressed === undefined ? undefined : saidOf(pressed)} />
+      <PressLine said={latestSaid(pressed === undefined ? undefined : saidOf(pressed), flatTried === undefined ? undefined : { ...flatExposureWords(flatTried), at: flatTried.at })} />
 
       <ActionRow>
         <Choices
@@ -293,27 +294,21 @@ export function CalibrationArea() {
         <Facts items={[calibrationFirstStep[type]]} />
       </ActionRow>
 
-      {request === undefined ? null : (
-        <ActionRow label={type === 'bias' ? 'Temperature' : 'Exposure'}>
-          {type === 'bias' ? null : (
-            <>
-              <Field name="Exposure, seconds" kind="number" value={exposure} onChange={setTypedExposure} />
-              <span className={styles.note}>at</span>
-            </>
-          )}
-          <Field name="Temperature, degrees Celsius" kind="number" value={celsius} onChange={setTypedCelsius} />
-        </ActionRow>
-      )}
+      <ActionRow label={type === 'bias' || type === 'flats' ? 'Temperature' : 'Exposure'}>
+        {type === 'bias' || type === 'flats' ? null : (
+          <>
+            <Field name="Exposure, seconds" kind="number" value={exposure} onChange={setTypedExposure} />
+            <span className={styles.note}>at</span>
+          </>
+        )}
+        <Field name="Temperature, degrees Celsius" kind="number" value={celsius} onChange={setTypedCelsius} />
+      </ActionRow>
 
       <ActionRow>
-        {request === undefined ? (
-          <ActionButton>Start set</ActionButton>
-        ) : (
-          <CommandButton request={request} disabled={runActive} onAnswer={answered}>
-            Start set
-          </CommandButton>
-        )}
-        {runActive ? <span className={styles.note}>{cooling && sensor !== undefined ? `Run active · cooling, sensor ${sensor.toFixed(1)} °C` : 'Run active'}</span> : request === undefined ? <span className={styles.note}>Not built yet</span> : null}
+        <CommandButton request={request} disabled={runActive} onAnswer={answered}>
+          Start set
+        </CommandButton>
+        {runActive ? <span className={styles.note}>{cooling && sensor !== undefined ? `Run active · cooling, sensor ${sensor.toFixed(1)} °C` : 'Run active'}</span> : null}
       </ActionRow>
     </Area>
   )

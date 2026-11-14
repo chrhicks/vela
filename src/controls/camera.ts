@@ -1,12 +1,12 @@
 import { Context, Effect } from 'effect'
 import type { Done } from '../../state/commands.ts'
-import { operationObjects } from '../../state/entries.ts'
+import { operationObjects, type RunEnding } from '../../state/entries.ts'
 import { sequenceName, type CaptureRequest } from '../capture/request.ts'
 import { CommandRefused } from '../feed/commands.ts'
 import { Feed } from '../feed/feed.ts'
 import { DeviceCommands } from './device-commands.ts'
 
-export class Capturing extends Context.Service<Capturing, { readonly busy: Effect.Effect<boolean>; readonly start: (request: CaptureRequest) => Effect.Effect<void, CommandRefused> }>()('vela/Capturing') {}
+export class Capturing extends Context.Service<Capturing, { readonly busy: Effect.Effect<boolean>; readonly start: (request: CaptureRequest) => Effect.Effect<void, CommandRefused>; readonly finished: Effect.Effect<RunEnding | undefined> }>()('vela/Capturing') {}
 
 export class CalibrationSettings extends Context.Service<CalibrationSettings, { readonly biasExposureSeconds: number }>()('vela/CalibrationSettings') {}
 
