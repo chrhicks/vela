@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { endsBy } from '../../../../../state/ends-by.ts'
-import type { Run } from '../../../../../state/run.ts'
+import type { RememberedAnswer } from '../../../../../state/remembered.ts'
 import { ActionLink } from '../../../components/ActionLink.tsx'
 import { Caption } from '../../../components/Caption.tsx'
 import { Choices } from '../../../components/Choices.tsx'
@@ -13,7 +13,7 @@ import { Readings } from '../../../components/Readings.tsx'
 import { Statement } from '../../../components/Statement.tsx'
 import { useLocalNow } from '../../../rig/clock.ts'
 import { serviceNow } from '../../../rig/service-clock.ts'
-import { useLink, useRig } from '../../../rig/store.ts'
+import { useLink } from '../../../rig/store.ts'
 import { targetFacts } from '../../../rig/targets.ts'
 import { useAsked } from '../../../rig/use-asked.ts'
 import { FramedSky } from './FramedSky.tsx'
@@ -23,6 +23,8 @@ import { endsByWords, sizeOf, typeOf, unknown } from './words.ts'
 interface TargetPanelProps {
   readonly id: string
   readonly darkUntil: number | undefined
+  readonly lastLight: RememberedAnswer['lastLight']
+  readonly cameraAngleDegrees: number | null
   readonly refreshed: number
 }
 
@@ -51,18 +53,22 @@ const namesShown = 3
 
 const presetOf = (seconds: number): Preset | undefined => (seconds === 60 ? '60' : seconds === 90 ? '90' : seconds === 120 ? '120' : undefined)
 
-function lastChoice(run: Run | undefined): Choice {
-  if (run === undefined || run.frameType !== 'light') return firstChoice
+function lastChoice(lastLight: RememberedAnswer['lastLight']): Choice {
+  if (lastLight === null) return firstChoice
 
-  const preset = presetOf(run.exposureSeconds)
+  const preset = presetOf(lastLight.exposureSeconds)
 
   return {
     exposure: preset ?? 'other',
-    otherSeconds: preset === undefined ? run.exposureSeconds : firstChoice.otherSeconds,
-    stop: run.count === undefined ? 'said' : 'frames',
-    frames: run.count ?? firstChoice.frames,
+    otherSeconds: preset === undefined ? lastLight.exposureSeconds : firstChoice.otherSeconds,
+    stop: lastLight.frames === null ? 'said' : 'frames',
+    frames: lastLight.frames ?? firstChoice.frames,
   }
 }
+
+type Framing = 'catalog' | 'last'
+
+const dayOf = (at: number) => new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' })
 
 const wholeNumber = (typed: string, fallback: number) => {
   const value = Number.parseInt(typed, 10)
@@ -70,8 +76,9 @@ const wholeNumber = (typed: string, fallback: number) => {
   return Number.isFinite(value) && value > 0 ? value : fallback
 }
 
-export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
-  const last = lastChoice(useRig(rig => rig.run))
+export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, refreshed }: TargetPanelProps) {
+  const last = lastChoice(lastLight)
+  const [framing, setFraming] = useState<Framing>('last')
   const [exposure, setExposure] = useState<ExposureChoice>(last.exposure)
   const [otherSeconds, setOtherSeconds] = useState(String(last.otherSeconds))
   const [stop, setStop] = useState<Stop>(last.stop)
@@ -87,6 +94,7 @@ export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
   const target = answer.facts
   const exposureSeconds = exposure === 'other' ? wholeNumber(otherSeconds, last.otherSeconds) : presetSeconds[exposure]
   const frameCount = wholeNumber(frames, last.frames)
+  const centre = framing === 'last' && target.lastCentre !== null ? { raDegrees: target.lastCentre.raDegrees, decDegrees: target.lastCentre.decDegrees } : undefined
 
   const ends =
     now === undefined
@@ -96,7 +104,7 @@ export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
   return (
     <section className={styles.panel}>
       <Picture label="Chosen" detail={frame}>
-        <FramedSky seed={target.name.length * 13} />
+        <FramedSky seed={target.name.length * 13} angleDegrees={cameraAngleDegrees ?? undefined} />
       </Picture>
 
       <h2 className={styles.name}>{target.name}</h2>
@@ -111,6 +119,24 @@ export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
       />
 
       <div className={styles.settings}>
+        {target.lastCentre === null ? null : (
+          <div className={styles.setting}>
+            <Caption>Framing</Caption>
+
+            <div className={styles.answer}>
+              <Choices
+                name="Framing"
+                choices={[
+                  { value: 'last', label: `As ${dayOf(target.lastCentre.at)}` },
+                  { value: 'catalog', label: 'Catalog centre' },
+                ]}
+                chosen={framing}
+                onChoose={setFraming}
+              />
+            </div>
+          </div>
+        )}
+
         <div className={styles.setting}>
           <Caption>Exposure</Caption>
 
@@ -174,7 +200,7 @@ export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
       </div>
 
       <div className={styles.start}>
-        <CommandPill request={{ command: 'startTarget', target: target.id, exposureSeconds, ...(stop === 'frames' ? { frames: frameCount } : {}) }} onCarriedOut={() => navigate('/')}>
+        <CommandPill request={{ command: 'startTarget', target: target.id, exposureSeconds, ...(stop === 'frames' ? { frames: frameCount } : {}), ...(centre === undefined ? {} : { centre }) }} onCarriedOut={() => navigate('/')}>
           Start
         </CommandPill>
       </div>

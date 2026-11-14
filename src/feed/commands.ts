@@ -31,7 +31,7 @@ export class Operations extends Context.Service<
     readonly dewFixed: (percent: number) => Effect.Effect<Done, CommandRefused>
     readonly dewOff: Effect.Effect<Done, CommandRefused>
     readonly testFrame: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
-    readonly startTarget: (target: string, exposureSeconds: number, frames: number | undefined) => Effect.Effect<Done, CommandRefused>
+    readonly startTarget: (target: string, exposureSeconds: number, frames: number | undefined, centre: { readonly raDegrees: number; readonly decDegrees: number } | undefined) => Effect.Effect<Done, CommandRefused>
     readonly takeDarks: (frames: number, exposureSeconds: number, celsius: number) => Effect.Effect<Done, CommandRefused>
     readonly takeDarkFlats: (frames: number, exposureSeconds: number, celsius: number) => Effect.Effect<Done, CommandRefused>
     readonly takeFlats: (frames: number, celsius: number) => Effect.Effect<Done, CommandRefused>
@@ -73,7 +73,7 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         dewFixed: ({ percent }) => operations.dewFixed(percent),
         dewOff: () => operations.dewOff,
         testFrame: ({ exposureSeconds }) => operations.testFrame(exposureSeconds),
-        startTarget: ({ target, exposureSeconds, frames }) => operations.startTarget(target, exposureSeconds, frames),
+        startTarget: ({ target, exposureSeconds, frames, centre }) => operations.startTarget(target, exposureSeconds, frames, centre),
         takeDarks: ({ frames, exposureSeconds, celsius }) => operations.takeDarks(frames, exposureSeconds, celsius),
         takeDarkFlats: ({ frames, exposureSeconds, celsius }) => operations.takeDarkFlats(frames, exposureSeconds, celsius),
         takeFlats: ({ frames, celsius }) => operations.takeFlats(frames, celsius),

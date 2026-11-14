@@ -1,6 +1,8 @@
 import { Clock, Context, Duration, Effect, Fiber, Option, Result, Stream } from 'effect'
 import type { CaptureRequest } from '../capture/request.ts'
+import { positionId } from '../catalog/position.ts'
 import type { CatalogTarget } from '../catalog/types.ts'
+import type { EquatorialPosition } from '../sky/coordinates.ts'
 import type { Done, FilterAnswer, Refusal } from '../../state/commands.ts'
 import { isGuiderReport, readRigEntry, type StartId, type StartStep, type TargetStepBody } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
@@ -111,7 +113,7 @@ export const startControls = Effect.gen(function* () {
     )
 
   return {
-    startTarget: (id: string, exposureSeconds: number, frames: number | undefined) =>
+    startTarget: (id: string, exposureSeconds: number, frames: number | undefined, centre: EquatorialPosition | undefined) =>
       Effect.gen(function* () {
         const found = catalog.find(id)
 
@@ -136,7 +138,7 @@ export const startControls = Effect.gen(function* () {
         const steps: ReadonlyArray<Step> = [
           ['home', home],
           ['stop-guiding', guiding.stopGuiding],
-          ['centre', centring.centre(found.id).pipe(Effect.andThen(operationDone('centring')))],
+          ['centre', centring.centre(centre === undefined ? found.id : positionId(centre)).pipe(Effect.andThen(operationDone('centring')))],
           ['autofocus', autofocus],
           ['guiding', guide],
           ['capture', capturing.start(request)],
