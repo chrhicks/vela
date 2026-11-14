@@ -11,3 +11,14 @@ The deep-sky object catalog of the Stellarium planetarium, and its list of commo
 - In this repository: none of the data. `src/bin/catalog-setup.ts` downloads the two files at the revision named in `src/catalog/stellarium/source.ts` and loads them into a local database, which records the revision, each file's address and its SHA-256.
 
 Stellarium compiled the catalog from the SIMBAD Astronomical Database, the NASA/IPAC Extragalactic Database, and the catalogs of Sharpless, Rodgers, Campbell and Whiteoak, van den Bergh, Lynds, Cederblad, Barnard, Melotte and Collinder as distributed by VizieR and NASA ADS. Each common name in `names.dat` cites the books and sites it was taken from.
+
+## Digitized Sky Survey, coloured
+
+The DSS colour survey as a HiPS tile set: the photographic sky surveys digitized by the Space Telescope Science Institute, coloured and tiled by the Centre de Données astronomiques de Strasbourg.
+
+- Source: https://skies.esac.esa.int/DSSColor, the mirror kept by the European Space Agency
+- Credit, as the survey gives it: Digitized Sky Survey - STScI/NASA, Colored & Healpixed by CDS
+- Terms: http://archive.stsci.edu/dss/copyright.html
+- In this repository: none of the pictures. `src/bin/sky-setup.ts` downloads the tiles of one HiPS order into a local folder, with the survey's own `properties` file beside them.
+
+The Digitized Sky Surveys were produced at the Space Telescope Science Institute under U.S. Government grant NAG W-2166, from photographic data obtained with the Oschin Schmidt Telescope on Palomar Mountain and the UK Schmidt Telescope.

@@ -34,7 +34,9 @@ import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
 import { SkyNow } from '../feed/sky.ts'
 import { Targets } from '../feed/targets.ts'
+import { readSurvey, SurveySettings } from '../sky/survey.ts'
 import { skyTonight } from '../sky/tonight.ts'
+import { SurveyKept } from '../feed/survey.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
@@ -100,6 +102,19 @@ const catalog = runHandledSync(
     ),
   ),
 )
+const surveyKept = await runHandledPromise(
+  readSurvey.pipe(
+    Effect.provide(Layer.succeed(SurveySettings, settings.sky)),
+    Effect.catchTag('SurveyUnreadable', ({ path, reason }) =>
+      Effect.sync(() => {
+        console.error(`vela: no sky survey, the picker shows no sky picture: ${path}: ${reason}. Run src/bin/sky-setup.ts`)
+
+        return null
+      }),
+    ),
+  ),
+)
+
 let remembered = nothingRemembered
 
 const placedTargets = makePlacedTargets({
@@ -324,6 +339,7 @@ const feedApp = FeedServer.pipe(
           cameraAngleDegrees: remembered.cameraAngle?.degrees ?? null,
         })),
       }),
+      Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
       Layer.succeed(SkyNow, {
         tonight: Effect.map(Clock.currentTimeMillis, at => {
           const site = siteOf(picture, settings.devices.mount)
