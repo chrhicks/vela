@@ -25,7 +25,7 @@ Each route serves one moment of the night.
 
 Every screen is drawn. Real data reaches the page through `src/rig/`: the service's event stream folded into a store by the reducers in `state/`. On real data now: the run page's header, latest frame, rig line (readings, guiding, flip) and trend charts; the link banners (no connection, rig silent); and on `/launch` the set-up checklist, bring-up, alignment, the filter question and autofocus, with their commands sent to `POST /commands`.
 
-The target picker asks the service: `GET /targets/best-placed` with nothing typed, `GET /targets?q=` for a search, `GET /target?id=` for the chosen target and `GET /sky` for the header (`src/rig/targets.ts`), each again every minute. Its sky picture is still a drawing, and Start sends nothing yet.
+The target picker asks the service: `GET /targets/best-placed` with nothing typed, `GET /targets?q=` for a search, `GET /target?id=` for the chosen target and `GET /sky` for the header (`src/rig/targets.ts`), each again every minute. Start sends `startTarget` with the chosen exposure and count, which begins a capture run where the mount points; it does not slew, focus or guide yet. Its sky picture is still a drawing.
 
 The rest still reads a `stub.ts` beside its page, shaped like what the stream will give, so wiring it changes the source and leaves the components alone: the capture checks and the starting and night-over views, the ready step on `/launch`, `/controls`, and the frame and stack inspect views.
 

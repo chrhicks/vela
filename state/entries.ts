@@ -1,6 +1,7 @@
 import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effect'
 import { FilterAnswer } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
+import { RunTarget } from './targets.ts'
 
 export const RunId = Schema.NonEmptyString.pipe(Schema.brand('RunId'))
 
@@ -59,6 +60,7 @@ export const RunStarted = entryOf('vela.run.started', {
   frameType: FrameType,
   exposureSeconds: Schema.Number,
   count: Schema.optionalKey(Count),
+  target: Schema.optionalKey(RunTarget),
 })
 
 export const RunExposed = entryOf('vela.run.exposed', { run: RunId, frame: Count })

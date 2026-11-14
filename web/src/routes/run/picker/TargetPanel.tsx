@@ -1,13 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 
 import { endsBy } from '../../../../../state/ends-by.ts'
 import type { Run } from '../../../../../state/run.ts'
 import { ActionLink } from '../../../components/ActionLink.tsx'
 import { Caption } from '../../../components/Caption.tsx'
 import { Choices } from '../../../components/Choices.tsx'
+import { CommandPill } from '../../../components/CommandPill.tsx'
 import { Field } from '../../../components/Field.tsx'
 import { Picture } from '../../../components/Picture.tsx'
-import { PillLink } from '../../../components/PillLink.tsx'
 import { Readings } from '../../../components/Readings.tsx'
 import { Statement } from '../../../components/Statement.tsx'
 import { useLocalNow } from '../../../rig/clock.ts'
@@ -77,6 +78,7 @@ export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
   const [frames, setFrames] = useState(String(last.frames))
   const answer = useAsked(() => targetFacts(id), id, refreshed)
   const now = serviceNow(useLink(), useLocalNow(tickMilliseconds))
+  const navigate = useNavigate()
 
   if (answer === undefined) return null
 
@@ -84,11 +86,12 @@ export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
 
   const target = answer.facts
   const exposureSeconds = exposure === 'other' ? wholeNumber(otherSeconds, last.otherSeconds) : presetSeconds[exposure]
+  const frameCount = wholeNumber(frames, last.frames)
 
   const ends =
     now === undefined
       ? unknown
-      : endsByWords(endsBy({ now, exposureSeconds, frames: stop === 'frames' ? wholeNumber(frames, last.frames) : undefined, line: target.placement?.line, darkUntil }), now)
+      : endsByWords(endsBy({ now, exposureSeconds, frames: stop === 'frames' ? frameCount : undefined, line: target.placement?.line, darkUntil }), now)
 
   return (
     <section className={styles.panel}>
@@ -171,7 +174,9 @@ export function TargetPanel({ id, darkUntil, refreshed }: TargetPanelProps) {
       </div>
 
       <div className={styles.start}>
-        <PillLink to="/" waiting>Start</PillLink>
+        <CommandPill request={{ command: 'startTarget', target: target.id, exposureSeconds, ...(stop === 'frames' ? { frames: frameCount } : {}) }} onCarriedOut={() => navigate('/')}>
+          Start
+        </CommandPill>
       </div>
 
       <div className={styles.back}>
