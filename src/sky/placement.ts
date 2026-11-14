@@ -26,11 +26,11 @@ export function placementOf(targetJ2000: EquatorialPosition, site: Site, at: num
   const altitudeDegrees = Math.asin(Math.max(-1, Math.min(1, sineOfAltitude))) / radians
   const moonDegrees = angularDistance(targetJ2000, moon)
 
-  if (cosineAtLine <= -1) return { altitudeDegrees, moonDegrees, line: { above: 'always' } }
+  if (cosineAtLine <= -1) return { altitudeDegrees, lineDegrees, moonDegrees, line: { above: 'always' } }
 
   const hoursAtLine = cosineAtLine >= 1 ? 0 : Math.acos(cosineAtLine) / radians / 15
 
-  if (Math.abs(hourAngle) >= hoursAtLine) return { altitudeDegrees, moonDegrees, line: { above: 'no' } }
+  if (Math.abs(hourAngle) >= hoursAtLine) return { altitudeDegrees, lineDegrees, moonDegrees, line: { above: 'no' } }
 
-  return { altitudeDegrees, moonDegrees, line: { above: 'until', until: Math.round(at + ((hoursAtLine - hourAngle) / siderealHoursPerHour) * hourMs) } }
+  return { altitudeDegrees, lineDegrees, moonDegrees, line: { above: 'until', until: Math.round(at + ((hoursAtLine - hourAngle) / siderealHoursPerHour) * hourMs) } }
 }

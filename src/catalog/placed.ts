@@ -33,10 +33,10 @@ export function makePlacedTargets({ catalog, site, settings }: PlacedOptions) {
     search: (text: string, at: number): ReadonlyArray<TargetFound> => {
       const place = placer(at)
 
-      return catalog.search(text, settings.searchResults).map(found => {
+      return catalog.search(text, settings.searchResults).flatMap(found => {
         const target = catalog.find(found.id)
 
-        return { ...found, placement: place === undefined || target === undefined ? null : place(target) }
+        return target === undefined ? [] : [{ ...found, placement: place?.(target) ?? null, dualBandHint: dualBandHint(target) }]
       })
     },
 
@@ -51,9 +51,9 @@ export function makePlacedTargets({ catalog, site, settings }: PlacedOptions) {
       return {
         ...summary,
         placement: placer(at)?.(target) ?? null,
+        dualBandHint: dualBandHint(target),
         otherNames: catalog.namesOf(target).filter(name => !shown.includes(name)),
         sizeArcminutes: target.majorAxisArcminutes === null ? null : { long: target.majorAxisArcminutes, short: target.minorAxisArcminutes },
-        dualBandHint: dualBandHint(target),
       }
     },
 
@@ -67,7 +67,7 @@ export function makePlacedTargets({ catalog, site, settings }: PlacedOptions) {
         .map(target => ({ target, placement: place(target) }))
         .filter(({ placement }) => placement.line.above !== 'no')
         .slice(0, settings.bestPlacedRows)
-        .map(({ target, placement }) => ({ ...summarised(target), placement }))
+        .map(({ target, placement }) => ({ ...summarised(target), placement, dualBandHint: dualBandHint(target) }))
     },
   }
 }
