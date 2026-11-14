@@ -32,7 +32,9 @@ import { makePage } from '../page/server.ts'
 import { VelaSettings } from '../settings.ts'
 import { Feed, FeedLive } from '../feed/feed.ts'
 import { FeedServer, FeedSettings, Tonight } from '../feed/route.ts'
+import { SkyNow } from '../feed/sky.ts'
 import { Targets } from '../feed/targets.ts'
+import { skyTonight } from '../sky/tonight.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
@@ -269,6 +271,13 @@ const feedApp = FeedServer.pipe(
   Layer.provide(Layer.mergeAll(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
+      Layer.succeed(SkyNow, {
+        tonight: Effect.map(Clock.currentTimeMillis, at => {
+          const site = siteOf(picture, settings.devices.mount)
+
+          return site === undefined ? null : skyTonight(site, at)
+        }),
+      }),
       Layer.succeed(Targets, {
         search: text => Effect.map(Clock.currentTimeMillis, at => placedTargets.search(text, at)),
         bestPlaced: Effect.map(Clock.currentTimeMillis, at => placedTargets.bestPlaced(at)),
