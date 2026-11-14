@@ -102,6 +102,7 @@ interface Active {
   waiting: { readonly what: string; readonly since: () => number; readonly alertAfterMs: number } | undefined
   readonly refused: Map<string, string>
   paused: boolean
+  setpointState: string | undefined
 }
 
 type Stop = { readonly reason: EndReason; readonly detail: string }
@@ -278,6 +279,12 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
       if (stop !== undefined) return finishWith(run, stop)
 
+      if (first && run.request.waitForSetpoint === true) {
+        await changes.until(() => run.setpointState === 'Ok', undefined, run.abort.signal)
+
+        if (run.abort.signal.aborted) return finishWith(run, { reason: 'stopped', detail: 'Stop pressed' })
+      }
+
       first = false
 
       const next = await run.between?.(run.counted, run.abort.signal)
@@ -358,6 +365,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         waiting: undefined,
         refused: new Map(),
         paused: false,
+        setpointState: undefined,
       }
 
       active = run
@@ -384,11 +392,12 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
       const run = active
       const watch = run?.watch
+      const wire = run === undefined || entry.kind !== 'wire' ? undefined : readWireBody(entry)
+
+      if (run !== undefined && wire?.dir === 'in' && wire.device === settings.device && wire.property === 'CCD_TEMPERATURE') run.setpointState = wire.state
 
       if (run !== undefined && watch !== undefined) {
-        const wire = readWireBody(entry)
-
-        if (entry.kind === 'wire' && wire?.dir === 'in' && wire.device === settings.device) {
+        if (wire?.dir === 'in' && wire.device === settings.device) {
           if (wire.property === 'CCD_EXPOSURE') {
             watch.exposureHeardAt = now()
             if (wire.state === 'Alert') watch.alerted = true

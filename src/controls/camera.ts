@@ -35,7 +35,7 @@ export const cameraControls = Effect.gen(function* () {
       if (limits !== undefined && (celsius < limits.min || celsius > limits.max)) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'out-of-range', value: celsius, ...limits } }))
       if (yield* capturing.busy) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'run-active' } }))
 
-      yield* capturing.start({ ...set, gain, offset, cooler: 'on', setpoint: celsius })
+      yield* capturing.start({ ...set, gain, offset, cooler: 'on', setpoint: celsius, waitForSetpoint: true })
     })
 
   return {

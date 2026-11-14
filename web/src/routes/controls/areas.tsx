@@ -11,7 +11,7 @@ import type { Frame } from '../../../../state/frames.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import styles from './areas.module.css'
 import { Choices } from '../../components/Choices.tsx'
-import { dewHeaters } from '../../../../state/devices.ts'
+import { dewHeaters, sensorCelsius } from '../../../../state/devices.ts'
 import { Facts } from '../../components/Facts.tsx'
 import { Field } from '../../components/Field.tsx'
 import { ActionRow, Area } from './Area.tsx'
@@ -247,6 +247,8 @@ export function CalibrationArea() {
   const [typedExposure, setTypedExposure] = useState<string | undefined>(undefined)
   const [typedCelsius, setTypedCelsius] = useState<string | undefined>(undefined)
   const frames = typedFrames ?? (controls === undefined ? '' : String(controls.calibrationFrames))
+  const cooling = useRig(rig => rig.devices.primary.CCD_TEMPERATURE?.state === 'Busy')
+  const sensor = useRig(rig => sensorCelsius(rig.devices.primary))
   const lastFlat = useRig(rig => (rig.calibration?.frameType === 'flat' ? rig.calibration.exposureSeconds : undefined))
   const offered = type === 'dark-flats' ? lastFlat : lastLight
   const exposure = typedExposure ?? (offered === undefined ? '' : String(offered))
@@ -311,7 +313,7 @@ export function CalibrationArea() {
             Start set
           </CommandButton>
         )}
-        {runActive ? <span className={styles.note}>Run active</span> : request === undefined ? <span className={styles.note}>Not built yet</span> : null}
+        {runActive ? <span className={styles.note}>{cooling && sensor !== undefined ? `Run active · cooling, sensor ${sensor.toFixed(1)} °C` : 'Run active'}</span> : request === undefined ? <span className={styles.note}>Not built yet</span> : null}
       </ActionRow>
     </Area>
   )

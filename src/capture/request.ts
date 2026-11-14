@@ -20,6 +20,7 @@ export const CaptureRequest = Schema.Struct({
   offset: nonNegative,
   cooler: Schema.Literals(['keep', 'on', 'off']),
   setpoint: Schema.optionalKey(Schema.Finite),
+  waitForSetpoint: Schema.optionalKey(Schema.Boolean),
 })
 
 export type CaptureRequest = typeof CaptureRequest.Type

@@ -41,6 +41,24 @@ describe('a capture run on a scripted camera', () => {
     expect(camera.runFile.read()).toBeUndefined()
   })
 
+  it('a set that waits for the setpoint exposes nothing until the camera says the temperature is reached', async () => {
+    const camera = fakeCamera()
+    const started = camera.capture.start({ ...request, waitForSetpoint: true })
+
+    if (!started.ok) throw new Error(started.reason)
+
+    await until(() => camera.script.sent.some(sent => sent.property === 'UPLOAD_SETTINGS'))
+    camera.set('CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: 20 }, 'Busy')
+    await new Promise(resolve => setTimeout(resolve, 30))
+
+    expect(camera.script.sent.some(sent => sent.property === 'CCD_EXPOSURE')).toBe(false)
+
+    camera.set('CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: -9.8 }, 'Ok')
+    await started.done
+
+    expect(camera.capture.view().last).toMatchObject({ reason: 'done', counted: 3 })
+  })
+
   it('names the object in every light frame and clears custom header keys at the start of a run', async () => {
     const camera = fakeCamera()
 
