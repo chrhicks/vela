@@ -16,6 +16,7 @@ export const TargetAsked = Schema.Struct({ id: Schema.String })
 
 export const Placement = Schema.Struct({
   altitudeDegrees: Schema.Number,
+  lineDegrees: Schema.Number,
   moonDegrees: Schema.Number,
   line: Schema.Union([
     Schema.Struct({ above: Schema.Literal('until'), until: Schema.Number }),
@@ -36,7 +37,7 @@ export const TargetSummary = Schema.Struct({
 
 export type TargetSummary = typeof TargetSummary.Type
 
-export const TargetFound = Schema.Struct({ ...TargetSummary.fields, placement: Schema.NullOr(Placement) })
+export const TargetFound = Schema.Struct({ ...TargetSummary.fields, placement: Schema.NullOr(Placement), dualBandHint: Schema.Boolean })
 
 export type TargetFound = typeof TargetFound.Type
 
@@ -46,7 +47,6 @@ export const TargetFacts = Schema.Struct({
   ...TargetFound.fields,
   otherNames: Schema.Array(Schema.String),
   sizeArcminutes: Schema.NullOr(Schema.Struct({ long: Schema.Number, short: Schema.NullOr(Schema.Number) })),
-  dualBandHint: Schema.Boolean,
 })
 
 export type TargetFacts = typeof TargetFacts.Type

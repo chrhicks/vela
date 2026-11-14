@@ -36,7 +36,7 @@ describe('targets with their place in the sky', () => {
     const [first] = makePlacedTargets({ catalog: testCatalog, site: () => phoenix, settings }).bestPlaced(andromedaOverhead)
 
     expect(first?.placement?.altitudeDegrees).toBeGreaterThan(80)
-    expect(first).toMatchObject({ name: 'M 31', commonName: 'Andromeda Galaxy', constellation: 'Andromeda' })
+    expect(first).toMatchObject({ name: 'M 31', commonName: 'Andromeda Galaxy', constellation: 'Andromeda', dualBandHint: false })
   })
 
   it('finds a target by text with its place, or without one while the site is not known', () => {
@@ -45,6 +45,7 @@ describe('targets with their place in the sky', () => {
 
     expect(known.search('m 31', andromedaOverhead)[0]?.placement?.line.above).toBe('until')
     expect(unknown.search('m 31', andromedaOverhead)[0]).toMatchObject({ id: 'andromeda', placement: null })
+    expect(known.search('orion', andromedaOverhead)[0]).toMatchObject({ id: 'orion', dualBandHint: true, placement: { lineDegrees: 30 } })
     expect(unknown.bestPlaced(andromedaOverhead)).toEqual([])
   })
 
