@@ -104,7 +104,7 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, refr
   return (
     <section className={styles.panel}>
       <Picture label="Chosen" detail={frame}>
-        <FramedSky seed={target.name.length * 13} angleDegrees={cameraAngleDegrees ?? undefined} />
+        <FramedSky seed={target.name.length * 13} angleDegrees={cameraAngleDegrees ?? undefined} offset={framing === 'last' && target.lastCentre !== null ? target.lastCentre : undefined} />
       </Picture>
 
       <h2 className={styles.name}>{target.name}</h2>

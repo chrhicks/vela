@@ -20,6 +20,13 @@ export interface PlacedOptions {
   readonly settings: PlacedSettings
 }
 
+const signedDegrees = (degrees: number) => ((((degrees + 180) % 360) + 360) % 360) - 180
+
+const offsetFrom = (target: EquatorialPosition, centre: EquatorialPosition) => ({
+  eastDegrees: signedDegrees(centre.raDegrees - target.raDegrees) * Math.cos((target.decDegrees * Math.PI) / 180),
+  northDegrees: centre.decDegrees - target.decDegrees,
+})
+
 export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: PlacedOptions) {
   const placer = (at: number) => {
     const here = site()
@@ -57,7 +64,7 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: P
         dualBandHint: dualBandHint(target),
         otherNames: catalog.namesOf(target).filter(name => !shown.includes(name)),
         sizeArcminutes: target.majorAxisArcminutes === null ? null : { long: target.majorAxisArcminutes, short: target.minorAxisArcminutes },
-        lastCentre: centred === undefined ? null : { raDegrees: centred.raDegrees, decDegrees: centred.decDegrees, at: centred.at },
+        lastCentre: centred === undefined ? null : { raDegrees: centred.raDegrees, decDegrees: centred.decDegrees, at: centred.at, ...offsetFrom(target, centred) },
       }
     },
 

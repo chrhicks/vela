@@ -47,7 +47,7 @@ export const TargetFacts = Schema.Struct({
   ...TargetFound.fields,
   otherNames: Schema.Array(Schema.String),
   sizeArcminutes: Schema.NullOr(Schema.Struct({ long: Schema.Number, short: Schema.NullOr(Schema.Number) })),
-  lastCentre: Schema.NullOr(Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number, at: Schema.Number })),
+  lastCentre: Schema.NullOr(Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number, at: Schema.Number, eastDegrees: Schema.Number, northDegrees: Schema.Number })),
 })
 
 export type TargetFacts = typeof TargetFacts.Type

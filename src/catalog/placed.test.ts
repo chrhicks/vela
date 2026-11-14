@@ -76,10 +76,14 @@ describe('targets with their place in the sky', () => {
     expect(makePlacedTargets({ catalog: testCatalog, lastCentreNear, site: () => phoenix, settings }).facts('23h18m56s +61d33m37s', orionOverhead)).toMatchObject({ type: 'J2000 position', otherNames: [], sizeArcminutes: null, dualBandHint: false })
   })
 
-  it('gives the last centre reached near a target, when there is one', () => {
+  it('gives the last centre reached near a target and how far east and north of the target it lies', () => {
     const placed = makePlacedTargets({ catalog: testCatalog, lastCentreNear, site: () => undefined, settings })
 
-    expect(placed.facts('orion', orionOverhead)?.lastCentre).toEqual(bubbleFraming)
+    const centre = placed.facts('orion', orionOverhead)?.lastCentre
+
+    expect(centre).toMatchObject(bubbleFraming)
+    expect(centre?.eastDegrees).toBeCloseTo(0.08 * Math.cos((5.39 * Math.PI) / 180), 6)
+    expect(centre?.northDegrees).toBeCloseTo(0.19, 6)
     expect(placed.facts('andromeda', orionOverhead)?.lastCentre).toBeNull()
   })
 })
