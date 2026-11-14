@@ -22,6 +22,8 @@ export const doneWords = (done: Done): RefusalWords =>
   Match.value(done).pipe(
     Match.discriminatorsExhaustive('code')({
       'carried-out': () => ({ happened: 'Done' }),
+      'guiding-starting': ({ recalibrate }) => ({ happened: recalibrate ? 'Calibrating, then guiding' : 'Guiding starting', toDo: 'PHD2 has the command' }),
+      'guiding-stopped': () => ({ happened: 'Guiding stopped' }),
       focusing: ({ position }) => ({ happened: `Moving to ${position}`, toDo: 'still moving' }),
       focused: ({ position }) => ({ happened: `At ${position}` }),
       cooling: ({ celsius }) => ({ happened: `Cooling to ${celsius} °C` }),
@@ -65,6 +67,8 @@ export const refusalWords = (refusal: Refusal): RefusalWords =>
       'not-connected': ({ device }) => ({ happened: `${deviceWords[device]} not connected` }),
       'no-answer': ({ seconds }) => ({ happened: `No answer ${seconds} s`, toDo: 'Check rig PC' }),
       'rig-refused': ({ text }) => ({ happened: 'Rig refused', toDo: text }),
+      'guider-refused': ({ text }) => ({ happened: 'PHD2 refused', toDo: text }),
+      'guider-silent': ({ seconds }) => ({ happened: `No reply from PHD2 ${seconds} s`, toDo: 'Check PHD2' }),
       'unknown-target': ({ text }) => ({ happened: `${text} not found`, toDo: 'Check the name' }),
       'run-active': () => ({ happened: 'Run active', toDo: 'See latest frame' }),
       'move-failed': ({ device }) => ({ happened: `${deviceWords[device]} did not move`, toDo: 'Driver refused the move' }),

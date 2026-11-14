@@ -31,6 +31,10 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('releaseNudge'), id: NudgeId }),
   Schema.Struct({ command: Schema.Literal('slewAndCentre'), target: Schema.NonEmptyString }),
   Schema.Struct({ command: Schema.Literal('flipNow') }),
+  Schema.Struct({ command: Schema.Literal('startGuiding') }),
+  Schema.Struct({ command: Schema.Literal('stopGuiding') }),
+  Schema.Struct({ command: Schema.Literal('pickGuideStar') }),
+  Schema.Struct({ command: Schema.Literal('calibrateGuiding') }),
   Schema.Struct({ command: Schema.Literal('focusTo'), position: Schema.Int }),
   Schema.Struct({ command: Schema.Literal('focusBy'), steps: Schema.Int }),
   Schema.Struct({ command: Schema.Literal('coolTo'), celsius: Schema.Number }),
@@ -50,6 +54,8 @@ export type CommandRequest = typeof CommandRequest.Type
 
 export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('carried-out') }),
+  Schema.Struct({ code: Schema.Literal('guiding-starting'), recalibrate: Schema.Boolean }),
+  Schema.Struct({ code: Schema.Literal('guiding-stopped') }),
   Schema.Struct({ code: Schema.Literal('focusing'), position: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('focused'), position: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('cooling'), celsius: Schema.Number }),
@@ -77,6 +83,8 @@ export const Refusal = Schema.Union([
   Schema.Struct({ code: Schema.Literal('not-connected'), device: DeviceName }),
   Schema.Struct({ code: Schema.Literal('no-answer'), seconds: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('rig-refused'), text: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('guider-refused'), text: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('guider-silent'), seconds: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('unknown-target'), text: Schema.String }),
   Schema.Struct({ code: Schema.Literal('move-failed'), device: DeviceName }),
   Schema.Struct({ code: Schema.Literal('run-active') }),

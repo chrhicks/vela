@@ -82,16 +82,29 @@ export function MountArea() {
 }
 
 export function GuidingArea() {
+  const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
+  const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
+
   return (
     <Area id="guiding">
+      <PressLine said={pressed === undefined ? undefined : saidOf(pressed)} />
+
       <ActionRow>
-        <ActionButton>Start</ActionButton>
-        <ActionButton>Stop</ActionButton>
+        <CommandButton request={{ command: 'startGuiding' }} onAnswer={answered}>
+          Start
+        </CommandButton>
+        <CommandButton request={{ command: 'stopGuiding' }} alwaysReady onAnswer={answered}>
+          Stop
+        </CommandButton>
       </ActionRow>
 
       <ActionRow>
-        <ActionButton>Pick new star</ActionButton>
-        <ActionButton>Calibrate</ActionButton>
+        <CommandButton request={{ command: 'pickGuideStar' }} onAnswer={answered}>
+          Pick new star
+        </CommandButton>
+        <CommandButton request={{ command: 'calibrateGuiding' }} onAnswer={answered}>
+          Calibrate
+        </CommandButton>
       </ActionRow>
     </Area>
   )
