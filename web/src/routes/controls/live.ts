@@ -94,8 +94,8 @@ function cameraArea(primary: Primary): AreaState {
   const sensor = sensorCelsius(primary)
   const cooler = primary.CCD_COOLER?.values.COOLER_ON
   const power = primary.CCD_COOLER_POWER?.values.CCD_COOLER_VALUE
-  const gain = primary.CCD_CONTROLS?.values['Gain']
-  const offset = primary.CCD_CONTROLS?.values['Offset']
+  const gain = primary.CCD_CONTROLS?.values.Gain
+  const offset = primary.CCD_CONTROLS?.values.Offset
 
   return {
     heading: 'Camera',

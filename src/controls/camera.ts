@@ -27,8 +27,8 @@ export const cameraControls = Effect.gen(function* () {
   const calibrationSet = (set: Pick<CaptureRequest, 'object' | 'frameType' | 'exposureSeconds' | 'count'>, celsius: number) =>
     Effect.gen(function* () {
       const reported = yield* camera
-      const gain = reported.CCD_CONTROLS?.values['Gain']
-      const offset = reported.CCD_CONTROLS?.values['Offset']
+      const gain = reported.CCD_CONTROLS?.values.Gain
+      const offset = reported.CCD_CONTROLS?.values.Offset
       const limits = reported.CCD_TEMPERATURE?.limits?.['CCD_TEMPERATURE_VALUE']
 
       if (gain === undefined || offset === undefined) return yield* Effect.fail(notConnected)
@@ -57,8 +57,8 @@ export const cameraControls = Effect.gen(function* () {
     testFrame: (exposureSeconds: number) =>
       Effect.gen(function* () {
         const controls = (yield* camera).CCD_CONTROLS?.values
-        const gain = controls?.['Gain']
-        const offset = controls?.['Offset']
+        const gain = controls?.Gain
+        const offset = controls?.Offset
 
         if (gain === undefined || offset === undefined) return yield* Effect.fail(notConnected)
         if (yield* capturing.busy) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'run-active' } }))
