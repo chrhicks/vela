@@ -30,6 +30,8 @@ export const doneWords = (done: Done): RefusalWords =>
       'dew-off': () => ({ happened: 'Dew heater off' }),
       'test-frame': ({ exposureSeconds }) => ({ happened: `Test frame ${exposureSeconds} s` }),
       darks: ({ frames, exposureSeconds, celsius }) => ({ happened: `Darks ${frames} × ${exposureSeconds} s`, toDo: `at ${celsius} °C` }),
+      'dark-flats': ({ frames, exposureSeconds, celsius }) => ({ happened: `Dark flats ${frames} × ${exposureSeconds} s`, toDo: `at ${celsius} °C` }),
+      bias: ({ frames, celsius }) => ({ happened: `Bias ${frames} frames`, toDo: `at ${celsius} °C` }),
       autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
