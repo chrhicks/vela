@@ -16,7 +16,7 @@ export function wire(device: string, property: string | undefined, elements: Rea
 }
 
 export function runStarted(run: string, at: number, object = 'M 31'): Entry {
-  return entry('vela.run.started', at, { run, object, frameType: 'light', exposureSeconds: 120, count: 30, gain: 100, offset: 50, sequence: 1 })
+  return entry('vela.run.started', at, { run, object, frameType: 'light', exposureSeconds: 120, count: 30, gain: 100, offset: 50, sequence: 'M-31_light' })
 }
 
 export function frameKept(file: string, at: number, night = '2026-11-08'): Entry {

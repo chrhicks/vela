@@ -254,6 +254,13 @@ export const StartRoutineSettings = Schema.Struct({
   guidingSeconds: described('Seconds the start routine waits for PHD2 to report guiding settled, calibration included, before it reports the step and goes on', Schema.Number, 600),
 })
 
+export const FirstFramesSettings = Schema.Struct({
+  skippedFrames: described('Frames at the start of a run that the first-frames check does not look at, taken while the mount and the guider settle', Schema.Int, 2),
+  checkedFrames: described('Frames the first-frames check looks at, after the skipped ones', Schema.Int, 3),
+  focusRatio: described('How many times the star size autofocus reached the stars of the checked frames may be before the check calls focus poor', Schema.Number, 1.3),
+  trailedElongation: described('The star elongation, long side over short side, from which the check calls the frames trailed', Schema.Number, 1.5),
+})
+
 export const VelaSettings = Schema.Struct({
   port: Schema.Number.annotate({ description: 'Local port the night page is served on, on 127.0.0.1 only' }),
   broker: BrokerSettings,
@@ -296,6 +303,7 @@ export const VelaSettings = Schema.Struct({
   launch: described('What the launch steps start on a tap: alignment, and autofocus after the filter answer', LaunchSettings, {}),
   controls: described('The controls page', ControlsSettings, {}),
   centre: described('Settings for slew and centre', CentreSettings, {}),
+  firstFrames: described('The check of the first frames of a run on a target', FirstFramesSettings, {}),
   start: described('Starting a target from the picker: home, stop guiding, slew and centre, autofocus, guiding, then the run', StartRoutineSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({
