@@ -266,45 +266,6 @@ export const capturing: Readonly<Record<'steady' | 'alert', Capturing>> = {
   },
 }
 
-export interface Check {
-  readonly label: string
-  readonly value: string
-  readonly verdict: string
-}
-
-export interface Starting {
-  readonly facts: ReadonlyArray<string>
-  readonly latestDetail: string
-  readonly sequence: ReadonlyArray<Reading>
-  readonly checks: ReadonlyArray<Check>
-  readonly baseline: string
-}
-
-export const starting: Starting = {
-  facts: ['NGC 7635', '60 s', 'Frame 5', 'First frames OK 20:57'],
-  latestDetail: '5 · 20:57:47',
-  sequence: [
-    { label: 'Home', value: 'DONE' },
-    { label: 'Slew and centre', value: 'DONE' },
-    { label: 'Autofocus', value: 'DONE' },
-    { label: 'Guiding', value: 'DONE' },
-    { label: 'Frames 1 to 2', value: 'SKIPPED, SETTLING' },
-    { label: 'Frames 3 to 5', value: 'CHECKED' },
-  ],
-  checks: [
-    { label: 'On target', value: '14″', verdict: 'OK' },
-    { label: 'Stars', value: '782', verdict: 'OK' },
-    { label: 'HFD vs focus', value: '3.1 / 2.8', verdict: 'OK' },
-    { label: 'Trailing', value: 'NONE', verdict: 'OK' },
-    { label: 'Sky', value: '936', verdict: 'OK' },
-    { label: 'Filter', value: 'IN', verdict: 'OK' },
-    { label: 'Settings', value: 'AS SET', verdict: 'OK' },
-    { label: 'Guiding', value: '3.5″', verdict: 'OK' },
-  ],
-  baseline: 'Baseline set from frames 3 to 5',
-}
-
-
 export interface NightOver {
   readonly facts: ReadonlyArray<string>
   readonly rig: ReadonlyArray<Reading>

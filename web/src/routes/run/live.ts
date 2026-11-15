@@ -1,4 +1,5 @@
 import { flip } from '../../../../state/flip.ts'
+import type { FirstFramesChecked } from '../../../../state/first-frames.ts'
 import type { Frame } from '../../../../state/frames.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Devices } from '../../../../state/devices.ts'
@@ -9,6 +10,7 @@ import { niceTicks } from '../../components/ticks.ts'
 import type { Point, Trends } from '../../../../state/trends.ts'
 import type { TrendWindowName } from './TrendWindow.tsx'
 import type { Capturing, Trend, TrendView } from './stub.ts'
+import { poorAlert, verdictFact } from './first-frames.ts'
 import { flipWord, guidingWord, mountWords, unknown } from '../../rig/words.ts'
 
 const clock = (at: number, withSeconds = false) =>
@@ -104,9 +106,10 @@ export interface Live {
   readonly guiding: Guiding
   readonly now: number | undefined
   readonly trends: Trends
+  readonly checked?: FirstFramesChecked | undefined
 }
 
-export function liveCapturing({ run, frames, devices, guiding, now, trends }: Live, placeholder: Capturing): Capturing {
+export function liveCapturing({ run, frames, devices, guiding, now, trends, checked }: Live, placeholder: Capturing): Capturing {
   const live = { ...placeholder, rig: rigLine(devices, guiding, now), trendWindows: now === undefined ? placeholder.trendWindows : trendWindows(trends, now) }
 
   if (run === undefined) return live
@@ -116,7 +119,8 @@ export function liveCapturing({ run, frames, devices, guiding, now, trends }: Li
   return {
     ...live,
     frame: run.frames,
-    facts: [run.object, `${run.exposureSeconds} s`, `Since ${clock(run.startedAt)}`, run.count === undefined ? 'Until stopped' : `${run.count} frames`],
+    facts: [run.object, `${run.exposureSeconds} s`, `Since ${clock(run.startedAt)}`, run.count === undefined ? 'Until stopped' : `${run.count} frames`, ...(checked === undefined ? [] : [verdictFact(checked)])],
+    alert: checked === undefined ? undefined : poorAlert(checked),
     latest: {
       detail: latest === undefined ? unknown : `${run.frames} · ${clock(latest.keptAt, true)}`,
       stats: latestStats(latest),

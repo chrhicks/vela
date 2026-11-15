@@ -1,8 +1,10 @@
 import { useSearchParams } from 'react-router'
 
+import { firstFrames, seenIn } from '../../../../state/first-frames.ts'
 import { isStarting } from '../../../../state/starting.ts'
 import { useLink, useRig } from '../../rig/store.ts'
 import { CapturingView } from './CapturingView.tsx'
+import { FirstFramesView } from './FirstFramesView.tsx'
 import { IdleView } from './IdleView.tsx'
 import { ReadyView } from './picker/ReadyView.tsx'
 import { liveCapturing } from './live.ts'
@@ -15,13 +17,25 @@ export function RunPage() {
   const frames = useRig(rig => rig.frames)
   const devices = useRig(rig => rig.devices)
   const guiding = useRig(rig => rig.guiding)
-  const now = useLink().beat?.at
+  const link = useLink()
+  const now = link.beat?.at
   const trends = useRig(rig => rig.trends)
   const starting = useRig(rig => rig.starting)
+  const autofocus = useRig(rig => rig.autofocus)
+  const operations = useRig(rig => rig.operations)
+  const announced = useRig(rig => rig.firstFrames)
 
   if (starting !== undefined && isStarting(starting)) return <StartView starting={starting} />
   if (search.has('pick') || search.has('target')) return <ReadyView />
-  if (run?.status === 'capturing') return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends }, capturing.steady)} />
 
-  return <IdleView />
+  if (run?.status !== 'capturing') return <IdleView />
+
+  const checked = announced?.run === run.id ? announced : undefined
+  const found = link.firstFrames === undefined ? undefined : firstFrames(seenIn({ run, frames, autofocus, operations, devices, guiding }), link.firstFrames)
+
+  if (checked === undefined && found !== undefined && found.frames <= found.checked.to) {
+    return <FirstFramesView run={run} found={found} starting={starting?.target.id === run.target?.id ? starting : undefined} />
+  }
+
+  return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends, checked }, capturing.steady)} />
 }
