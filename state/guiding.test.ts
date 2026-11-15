@@ -16,6 +16,11 @@ describe('guiding', () => {
     expect(reduce([guider('GuideStep', 1, { AvgDist: 0.2 }), guider('GuidingStopped', 2)])).toMatchObject({ activity: 'stopped' })
   })
 
+  it("reads PHD2's events that carry a text status", () => {
+    expect(reduce([guider('GuideStep', 1, { AvgDist: 0.2 }), guider('StarLost', 2, { ErrorCode: 2, Status: 'Star lost - low SNR' })])).toMatchObject({ activity: 'starLost' })
+    expect(reduce([guider('LoopingExposures', 1, { Frame: 1, ErrorCode: 8, Status: 'No star selected' })])).toMatchObject({ activity: 'looping' })
+  })
+
   it('follows the link to PHD2 and starts over when the rig program reconnects', () => {
     const state = reduce([guider('GuideStep', 1, { AvgDist: 0.2 })])
 
