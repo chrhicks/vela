@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 import { NightName } from './entries.ts'
 import { StreamPosition, type Entry } from './entry.ts'
+import { FirstFramesLimits } from './first-frames-check.ts'
 import { RigState } from './rig.ts'
 
 export const StartToken = Schema.String.pipe(Schema.brand('StartToken'))
@@ -25,7 +26,7 @@ export const ControlsLimits = Schema.Struct({ nudgeHoldMs: Schema.Number, focusS
 
 export type ControlsLimits = typeof ControlsLimits.Type
 
-export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, launch: LaunchLimits, controls: ControlsLimits, state: RigState })
+export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, launch: LaunchLimits, controls: ControlsLimits, firstFrames: FirstFramesLimits, state: RigState })
 
 export type Bootstrap = typeof Bootstrap.Type
 

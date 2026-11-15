@@ -1,6 +1,7 @@
 import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effect'
 import { FilterAnswer, Refusal } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
+import { Check, CheckedFrames, FirstFramesVerdict } from './first-frames-check.ts'
 import { RunTarget } from './targets.ts'
 
 export const RunId = Schema.NonEmptyString.pipe(Schema.brand('RunId'))
@@ -61,6 +62,9 @@ export const RunStarted = entryOf('vela.run.started', {
   exposureSeconds: Schema.Number,
   count: Schema.optionalKey(Count),
   target: Schema.optionalKey(RunTarget),
+  sequence: Schema.optionalKey(Schema.String),
+  gain: Schema.optionalKey(Schema.Number),
+  offset: Schema.optionalKey(Schema.Number),
 })
 
 export const RunExposed = entryOf('vela.run.exposed', { run: RunId, frame: Count })
@@ -167,7 +171,11 @@ export const TargetStep = entryOf('vela.target.step', { start: StartId, target: 
 
 export type TargetStepBody = typeof TargetStep.Type['body']
 
-export const RigEntry = Schema.Union([TargetStep, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
+export const FirstFramesAnnounced = entryOf('vela.first-frames', { run: RunId, verdict: FirstFramesVerdict, frames: CheckedFrames, checks: Schema.Array(Check) })
+
+export type FirstFramesBody = typeof FirstFramesAnnounced.Type['body']
+
+export const RigEntry = Schema.Union([TargetStep, FirstFramesAnnounced, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 

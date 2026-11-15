@@ -7,7 +7,7 @@ const reduce = (entries: Parameters<typeof fold>[2]) => fold<Run | undefined>(ru
 
 describe('run', () => {
   it('starts a run with what was asked for', () => {
-    expect(reduce([runStarted('r1', 1000)])).toEqual({ status: 'capturing', id: 'r1', object: 'M 31', frameType: 'light', exposureSeconds: 120, count: 30, startedAt: 1000, frames: 0, failures: 0 })
+    expect(reduce([runStarted('r1', 1000)])).toEqual({ status: 'capturing', id: 'r1', object: 'M 31', frameType: 'light', exposureSeconds: 120, count: 30, sequence: 'M-31_light', gain: 100, offset: 50, startedAt: 1000, frames: 0, failures: 0 })
   })
 
   it('counts frames and failures, then ends with its reason as a code', () => {

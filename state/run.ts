@@ -9,6 +9,9 @@ const runFacts = {
   exposureSeconds: Schema.Number,
   count: Schema.optional(Schema.Number),
   target: Schema.optional(RunTarget),
+  sequence: Schema.optional(Schema.String),
+  gain: Schema.optional(Schema.Number),
+  offset: Schema.optional(Schema.Number),
   startedAt: Schema.Number,
   frames: Schema.Number,
   failures: Schema.Number,
@@ -23,11 +26,11 @@ export type Run = typeof Run.Type
 
 export function run(state: Run | undefined, entry: RigEntry): Run | undefined {
   if (entry.kind === 'vela.run.started') {
-    const { run: id, object, frameType, exposureSeconds, count, target } = entry.body
+    const { run: id, object, frameType, exposureSeconds, count, target, sequence, gain, offset } = entry.body
 
     if (object._tag === 'Operation') return state
 
-    return { status: 'capturing', id, object: object.name, frameType, exposureSeconds, count, target, startedAt: entry.at, frames: 0, failures: 0 }
+    return { status: 'capturing', id, object: object.name, frameType, exposureSeconds, count, target, sequence, gain, offset, startedAt: entry.at, frames: 0, failures: 0 }
   }
 
   if (state?.status !== 'capturing') return state

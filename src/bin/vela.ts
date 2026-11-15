@@ -7,6 +7,7 @@ import { Clock, Context, Effect, Fiber, Layer, Match, Scope, Stream } from 'effe
 import { runEntry } from '../capture/events.ts'
 import { makeRunFile } from '../capture/runfile.ts'
 import { makeCapture } from '../capture/run.ts'
+import { makeFirstFramesCheck } from '../capture/first-frames.ts'
 import { makeSender } from '../commands/sender.ts'
 import { readConfig } from '../config.ts'
 import { makeActivity } from '../activity/activity.ts'
@@ -354,7 +355,7 @@ const feedApp = FeedServer.pipe(
         size: catalog.size,
       }),
       deviceCommandsFrom({ send: (command, signal) => sender.send(command, signal), ask: (request, signal) => sender.ask(request, signal), tell: (device, body) => sender.tell(device, body), deviceIds: settings.devices, answerSeconds: settings.capture.commandAnswerSeconds }),
-      Layer.succeed(FeedSettings, { ...settings.feed, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs, focusSteps: settings.controls.focusSteps, autofocusExposureSeconds: settings.launch.autofocusExposureSeconds, coolerCelsius: settings.controls.coolerCelsius, dewChannel: settings.controls.dewChannel, dewPercent: settings.controls.dewPercent, testFrameSeconds: settings.controls.testFrameSeconds, calibrationFrames: settings.controls.calibrationFrames } }),
+      Layer.succeed(FeedSettings, { ...settings.feed, firstFrames: settings.firstFrames, rigSilentAfterSeconds: settings.silenceSeconds, launch: { alignGoodArcmin: settings.launch.alignGoodArcmin, alignMovedArcmin: settings.launch.alignMovedArcmin }, controls: { nudgeHoldMs: settings.controls.nudgeHoldMs, focusSteps: settings.controls.focusSteps, autofocusExposureSeconds: settings.launch.autofocusExposureSeconds, coolerCelsius: settings.controls.coolerCelsius, dewChannel: settings.controls.dewChannel, dewPercent: settings.controls.dewPercent, testFrameSeconds: settings.controls.testFrameSeconds, calibrationFrames: settings.controls.calibrationFrames } }),
     )),
 )
 const servicesScope = runHandledSync(Scope.make())
@@ -394,6 +395,13 @@ function observe(entry: Entry) {
 
 const logProblem = (line: string) => Effect.sync(() => console.error(`vela: ${line}`))
 
+let caughtUp = false
+
+const firstFramesCheck = makeFirstFramesCheck({
+  limits: settings.firstFrames,
+  announce: checked => publishEntry(stream.vela('first-frames'), 'vela.first-frames', checked.run, checked),
+})
+
 const handleMessage = (message: Message) =>
   Effect.fromResult(readMessage(message)).pipe(
     Effect.tap(entry =>
@@ -410,6 +418,7 @@ const handleMessage = (message: Message) =>
       }),
     ),
     Effect.tap(entry => Effect.sync(() => observe(entry))),
+    Effect.tap(() => Effect.flatMap(feed.current, rig => Effect.sync(() => (caughtUp ? firstFramesCheck.observe(rig) : undefined)))),
     Effect.catchTag('UnreadableMessage', error => logProblem(`${error.subject} #${error.seq} could not be read: ${error.issue}`)),
     Effect.asVoid,
   )
@@ -417,7 +426,11 @@ const handleMessage = (message: Message) =>
 const handleFollowed = (followed: Followed) =>
   Match.valueTags(followed, {
     Message: ({ message }) => handleMessage(message),
-    CaughtUp: () => Effect.sync(() => picture.caughtUp()),
+    CaughtUp: () =>
+      Effect.sync(() => {
+        caughtUp = true
+        picture.caughtUp()
+      }),
   })
 
 remembered = await runHandledPromise(

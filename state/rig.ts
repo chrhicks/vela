@@ -8,6 +8,7 @@ import { Devices, devices, noDevices } from './devices.ts'
 import type { MalformedReading } from './entry.ts'
 import { Run, run } from './run.ts'
 import { Starting, starting } from './starting.ts'
+import { FirstFramesChecked, firstFramesChecked } from './first-frames.ts'
 import { noTrends, Trends, trends } from './trends.ts'
 import { Alignment, alignment, noAlignment } from './alignment.ts'
 import { Autofocus, autofocus, noAutofocus } from './autofocus.ts'
@@ -20,6 +21,7 @@ export const RigState = Schema.Struct({
   position: Schema.optional(StreamPosition),
   run: Schema.optional(Run),
   starting: Schema.optional(Starting),
+  firstFrames: Schema.optional(FirstFramesChecked),
   frames: Schema.Array(Frame),
   readings: Readings,
   devices: Devices,
@@ -37,7 +39,7 @@ export const RigState = Schema.Struct({
 
 export type RigState = typeof RigState.Type
 
-export const emptyRig: RigState = { position: undefined, run: undefined, starting: undefined, frames: [], readings: {}, devices: noDevices, guiding: unknownGuiding, trends: noTrends, writes: {}, operations: noOperations, alignment: noAlignment, autofocus: noAutofocus, calibration: undefined, flatExposure: undefined }
+export const emptyRig: RigState = { position: undefined, run: undefined, starting: undefined, firstFrames: undefined, frames: [], readings: {}, devices: noDevices, guiding: unknownGuiding, trends: noTrends, writes: {}, operations: noOperations, alignment: noAlignment, autofocus: noAutofocus, calibration: undefined, flatExposure: undefined }
 
 const fromRig = (entry: RigEntry) => entry.kind === 'wire' || entry.kind === 'client.connected' || entry.kind === 'client.connection' || isGuiderReport(entry)
 
@@ -49,6 +51,7 @@ export function rig(state: RigState, entry: RigEntry): Result.Result<RigState, M
       position: entry.seq,
       run: run(state.run, entry),
       starting: starting(state.starting, entry),
+      firstFrames: firstFramesChecked(state.firstFrames, entry),
       frames: frames(state.frames, entry),
       readings: nextReadings,
       devices: nextDevices,
