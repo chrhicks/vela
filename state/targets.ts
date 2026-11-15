@@ -6,6 +6,12 @@ export const bestPlacedPath = '/targets/best-placed'
 
 export const targetPath = '/target'
 
+export const catalogPath = '/catalog'
+
+export const CatalogSize = Schema.Struct({ targets: Schema.Int })
+
+export type CatalogSize = typeof CatalogSize.Type
+
 export const TargetId = Schema.String.pipe(Schema.brand('TargetId'))
 
 export type TargetId = typeof TargetId.Type

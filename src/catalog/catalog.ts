@@ -10,6 +10,7 @@ export interface Catalog {
   readonly search: (text: string, limit: number) => ReadonlyArray<TargetSummary>
   readonly find: (id: string) => CatalogTarget | undefined
   readonly mostCited: ReadonlyArray<CatalogTarget>
+  readonly size: number
   readonly namesOf: (target: CatalogTarget) => ReadonlyArray<string>
 }
 
@@ -81,6 +82,8 @@ export function catalogOf(targets: ReadonlyArray<CatalogTarget>, names: Readonly
 
   return {
     mostCited: targets.filter(target => target.nameCitations > 0).sort((a, b) => b.nameCitations - a.nameCitations || a.id.localeCompare(b.id)),
+
+    size: targets.length,
 
     find: id => byId.get(id) ?? positionTarget(id),
 
