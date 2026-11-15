@@ -6,7 +6,7 @@
 
 .check {
   display: grid;
-  grid-template-columns: 1fr auto 2rem;
+  grid-template-columns: 1fr auto 2.75rem;
   align-items: baseline;
   gap: 1.25rem;
   letter-spacing: var(--track-label);
@@ -24,4 +24,8 @@
   font-weight: 500;
   letter-spacing: var(--track-code);
   text-align: right;
+}
+
+.attention {
+  color: var(--amber);
 }

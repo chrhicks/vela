@@ -81,7 +81,7 @@ export function firstFrames(seen: Seen, limits: FirstFramesLimits): FirstFrames 
   }
 }
 
-export const seenIn = (rig: RigState): Seen => ({
+export const seenIn = (rig: Pick<RigState, 'run' | 'frames' | 'autofocus' | 'operations' | 'devices' | 'guiding'>): Seen => ({
   run: rig.run,
   frames: rig.frames,
   focusedPixels: checkOf(rig.autofocus)?.hfd ?? undefined,

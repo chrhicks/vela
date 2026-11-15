@@ -5,7 +5,7 @@ import { Caption } from '../../components/Caption.tsx'
 import { CommandPill } from '../../components/CommandPill.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
-import { Readings } from '../../components/Readings.tsx'
+import { Readings, type Reading } from '../../components/Readings.tsx'
 import { clockTime } from '../../rig/clock.ts'
 import { refusalWords } from '../../rig/words.ts'
 import layout from './layout.module.css'
@@ -32,6 +32,14 @@ function valueOf(report: StepReport | undefined) {
   return [outcomeWords[report.outcome], happened, ...(toDo === undefined ? [] : [toDo])].join(' · ').toUpperCase()
 }
 
+export function startRows(starting: Starting): ReadonlyArray<Reading> {
+  return steps.map(step => {
+    const report = starting.steps.find(reported => reported.step === step)
+
+    return { label: stepWords[step], value: valueOf(report), attention: report?.outcome === 'failed' }
+  })
+}
+
 export function StartView({ starting }: { readonly starting: Starting }) {
   return (
     <Page width="wide">
@@ -48,13 +56,7 @@ export function StartView({ starting }: { readonly starting: Starting }) {
           </div>
 
           <div className={layout.first}>
-            <Readings
-              rows={steps.map(step => {
-                const report = starting.steps.find(reported => reported.step === step)
-
-                return { label: stepWords[step], value: valueOf(report), attention: report?.outcome === 'failed' }
-              })}
-            />
+            <Readings rows={startRows(starting)} />
           </div>
         </div>
       </div>
