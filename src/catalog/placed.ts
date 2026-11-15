@@ -60,6 +60,8 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: P
 
       return {
         ...summary,
+        raDegrees: target.raDegrees,
+        decDegrees: target.decDegrees,
         placement: placer(at)?.(target) ?? null,
         dualBandHint: dualBandHint(target),
         otherNames: catalog.namesOf(target).filter(name => !shown.includes(name)),

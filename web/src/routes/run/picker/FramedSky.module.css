@@ -1,11 +1,14 @@
 .sky {
   position: relative;
+  overflow: hidden;
 }
 
-.sky > svg {
+.picture {
   display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  background: var(--picture-ground);
 }
 
 .frame {

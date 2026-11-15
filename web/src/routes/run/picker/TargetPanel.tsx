@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 
 import { endsBy } from '../../../../../state/ends-by.ts'
 import type { RememberedAnswer } from '../../../../../state/remembered.ts'
+import type { Survey } from '../../../../../state/survey.ts'
 import { ActionLink } from '../../../components/ActionLink.tsx'
 import { Caption } from '../../../components/Caption.tsx'
 import { Choices } from '../../../components/Choices.tsx'
@@ -25,6 +26,7 @@ interface TargetPanelProps {
   readonly darkUntil: number | undefined
   readonly lastLight: RememberedAnswer['lastLight']
   readonly cameraAngleDegrees: number | null
+  readonly survey: Survey | null
   readonly refreshed: number
 }
 
@@ -76,7 +78,7 @@ const wholeNumber = (typed: string, fallback: number) => {
   return Number.isFinite(value) && value > 0 ? value : fallback
 }
 
-export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, refreshed }: TargetPanelProps) {
+export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, survey, refreshed }: TargetPanelProps) {
   const last = lastChoice(lastLight)
   const [framing, setFraming] = useState<Framing>('last')
   const [exposure, setExposure] = useState<ExposureChoice>(last.exposure)
@@ -104,8 +106,10 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, refr
   return (
     <section className={styles.panel}>
       <Picture label="Chosen" detail={frame}>
-        <FramedSky seed={target.name.length * 13} angleDegrees={cameraAngleDegrees ?? undefined} offset={framing === 'last' && target.lastCentre !== null ? target.lastCentre : undefined} />
+        <FramedSky survey={survey} raDegrees={target.raDegrees} decDegrees={target.decDegrees} angleDegrees={cameraAngleDegrees ?? undefined} offset={framing === 'last' && target.lastCentre !== null ? target.lastCentre : undefined} />
       </Picture>
+
+      {survey === null ? null : <p className={styles.credit}>{survey.credit}</p>}
 
       <h2 className={styles.name}>{target.name}</h2>
 
