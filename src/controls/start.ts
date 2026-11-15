@@ -88,7 +88,7 @@ export const startControls = Effect.gen(function* () {
     Effect.gen(function* () {
       const { entries } = yield* feed.subscribe
 
-      yield* guiding.pickGuideStar
+      yield* guiding.startGuiding
 
       const settle = yield* entries.pipe(Stream.filterMap(settled), Stream.runHead, Effect.timeoutOption(Duration.seconds(guidingSeconds)), Effect.map(Option.flatten))
 

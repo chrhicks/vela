@@ -75,13 +75,13 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
 }
 
 describe('Start a target', () => {
-  it('goes home, stops guiding, centres, focuses, guides on a new star and then starts the run, in that order', async () => {
+  it('goes home, stops guiding, centres, focuses, guides and then starts the run, in that order', async () => {
     const { did, started, press, finished } = setup()
 
     expect(await press('orion', 120, 100)).toMatchObject({ success: { code: 'starting-target', name: 'M 42', exposureSeconds: 120, frames: 100 } })
     await finished()
 
-    expect(did).toEqual(['mount TELESCOPE_HOME', 'guider stop_capture', 'centre orion', 'autofocus 2', 'guider get_connected', 'guider loop', 'guider find_star', 'guider guide'])
+    expect(did).toEqual(['mount TELESCOPE_HOME', 'guider stop_capture', 'centre orion', 'autofocus 2', 'guider get_connected', 'guider guide'])
     expect(started).toEqual([{ object: 'M 42', frameType: 'light', exposureSeconds: 120, count: 100, gain: 100, offset: 50, cooler: 'keep', target: { id: 'orion', name: 'M 42', raDegrees: 83.82, decDegrees: -5.39 } }])
   })
 
