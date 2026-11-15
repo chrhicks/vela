@@ -2,7 +2,7 @@ import { Effect, Schema } from 'effect'
 import { RememberedAnswer, rememberedPath } from '../../../state/remembered.ts'
 import { SkyAnswer, skyPath, type Sky } from '../../../state/sky.ts'
 import { SurveyAnswer, surveyPath, type Survey } from '../../../state/survey.ts'
-import { bestPlacedPath, TargetFacts, targetPath, TargetsFound, targetsPath, type TargetFound } from '../../../state/targets.ts'
+import { bestPlacedPath, catalogPath, CatalogSize, TargetFacts, targetPath, TargetsFound, targetsPath, type TargetFound } from '../../../state/targets.ts'
 
 export type Listing = { readonly status: 'listed'; readonly targets: ReadonlyArray<TargetFound> } | { readonly status: 'unreachable' }
 
@@ -70,3 +70,11 @@ const survey: Effect.Effect<Survey | null> = asked(surveyPath).pipe(
 )
 
 export const surveyKept = (): Promise<Survey | null> => Effect.runPromise(survey)
+
+const catalog: Effect.Effect<CatalogSize | undefined> = asked(catalogPath).pipe(
+  Effect.flatMap(bodyOf),
+  Effect.flatMap(Schema.decodeUnknownEffect(CatalogSize)),
+  Effect.catchTags({ UnknownError: () => Effect.succeed(undefined), SchemaError: () => Effect.succeed(undefined) }),
+)
+
+export const catalogSize = (): Promise<CatalogSize | undefined> => Effect.runPromise(catalog)

@@ -9,7 +9,7 @@ import { PageHeader } from '../../../components/PageHeader.tsx'
 import { Statement } from '../../../components/Statement.tsx'
 import { clockTime, useLocalNow } from '../../../rig/clock.ts'
 import { useRig } from '../../../rig/store.ts'
-import { bestPlacedTargets, findTargets, rememberedNow, skyTonight, surveyKept } from '../../../rig/targets.ts'
+import { bestPlacedTargets, catalogSize, findTargets, rememberedNow, skyTonight, surveyKept } from '../../../rig/targets.ts'
 import { useAsked } from '../../../rig/use-asked.ts'
 import styles from './ReadyView.module.css'
 import { TargetList } from './TargetList.tsx'
@@ -28,6 +28,7 @@ export function ReadyView() {
   const sky = useAsked(skyTonight, 'sky', minute)
   const recalled = useAsked(rememberedNow, 'remembered', minute)
   const survey = useAsked(surveyKept, 'survey', 0)
+  const catalog = useAsked(catalogSize, 'catalog', 0)
   const focus = useRig(rig => rig.operations.focus)
   const filter = useRig(rig => rig.operations.filter)
 
@@ -59,7 +60,11 @@ export function ReadyView() {
           </div>
 
           {listing?.status === 'unreachable' ? <Statement size="instruction">Vela did not answer</Statement> : null}
-          {listing?.status === 'listed' && targets.length === 0 ? <Statement size="instruction">{text === '' ? 'Nothing listed yet: the mount has not reported the site' : 'No target by that name'}</Statement> : null}
+          {catalog?.targets === 0 ? (
+            <Statement size="instruction">No target catalog on this machine: only typed coordinates can be found</Statement>
+          ) : listing?.status === 'listed' && targets.length === 0 ? (
+            <Statement size="instruction">{text === '' ? 'Nothing listed yet: the mount has not reported the site' : 'No target by that name'}</Statement>
+          ) : null}
 
           <TargetList targets={targets} chosen={shown} />
         </div>

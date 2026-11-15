@@ -1,9 +1,9 @@
 import { Context, Effect } from 'effect'
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
 import type { Refusal } from '../../state/commands.ts'
-import { bestPlacedPath, TargetAsked, targetPath, TargetSearch, targetsPath, type TargetFacts, type TargetFound } from '../../state/targets.ts'
+import { bestPlacedPath, catalogPath, TargetAsked, targetPath, TargetSearch, targetsPath, type TargetFacts, type TargetFound } from '../../state/targets.ts'
 
-export class Targets extends Context.Service<Targets, { readonly search: (text: string) => Effect.Effect<ReadonlyArray<TargetFound>>; readonly bestPlaced: Effect.Effect<ReadonlyArray<TargetFound>>; readonly facts: (id: string) => Effect.Effect<TargetFacts | undefined> }>()('vela/Targets') {}
+export class Targets extends Context.Service<Targets, { readonly search: (text: string) => Effect.Effect<ReadonlyArray<TargetFound>>; readonly bestPlaced: Effect.Effect<ReadonlyArray<TargetFound>>; readonly facts: (id: string) => Effect.Effect<TargetFacts | undefined>; readonly size: number }>()('vela/Targets') {}
 
 const malformed: Refusal = { code: 'malformed' }
 
@@ -35,3 +35,5 @@ export const TargetRoute = HttpRouter.add(
     return facts === undefined ? refused(404, { code: 'unknown-target', text: id }) : answer(facts)
   }).pipe(Effect.catchTag('SchemaError', () => Effect.succeed(refused(400, malformed)))),
 )
+
+export const CatalogRoute = HttpRouter.add('GET', catalogPath, Effect.map(Targets, ({ size }) => HttpServerResponse.jsonUnsafe({ targets: size }, { headers: { 'cache-control': 'no-store' } })))

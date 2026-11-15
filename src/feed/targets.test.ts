@@ -3,15 +3,15 @@ import { HttpRouter } from 'effect/http'
 import { describe, expect, it } from 'vitest'
 import { type Placement, type TargetFacts } from '../../state/targets.ts'
 import { testCatalog } from '../catalog/testing.ts'
-import { BestPlacedRoute, TargetRoute, Targets, TargetsRoute } from './targets.ts'
+import { BestPlacedRoute, CatalogRoute, TargetRoute, Targets, TargetsRoute } from './targets.ts'
 
 const placement: Placement = { altitudeDegrees: 71.2, lineDegrees: 30, moonDegrees: 112, line: { above: 'until', until: 1794380000000 } }
 
 async function get(address: string) {
   const asked: Array<string> = []
   const facts: TargetFacts = { ...testCatalog.search('m 42', 1)[0]!, placement, dualBandHint: true, raDegrees: 83.82, decDegrees: -5.39, otherNames: ['NGC 1976'], sizeArcminutes: { long: 90, short: 60 }, lastCentre: null }
-  const targets = { facts: (id: string) => Effect.succeed(id === 'orion' ? facts : undefined), bestPlaced: Effect.succeed([{ ...testCatalog.search('m 42', 1)[0]!, placement, dualBandHint: true }]), search: (text: string) => Effect.sync(() => (asked.push(text), testCatalog.search(text, 2).map(found => ({ ...found, placement: found.id === 'andromeda' ? placement : null, dualBandHint: false })))) }
-  const { handler, dispose } = HttpRouter.toWebHandler(Layer.mergeAll(BestPlacedRoute, TargetRoute, TargetsRoute), { disableLogger: true })
+  const targets = { size: testCatalog.size, facts: (id: string) => Effect.succeed(id === 'orion' ? facts : undefined), bestPlaced: Effect.succeed([{ ...testCatalog.search('m 42', 1)[0]!, placement, dualBandHint: true }]), search: (text: string) => Effect.sync(() => (asked.push(text), testCatalog.search(text, 2).map(found => ({ ...found, placement: found.id === 'andromeda' ? placement : null, dualBandHint: false })))) }
+  const { handler, dispose } = HttpRouter.toWebHandler(Layer.mergeAll(BestPlacedRoute, CatalogRoute, TargetRoute, TargetsRoute), { disableLogger: true })
   const response = await handler(new Request(`http://localhost${address}`), Context.make(Targets, targets))
   const body = await response.json()
 
@@ -48,5 +48,9 @@ describe('GET /targets', () => {
   it('refuses a target that is not in the catalog, and a request with no id', async () => {
     expect(await get('/target?id=nowhere')).toMatchObject({ status: 404, body: { code: 'unknown-target', text: 'nowhere' } })
     expect(await get('/target')).toMatchObject({ status: 400, body: { code: 'malformed' } })
+  })
+
+  it('says how many targets the catalog holds', async () => {
+    expect(await get('/catalog')).toMatchObject({ status: 200, body: { targets: testCatalog.size } })
   })
 })
