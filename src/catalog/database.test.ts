@@ -32,10 +32,10 @@ async function written() {
     const objects = yield* readObjects(objectsText)
     const names = yield* readNames(namesText)
 
-    return yield* writeCatalog({ pulled: [{ source: stellarium, pulledAt: '2026-01-01T00:00:00.000Z', files: [file] }], stellarium: { objects, names } })
+    return yield* writeCatalog({ pulled: [{ source: stellarium, pulledAt: '2026-01-01T00:00:00.000Z', files: [file] }], stellarium: { objects, names }, openNgc: { objects: [], placed: [], names: [] } })
   })
 
-  return new DatabaseSync(await Effect.runPromise(write.pipe(Effect.provide(Layer.succeed(CatalogSettings, { database })))), { readOnly: true })
+  return new DatabaseSync(await Effect.runPromise(write.pipe(Effect.provide(Layer.succeed(CatalogSettings, { database, sameObjectArcseconds: 5 })))), { readOnly: true })
 }
 
 test('each object is one target, named by its first designation and its most cited common name, the later one on a tie', async () => {

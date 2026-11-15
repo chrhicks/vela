@@ -56,7 +56,7 @@ describe('catalog search', () => {
 })
 
 describe('the catalog database', () => {
-  const settingsOf = (database: string) => Layer.succeed(CatalogSettings, { database })
+  const settingsOf = (database: string) => Layer.succeed(CatalogSettings, { database, sameObjectArcseconds: 5 })
   const folder = () => mkdtempSync(join(tmpdir(), 'vela-catalog-'))
 
   it('is read into a catalog of its named targets', async () => {
@@ -68,7 +68,7 @@ describe('the catalog database', () => {
         const objects = yield* readObjects(objectsText)
         const names = yield* readNames(nameLine('NGC', '7000', 'North America Nebula', 'WK'))
 
-        yield* writeCatalog({ pulled: [{ source: stellarium, pulledAt: '2026-01-01T00:00:00.000Z', files: [] }], stellarium: { objects, names } })
+        yield* writeCatalog({ pulled: [{ source: stellarium, pulledAt: '2026-01-01T00:00:00.000Z', files: [] }], stellarium: { objects, names }, openNgc: { objects: [], placed: [], names: [] } })
 
         return yield* readCatalog
       }).pipe(Effect.provide(settings)),

@@ -12,6 +12,16 @@ The deep-sky object catalog of the Stellarium planetarium, and its list of commo
 
 Stellarium compiled the catalog from the SIMBAD Astronomical Database, the NASA/IPAC Extragalactic Database, and the catalogs of Sharpless, Rodgers, Campbell and Whiteoak, van den Bergh, Lynds, Cederblad, Barnard, Melotte and Collinder as distributed by VizieR and NASA ADS. Each common name in `names.dat` cites the books and sites it was taken from.
 
+## OpenNGC
+
+A database of NGC and IC objects by Mattia Verga and contributors.
+
+- Source: https://github.com/mattiaverga/OpenNGC, file `database_files/NGC.csv`
+- License: Creative Commons Attribution-ShareAlike 4.0 International
+- In this repository: none of the data. `src/bin/catalog-setup.ts` downloads the file at the revision named in `src/catalog/openngc/source.ts` and loads it into the local database beside the Stellarium DSO Catalog.
+
+OpenNGC acknowledges the NASA/IPAC Extragalactic Database, HyperLEDA, SIMBAD, HEASARC and Harold Corwin's NGC/IC positions and notes.
+
 ## Digitized Sky Survey, coloured
 
 The DSS colour survey as a HiPS tile set: the photographic sky surveys digitized by the Space Telescope Science Institute, coloured and tiled by the Centre de Données astronomiques de Strasbourg.
