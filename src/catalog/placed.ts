@@ -4,6 +4,7 @@ import { moonPosition, placementOf } from '../sky/placement.ts'
 import type { TargetFacts, TargetFound } from '../../state/targets.ts'
 import { summarised, type Catalog } from './catalog.ts'
 import { dualBandHint } from './dual-band.ts'
+import { positionTarget } from './position.ts'
 import type { CatalogTarget } from './types.ts'
 
 export interface PlacedSettings {
@@ -55,7 +56,7 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: P
       if (target === undefined) return undefined
 
       const summary = summarised(target)
-      const centred = lastCentreNear(target)
+      const centred = positionTarget(id) === undefined ? lastCentreNear(target) : undefined
       const shown = [target.name, target.commonName]
 
       return {

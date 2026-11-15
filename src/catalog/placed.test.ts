@@ -86,4 +86,11 @@ describe('targets with their place in the sky', () => {
     expect(centre?.northDegrees).toBeCloseTo(0.19, 6)
     expect(placed.facts('andromeda', orionOverhead)?.lastCentre).toBeNull()
   })
+
+  it('offers no earlier centre for typed coordinates, which are their own centre', () => {
+    const placed = makePlacedTargets({ catalog: testCatalog, lastCentreNear: () => bubbleFraming, site: () => undefined, settings })
+
+    expect(placed.facts('05h35m17s -05d23m28s', orionOverhead)?.lastCentre).toBeNull()
+    expect(placed.facts('orion', orionOverhead)?.lastCentre).not.toBeNull()
+  })
 })
