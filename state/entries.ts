@@ -112,7 +112,7 @@ export const GuiderReported = Schema.Struct({
     SNR: Schema.optionalKey(Schema.Number),
     RADistanceRaw: Schema.optionalKey(Schema.Number),
     DECDistanceRaw: Schema.optionalKey(Schema.Number),
-    Status: Schema.optionalKey(Schema.Number),
+    Status: Schema.optionalKey(Schema.Union([Schema.Number, Schema.String])),
     Error: Schema.optionalKey(Schema.String),
   }),
 })

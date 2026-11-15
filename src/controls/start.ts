@@ -40,7 +40,7 @@ const refusedWith = (refusal: Refusal) => Effect.fail(new CommandRefused({ refus
 
 const asciiName = (name: string) => name.replaceAll('°', 'd').replaceAll('′', 'm').replaceAll('″', 's')
 
-const settled = (entry: Entry): Result.Result<{ readonly status: number | undefined; readonly error: string | undefined }, Entry> =>
+const settled = (entry: Entry): Result.Result<{ readonly status: number | string | undefined; readonly error: string | undefined }, Entry> =>
   Result.match(readRigEntry(entry), {
     onFailure: () => Result.fail(entry),
     onSuccess: found => {
