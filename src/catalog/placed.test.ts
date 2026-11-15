@@ -56,7 +56,7 @@ describe('targets with their place in the sky', () => {
     const placed = makePlacedTargets({ catalog: testCatalog, lastCentreNear, site: () => phoenix, settings })
 
     expect(placed.facts('orion', orionOverhead)).toMatchObject({ name: 'M 42', commonName: 'Orion Nebula', otherNames: ['Great Orion Nebula'], sizeArcminutes: { long: 90, short: null }, dualBandHint: true, constellation: 'Orion' })
-    expect(placed.facts('andromeda', orionOverhead)).toMatchObject({ otherNames: ['NGC 224'], dualBandHint: false })
+    expect(placed.facts('andromeda', orionOverhead)).toMatchObject({ otherNames: ['NGC 224'], dualBandHint: false, raDegrees: 10.68, decDegrees: 41.27 })
     expect(placed.facts('m3', orionOverhead)).toMatchObject({ otherNames: [], sizeArcminutes: null })
     expect(placed.facts('nowhere', orionOverhead)).toBeUndefined()
   })

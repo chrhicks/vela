@@ -78,3 +78,11 @@
     margin-top: var(--gap-row);
   }
 }
+
+.credit {
+  margin: 0;
+  color: var(--ember-quiet);
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
