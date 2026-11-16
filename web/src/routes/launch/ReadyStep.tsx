@@ -1,3 +1,4 @@
+import { ActionLink } from '../../components/ActionLink.tsx'
 import { PillLink } from '../../components/PillLink.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { Statement } from '../../components/Statement.tsx'
@@ -30,6 +31,10 @@ export function ReadyStep() {
           { label: 'Focus', value: ready.focusPixels === undefined ? unknown : `${ready.focusPixels.toFixed(1)} px`, attention: !ready.focusFound },
         ]}
       />
+
+      <div>
+        <ActionLink to="/launch/filter">Focus again</ActionLink>
+      </div>
     </LaunchStep>
   )
 }
