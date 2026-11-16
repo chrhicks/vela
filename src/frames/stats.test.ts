@@ -90,7 +90,7 @@ describe('frame statistics', () => {
 
     expect(await measure(light)).toMatchObject({ stars: 2, hfdPixels: 2.8, arcsecPerPixel: 1.94, shapedStars: 1, sky: 500 })
     expect((await measure(light)).elongation).toBeCloseTo(1, 1)
-    expect(await measure(dark)).toEqual({ centre: null, stars: null, hfdPixels: null, arcsecPerPixel: null, elongation: null, shapedStars: 0, sky: 500, noise: 0 })
+    expect(await measure(dark)).toEqual({ centre: null, solution: null, stars: null, hfdPixels: null, arcsecPerPixel: null, elongation: null, shapedStars: 0, sky: 500, noise: 0 })
     expect(asked).toEqual([light, light])
   })
 
@@ -98,7 +98,7 @@ describe('frame statistics', () => {
     const solved: string[] = []
     const measure = makeFrameStats({ ...settings, catalog: '/catalog' }, async () => 'x,y,hfd,snr,flux\n21,21,2.8,100,1000\n', async (program, catalog, path, near, radiusDegrees) => {
       solved.push(`${program} ${catalog} ${path} ${near.raDegrees} ${near.decDegrees} ${radiusDegrees}`)
-      return 'PLTSOLVD=T\nCRVAL1= 2.3459289749219220E+001\nCRVAL2= 3.0648188779510235E+001\n'
+      return 'PLTSOLVD=T\nCRVAL1= 2.3459289749219220E+001\nCRVAL2= 3.0648188779510235E+001\nCRPIX1= 3124.5\nCRPIX2= 2088.5\nCD1_1= 1.786e-4\nCD1_2= 5.052e-4\nCD2_1= -5.051e-4\nCD2_2= 1.784e-4\n'
     })
     const pointed = join(directory, 'pointed.fits')
     const unpointed = join(directory, 'unpointed.fits')
@@ -112,15 +112,16 @@ describe('frame statistics', () => {
     expect(solved).toEqual([`astap_cli /catalog ${pointed} 23.45079 30.64996 2`])
   })
 
-  it("reads ASTAP's solution, and nothing from a frame it could not solve", () => {
-    expect(readSolution('PLTSOLVD=T\r\nCRVAL1= 2.3459289749219220E+001\r\nCRVAL2= 3.0648188779510235E+001\r\nCROTA2=-7.0551224671978517E+001\r\n')).toEqual({ raDegrees: 23.45928974921922, decDegrees: 30.648188779510235 })
+  it("reads ASTAP's solution, and nothing from a frame it could not solve or that lacks the pixel scale", () => {
+    expect(readSolution('PLTSOLVD=T\r\nCRPIX1= 3.1245000000000000E+003\r\nCRPIX2= 2.0885000000000000E+003\r\nCRVAL1= 2.3459289749219220E+001\r\nCRVAL2= 3.0648188779510235E+001\r\nCROTA2=-7.0551224671978517E+001\r\nCD1_1= 1.7864279971656184E-004\r\nCD1_2= 5.0522612662452055E-004\r\nCD2_1=-5.0512286386245552E-004\r\nCD2_2= 1.7836531801028712E-004\r\n')).toEqual({ centre: { raDegrees: 23.45928974921922, decDegrees: 30.648188779510235 }, referencePixel: [3124.5, 2088.5], matrix: [[1.7864279971656184e-4, 5.0522612662452055e-4], [-5.0512286386245552e-4, 1.7836531801028712e-4]] })
+    expect(readSolution('PLTSOLVD=T\nCRVAL1= 23.4\nCRVAL2= 30.6\n')).toBeNull()
     expect(readSolution('PLTSOLVD=F\nERROR=No star database found.\n')).toBeNull()
     expect(readSolution('')).toBeNull()
   })
 
   it('saves the statistics next to the frame', async () => {
     const path = join(directory, 'a_001.fits')
-    const stats = { centre: null, stars: 1, hfdPixels: 2, arcsecPerPixel: null, elongation: 1.04, shapedStars: 1, sky: 3, noise: 4 }
+    const stats = { centre: null, solution: null, stars: 1, hfdPixels: 2, arcsecPerPixel: null, elongation: 1.04, shapedStars: 1, sky: 3, noise: 4 }
 
     await saveStats(path, stats)
 
