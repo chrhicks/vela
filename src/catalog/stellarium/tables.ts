@@ -2,6 +2,8 @@ import { designationsInNamingOrder, type Designation } from './designations.ts'
 import { nameColumns } from './names.ts'
 import { objectColumnDefinitions } from './objects.ts'
 
+const citationsAhead = 2
+
 const quoted = (text: string) => `'${text.replaceAll("'", "''")}'`
 
 const present = ({ column, numbered }: Designation) => (numbered ? `${column} > 0` : `${column} IS NOT NULL`)
@@ -41,11 +43,21 @@ ${commonNameRows}
 UNION ALL
 SELECT CAST(identifier AS INTEGER), name, line, citations FROM stellarium_names WHERE prefix = '';
 
+CREATE VIEW stellarium_cited_names AS
+SELECT dso, name, line, CASE WHEN citations IS NULL THEN 0 ELSE length(citations) - length(replace(citations, ',', '')) + 1 END AS cited
+FROM stellarium_common_names;
+
 CREATE VIEW stellarium_preferred_names AS
-SELECT dso, name FROM (
-  SELECT dso, name, row_number() OVER (PARTITION BY dso ORDER BY length(citations) - length(replace(citations, ',', '')) DESC, line DESC) AS position
-  FROM stellarium_common_names
-) WHERE position = 1;
+WITH ranked AS (
+  SELECT dso, name, cited,
+    row_number() OVER (PARTITION BY dso ORDER BY line) AS listed,
+    row_number() OVER (PARTITION BY dso ORDER BY cited DESC, line) AS mostCited
+  FROM stellarium_cited_names
+)
+SELECT first.dso, CASE WHEN best.cited - first.cited >= ${citationsAhead} THEN best.name ELSE first.name END AS name
+FROM ranked AS first
+JOIN ranked AS best ON best.dso = first.dso AND best.mostCited = 1
+WHERE first.listed = 1;
 
 CREATE VIEW stellarium_citations AS
 SELECT dso, sum(CASE WHEN citations IS NULL THEN 0 ELSE length(citations) - length(replace(citations, ',', '')) + 1 END) AS citations
