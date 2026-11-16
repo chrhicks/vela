@@ -40,7 +40,7 @@ import { readSurvey, SurveySettings } from '../sky/survey.ts'
 import { skyTonight } from '../sky/tonight.ts'
 import { PreviewFailed, Previews } from '../feed/previews.ts'
 import { StackPictures } from '../feed/stack.ts'
-import { SurveyKept } from '../feed/survey.ts'
+import { DetailSurveyKept, SurveyKept } from '../feed/survey.ts'
 import { CommandLog, CommandRefused, Operations } from '../feed/commands.ts'
 import { pressKey } from '../../state/pressing.ts'
 import type { FilterAnswer } from '../../state/commands.ts'
@@ -108,18 +108,22 @@ const catalog = runHandledSync(
     ),
   ),
 )
-const surveyKept = await runHandledPromise(
-  readSurvey.pipe(
-    Effect.provide(Layer.succeed(SurveySettings, settings.sky)),
-    Effect.catchTag('SurveyUnreadable', ({ path, reason }) =>
-      Effect.sync(() => {
-        console.error(`vela: no sky survey, the picker shows no sky picture: ${path}: ${reason}. Run src/bin/sky-setup.ts`)
+const surveyOf = (config: typeof settings.sky, missing: string) =>
+  runHandledPromise(
+    readSurvey.pipe(
+      Effect.provide(Layer.succeed(SurveySettings, config)),
+      Effect.catchTag('SurveyUnreadable', ({ path, reason }) =>
+        Effect.sync(() => {
+          console.error(`vela: ${missing}: ${path}: ${reason}`)
 
-        return null
-      }),
+          return null
+        }),
+      ),
     ),
-  ),
-)
+  )
+
+const surveyKept = await surveyOf(settings.sky, 'no sky survey, the picker shows no sky picture. Run src/bin/sky-setup.ts')
+const detailSurveyKept = await surveyOf(settings.skyDetail, 'no detail survey, the picker has no full-size view. Run src/bin/sky-setup.ts with detail')
 
 let remembered = nothingRemembered
 
@@ -365,6 +369,7 @@ const feedApp = FeedServer.pipe(
         })),
       }),
       Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
+      Layer.succeed(DetailSurveyKept, { survey: detailSurveyKept, tilesDir: settings.skyDetail.tilesDir }),
       Layer.succeed(Previews, { get: (night, file) => Effect.tryPromise({ try: () => previews.get(night, file), catch: cause => new PreviewFailed({ night, file, cause }) }) }),
       Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)) }),
       Layer.succeed(CommandLog, {

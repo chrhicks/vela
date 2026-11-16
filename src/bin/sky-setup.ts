@@ -14,7 +14,7 @@ const failed = (reason: string) =>
 
 await runHandledPromise(
   downloadSurvey.pipe(
-    Effect.provide(Layer.succeed(SurveySettings, settings.sky)),
+    Effect.provide(Layer.succeed(SurveySettings, process.argv[3] === 'detail' ? settings.skyDetail : settings.sky)),
     Effect.flatMap(({ survey, fetched, tilesDir }) => Effect.sync(() => console.log(`sky: ${survey.name}, ${survey.tiles} tiles at order ${survey.order} in ${tilesDir}; ${fetched} downloaded now`))),
     Effect.catchTags({
       SurveyUnreachable: ({ address, reason }) => failed(`could not download ${address}: ${reason}. Run it again to carry on from the tiles already kept`),

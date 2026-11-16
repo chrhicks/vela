@@ -14,7 +14,7 @@ import { StackPictureRoute } from './stack.ts'
 import type { FirstFramesLimits } from '../../state/first-frames-check.ts'
 import { pressedSince } from '../../state/pressing.ts'
 import { ServiceStart, startedAt } from './start.ts'
-import { SurveyRoute, SurveyTiles } from './survey.ts'
+import { DetailSurveyRoute, DetailSurveyTiles, SurveyRoute, SurveyTiles } from './survey.ts'
 import { BestPlacedRoute, CatalogRoute, TargetRoute, TargetsRoute } from './targets.ts'
 
 export class Tonight extends Context.Service<Tonight, { readonly nightOf: (at: number) => NightName }>()('vela/Tonight') {}
@@ -53,7 +53,7 @@ export const FeedRoute = HttpRouter.add(
 
 export const WebApp = Layer.unwrap(Effect.map(FeedSettings, ({ webRoot }) => HttpStaticServer.layer({ root: webRoot, spa: true, cacheControl: 'no-cache' })))
 
-export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, CommandsRoute, RememberedRoute, SkyRoute, PreviewRoute, StackPictureRoute, BestPlacedRoute, TargetRoute, TargetsRoute, CatalogRoute, SurveyRoute, SurveyTiles, WebApp), { disableLogger: true }).pipe(
+export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, CommandsRoute, RememberedRoute, SkyRoute, PreviewRoute, StackPictureRoute, BestPlacedRoute, TargetRoute, TargetsRoute, CatalogRoute, SurveyRoute, SurveyTiles, DetailSurveyRoute, DetailSurveyTiles, WebApp), { disableLogger: true }).pipe(
   Layer.provideMerge(
     Layer.unwrap(
       Effect.map(FeedSettings, ({ host, port }) => NodeHttpServer.layer(createServer, { port, host })),
