@@ -179,7 +179,9 @@ export const FirstFramesAnnounced = entryOf('vela.first-frames', { run: RunId, v
 
 export type FirstFramesBody = typeof FirstFramesAnnounced.Type['body']
 
-export const RigEntry = Schema.Union([TargetStep, FirstFramesAnnounced, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
+export const StackGrew = entryOf('vela.stack', { night: NightName, sequence: Schema.String, frames: Schema.Number, leftOut: Schema.Number })
+
+export const RigEntry = Schema.Union([TargetStep, FirstFramesAnnounced, StackGrew, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 
