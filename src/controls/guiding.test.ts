@@ -15,7 +15,7 @@ type Controls = Effect.Success<typeof guidingControls>
 
 type Replying = (method: string) => Readonly<Record<string, unknown>> | undefined
 
-function setup(replying: Replying, outcome: Outcome = { result: 'written' }, guiding: Guiding = emptyRig.guiding) {
+function setup(replying: Replying, outcome: Outcome = { result: 'written' }, guiding: Guiding = emptyRig.guiding, announcing: (method: string) => ReadonlyArray<Entry> = () => []) {
   const asked: Array<string> = []
   const replies: Array<Entry> = []
   let ids = 0
@@ -25,6 +25,7 @@ function setup(replying: Replying, outcome: Outcome = { result: 'written' }, gui
     const reply = replying(String(request.body['method']))
 
     if (reply !== undefined) replies.push(entry('phd2.reply', 1, { jsonrpc: '2.0', id: request.id, ...reply }))
+    replies.push(...announcing(String(request.body['method'])))
 
     return Promise.resolve(outcome)
   }
@@ -59,14 +60,20 @@ describe('Guiding', () => {
     expect(calibrated.asked[1]).toBe('phd2 {"method":"guide","params":{"settle":{"pixels":1.5,"time":10,"timeout":90},"recalibrate":true}}')
   })
 
-  it('pick new star loops, picks a star, then guides; stop stops the capture', async () => {
-    const picked = setup(method => ({ result: method === 'get_connected' ? true : 0 }))
+  it('pick new star stops the capture, waits for it to end, then guides, so PHD2 picks from a fresh frame; stop stops the capture', async () => {
+    const stoppedEvent = entry('phd2.LoopingExposuresStopped', 2, { Event: 'LoopingExposuresStopped', Timestamp: 2 })
+    const guiding = setup(method => ({ result: method === 'get_connected' ? true : 0 }), undefined, { link: 'connected', activity: 'starLost' }, method => (method === 'stop_capture' ? [stoppedEvent] : []))
+    const idle = setup(method => ({ result: method === 'get_connected' ? true : 0 }), undefined, { link: 'connected', activity: 'stopped' })
+    const stuck = setup(method => ({ result: method === 'get_connected' ? true : 0 }), undefined, { link: 'connected', activity: 'guiding' })
     const stopped = setup(() => ({ result: 0 }))
 
-    await picked.press(controls => controls.pickGuideStar)
-
+    expect(await guiding.press(controls => controls.pickGuideStar)).toMatchObject({ success: { code: 'guiding-starting', recalibrate: false } })
+    expect(await idle.press(controls => controls.pickGuideStar)).toMatchObject({ success: { code: 'guiding-starting' } })
+    expect(await stuck.press(controls => controls.pickGuideStar)).toMatchObject({ failure: { refusal: { code: 'guider-silent' } } })
     expect(await stopped.press(controls => controls.stopGuiding)).toMatchObject({ success: { code: 'guiding-stopped' } })
-    expect(picked.asked).toEqual(['phd2 {"method":"get_connected"}', 'phd2 {"method":"loop"}', 'phd2 {"method":"find_star"}', guide])
+    expect(guiding.asked).toEqual(['phd2 {"method":"get_connected"}', 'phd2 {"method":"stop_capture"}', guide])
+    expect(idle.asked).toEqual(['phd2 {"method":"get_connected"}', guide])
+    expect(stuck.asked).toEqual(['phd2 {"method":"get_connected"}', 'phd2 {"method":"stop_capture"}'])
     expect(stopped.asked).toEqual(['phd2 {"method":"stop_capture"}'])
   })
 
