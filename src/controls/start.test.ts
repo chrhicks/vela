@@ -13,6 +13,7 @@ import { Capturing } from './camera.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
 import { Autofocusing } from './focus.ts'
 import { GuidingSettings } from './guiding.ts'
+import { MountRuns } from './mount.ts'
 import { startControls, StartLog, StartRunning, StartSettings, TargetCatalog, TargetCentring } from './start.ts'
 
 const deviceIds = { mount: 'mount', primary: 'asi', focuser: 'focuser', box: 'box', guide: 'guide' }
@@ -33,9 +34,12 @@ interface Options {
   readonly busy?: boolean
   readonly centreRefused?: boolean
   readonly mountAnswers?: boolean
+  readonly guiderAnswers?: boolean
+  readonly running?: boolean
+  readonly homeSeconds?: number
 }
 
-function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswers = true }: Options = {}) {
+function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswers = true, guiderAnswers = true, running = false, homeSeconds = 5 }: Options = {}) {
   const did: Array<string> = []
   const reported: Array<string> = []
   const started: Array<CaptureRequest> = []
@@ -46,7 +50,7 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
   const send = (command: Command) => (did.push(`${command.device} ${command.property}`), Promise.resolve<Outcome>({ result: 'written' }))
   const ask = (request: Request) => {
     did.push(`guider ${String(request.body['method'])}`)
-    heard.push(entry('phd2.reply', 1, { jsonrpc: '2.0', id: request.id, result: true }))
+    if (guiderAnswers) heard.push(entry('phd2.reply', 1, { jsonrpc: '2.0', id: request.id, result: true }))
 
     return Promise.resolve<Outcome>({ result: 'written' })
   }
@@ -65,13 +69,16 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
     Layer.succeed(TargetCatalog, { find: id => testCatalog.find(id) }),
     Layer.succeed(StartLog, { report }),
     Layer.succeed(StartRunning, { busy: Effect.sync(() => routine !== undefined), began: begun => Effect.sync(() => void (routine = begun)) }),
-    Layer.succeed(StartSettings, { homeSeconds: 5, guidingSeconds: 5, rigSilentAfterSeconds: 10, autofocusExposureSeconds: { in: 10, out: 2 }, newId: Effect.succeed(StartId.make('start-1')) }),
+    Layer.succeed(MountRuns, { endRun: Effect.sync(() => (did.push('end run'), running)), idle: Effect.void, pause: Effect.succeed(false), resume: Effect.void }),
+    Layer.succeed(StartSettings, { homeSeconds, guidingSeconds: 5, rigSilentAfterSeconds: 10, autofocusExposureSeconds: { in: 10, out: 2 }, newId: Effect.succeed(StartId.make('start-1')) }),
   )
 
   const press = (id: string, exposureSeconds: number, frames: number | undefined, centre?: { readonly raDegrees: number; readonly decDegrees: number }) =>
     Effect.runPromise(Effect.flatMap(startControls, controls => controls.startTarget(id, exposureSeconds, frames, centre)).pipe(Effect.result, Effect.provide(services)))
 
-  return { did, reported, started, press, finished: () => Effect.runPromise(Fiber.await(routine!)), stop: () => Effect.runPromise(Fiber.interrupt(routine!)), underWay: () => vi.waitFor(() => expect(reported).toContain('home started')) }
+  const stopForTheNight = () => Effect.runPromise(Effect.flatMap(startControls, controls => controls.stopForTheNight).pipe(Effect.result, Effect.provide(services)))
+
+  return { did, reported, started, press, stopForTheNight, finished: () => Effect.runPromise(Fiber.await(routine!)), stop: () => Effect.runPromise(Fiber.interrupt(routine!)), underWay: () => vi.waitFor(() => expect(reported).toContain('home started')) }
 }
 
 describe('Start a target', () => {
@@ -151,5 +158,19 @@ describe('Start a target', () => {
       expect(await rig.press(id, 60, 1)).toMatchObject({ failure: { refusal } })
       expect([...rig.did, ...rig.reported, ...rig.started]).toEqual([])
     }
+  })
+
+  it('stops for the night: ends the run, stops guiding, goes home and waits, then turns tracking and the cooler off', async () => {
+    const { did, stopForTheNight } = setup({ running: true })
+
+    expect(await stopForTheNight()).toMatchObject({ success: { code: 'stopped-for-night', endedRun: true, missed: [] } })
+    expect(did).toEqual(['end run', 'guider stop_capture', 'mount TELESCOPE_HOME', 'mount TELESCOPE_TRACK_STATE', 'asi CCD_COOLER'])
+  })
+
+  it('goes on with the night stop when PHD2 or the mount does not answer, and names what did not happen', async () => {
+    const { did, stopForTheNight } = setup({ mountAnswers: false, guiderAnswers: false, homeSeconds: 0.05 })
+
+    expect(await stopForTheNight()).toMatchObject({ success: { code: 'stopped-for-night', endedRun: false, missed: ['guiding', 'home'] } })
+    expect(did).toEqual(['end run', 'guider stop_capture', 'mount TELESCOPE_HOME', 'mount TELESCOPE_TRACK_STATE', 'asi CCD_COOLER'])
   })
 })

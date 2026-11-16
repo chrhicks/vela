@@ -19,6 +19,10 @@ export const NudgeId = Schema.String.check(Schema.isPattern(/^[0-9a-f]{8}-[0-9a-
 
 export type NudgeId = typeof NudgeId.Type
 
+export const NightStep = Schema.Literals(['guiding', 'home', 'tracking', 'cooler'])
+
+export type NightStep = typeof NightStep.Type
+
 export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('startAlignment') }),
   Schema.Struct({ command: Schema.Literal('finishAlignment') }),
@@ -48,6 +52,7 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('takeBias'), frames: Schema.Int.check(Schema.isGreaterThan(0)), celsius: Schema.Number }),
   Schema.Struct({ command: Schema.Literal('testFrame'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
   Schema.Struct({ command: Schema.Literal('autofocus'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
+  Schema.Struct({ command: Schema.Literal('stopForTheNight') }),
   Schema.Struct({ command: Schema.Literal('startTarget'), target: Schema.NonEmptyString, exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), frames: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))), centre: Schema.optionalKey(Schema.Struct({ raDegrees: Schema.Finite, decDegrees: Schema.Finite })) }),
 ])
 
@@ -73,6 +78,7 @@ export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('autofocusing'), exposureSeconds: Schema.Number, endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean }),
+  Schema.Struct({ code: Schema.Literal('stopped-for-night'), endedRun: Schema.Boolean, missed: Schema.Array(NightStep) }),
   Schema.Struct({ code: Schema.Literal('tracking'), on: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('centring'), target: Schema.String, endedRun: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('flip'), settled: Schema.Boolean, flipped: Schema.Boolean, pierSide: Schema.optionalKey(Schema.Literals(['east', 'west'])), pausedRun: Schema.Boolean }),
