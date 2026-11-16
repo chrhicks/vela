@@ -206,6 +206,7 @@ const stacks = makeStacks({
   keepDir: frames.keepDir,
   preview: frames.preview,
   solve: (path, near, fieldDegrees) => (stars?.catalog === undefined ? Promise.resolve('') : solveFrame(stars.program, stars.catalog, path, near, stars.solveRadiusDegrees, fieldDegrees)),
+  failed: (file, error) => console.error(`vela: could not stack ${file}: ${String(error)}`),
 })
 const publishStack = (count: StackCount | undefined) => {
   if (count !== undefined) publishEntry(stream.vela('stack'), 'vela.stack', `${count.sequence}:${count.frames}:${count.leftOut}`, { ...count })
@@ -222,7 +223,7 @@ function measureKept(frame: { readonly night: string; readonly file: string; rea
       await saveStats(path, stats)
       page.framesChanged()
       publishEntry(stream.vela('frame'), 'vela.frame.stats', frame.file, { night: frame.night, file: frame.file, ...(frame.sequence === undefined ? {} : { sequence: frame.sequence }), ...stats })
-      publishStack(await stacks.add(frame, stats.solution).catch((error: unknown) => void console.error(`vela: could not stack ${frame.file}: ${String(error)}`)))
+      publishStack(await stacks.add(frame, stats.solution))
     })
     .catch((error: unknown) => console.error(`vela: could not measure ${frame.file}: ${String(error)}`))
 }
