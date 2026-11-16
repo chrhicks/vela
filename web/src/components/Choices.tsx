@@ -9,7 +9,7 @@ interface Choice<Value extends string> {
 interface ChoicesProps<Value extends string> {
   readonly name: string
   readonly choices: ReadonlyArray<Choice<Value>>
-  readonly chosen: Value
+  readonly chosen: Value | undefined
   readonly onChoose: (value: Value) => void
 }
 
