@@ -7,7 +7,8 @@ import type { Command, Outcome, Request } from '../commands/sender.ts'
 import { Feed } from '../feed/feed.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
 import { NudgeId } from '../../state/commands.ts'
-import { Centring, mountControls, MountRuns, MountSettings } from './mount.ts'
+import { CommandRefused } from '../feed/commands.ts'
+import { Centring, mountControls, MountGuiding, MountRuns, MountSettings } from './mount.ts'
 
 const deviceIds = { mount: 'am5', primary: 'primary', focuser: 'focuser', box: 'box', guide: 'guide' }
 
@@ -25,7 +26,7 @@ const written = () => Promise.resolve<Outcome>({ result: 'written' })
 
 type Controls = Effect.Success<typeof mountControls>
 
-function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) => Promise<Outcome> = written, answerSeconds = 10, later: ReadonlyArray<{ readonly rig: RigState; readonly entry: Entry }> = []) {
+function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) => Promise<Outcome> = written, answerSeconds = 10, later: ReadonlyArray<{ readonly rig: RigState; readonly entry: Entry }> = [], guider: { readonly guiding?: boolean; readonly refuses?: boolean } = {}) {
   let now = rig
   const sent: Array<string> = []
   const send = (command: Command, signal: AbortSignal) => (sent.push(`${command.device} ${command.property} ${JSON.stringify(command.values)}`), answer(command, signal))
@@ -36,7 +37,11 @@ function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) =>
   const entries = Stream.fromIterable(later).pipe(Stream.map(next => ((now = next.rig), next.entry)))
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.succeed({ state: rig, entries }), current: Effect.sync(() => now) })
   const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('vela run stopped'), true)), idle: Effect.sync(() => void sent.push('no run')), pause: Effect.sync(() => (sent.push('run paused'), true)), resume: Effect.sync(() => void sent.push('run resumed')) })
-  const services = Layer.mergeAll(feed, runs, settings, centring, deviceCommandsFrom({ send, ask, tell, deviceIds, answerSeconds }))
+  const guiding = Layer.succeed(MountGuiding, {
+    stop: guider.refuses === true ? Effect.fail(new CommandRefused({ refusal: { code: 'guider-silent', seconds: 30 } })) : guider.guiding === true ? Effect.sync(() => (sent.push('guiding stopped'), true)) : Effect.succeed(false),
+    start: Effect.sync(() => (sent.push('guiding started'), true)),
+  })
+  const services = Layer.mergeAll(feed, runs, settings, centring, guiding, deviceCommandsFrom({ send, ask, tell, deviceIds, answerSeconds }))
   const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) =>
     Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.flip, Effect.option, Effect.provide(services)))
   const done = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(mountControls, controls => choose(controls)).pipe(Effect.option, Effect.provide(services)))
@@ -157,5 +162,44 @@ describe('Slew and centre, and Flip now', () => {
     expect(await press(mount => mount.flipNow)).toMatchObject({ value: { refusal: { code: 'not-connected' } } })
     expect(await press(mount => mount.slewAndCentre('M 31'))).toMatchObject({ value: { refusal: { code: 'not-connected' } } })
     expect(sent).toEqual([])
+  })
+})
+
+describe('guiding around mount moves', () => {
+  it('stops guiding before Home and Slew and centre move the mount, and says so', async () => {
+    const home = setup(connected, written, 10, [], { guiding: true })
+    const centre = setup(connected, written, 10, [], { guiding: true })
+
+    expect(await home.done(mount => mount.home)).toMatchObject({ value: { code: 'home', stoppedGuiding: true } })
+    expect(await centre.done(mount => mount.slewAndCentre('M 33'))).toMatchObject({ value: { code: 'centring', stoppedGuiding: true } })
+    expect(home.sent).toEqual(['vela run stopped', 'guiding stopped', 'am5 TELESCOPE_HOME {"GO":true}'])
+    expect(centre.sent).toEqual(['vela run stopped', 'no run', 'guiding stopped', 'centre on M 33'])
+  })
+
+  it('moves nothing when PHD2 does not answer the stop, except Stop, which aborts the motion anyway', async () => {
+    const home = setup(connected, written, 10, [], { refuses: true })
+    const stop = setup(connected, written, 10, [], { refuses: true })
+
+    expect(await home.press(mount => mount.home)).toMatchObject({ value: { refusal: { code: 'guider-silent' } } })
+    expect(await stop.done(mount => mount.stop)).toMatchObject({ value: { code: 'stop', stoppedGuiding: false } })
+    expect(home.sent).toEqual(['vela run stopped'])
+    expect(stop.sent).toEqual(['vela run stopped', 'am5 TELESCOPE_ABORT_MOTION {"ABORT":true}'])
+  })
+
+  it('stops guiding for a flip and starts it again before the run resumes', async () => {
+    const west = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false })], pointing)
+    const eastSettled = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: false, PIER_EAST: true })], pointing)
+    const { sent, done } = setup(west, written, 10, [step(west, 'Busy'), step(eastSettled, 'Ok')], { guiding: true })
+
+    expect(await done(mount => mount.flipNow)).toMatchObject({ value: { code: 'flip', flipped: true, stoppedGuiding: true, restartedGuiding: true } })
+    expect(sent).toEqual(['run paused', 'guiding stopped', 'am5 ON_COORD_SET {"SLEW":false,"TRACK":true,"SYNC":false}', 'am5 EQUATORIAL_EOD_COORD {"RA":23.3,"DEC":61.2}', 'guiding started', 'run resumed'])
+  })
+
+  it('does not start guiding after a flip when it was not guiding before', async () => {
+    const west = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false })], pointing)
+    const { sent, done } = setup(west, written, 10, [step(west, 'Busy'), step(west, 'Ok')])
+
+    expect(await done(mount => mount.flipNow)).toMatchObject({ value: { stoppedGuiding: false, restartedGuiding: false } })
+    expect(sent).not.toContain('guiding started')
   })
 })

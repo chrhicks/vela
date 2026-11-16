@@ -6,7 +6,8 @@ import { entry } from '../../state/testing.ts'
 import type { Outcome, Request } from '../commands/sender.ts'
 import { Feed } from '../feed/feed.ts'
 import { deviceCommandsFrom } from './device-commands.ts'
-import { guidingControls, GuidingSettings } from './guiding.ts'
+import type { Guiding } from '../../state/guiding.ts'
+import { guidingControls, GuidingSettings, mountGuiding } from './guiding.ts'
 
 const deviceIds = { mount: 'mount', primary: 'primary', focuser: 'focuser', box: 'box', guide: 'guide' }
 
@@ -14,7 +15,7 @@ type Controls = Effect.Success<typeof guidingControls>
 
 type Replying = (method: string) => Readonly<Record<string, unknown>> | undefined
 
-function setup(replying: Replying, outcome: Outcome = { result: 'written' }) {
+function setup(replying: Replying, outcome: Outcome = { result: 'written' }, guiding: Guiding = emptyRig.guiding) {
   const asked: Array<string> = []
   const replies: Array<Entry> = []
   let ids = 0
@@ -28,12 +29,13 @@ function setup(replying: Replying, outcome: Outcome = { result: 'written' }) {
     return Promise.resolve(outcome)
   }
   const subscribe = Effect.sync(() => ({ state: emptyRig, entries: Stream.suspend(() => (replies.length === 0 ? Stream.never : Stream.fromIterable([...replies]))) }))
-  const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe, current: Effect.succeed(emptyRig) })
+  const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe, current: Effect.succeed({ ...emptyRig, guiding }) })
   const commands = deviceCommandsFrom({ send: () => Promise.resolve({ result: 'written' }), ask, tell: () => undefined, deviceIds, answerSeconds: 10 })
   const settings = Layer.succeed(GuidingSettings, { settle: { pixels: 1.5, time: 10, timeout: 90 }, replySeconds: 0.05, connectSeconds: 0.05, newId: Effect.sync(() => `id-${(ids += 1)}`) })
   const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(guidingControls, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands, settings))))
+  const around = (choose: (around: Effect.Success<typeof mountGuiding>) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(mountGuiding, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands, settings))))
 
-  return { asked, press }
+  return { asked, press, around }
 }
 
 const guide = 'phd2 {"method":"guide","params":{"settle":{"pixels":1.5,"time":10,"timeout":90},"recalibrate":false}}'
@@ -83,5 +85,31 @@ describe('Guiding', () => {
 
     expect(await press(controls => controls.startGuiding)).toMatchObject({ failure: { refusal: { code: 'guider-refused' } } })
     expect(asked).toEqual(['phd2 {"method":"get_connected"}'])
+  })
+})
+
+describe('guiding around a mount move', () => {
+  it('stops PHD2 and says guiding was on, so a flip can start it again', async () => {
+    const { asked, around } = setup(() => ({ result: 0 }), undefined, { link: 'connected', activity: 'guiding' })
+
+    expect(await around(guider => guider.stop)).toMatchObject({ success: true })
+    expect(asked).toEqual(['phd2 {"method":"stop_capture"}'])
+  })
+
+  it('stops a loop without counting it as guiding, and leaves a stopped or unlinked PHD2 alone', async () => {
+    const looping = setup(() => ({ result: 0 }), undefined, { link: 'connected', activity: 'looping' })
+    const stopped = setup(() => ({ result: 0 }), undefined, { link: 'connected', activity: 'stopped' })
+    const unlinked = setup(() => ({ result: 0 }), undefined, { link: 'closed', activity: 'guiding' })
+
+    expect(await looping.around(guider => guider.stop)).toMatchObject({ success: false })
+    expect(await stopped.around(guider => guider.stop)).toMatchObject({ success: false })
+    expect(await unlinked.around(guider => guider.stop)).toMatchObject({ success: false })
+    expect([looping.asked, stopped.asked, unlinked.asked]).toEqual([['phd2 {"method":"stop_capture"}'], [], []])
+  })
+
+  it("passes on PHD2's silence when it does not answer the stop", async () => {
+    const { around } = setup(() => undefined, undefined, { link: 'connected', activity: 'guiding' })
+
+    expect(await around(guider => guider.stop)).toMatchObject({ failure: { refusal: { code: 'guider-silent' } } })
   })
 })

@@ -16,6 +16,14 @@ export class MountRuns extends Context.Service<
   }
 >()('vela/MountRuns') {}
 
+export class MountGuiding extends Context.Service<
+  MountGuiding,
+  {
+    readonly stop: Effect.Effect<boolean, CommandRefused>
+    readonly start: Effect.Effect<boolean>
+  }
+>()('vela/MountGuiding') {}
+
 export class Centring extends Context.Service<Centring, { readonly centreOn: (target: string) => Effect.Effect<string, CommandRefused> }>()('vela/Centring') {}
 
 export class MountSettings extends Context.Service<MountSettings, { readonly nudgeRates: Readonly<Record<NudgeRate, string>>; readonly flipSettleSeconds: number }>()('vela/MountSettings') {}
@@ -36,6 +44,7 @@ export const mountControls = Effect.gen(function* () {
   const runs = yield* MountRuns
   const { nudgeRates, flipSettleSeconds } = yield* MountSettings
   const centring = yield* Centring
+  const guider = yield* MountGuiding
 
   const connected = Effect.flatMap(feed.current, rig => (rig.devices.mount.CONNECTION?.values.CONNECT === true ? Effect.void : Effect.fail(notConnected)))
 
@@ -44,17 +53,19 @@ export const mountControls = Effect.gen(function* () {
       yield* connected
 
       const endedRun = yield* runs.endRun
+      const stoppedGuiding = yield* guider.stop
 
       yield* commands.write('mount', 'TELESCOPE_HOME', { GO: true })
 
-      return { code: 'home', endedRun } satisfies Done
+      return { code: 'home', endedRun, stoppedGuiding } satisfies Done
     }),
     stop: Effect.gen(function* () {
       const endedRun = yield* runs.endRun
+      const stoppedGuiding = yield* guider.stop.pipe(Effect.orElseSucceed(() => false))
 
       yield* commands.write('mount', 'TELESCOPE_ABORT_MOTION', { ABORT: true })
 
-      return { code: 'stop', endedRun } satisfies Done
+      return { code: 'stop', endedRun, stoppedGuiding } satisfies Done
     }),
     tracking: (on: boolean) => connected.pipe(Effect.andThen(commands.write('mount', 'TELESCOPE_TRACK_STATE', { TRACK_ON: on, TRACK_OFF: !on })), Effect.as<Done>({ code: 'tracking', on })),
     nudge: (id: NudgeId, direction: NudgeDirection, rate: NudgeRate) => connected.pipe(Effect.andThen(commands.ask('mount', 'nudge', nudgeOf(id), { nudge: direction, rate: nudgeRates[rate] }))),
@@ -67,9 +78,10 @@ export const mountControls = Effect.gen(function* () {
 
         yield* runs.idle
 
+        const stoppedGuiding = yield* guider.stop
         const name = yield* centring.centreOn(target)
 
-        return { code: 'centring', target: name, endedRun } satisfies Done
+        return { code: 'centring', target: name, endedRun, stoppedGuiding } satisfies Done
       }),
     flipNow: Effect.scoped(
       Effect.gen(function* () {
@@ -82,20 +94,22 @@ export const mountControls = Effect.gen(function* () {
 
         const { entries } = yield* feed.subscribe
         const pausedRun = yield* runs.pause
+        const stoppedGuiding = yield* guider.stop.pipe(Effect.tapError(() => runs.resume))
 
         yield* commands.write('mount', 'ON_COORD_SET', { SLEW: false, TRACK: true, SYNC: false }).pipe(
           Effect.andThen(commands.write('mount', 'EQUATORIAL_EOD_COORD', { RA: pointing.RA, DEC: pointing.DEC })),
-          Effect.tapError(() => runs.resume),
+          Effect.tapError(() => (stoppedGuiding ? guider.start : Effect.void).pipe(Effect.andThen(runs.resume))),
         )
 
         const settled = Option.isSome(yield* endOfMove(entries, 'mount', 'EQUATORIAL_EOD_COORD', flipSettleSeconds))
+        const restartedGuiding = stoppedGuiding ? yield* guider.start : false
 
         yield* runs.resume
 
         const after = pierSideOf(yield* feed.current)
         const flipped = after !== undefined && after !== pierSideOf(before)
 
-        return { code: 'flip', settled, flipped, pausedRun, ...(after === undefined ? {} : { pierSide: after }) } satisfies Done
+        return { code: 'flip', settled, flipped, pausedRun, stoppedGuiding, restartedGuiding, ...(after === undefined ? {} : { pierSide: after }) } satisfies Done
       }),
     ),
     releaseNudge: (id: NudgeId) => commands.ask('mount', 'nudge release', `${nudgeOf(id)}-release`, { release: nudgeOf(id) }),

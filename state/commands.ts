@@ -76,12 +76,12 @@ export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('test-frame'), exposureSeconds: Schema.Number, sequence: Schema.String }),
   Schema.Struct({ code: Schema.Literal('starting-target'), name: Schema.String, exposureSeconds: Schema.Number, frames: Schema.optionalKey(Schema.Number) }),
   Schema.Struct({ code: Schema.Literal('autofocusing'), exposureSeconds: Schema.Number, endedRun: Schema.Boolean }),
-  Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean }),
-  Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean }),
+  Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean) }),
+  Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean) }),
   Schema.Struct({ code: Schema.Literal('stopped-for-night'), endedRun: Schema.Boolean, missed: Schema.Array(NightStep) }),
   Schema.Struct({ code: Schema.Literal('tracking'), on: Schema.Boolean }),
-  Schema.Struct({ code: Schema.Literal('centring'), target: Schema.String, endedRun: Schema.Boolean }),
-  Schema.Struct({ code: Schema.Literal('flip'), settled: Schema.Boolean, flipped: Schema.Boolean, pierSide: Schema.optionalKey(Schema.Literals(['east', 'west'])), pausedRun: Schema.Boolean }),
+  Schema.Struct({ code: Schema.Literal('centring'), target: Schema.String, endedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean) }),
+  Schema.Struct({ code: Schema.Literal('flip'), settled: Schema.Boolean, flipped: Schema.Boolean, pierSide: Schema.optionalKey(Schema.Literals(['east', 'west'])), pausedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean), restartedGuiding: Schema.optionalKey(Schema.Boolean) }),
 ])
 
 export type Done = typeof Done.Type
