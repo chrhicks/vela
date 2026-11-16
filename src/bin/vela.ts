@@ -142,6 +142,7 @@ const capture = makeCapture({
     failuresInRow: settings.capture.failuresInRow,
     telescope: settings.capture.telescope,
     filterNames: settings.capture.filterNames,
+    filterInSuffix: settings.capture.filterInSuffix,
   },
   runFile: makeRunFile(settings.capture.runFile),
   nextName: makeNamer({ night: () => nightOf(Date.now(), naming), kept: night => readdir(join(frames.keepDir, night)) }),

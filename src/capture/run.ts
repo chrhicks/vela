@@ -36,6 +36,7 @@ export interface CaptureSettings {
   readonly failuresInRow: number
   readonly telescope: string | undefined
   readonly filterNames: Readonly<Record<FilterAnswer, string>>
+  readonly filterInSuffix: string
 }
 
 export interface CaptureOptions {
@@ -114,6 +115,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   const labels = new Map<string, FrameLabel>()
   let active: Active | undefined
   let filter: FilterAnswer | undefined
+  const filterNameOf = (answer: FilterAnswer | undefined) => (answer === undefined ? undefined : settings.filterNames[answer])
   let last: Ending | undefined
   const idleWaiters = new Set<() => void>()
 
@@ -336,11 +338,11 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
   return {
     start(json: unknown, between?: Between, measure?: ReadonlyArray<Measurement>): StartResult {
-      const parsed = parseRequest(json)
+      const parsed = parseRequest(json, settings.filterInSuffix)
 
       if (!parsed.ok) return parsed
 
-      const wanted = wantedOf(parsed.request, parsed.sequence, measure === undefined ? settings.spoolDir : settings.measureDir, settings.telescope, filter === undefined ? undefined : settings.filterNames[filter])
+      const wanted = wantedOf(parsed.request, parsed.sequence, measure === undefined ? settings.spoolDir : settings.measureDir, settings.telescope, filterNameOf(parsed.request.filter ?? filter))
       const refusal = refusalToStart(parsed.request, wanted)
 
       if (refusal !== undefined) return { ok: false, reason: refusal }

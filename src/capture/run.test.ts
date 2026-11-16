@@ -98,6 +98,20 @@ describe('a capture run on a scripted camera', () => {
     expect(filters.map(sent => sent.values['KEYWORD_VALUE'])).toEqual(['Example band', 'Example band', 'Example band'])
   })
 
+  it("names a run taken with the filter in apart from the same target without it, and writes the run's own filter", async () => {
+    const withFilter = fakeCamera()
+    const without = fakeCamera()
+
+    withFilter.feed({ seq: StreamPosition.make(0), kind: 'vela.filter', at: 1, body: { filter: 'out' } })
+    await runToEnd(withFilter, { ...(request as object), frameType: 'light', filter: 'in' })
+    await runToEnd(without, { ...(request as object), frameType: 'light', filter: 'out' })
+
+    expect(withFilter.events.find(event => event.kind === 'started')).toMatchObject({ body: { sequence: 'M-31_light_dual' } })
+    expect(without.events.find(event => event.kind === 'started')).toMatchObject({ body: { sequence: 'M-31_light' } })
+    expect(withFilter.script.sent.filter(sent => sent.values['KEYWORD_NAME'] === 'FILTER').map(sent => sent.values['KEYWORD_VALUE'])).toContain('Example band')
+    expect(withFilter.script.sent.filter(sent => sent.values['KEYWORD_NAME'] === 'FILTER').map(sent => sent.values['KEYWORD_VALUE'])).not.toContain('None')
+  })
+
   it('labels each saved file with the run, the sequence and the frame number', async () => {
     const camera = fakeCamera()
 

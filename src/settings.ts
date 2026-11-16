@@ -108,6 +108,7 @@ export const CaptureSettings = Schema.Struct({
     Schema.Struct({ in: Schema.NonEmptyString, out: Schema.NonEmptyString }),
     { in: 'Dual band', out: 'None' },
   ),
+  filterInSuffix: described("What a run's frame names end with, after the frame type, when the run is taken with the filter in", Schema.NonEmptyString, 'dual'),
   telescope: Schema.optionalKey(
     Schema.NonEmptyString.annotate({
       description:
