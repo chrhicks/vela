@@ -1,5 +1,5 @@
 import { Match } from 'effect'
-import type { Done, NudgeDirection, Refusal } from '../../../state/commands.ts'
+import type { Done, NightStep, NudgeDirection, Refusal } from '../../../state/commands.ts'
 import type { DeviceName } from '../../../state/devices.ts'
 import type { RunEnding } from '../../../state/entries.ts'
 import type { FlatExposure } from '../../../state/flats.ts'
@@ -17,6 +17,8 @@ export interface RefusalWords {
   readonly happened: string
   readonly toDo?: string
 }
+
+const nightStepWords: Readonly<Record<NightStep, string>> = { guiding: 'guiding off', home: 'home', tracking: 'tracking off', cooler: 'cooler off' }
 
 export const doneWords = (done: Done): RefusalWords =>
   Match.value(done).pipe(
@@ -40,6 +42,7 @@ export const doneWords = (done: Done): RefusalWords =>
       autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
+      'stopped-for-night': ({ missed }) => ({ happened: 'Stopped for the night', ...(missed.length === 0 ? {} : { toDo: `not done: ${missed.map(step => nightStepWords[step]).join(', ')}` }) }),
       tracking: ({ on }) => ({ happened: on ? 'Tracking on' : 'Tracking off' }),
       centring: ({ target, endedRun }) => ({ happened: `Centring ${target}`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       flip: ({ settled, flipped, pierSide, pausedRun }) => {

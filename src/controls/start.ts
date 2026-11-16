@@ -3,7 +3,7 @@ import type { CaptureRequest } from '../capture/request.ts'
 import { positionId } from '../catalog/position.ts'
 import type { CatalogTarget } from '../catalog/types.ts'
 import type { EquatorialPosition } from '../sky/coordinates.ts'
-import type { Done, FilterAnswer, Refusal } from '../../state/commands.ts'
+import type { Done, FilterAnswer, NightStep, Refusal } from '../../state/commands.ts'
 import { isGuiderReport, readRigEntry, type StartId, type StartStep, type TargetStepBody } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
 import type { RunTarget } from '../../state/targets.ts'
@@ -13,6 +13,7 @@ import { Capturing } from './camera.ts'
 import { DeviceCommands } from './device-commands.ts'
 import { Autofocusing } from './focus.ts'
 import { guidingControls } from './guiding.ts'
+import { MountRuns } from './mount.ts'
 import { endOfMove } from './settle.ts'
 
 export class TargetCatalog extends Context.Service<TargetCatalog, { readonly find: (id: string) => CatalogTarget | undefined }>()('vela/TargetCatalog') {}
@@ -60,6 +61,7 @@ export const startControls = Effect.gen(function* () {
   const log = yield* StartLog
   const running = yield* StartRunning
   const guiding = yield* guidingControls
+  const runs = yield* MountRuns
   const { homeSeconds, guidingSeconds, rigSilentAfterSeconds, autofocusExposureSeconds, newId } = yield* StartSettings
 
   const operationDone = (what: string) => Effect.flatMap(capturing.finished, reason => (reason === 'done' ? Effect.void : refusedWith({ code: 'refused', text: `${what} ended ${reason ?? 'with no word'}` })))
@@ -112,7 +114,20 @@ export const startControls = Effect.gen(function* () {
       { discard: true },
     )
 
+  const nightSteps: ReadonlyArray<readonly [NightStep, Effect.Effect<unknown, CommandRefused>]> = [
+    ['guiding', guiding.stopGuiding],
+    ['home', home],
+    ['tracking', commands.write('mount', 'TELESCOPE_TRACK_STATE', { TRACK_ON: false, TRACK_OFF: true })],
+    ['cooler', commands.write('primary', 'CCD_COOLER', { COOLER_ON: false, COOLER_OFF: true })],
+  ]
+
   return {
+    stopForTheNight: Effect.gen(function* () {
+      const endedRun = yield* runs.endRun
+      const missed = yield* Effect.forEach(nightSteps, ([step, work]) => Effect.map(Effect.result(work), done => (Result.isFailure(done) ? [step] : [])))
+
+      return { code: 'stopped-for-night', endedRun, missed: missed.flat() } satisfies Done
+    }),
     startTarget: (id: string, exposureSeconds: number, frames: number | undefined, centre: EquatorialPosition | undefined) =>
       Effect.gen(function* () {
         const found = catalog.find(id)

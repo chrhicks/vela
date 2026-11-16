@@ -250,7 +250,7 @@ export const AutofocusSettings = Schema.Struct({
 })
 
 export const StartRoutineSettings = Schema.Struct({
-  homeSeconds: described('Seconds the start routine waits for the mount to report the end of its move home before it reports the step and goes on', Schema.Number, 120),
+  homeSeconds: described('Seconds the start routine and Stop for the night wait for the mount to report the end of its move home before they report the step and go on', Schema.Number, 120),
   guidingSeconds: described('Seconds the start routine waits for PHD2 to report guiding settled, calibration included, before it reports the step and goes on', Schema.Number, 600),
 })
 

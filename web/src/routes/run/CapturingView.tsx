@@ -2,13 +2,13 @@ import { useState } from 'react'
 
 import { ActionButton } from '../../components/ActionButton.tsx'
 import { ActionLink } from '../../components/ActionLink.tsx'
+import { CommandPill } from '../../components/CommandPill.tsx'
 import { Alert } from '../../components/Alert.tsx'
 import { Choices } from '../../components/Choices.tsx'
 import { Log } from '../../components/Log.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { Picture } from '../../components/Picture.tsx'
-import { PillLink } from '../../components/PillLink.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { StatusLine } from '../../components/StatusLine.tsx'
 import { StubSky } from '../../stub/StubSky.tsx'
@@ -34,7 +34,7 @@ export function CapturingView({ run }: CapturingViewProps) {
         <ActionLink to="/controls">Controls</ActionLink>
 
         <span className={layout.wideOnly}>
-          <PillLink to="/" waiting>Stop for the night</PillLink>
+          <CommandPill request={{ command: 'stopForTheNight' }}>Stop for the night</CommandPill>
         </span>
       </PageHeader>
 
@@ -110,7 +110,7 @@ export function CapturingView({ run }: CapturingViewProps) {
         </div>
 
         <div className={`${layout.phoneOnly} ${layout.last}`}>
-          <PillLink to="/" waiting>Stop for the night</PillLink>
+          <CommandPill request={{ command: 'stopForTheNight' }}>Stop for the night</CommandPill>
         </div>
       </div>
     </Page>
