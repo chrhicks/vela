@@ -132,5 +132,6 @@ describe('frame statistics', () => {
     expect(fieldHeightDegrees(new Map([['YPIXSZ', 3.76], ['FOCALLEN', 400]]), 4176)?.toFixed(3)).toBe('2.249')
     expect(fieldHeightDegrees(new Map([['XPIXSZ', 3.76], ['FOCALLEN', 400]]), 4176)?.toFixed(3)).toBe('2.249')
     expect(fieldHeightDegrees(new Map([['XPIXSZ', 3.76]]), 4176)).toBeUndefined()
+    expect(fieldHeightDegrees(new Map([['XPIXSZ', 3.76], ['FOCALLEN', 0]]), 4176)).toBeUndefined()
   })
 })

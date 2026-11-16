@@ -233,8 +233,10 @@ export function readSolution(ini: string): PlateSolution | null {
 
 export function fieldHeightDegrees(header: ReadonlyMap<string, HeaderValue>, rows: number): number | undefined {
   const number = (key: string) => Number(header.get(key))
+  const focalLength = number('FOCALLEN')
+  if (!(focalLength > 0)) return undefined
   const millimetres = (rows * (header.has('YPIXSZ') ? number('YPIXSZ') : number('XPIXSZ'))) / 1000
-  const degrees = (2 * Math.atan(millimetres / 2 / number('FOCALLEN')) * 180) / Math.PI
+  const degrees = (2 * Math.atan(millimetres / 2 / focalLength) * 180) / Math.PI
 
   return Number.isFinite(degrees) && degrees > 0 ? degrees : undefined
 }
