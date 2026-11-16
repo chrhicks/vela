@@ -5,25 +5,27 @@ const good = { object: 'M 31', frameType: 'light', exposureSeconds: 120, count: 
 
 describe('parseRequest', () => {
   it('accepts a full request and names the files by object and frame type', () => {
-    expect(parseRequest(good)).toMatchObject({ ok: true, sequence: 'M-31_light', request: { count: 10, setpoint: -10 } })
+    expect(parseRequest(good, 'dual')).toMatchObject({ ok: true, sequence: 'M-31_light', request: { count: 10, setpoint: -10 } })
+    expect(parseRequest({ ...good, filter: 'in' }, 'dual')).toMatchObject({ ok: true, sequence: 'M-31_light_dual' })
+    expect(parseRequest({ ...good, filter: 'out' }, 'dual')).toMatchObject({ ok: true, sequence: 'M-31_light' })
   })
 
   it('refuses an exposure that is not positive, a count that is not a whole number and a negative gain', () => {
-    expect(parseRequest({ ...good, exposureSeconds: 0 }).ok).toBe(false)
-    expect(parseRequest({ ...good, count: 2.5 }).ok).toBe(false)
-    expect(parseRequest({ ...good, gain: -1 }).ok).toBe(false)
-    expect(parseRequest({ ...good, frameType: 'bright' }).ok).toBe(false)
+    expect(parseRequest({ ...good, exposureSeconds: 0 }, 'dual').ok).toBe(false)
+    expect(parseRequest({ ...good, count: 2.5 }, 'dual').ok).toBe(false)
+    expect(parseRequest({ ...good, gain: -1 }, 'dual').ok).toBe(false)
+    expect(parseRequest({ ...good, frameType: 'bright' }, 'dual').ok).toBe(false)
   })
 
   it('refuses an object name with nothing to name files by', () => {
-    expect(parseRequest({ ...good, object: ' / ' })).toEqual({ ok: false, reason: 'the object name has no letters or digits to name the files by' })
+    expect(parseRequest({ ...good, object: ' / ' }, 'dual')).toEqual({ ok: false, reason: 'the object name has no letters or digits to name the files by' })
   })
 
   it('needs a setpoint only when the cooler is on', () => {
     const { setpoint: _, ...without } = good
 
-    expect(parseRequest(without)).toEqual({ ok: false, reason: 'a setpoint is needed when the cooler is on' })
-    expect(parseRequest({ ...without, cooler: 'off' }).ok).toBe(true)
+    expect(parseRequest(without, 'dual')).toEqual({ ok: false, reason: 'a setpoint is needed when the cooler is on' })
+    expect(parseRequest({ ...without, cooler: 'off' }, 'dual').ok).toBe(true)
   })
 })
 

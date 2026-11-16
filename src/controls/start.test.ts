@@ -91,7 +91,7 @@ describe('Start a target', () => {
     await finished()
 
     expect(did).toEqual(['filter out', 'mount TELESCOPE_HOME', 'guider stop_capture', 'centre orion', 'autofocus 2', 'guider get_connected', 'guider guide'])
-    expect(started).toEqual([{ object: 'M 42', frameType: 'light', exposureSeconds: 120, count: 100, gain: 100, offset: 50, cooler: 'keep', target: { id: 'orion', name: 'M 42', raDegrees: 83.82, decDegrees: -5.39 } }])
+    expect(started).toEqual([{ object: 'M 42', frameType: 'light', exposureSeconds: 120, filter: 'out', count: 100, gain: 100, offset: 50, cooler: 'keep', target: { id: 'orion', name: 'M 42', raDegrees: 83.82, decDegrees: -5.39 } }])
   })
 
   it('records the filter chosen for the target before the routine starts, and focuses with that filter\'s exposure', async () => {

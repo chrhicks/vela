@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { FilterAnswer } from '../../state/commands.ts'
 import { FrameType, SkyPosition } from '../../state/entries.ts'
 import { RunTarget } from '../../state/targets.ts'
 import { decodeConfig } from '../config.ts'
@@ -24,19 +25,20 @@ export const CaptureRequest = Schema.Struct({
   waitForSetpoint: Schema.optionalKey(Schema.Boolean),
   target: Schema.optionalKey(RunTarget),
   aim: Schema.optionalKey(SkyPosition),
+  filter: Schema.optionalKey(FilterAnswer),
 })
 
 export type CaptureRequest = typeof CaptureRequest.Type
 
-export function sequenceName(object: string, frameType: FrameType) {
+export function sequenceName(object: string, frameType: FrameType, suffix?: string) {
   const safe = object.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
-  return safe === '' ? undefined : `${safe}_${frameType}`
+  return safe === '' ? undefined : `${safe}_${frameType}${suffix === undefined ? '' : `_${suffix}`}`
 }
 
 export type Parsed = { readonly ok: true; readonly request: CaptureRequest; readonly sequence: string } | { readonly ok: false; readonly reason: string }
 
-export function parseRequest(json: unknown): Parsed {
+export function parseRequest(json: unknown, filterInSuffix: string): Parsed {
   let request: CaptureRequest
 
   try {
@@ -45,7 +47,7 @@ export function parseRequest(json: unknown): Parsed {
     return { ok: false, reason: `not a capture request: ${error instanceof Error ? error.message : String(error)}` }
   }
 
-  const sequence = sequenceName(request.object, request.frameType)
+  const sequence = sequenceName(request.object, request.frameType, request.filter === 'in' ? filterInSuffix : undefined)
 
   if (sequence === undefined) return { ok: false, reason: 'the object name has no letters or digits to name the files by' }
   if (request.cooler === 'on' && request.setpoint === undefined) return { ok: false, reason: 'a setpoint is needed when the cooler is on' }
