@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cutPlan, tilesOf, type SkyCut } from './sky-cut.ts'
+import { cutPlan, skyPositionAt, surveyPixelDegrees, tilesOf, type SkyCut } from './sky-cut.ts'
 
 const cutAt = (raDegrees: number, decDegrees: number): SkyCut => ({ raDegrees, decDegrees, widthDegrees: 7, widthPixels: 768, heightPixels: 512, order: 4, tileWidth: 512 })
 
@@ -25,5 +25,26 @@ describe('cutting a picture from sky survey tiles', () => {
   it('needs seven tiles for the field around the Bubble, and nine for one that holds the pole', () => {
     expect(tilesOf(cutPlan(cutAt(350.2012, 61.2017)))).toEqual([887, 892, 893, 894, 895, 980, 981])
     expect(tilesOf(cutPlan(cutAt(40, 89)))).toEqual([253, 254, 255, 510, 511, 767, 1021, 1022, 1023])
+  })
+})
+
+describe('where a point of the picture is on the sky', () => {
+  it('finds the centre at no offset, a degree north up in declination, and a degree east up in right ascension on the equator', () => {
+    const centre = skyPositionAt({ raDegrees: 23.46, decDegrees: 30.66 }, 0, 0)
+
+    expect(centre.raDegrees).toBeCloseTo(23.46, 9)
+    expect(centre.decDegrees).toBeCloseTo(30.66, 9)
+    expect(skyPositionAt({ raDegrees: 23.46, decDegrees: 30.66 }, 0, 1).decDegrees).toBeCloseTo(31.66, 3)
+    expect(skyPositionAt({ raDegrees: 10, decDegrees: 0 }, 1, 0).raDegrees).toBeCloseTo(11, 3)
+  })
+
+  it('wraps right ascension past 0 and 360', () => {
+    expect(skyPositionAt({ raDegrees: 359.5, decDegrees: 0 }, 1, 0).raDegrees).toBeCloseTo(0.5, 3)
+    expect(skyPositionAt({ raDegrees: 0.5, decDegrees: 0 }, -1, 0).raDegrees).toBeCloseTo(359.5, 3)
+  })
+
+  it("gives a survey's mean pixel size: 3.22 arcseconds at order 7, 25.8 at order 4, for 512-pixel tiles", () => {
+    expect(surveyPixelDegrees(7, 512) * 3600).toBeCloseTo(3.221, 2)
+    expect(surveyPixelDegrees(4, 512) * 3600).toBeCloseTo(25.77, 1)
   })
 })
