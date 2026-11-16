@@ -12,7 +12,7 @@ export function FilterStep() {
 
   return (
     <LaunchStep step={4} title="Filter" facts={['Dual band']}>
-      <Statement size="instruction">Filter tonight?</Statement>
+      <Statement size="instruction">Filter now?</Statement>
 
       <div className={styles.answers}>
         <CommandPill request={{ command: 'answerFilter', filter: 'in' }} onCarriedOut={toFocus}>

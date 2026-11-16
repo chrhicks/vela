@@ -104,7 +104,7 @@ export const CaptureSettings = Schema.Struct({
     3,
   ),
   filterNames: described(
-    "What the FILTER card in each frame says for each answer to the launch filter question, from the answer on. Before an answer, frames have no FILTER card",
+    "What the FILTER card in each frame says for each filter answer, from the Launch filter step or a target's Start. Before an answer, frames have no FILTER card",
     Schema.Struct({ in: Schema.NonEmptyString, out: Schema.NonEmptyString }),
     { in: 'Dual band', out: 'None' },
   ),
