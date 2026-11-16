@@ -89,3 +89,17 @@ export const seenIn = (rig: Pick<RigState, 'run' | 'frames' | 'autofocus' | 'ope
   camera: rig.devices.primary.CCD_CONTROLS?.values,
   guiding: rig.guiding,
 })
+
+export interface VersusBaseline {
+  readonly hfdPercent: number | undefined
+  readonly starsPercent: number | undefined
+}
+
+const percentFrom = (now: number | null, baseline: number | undefined) => (now === null || baseline === undefined || baseline === 0 ? undefined : Math.round((now / baseline - 1) * 100))
+
+export function versusBaseline(measured: Measurements, checked: Pick<FirstFramesChecked, 'checks'>): VersusBaseline {
+  const focus = checked.checks.find(check => check.check === 'focus')
+  const stars = checked.checks.find(check => check.check === 'stars')
+
+  return { hfdPercent: percentFrom(measured.hfdPixels, focus?.hfdPixels), starsPercent: percentFrom(measured.stars, stars?.stars) }
+}
