@@ -16,7 +16,7 @@ afterEach(async () => {
 })
 
 const shape = { shapeMinSnr: 30, shapeStars: 300, saturated: 60000 }
-const settings = { program: 'astap_cli', analyseSnr: 10, solveRadiusDegrees: 2, ...shape }
+const settings = { program: 'astap_cli', analyseSnr: 10, listLimit: 10000, solveRadiusDegrees: 2, ...shape }
 
 function star(x: number, y: number, sigmaX: number, sigmaY: number) {
   return (px: number, py: number) => 20000 * Math.exp(-((px - x) ** 2) / (2 * sigmaX ** 2) - (py - y) ** 2 / (2 * sigmaY ** 2))
@@ -78,8 +78,8 @@ describe('frame statistics', () => {
 
   it('lists stars in a light frame, not in a dark, and always gives sky and noise', async () => {
     const asked: string[] = []
-    const measure = makeFrameStats(settings, async (_program, path) => {
-      asked.push(path)
+    const measure = makeFrameStats(settings, async (_program, path, snr, limit) => {
+      asked.push(`${path} ${snr} ${limit}`)
       return 'x,y,hfd,snr,flux\n21,21,2.8,100,1000\n10,10,3.0,12,10\n'
     })
     const light = join(directory, 'light.fits')
@@ -91,7 +91,7 @@ describe('frame statistics', () => {
     expect(await measure(light)).toMatchObject({ stars: 2, hfdPixels: 2.8, arcsecPerPixel: 1.94, shapedStars: 1, sky: 500 })
     expect((await measure(light)).elongation).toBeCloseTo(1, 1)
     expect(await measure(dark)).toEqual({ centre: null, solution: null, stars: null, hfdPixels: null, arcsecPerPixel: null, elongation: null, shapedStars: 0, sky: 500, noise: 0 })
-    expect(asked).toEqual([light, light])
+    expect(asked).toEqual([`${light} 10 10000`, `${light} 10 10000`])
   })
 
   it("plate solves a light frame near the mount's pointing in its header, when a star database is set", async () => {

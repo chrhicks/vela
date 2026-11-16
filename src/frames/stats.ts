@@ -12,6 +12,7 @@ export interface StarSettings {
   readonly catalog?: string
   readonly solveRadiusDegrees: number
   readonly analyseSnr: number
+  readonly listLimit: number
   readonly shapeMinSnr: number
   readonly shapeStars: number
   readonly saturated: number
@@ -197,11 +198,11 @@ export function arcsecPerPixel(header: ReadonlyMap<string, HeaderValue>): number
 
 export const isLight = (header: ReadonlyMap<string, HeaderValue>) => /light/i.test(String(header.get('IMAGETYP') ?? 'Light'))
 
-export async function listStars(program: string, path: string, snr: number): Promise<string> {
+export async function listStars(program: string, path: string, snr: number, limit: number): Promise<string> {
   const csv = path.replace(/\.fits$/, '.csv')
 
   try {
-    await run(program, ['-f', path, '-extract', String(snr)])
+    await run(program, ['-f', path, '-extract', String(snr), '-s', String(limit)])
 
     return await readFile(csv, 'utf8')
   } finally {
@@ -245,7 +246,7 @@ export async function solveFrame(program: string, catalog: string, path: string,
   }
 }
 
-export function makeFrameStats(settings: StarSettings | undefined, list: (program: string, path: string, snr: number) => Promise<string> = listStars, solve: Solve = solveFrame) {
+export function makeFrameStats(settings: StarSettings | undefined, list: (program: string, path: string, snr: number, limit: number) => Promise<string> = listStars, solve: Solve = solveFrame) {
   return async function measure(path: string): Promise<FrameStats> {
     const fits = readFits(await readFile(path))
     const { sky, noise } = skyAndNoise(fits.pixels, fits.width, typeof fits.header.get('BAYERPAT') === 'string')
@@ -253,7 +254,7 @@ export function makeFrameStats(settings: StarSettings | undefined, list: (progra
 
     if (settings === undefined || !isLight(fits.header)) return { centre: null, solution: null, stars: null, hfdPixels: null, arcsecPerPixel: scale, elongation: null, shapedStars: 0, sky, noise }
 
-    const stars = readStarList(await list(settings.program, path, settings.analyseSnr).catch(() => ''))
+    const stars = readStarList(await list(settings.program, path, settings.analyseSnr, settings.listLimit).catch(() => ''))
     const hfd = median(stars.map(star => star.hfd))
     const near = pointingOf(fits.header)
     const solution = settings.catalog === undefined || near === undefined ? null : readSolution(await solve(settings.program, settings.catalog, path, near, settings.solveRadiusDegrees).catch(() => ''))

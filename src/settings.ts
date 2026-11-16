@@ -161,6 +161,11 @@ export const StarSettings = Schema.Struct({
     Schema.Number,
     10,
   ),
+  listLimit: described(
+    "The most stars ASTAP lists for a kept frame, set above any frame's star count so the list holds every star with the signal asked for",
+    Schema.Int.check(Schema.isGreaterThan(0)),
+    10000,
+  ),
   shapeMinSnr: described(
     "The signal to noise a star needs for its shape to count towards the frame's elongation",
     Schema.Number,
