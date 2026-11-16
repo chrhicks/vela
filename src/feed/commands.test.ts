@@ -2,7 +2,7 @@ import { Context, Effect } from 'effect'
 import { HttpRouter } from 'effect/http'
 import { describe, expect, it } from 'vitest'
 import { commandsPath, type Done } from '../../state/commands.ts'
-import { CommandRefused, CommandsRoute, Operations } from './commands.ts'
+import { CommandLog, CommandRefused, CommandsRoute, Operations } from './commands.ts'
 
 function fakeOperations(refuse?: string) {
   const calls: Array<string> = []
@@ -15,16 +15,21 @@ function fakeOperations(refuse?: string) {
   }
 }
 
-async function post(body: unknown, refuse?: string) {
+async function send(body: unknown, refuse?: string) {
   const { calls, operations } = fakeOperations(refuse)
+  const logged: Array<string> = []
+  let ids = 0
+  const log = { newId: Effect.sync(() => `press-${(ids += 1)}`), pressed: (id: string, command: string) => Effect.sync(() => void logged.push(`pressed ${id} ${command}`)), answered: (id: string, command: string) => Effect.sync(() => void logged.push(`answered ${id} ${command}`)) }
   const { handler, dispose } = HttpRouter.toWebHandler(CommandsRoute, { disableLogger: true })
-  const response = await handler(new Request(`http://localhost${commandsPath}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), Context.make(Operations, operations))
+  const response = await handler(new Request(`http://localhost${commandsPath}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), Context.make(Operations, operations).pipe(Context.add(CommandLog, log)))
   const text = await response.text()
 
   await dispose()
 
-  return { status: response.status, body: text === '' ? undefined : JSON.parse(text), calls }
+  return { answer: { status: response.status, body: text === '' ? undefined : JSON.parse(text), calls }, logged }
 }
+
+const post = async (body: unknown, refuse?: string) => (await send(body, refuse)).answer
 
 const nudgeId = '6f1c0e2a-4b3d-4e5f-8a9b-0c1d2e3f4a5b'
 
@@ -64,5 +69,11 @@ describe('POST /commands', () => {
     expect(await post({ command: 'focusTo', position: 3.5 })).toEqual({ status: 400, body: { code: 'malformed' }, calls: [] })
     expect(await post({ command: 'autofocus', exposureSeconds: 0 })).toEqual({ status: 400, body: { code: 'malformed' }, calls: [] })
     expect(await post({ command: 'nudge', id: 'not-a-uuid', direction: 'north', rate: 'fast' })).toEqual({ status: 400, body: { code: 'malformed' }, calls: [] })
+  })
+
+  it('writes when a command was pressed and when it was answered, so every open page can show it, but not for nudges', async () => {
+    expect((await send({ command: 'home' })).logged).toEqual(['pressed press-1 home', 'answered press-1 home'])
+    expect((await send({ command: 'home' }, 'the mount is parked')).logged).toEqual(['pressed press-1 home', 'answered press-1 home'])
+    expect((await send({ command: 'holdNudge', id: nudgeId })).logged).toEqual([])
   })
 })

@@ -7,3 +7,5 @@ export const ServiceStartNow = Layer.effect(
   ServiceStart,
   Effect.map(Clock.currentTimeMillis, at => ({ token: StartToken.make(String(at)) })),
 )
+
+export const startedAt = (token: StartToken) => Number(token)

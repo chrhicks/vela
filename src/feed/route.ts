@@ -12,7 +12,8 @@ import { PreviewRoute } from './previews.ts'
 import { SkyRoute } from './sky.ts'
 import { StackPictureRoute } from './stack.ts'
 import type { FirstFramesLimits } from '../../state/first-frames-check.ts'
-import { ServiceStart } from './start.ts'
+import { pressedSince } from '../../state/pressing.ts'
+import { ServiceStart, startedAt } from './start.ts'
 import { SurveyRoute, SurveyTiles } from './survey.ts'
 import { BestPlacedRoute, CatalogRoute, TargetRoute, TargetsRoute } from './targets.ts'
 
@@ -39,7 +40,7 @@ const feedEvents = Effect.gen(function* () {
       const { state, entries } = yield* feed.subscribe
       const at = yield* Clock.currentTimeMillis
 
-      return Stream.concat(Stream.succeed(event('state', { token, at, night: nightOf(at), limits, launch, controls, firstFrames, state })), Stream.merge(entries.pipe(Stream.map(entry => event('entry', entry))), heartbeats))
+      return Stream.concat(Stream.succeed(event('state', { token, at, night: nightOf(at), limits, launch, controls, firstFrames, state: { ...state, pressing: pressedSince(state.pressing, startedAt(token)) } })), Stream.merge(entries.pipe(Stream.map(entry => event('entry', entry))), heartbeats))
     }),
   )
 })
