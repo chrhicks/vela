@@ -114,4 +114,10 @@ export function skyPositionAt(centre: SkyPosition, eastDegrees: number, northDeg
   return { raDegrees: (((ra / radians) % 360) + 360) % 360, decDegrees: dec / radians }
 }
 
+export function tileAt(order: number, position: SkyPosition): number {
+  const { face, x, y } = facePixel(position.raDegrees * radians, position.decDegrees * radians, 1 << order, order)
+
+  return face * (1 << (2 * order)) + interleaved(x, y, order)
+}
+
 export const surveyPixelDegrees = (order: number, tileWidth: number) => Math.sqrt(Math.PI / 3) / (2 ** order * tileWidth) / radians

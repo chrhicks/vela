@@ -1,14 +1,16 @@
+import { Result } from 'effect'
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { useNavigate } from 'react-router'
 
-import { skyPositionAt, surveyPixelDegrees } from '../../../../../state/sky-cut.ts'
-import { detailTilesPath, type Survey } from '../../../../../state/survey.ts'
+import { surveyPixelDegrees } from '../../../../../state/sky-cut.ts'
+import { detailTilesPath, surveyTilesPath, type Survey } from '../../../../../state/survey.ts'
 import { ActionLink } from '../../../components/ActionLink.tsx'
 import { Choices } from '../../../components/Choices.tsx'
 import { PageHeader } from '../../../components/PageHeader.tsx'
+import { Statement } from '../../../components/Statement.tsx'
 import { frameDegrees } from './frame.ts'
 import styles from './FullSky.module.css'
-import { skyPictureOf } from './sky-picture.ts'
+import { makeSkyDrawing, type SkyDrawing } from './sky-drawing.ts'
 
 interface Offset {
   readonly eastDegrees: number
@@ -36,7 +38,8 @@ interface Drag {
 type Zoom = 'fit' | 'full'
 
 interface FullSkyProps {
-  readonly survey: Survey
+  readonly coarse: Survey | null
+  readonly detail: Survey
   readonly name: string
   readonly raDegrees: number
   readonly decDegrees: number
@@ -47,6 +50,8 @@ interface FullSkyProps {
 }
 
 const radians = Math.PI / 180
+
+const pixelDegrees = (survey: Survey) => surveyPixelDegrees(survey.order, survey.tileWidth)
 
 const arcseconds = (degrees: number) => {
   const seconds = degrees * 3600
@@ -64,7 +69,7 @@ function fitDegreesPerPixel(bounds: Bounds, angleDegrees: number) {
 }
 
 function viewOf(bounds: Bounds, zoom: Zoom, centre: Offset | undefined, props: FullSkyProps): View {
-  const degreesPerPixel = zoom === 'fit' ? fitDegreesPerPixel(bounds, props.angleDegrees) : surveyPixelDegrees(props.survey.order, props.survey.tileWidth)
+  const degreesPerPixel = zoom === 'fit' ? fitDegreesPerPixel(bounds, props.angleDegrees) : pixelDegrees(props.detail)
 
   if (centre !== undefined) return { ...centre, degreesPerPixel }
 
@@ -74,7 +79,7 @@ function viewOf(bounds: Bounds, zoom: Zoom, centre: Offset | undefined, props: F
 }
 
 export function FullSky(props: FullSkyProps) {
-  const { survey, name, raDegrees, decDegrees, angleDegrees, framing, facts, closeTo } = props
+  const { coarse, detail, name, raDegrees, decDegrees, angleDegrees, framing, facts, closeTo } = props
   const navigate = useNavigate()
   const box = useRef<HTMLDivElement>(null)
   const top = useRef<HTMLDivElement>(null)
@@ -83,11 +88,10 @@ export function FullSky(props: FullSkyProps) {
   const [bounds, setBounds] = useState<Bounds | undefined>(undefined)
   const [zoom, setZoom] = useState<Zoom>('fit')
   const [centre, setCentre] = useState<Offset | undefined>(undefined)
-  const [drawn, setDrawn] = useState<View | undefined>(undefined)
+  const [undrawable, setUndrawable] = useState<string | undefined>(undefined)
+  const [missing, setMissing] = useState(0)
   const drag = useRef<Drag | undefined>(undefined)
-  const wanted = useRef<{ readonly key: string; readonly view: View; readonly bounds: Bounds } | undefined>(undefined)
-  const cutting = useRef(false)
-  const open = useRef(true)
+  const drawing = useRef<SkyDrawing | undefined>(undefined)
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -116,56 +120,39 @@ export function FullSky(props: FullSkyProps) {
     return () => window.removeEventListener('keydown', close)
   }, [navigate, closeTo])
 
-  useEffect(
-    () => () => {
-      open.current = false
-    },
-    [],
-  )
+  useLayoutEffect(() => {
+    if (canvas.current === null) return
 
-  const view = bounds === undefined ? undefined : viewOf(bounds, zoom, centre, props)
-  const key = view === undefined || bounds === undefined ? undefined : [view.eastDegrees, view.northDegrees, view.degreesPerPixel, bounds.width, bounds.height].join(' ')
+    const made = makeSkyDrawing(canvas.current, { raDegrees, decDegrees }, setMissing)
 
-  useEffect(() => {
-    if (view === undefined || bounds === undefined || key === undefined) return
+    if (Result.isFailure(made)) {
+      setUndrawable(made.failure.reason)
 
-    wanted.current = { key, view, bounds }
-
-    if (cutting.current) return
-
-    cutting.current = true
-
-    const cutNext = async () => {
-      for (;;) {
-        const next = wanted.current
-
-        if (next === undefined || !open.current) break
-
-        const at = skyPositionAt({ raDegrees, decDegrees }, next.view.eastDegrees, next.view.northDegrees)
-        const picture = await skyPictureOf(
-          { ...at, widthDegrees: next.view.degreesPerPixel * next.bounds.width, widthPixels: next.bounds.width, heightPixels: next.bounds.height, order: survey.order, tileWidth: survey.tileWidth },
-          detailTilesPath,
-        )
-
-        if (!open.current) break
-
-        const into = canvas.current
-
-        if (into !== null) {
-          into.width = next.bounds.width
-          into.height = next.bounds.height
-          into.getContext('2d')?.putImageData(picture, 0, 0)
-          setDrawn(next.view)
-        }
-
-        if (wanted.current?.key === next.key) break
-      }
-
-      cutting.current = false
+      return
     }
 
-    void cutNext()
-  }, [key])
+    drawing.current = made.success
+
+    return () => {
+      made.success.close()
+      drawing.current = undefined
+    }
+  }, [raDegrees, decDegrees])
+
+  const view = bounds === undefined ? undefined : viewOf(bounds, zoom, centre, props)
+  const fine = view !== undefined && (coarse === null || view.degreesPerPixel ** 2 < pixelDegrees(coarse) * pixelDegrees(detail))
+  const key = view === undefined || bounds === undefined ? undefined : [view.eastDegrees, view.northDegrees, view.degreesPerPixel, bounds.width, bounds.height, fine].join(' ')
+
+  useLayoutEffect(() => {
+    if (view === undefined || bounds === undefined) return
+
+    drawing.current?.show({
+      ...view,
+      widthPixels: bounds.width,
+      heightPixels: bounds.height,
+      layers: [...(coarse === null ? [] : [{ survey: coarse, tilesPath: surveyTilesPath }]), ...(fine ? [{ survey: detail, tilesPath: detailTilesPath }] : [])],
+    })
+  }, [key, coarse, detail])
 
   const press = (event: PointerEvent<HTMLCanvasElement>) => {
     if (view === undefined) return
@@ -198,13 +185,6 @@ export function FullSky(props: FullSkyProps) {
     if (chosen === 'fit') setCentre(undefined)
   }
 
-  const skyStyle =
-    view === undefined || drawn === undefined
-      ? undefined
-      : {
-          transform: `translate(${(view.eastDegrees - drawn.eastDegrees) / view.degreesPerPixel}px, ${(view.northDegrees - drawn.northDegrees) / view.degreesPerPixel}px) scale(${drawn.degreesPerPixel / view.degreesPerPixel})`,
-        }
-
   const frameStyle =
     view === undefined || bounds === undefined
       ? undefined
@@ -221,7 +201,6 @@ export function FullSky(props: FullSkyProps) {
       <canvas
         ref={canvas}
         className={styles.sky}
-        style={skyStyle}
         role="img"
         aria-label={`The sky around ${name}, north up and east to the left`}
         onPointerDown={press}
@@ -234,13 +213,15 @@ export function FullSky(props: FullSkyProps) {
       {frameStyle === undefined ? null : <span className={styles.frame} style={frameStyle} />}
 
       <div ref={top} className={styles.top}>
-        <PageHeader title={name} facts={[...facts, ...(view === undefined ? [] : [arcseconds(view.degreesPerPixel)])]}>
+        <PageHeader title={name} facts={[...facts, ...(view === undefined ? [] : [arcseconds(view.degreesPerPixel)]), ...(missing === 0 ? [] : [`${missing} tiles missing`])]}>
           <ActionLink to={closeTo}>Close</ActionLink>
         </PageHeader>
+
+        {undrawable === undefined ? null : <Statement size="instruction">{`Cannot draw the sky: ${undrawable}`}</Statement>}
       </div>
 
       <div ref={bottom} className={styles.bottom}>
-        <p className={styles.credit}>{survey.credit}</p>
+        <p className={styles.credit}>{detail.credit}</p>
 
         <Choices
           name="Zoom"

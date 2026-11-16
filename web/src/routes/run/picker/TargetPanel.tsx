@@ -119,7 +119,8 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
     <section className={styles.panel}>
       {detailSurvey === null || !search.has('full') ? null : (
         <FullSky
-          survey={detailSurvey}
+          coarse={survey}
+          detail={detailSurvey}
           name={target.name}
           raDegrees={target.raDegrees}
           decDegrees={target.decDegrees}
