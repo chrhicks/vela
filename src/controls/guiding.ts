@@ -1,6 +1,6 @@
 import { Context, Duration, Effect, Option, Result, Schema, Stream } from 'effect'
 import type { Done } from '../../state/commands.ts'
-import { readRigEntry } from '../../state/entries.ts'
+import { isGuiderReport, readRigEntry } from '../../state/entries.ts'
 import type { GuiderActivity } from '../../state/guiding.ts'
 import type { Entry } from '../../state/entry.ts'
 import { CommandRefused } from '../feed/commands.ts'
@@ -28,6 +28,20 @@ const replyTo =
         return replied?.kind === 'phd2.reply' && replied.body.id === id ? Result.succeed({ result: replied.body.result, error: replied.body.error?.message }) : Result.fail(entry)
       },
     })
+
+const guidingActivities: ReadonlyArray<GuiderActivity> = ['guiding', 'calibrating', 'starLost', 'paused']
+
+const capturingActivities: ReadonlyArray<GuiderActivity> = [...guidingActivities, 'looping', 'starPicked']
+
+const captureStopped = (entry: Entry): Result.Result<true, Entry> =>
+  Result.match(readRigEntry(entry), {
+    onFailure: () => Result.fail(entry),
+    onSuccess: found => {
+      const reported = Option.getOrUndefined(found)
+
+      return reported !== undefined && isGuiderReport(reported) && reported.body.Event === 'LoopingExposuresStopped' ? Result.succeed(true) : Result.fail(entry)
+    },
+  })
 
 export const guidingControls = Effect.gen(function* () {
   const feed = yield* Feed
@@ -64,13 +78,29 @@ export const guidingControls = Effect.gen(function* () {
     startGuiding: guide(false),
     calibrateGuiding: guide(true),
     stopGuiding: call('stop_capture').pipe(Effect.as<Done>({ code: 'guiding-stopped' })),
-    pickGuideStar: connected.pipe(Effect.andThen(call('loop')), Effect.andThen(call('find_star')), Effect.andThen(call('guide', { settle, recalibrate: false })), Effect.as<Done>({ code: 'guiding-starting', recalibrate: false })),
+    pickGuideStar: Effect.scoped(
+      Effect.gen(function* () {
+        yield* connected
+
+        const { link, activity } = (yield* feed.current).guiding
+
+        if (link === 'connected' && activity !== undefined && capturingActivities.includes(activity)) {
+          const { entries } = yield* feed.subscribe
+
+          yield* call('stop_capture')
+
+          const stopped = yield* entries.pipe(Stream.filterMap(captureStopped), Stream.runHead, Effect.timeoutOption(Duration.seconds(replySeconds)), Effect.map(Option.flatten))
+
+          if (Option.isNone(stopped)) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'guider-silent', seconds: replySeconds } }))
+        }
+
+        yield* call('guide', { settle, recalibrate: false })
+
+        return { code: 'guiding-starting', recalibrate: false } satisfies Done
+      }),
+    ),
   }
 })
-
-const guidingActivities: ReadonlyArray<GuiderActivity> = ['guiding', 'calibrating', 'starLost', 'paused']
-
-const capturingActivities: ReadonlyArray<GuiderActivity> = [...guidingActivities, 'looping', 'starPicked']
 
 export const mountGuiding = Effect.gen(function* () {
   const feed = yield* Feed
