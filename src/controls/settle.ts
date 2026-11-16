@@ -1,6 +1,6 @@
 import { Duration, Effect, Option, Result, Stream } from 'effect'
 import type { DeviceName } from '../../state/devices.ts'
-import { readRigEntry } from '../../state/entries.ts'
+import { isGuiderReport, readRigEntry } from '../../state/entries.ts'
 import type { Entry, PropertyState } from '../../state/entry.ts'
 
 const stateOf =
@@ -47,3 +47,20 @@ export const nextIdle = (entries: Stream.Stream<Entry>, device: DeviceName, prop
     Stream.runHead,
     within(seconds),
   )
+
+export interface SettleReport {
+  readonly status: number | string | undefined
+  readonly error: string | undefined
+}
+
+const settleDone = (entry: Entry): Result.Result<SettleReport, Entry> =>
+  Result.match(readRigEntry(entry), {
+    onFailure: () => Result.fail(entry),
+    onSuccess: found => {
+      const reported = Option.getOrUndefined(found)
+
+      return reported !== undefined && isGuiderReport(reported) && reported.body.Event === 'SettleDone' ? Result.succeed({ status: reported.body.Status, error: reported.body.Error }) : Result.fail(entry)
+    },
+  })
+
+export const guidingSettled = (entries: Stream.Stream<Entry>, seconds: number): Effect.Effect<Option.Option<SettleReport>> => entries.pipe(Stream.filterMap(settleDone), Stream.runHead, within(seconds))

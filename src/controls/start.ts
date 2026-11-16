@@ -1,11 +1,10 @@
-import { Clock, Context, Duration, Effect, Fiber, Option, Result, Stream } from 'effect'
+import { Clock, Context, Effect, Fiber, Option, Result } from 'effect'
 import type { CaptureRequest } from '../capture/request.ts'
 import { positionId } from '../catalog/position.ts'
 import type { CatalogTarget } from '../catalog/types.ts'
 import type { EquatorialPosition } from '../sky/coordinates.ts'
 import type { Done, FilterAnswer, NightStep, Refusal } from '../../state/commands.ts'
-import { isGuiderReport, readRigEntry, type StartId, type StartStep, type TargetStepBody } from '../../state/entries.ts'
-import type { Entry } from '../../state/entry.ts'
+import type { StartId, StartStep, TargetStepBody } from '../../state/entries.ts'
 import type { RunTarget } from '../../state/targets.ts'
 import { CommandRefused } from '../feed/commands.ts'
 import { Feed } from '../feed/feed.ts'
@@ -14,7 +13,7 @@ import { DeviceCommands } from './device-commands.ts'
 import { Autofocusing } from './focus.ts'
 import { guidingControls } from './guiding.ts'
 import { MountRuns } from './mount.ts'
-import { endOfMove } from './settle.ts'
+import { endOfMove, guidingSettled } from './settle.ts'
 
 export class TargetCatalog extends Context.Service<TargetCatalog, { readonly find: (id: string) => CatalogTarget | undefined }>()('vela/TargetCatalog') {}
 
@@ -40,16 +39,6 @@ type Step = readonly [name: StartStep, work: Effect.Effect<unknown, CommandRefus
 const refusedWith = (refusal: Refusal) => Effect.fail(new CommandRefused({ refusal }))
 
 const asciiName = (name: string) => name.replaceAll('°', 'd').replaceAll('′', 'm').replaceAll('″', 's')
-
-const settled = (entry: Entry): Result.Result<{ readonly status: number | string | undefined; readonly error: string | undefined }, Entry> =>
-  Result.match(readRigEntry(entry), {
-    onFailure: () => Result.fail(entry),
-    onSuccess: found => {
-      const reported = Option.getOrUndefined(found)
-
-      return reported !== undefined && isGuiderReport(reported) && reported.body.Event === 'SettleDone' ? Result.succeed({ status: reported.body.Status, error: reported.body.Error }) : Result.fail(entry)
-    },
-  })
 
 export const startControls = Effect.gen(function* () {
   const feed = yield* Feed
@@ -92,7 +81,7 @@ export const startControls = Effect.gen(function* () {
 
       yield* guiding.startGuiding
 
-      const settle = yield* entries.pipe(Stream.filterMap(settled), Stream.runHead, Effect.timeoutOption(Duration.seconds(guidingSeconds)), Effect.map(Option.flatten))
+      const settle = yield* guidingSettled(entries, guidingSeconds)
 
       if (Option.isNone(settle)) return yield* refusedWith({ code: 'guider-silent', seconds: guidingSeconds })
       if (settle.value.status !== 0) return yield* refusedWith({ code: 'guider-refused', text: settle.value.error ?? 'guiding did not settle' })

@@ -1,5 +1,5 @@
 import { Match } from 'effect'
-import type { Done, NightStep, NudgeDirection, Refusal } from '../../../state/commands.ts'
+import type { Done, GuidingSettle, NightStep, NudgeDirection, Refusal } from '../../../state/commands.ts'
 import type { DeviceName } from '../../../state/devices.ts'
 import type { RunEnding } from '../../../state/entries.ts'
 import type { FlatExposure } from '../../../state/flats.ts'
@@ -26,6 +26,16 @@ const afterwards = (endedRun: boolean, stoppedGuiding: boolean | undefined) => {
   return done.length === 0 ? {} : { toDo: done.join(' · ') }
 }
 
+const settleWords = (settle: GuidingSettle | undefined): string =>
+  settle === undefined
+    ? 'guiding restarted'
+    : Match.value(settle).pipe(
+        Match.when({ outcome: 'settled' }, () => 'guiding settled'),
+        Match.when({ outcome: 'not-settled' }, ({ text }) => `guiding did not settle: ${text}`),
+        Match.when({ outcome: 'no-word' }, ({ seconds }) => `no word from guiding in ${seconds} s`),
+        Match.exhaustive,
+      )
+
 export const doneWords = (done: Done): RefusalWords =>
   Match.value(done).pipe(
     Match.discriminatorsExhaustive('code')({
@@ -51,9 +61,9 @@ export const doneWords = (done: Done): RefusalWords =>
       'stopped-for-night': ({ missed }) => ({ happened: 'Stopped for the night', ...(missed.length === 0 ? {} : { toDo: `not done: ${missed.map(step => nightStepWords[step]).join(', ')}` }) }),
       tracking: ({ on }) => ({ happened: on ? 'Tracking on' : 'Tracking off' }),
       centring: ({ target, endedRun, stoppedGuiding }) => ({ happened: `Centring ${target}`, ...afterwards(endedRun, stoppedGuiding) }),
-      flip: ({ settled, flipped, pierSide, pausedRun, stoppedGuiding, restartedGuiding }) => {
+      flip: ({ settled, flipped, pierSide, pausedRun, stoppedGuiding, restartedGuiding, guidingSettle }) => {
         const side = pierSide === undefined ? [] : [`pier ${pierSide}`]
-        const guiding = stoppedGuiding === true ? [restartedGuiding === true ? 'guiding restarted' : 'guiding off'] : []
+        const guiding = stoppedGuiding === true ? [restartedGuiding === true ? settleWords(guidingSettle) : 'guiding off'] : []
         const run = [...guiding, ...(pausedRun ? ['run resumed'] : [])]
 
         if (!settled) return { happened: 'Flip sent', toDo: ['mount still moving', ...run].join(' · ') }
