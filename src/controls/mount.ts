@@ -60,10 +60,10 @@ export const mountControls = Effect.gen(function* () {
       return { code: 'home', endedRun, stoppedGuiding } satisfies Done
     }),
     stop: Effect.gen(function* () {
+      yield* commands.write('mount', 'TELESCOPE_ABORT_MOTION', { ABORT: true })
+
       const endedRun = yield* runs.endRun
       const stoppedGuiding = yield* guider.stop.pipe(Effect.orElseSucceed(() => false))
-
-      yield* commands.write('mount', 'TELESCOPE_ABORT_MOTION', { ABORT: true })
 
       return { code: 'stop', endedRun, stoppedGuiding } satisfies Done
     }),
@@ -102,7 +102,7 @@ export const mountControls = Effect.gen(function* () {
         )
 
         const settled = Option.isSome(yield* endOfMove(entries, 'mount', 'EQUATORIAL_EOD_COORD', flipSettleSeconds))
-        const restartedGuiding = stoppedGuiding ? yield* guider.start : false
+        const restartedGuiding = stoppedGuiding && settled ? yield* guider.start : false
 
         yield* runs.resume
 
