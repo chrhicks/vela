@@ -18,7 +18,8 @@ import { makeNamer } from '../frames/names.ts'
 import { frameDetail, listNight, makePreviews } from '../frames/library.ts'
 import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
-import { makeFrameStats, saveStats } from '../frames/stats.ts'
+import { makeFrameStats, saveStats, solveFrame } from '../frames/stats.ts'
+import { makeStacks, type StackCount } from '../stack/stacks.ts'
 import { makePointing } from '../pointing/pointing.ts'
 import { siteOf } from '../pointing/target.ts'
 import { makePrepare } from '../prepare/prepare.ts'
@@ -38,6 +39,7 @@ import { Targets } from '../feed/targets.ts'
 import { readSurvey, SurveySettings } from '../sky/survey.ts'
 import { skyTonight } from '../sky/tonight.ts'
 import { Previews } from '../feed/previews.ts'
+import { StackPictures } from '../feed/stack.ts'
 import { SurveyKept } from '../feed/survey.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
@@ -198,6 +200,15 @@ const page = makePage({
 })
 
 const measureStats = makeFrameStats(settings.stars)
+const stars = settings.stars
+const stacks = makeStacks({
+  keepDir: frames.keepDir,
+  preview: frames.preview,
+  solve: (path, near) => (stars?.catalog === undefined ? Promise.resolve('') : solveFrame(stars.program, stars.catalog, path, near, stars.solveRadiusDegrees)),
+})
+const publishStack = (count: StackCount | undefined) => {
+  if (count !== undefined) publishEntry(stream.vela('stack'), 'vela.stack', `${count.sequence}:${count.frames}:${count.leftOut}`, { ...count })
+}
 let statsQueue: Promise<void> = Promise.resolve()
 
 function measureKept(frame: { readonly night: string; readonly file: string; readonly sequence?: string }) {
@@ -210,9 +221,12 @@ function measureKept(frame: { readonly night: string; readonly file: string; rea
       await saveStats(path, stats)
       page.framesChanged()
       publishEntry(stream.vela('frame'), 'vela.frame.stats', frame.file, { night: frame.night, file: frame.file, ...(frame.sequence === undefined ? {} : { sequence: frame.sequence }), ...stats })
+      publishStack(await stacks.add(frame, stats.solution).catch((error: unknown) => void console.error(`vela: could not stack ${frame.file}: ${String(error)}`)))
     })
     .catch((error: unknown) => console.error(`vela: could not measure ${frame.file}: ${String(error)}`))
 }
+
+statsQueue = statsQueue.then(() => stacks.rebuild(nightOf(Date.now(), naming), publishStack)).catch((error: unknown) => console.error(`vela: could not rebuild tonight's stacks: ${String(error)}`))
 
 const keeper = makeKeeper({
   ssh: makeSsh(frames.host, frames.sshTimeoutSeconds * 1000),
@@ -345,6 +359,7 @@ const feedApp = FeedServer.pipe(
       }),
       Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
       Layer.succeed(Previews, { get: (night, file) => Effect.promise(() => previews.get(night, file).catch(() => undefined)) }),
+      Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)) }),
       Layer.succeed(SkyNow, {
         tonight: Effect.map(Clock.currentTimeMillis, at => {
           const site = siteOf(picture, settings.devices.mount)

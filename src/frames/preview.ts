@@ -11,7 +11,7 @@ const levels = 65536
 const madToSigma = 1.4826
 const channels = ['R', 'G', 'B'] as const
 
-function text(header: ReadonlyMap<string, HeaderValue>, key: string) {
+export function text(header: ReadonlyMap<string, HeaderValue>, key: string) {
   const value = header.get(key)
 
   return typeof value === 'string' ? value : undefined
@@ -23,7 +23,7 @@ function offset(header: ReadonlyMap<string, HeaderValue>, key: string) {
   return typeof value === 'number' ? value : 0
 }
 
-function superpixels(fits: Fits, bin: number) {
+export function superpixels(fits: Fits, bin: number) {
   const pattern = text(fits.header, 'BAYERPAT')?.toUpperCase()
 
   if (pattern === undefined || !/^[RGB]{4}$/.test(pattern)) throw new Error('the frame has no Bayer pattern')
@@ -79,7 +79,7 @@ function midtones(balance: number, value: number) {
   return ((balance - 1) * value) / ((2 * balance - 1) * value - balance)
 }
 
-function stretch(plane: Uint16Array, settings: PreviewSettings) {
+export function stretch(plane: Uint16Array, settings: Pick<PreviewSettings, 'blackSigmas' | 'targetMedian'>) {
   const histogram = new Uint32Array(levels)
 
   for (const value of plane) histogram[value] = (histogram[value] ?? 0) + 1

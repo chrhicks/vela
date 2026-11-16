@@ -195,7 +195,7 @@ export function arcsecPerPixel(header: ReadonlyMap<string, HeaderValue>): number
   return Number.isFinite(scale) && scale > 0 ? Math.round(scale * 1000) / 1000 : null
 }
 
-const isLight = (header: ReadonlyMap<string, HeaderValue>) => /light/i.test(String(header.get('IMAGETYP') ?? 'Light'))
+export const isLight = (header: ReadonlyMap<string, HeaderValue>) => /light/i.test(String(header.get('IMAGETYP') ?? 'Light'))
 
 export async function listStars(program: string, path: string, snr: number): Promise<string> {
   const csv = path.replace(/\.fits$/, '.csv')
@@ -209,7 +209,7 @@ export async function listStars(program: string, path: string, snr: number): Pro
   }
 }
 
-const pointingOf = (header: ReadonlyMap<string, HeaderValue>): SkyPosition | undefined => {
+export const pointingOf = (header: ReadonlyMap<string, HeaderValue>): SkyPosition | undefined => {
   const ra = header.get('RA')
   const dec = header.get('DEC')
 
