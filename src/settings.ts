@@ -305,6 +305,11 @@ export const VelaSettings = Schema.Struct({
   pointing: described('Settings for choosing a target and pointing the mount', PointingSettings, {}),
   catalog: described('The target catalog', CatalogConfig, {}),
   sky: described('The sky survey behind the picker\'s frame box, downloaded once by the sky survey setup', SurveyConfig, {}),
+  skyDetail: described(
+    "The finer sky survey behind the picker's full-size view, downloaded once by the sky survey setup run with detail",
+    SurveyConfig,
+    { tilesDir: '/mnt/storage/vela/sky/dss-colour-7', address: 'https://skies.esac.esa.int/DSSColor', order: 7, downloads: 4 },
+  ),
   align: described('Settings for polar alignment', AlignSettings, {}),
   stars: Schema.optionalKey(StarSettings.annotate({ description: 'Counting and sizing the stars of each kept imaging frame. Without it, kept frames get only their sky level and noise' })),
   autofocus: described('Settings for autofocus', AutofocusSettings, {}),

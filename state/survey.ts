@@ -4,6 +4,10 @@ export const surveyPath = '/sky-survey'
 
 export const surveyTilesPath = '/sky-tiles'
 
+export const detailSurveyPath = '/sky-detail-survey'
+
+export const detailTilesPath = '/sky-detail-tiles'
+
 export const Survey = Schema.Struct({
   name: Schema.String,
   credit: Schema.String,
