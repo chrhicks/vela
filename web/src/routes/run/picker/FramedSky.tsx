@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 
-import type { Survey } from '../../../../../state/survey.ts'
+import { surveyTilesPath, type Survey } from '../../../../../state/survey.ts'
 import styles from './FramedSky.module.css'
+import { frameDegrees } from './frame.ts'
 import { skyPictureOf } from './sky-picture.ts'
 
 interface FramedSkyProps {
@@ -14,7 +15,6 @@ interface FramedSkyProps {
 
 const picture = { widthDegrees: 7, widthPixels: 768, heightPixels: 512 }
 const pictureHeightDegrees = (picture.widthDegrees * picture.heightPixels) / picture.widthPixels
-const frameDegrees = { width: 3.37, height: 2.25 }
 
 const frameStyle = (angleDegrees: number, eastDegrees: number, northDegrees: number) => ({
   width: `${(frameDegrees.width / picture.widthDegrees) * 100}%`,
@@ -32,7 +32,7 @@ export function FramedSky({ survey, raDegrees, decDegrees, angleDegrees, offset 
 
     let current = true
 
-    void skyPictureOf({ raDegrees, decDegrees, ...picture, order: survey.order, tileWidth: survey.tileWidth }).then(cut => {
+    void skyPictureOf({ raDegrees, decDegrees, ...picture, order: survey.order, tileWidth: survey.tileWidth }, surveyTilesPath).then(cut => {
       if (current) canvas.current?.getContext('2d')?.putImageData(cut, 0, 0)
     })
 

@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { RememberedAnswer, rememberedPath } from '../../../state/remembered.ts'
 import { SkyAnswer, skyPath, type Sky } from '../../../state/sky.ts'
-import { SurveyAnswer, surveyPath, type Survey } from '../../../state/survey.ts'
+import { detailSurveyPath, SurveyAnswer, surveyPath, type Survey } from '../../../state/survey.ts'
 import { bestPlacedPath, catalogPath, CatalogSize, TargetFacts, targetPath, TargetsFound, targetsPath, type TargetFound } from '../../../state/targets.ts'
 
 export type Listing = { readonly status: 'listed'; readonly targets: ReadonlyArray<TargetFound> } | { readonly status: 'unreachable' }
@@ -63,13 +63,16 @@ const remembered: Effect.Effect<Recalled> = asked(rememberedPath).pipe(
 
 export const rememberedNow = (): Promise<Recalled> => Effect.runPromise(remembered)
 
-const survey: Effect.Effect<Survey | null> = asked(surveyPath).pipe(
-  Effect.flatMap(bodyOf),
-  Effect.flatMap(Schema.decodeUnknownEffect(SurveyAnswer)),
-  Effect.catchTags({ UnknownError: () => Effect.succeed(null), SchemaError: () => Effect.succeed(null) }),
-)
+const surveyAt = (path: string): Effect.Effect<Survey | null> =>
+  asked(path).pipe(
+    Effect.flatMap(bodyOf),
+    Effect.flatMap(Schema.decodeUnknownEffect(SurveyAnswer)),
+    Effect.catchTags({ UnknownError: () => Effect.succeed(null), SchemaError: () => Effect.succeed(null) }),
+  )
 
-export const surveyKept = (): Promise<Survey | null> => Effect.runPromise(survey)
+export const surveyKept = (): Promise<Survey | null> => Effect.runPromise(surveyAt(surveyPath))
+
+export const detailSurveyKept = (): Promise<Survey | null> => Effect.runPromise(surveyAt(detailSurveyPath))
 
 const catalog: Effect.Effect<CatalogSize | undefined> = asked(catalogPath).pipe(
   Effect.flatMap(bodyOf),

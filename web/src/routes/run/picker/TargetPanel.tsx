@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 
 import type { FilterAnswer } from '../../../../../state/commands.ts'
 import { endsBy } from '../../../../../state/ends-by.ts'
@@ -19,6 +19,7 @@ import { useLink, useRig } from '../../../rig/store.ts'
 import { targetFacts } from '../../../rig/targets.ts'
 import { useAsked } from '../../../rig/use-asked.ts'
 import { FramedSky } from './FramedSky.tsx'
+import { FullSky } from './FullSky.tsx'
 import styles from './TargetPanel.module.css'
 import { endsByWords, sizeOf, typeOf, unknown } from './words.ts'
 
@@ -28,6 +29,7 @@ interface TargetPanelProps {
   readonly lastLight: RememberedAnswer['lastLight']
   readonly cameraAngleDegrees: number | null
   readonly survey: Survey | null
+  readonly detailSurvey: Survey | null
   readonly refreshed: number
 }
 
@@ -79,7 +81,7 @@ const wholeNumber = (typed: string, fallback: number) => {
   return Number.isFinite(value) && value > 0 ? value : fallback
 }
 
-export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, survey, refreshed }: TargetPanelProps) {
+export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, survey, detailSurvey, refreshed }: TargetPanelProps) {
   const last = lastChoice(lastLight)
   const [framing, setFraming] = useState<Framing>('last')
   const [exposure, setExposure] = useState<ExposureChoice>(last.exposure)
@@ -91,6 +93,7 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
   const answer = useAsked(() => targetFacts(id), id, refreshed)
   const now = serviceNow(useLink(), useLocalNow(tickMilliseconds))
   const navigate = useNavigate()
+  const [search] = useSearchParams()
 
   if (answer === undefined) return null
 
@@ -100,6 +103,12 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
   const exposureSeconds = exposure === 'other' ? wholeNumber(otherSeconds, last.otherSeconds) : presetSeconds[exposure]
   const frameCount = wholeNumber(frames, last.frames)
   const centre = framing === 'last' && target.lastCentre !== null ? { raDegrees: target.lastCentre.raDegrees, decDegrees: target.lastCentre.decDegrees } : undefined
+  const offset = framing === 'last' && target.lastCentre !== null ? target.lastCentre : undefined
+  const fullOpen = new URLSearchParams(search)
+  const fullClosed = new URLSearchParams(search)
+
+  fullOpen.set('full', '')
+  fullClosed.delete('full')
 
   const ends =
     now === undefined
@@ -108,8 +117,21 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
 
   return (
     <section className={styles.panel}>
-      <Picture label="Chosen" detail={frame}>
-        <FramedSky survey={survey} raDegrees={target.raDegrees} decDegrees={target.decDegrees} angleDegrees={cameraAngleDegrees ?? undefined} offset={framing === 'last' && target.lastCentre !== null ? target.lastCentre : undefined} />
+      {detailSurvey === null || !search.has('full') ? null : (
+        <FullSky
+          survey={detailSurvey}
+          name={target.name}
+          raDegrees={target.raDegrees}
+          decDegrees={target.decDegrees}
+          angleDegrees={cameraAngleDegrees ?? 0}
+          framing={offset ?? { eastDegrees: 0, northDegrees: 0 }}
+          facts={[frame, offset === undefined ? 'Catalog centre' : `As ${dayOf(offset.at)}`]}
+          closeTo={`/?${fullClosed}`}
+        />
+      )}
+
+      <Picture label="Chosen" detail={frame} {...(detailSurvey === null ? {} : { to: `/?${fullOpen}` })}>
+        <FramedSky survey={survey} raDegrees={target.raDegrees} decDegrees={target.decDegrees} angleDegrees={cameraAngleDegrees ?? undefined} offset={offset} />
       </Picture>
 
       {survey === null ? null : <p className={styles.credit}>{survey.credit}</p>}

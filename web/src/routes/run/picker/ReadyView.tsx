@@ -9,7 +9,7 @@ import { PageHeader } from '../../../components/PageHeader.tsx'
 import { Statement } from '../../../components/Statement.tsx'
 import { clockTime, useLocalNow } from '../../../rig/clock.ts'
 import { useRig } from '../../../rig/store.ts'
-import { bestPlacedTargets, catalogSize, findTargets, rememberedNow, skyTonight, surveyKept } from '../../../rig/targets.ts'
+import { bestPlacedTargets, catalogSize, detailSurveyKept, findTargets, rememberedNow, skyTonight, surveyKept } from '../../../rig/targets.ts'
 import { useAsked } from '../../../rig/use-asked.ts'
 import styles from './ReadyView.module.css'
 import { TargetList } from './TargetList.tsx'
@@ -29,6 +29,7 @@ export function ReadyView() {
   const sky = useAsked(skyTonight, 'sky', minute)
   const recalled = useAsked(rememberedNow, 'remembered', minute)
   const survey = useAsked(surveyKept, 'survey', 0)
+  const detailSurvey = useAsked(detailSurveyKept, 'detail-survey', 0)
   const catalog = useAsked(catalogSize, 'catalog', 0)
   const focus = useRig(rig => rig.operations.focus)
   const filter = useRig(rig => rig.operations.filter)
@@ -72,7 +73,7 @@ export function ReadyView() {
 
         {shown === undefined || recalled === undefined ? null : (
           <div className={styles.chosen}>
-            <TargetPanel key={shown} id={shown} darkUntil={tonight?.dark?.until} lastLight={remembered?.lastLight ?? null} cameraAngleDegrees={remembered?.cameraAngleDegrees ?? null} survey={survey ?? null} refreshed={minute} />
+            <TargetPanel key={shown} id={shown} darkUntil={tonight?.dark?.until} lastLight={remembered?.lastLight ?? null} cameraAngleDegrees={remembered?.cameraAngleDegrees ?? null} survey={survey ?? null} detailSurvey={detailSurvey ?? null} refreshed={minute} />
           </div>
         )}
       </div>

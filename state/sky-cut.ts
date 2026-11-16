@@ -95,3 +95,23 @@ export function cutPlan(cut: SkyCut): CutPlan {
 }
 
 export const tilesOf = (plan: CutPlan): ReadonlyArray<number> => [...new Set(plan.tiles)].sort((a, b) => a - b)
+
+export interface SkyPosition {
+  readonly raDegrees: number
+  readonly decDegrees: number
+}
+
+export function skyPositionAt(centre: SkyPosition, eastDegrees: number, northDegrees: number): SkyPosition {
+  const ra0 = centre.raDegrees * radians
+  const sin0 = Math.sin(centre.decDegrees * radians)
+  const cos0 = Math.cos(centre.decDegrees * radians)
+  const east = eastDegrees * radians
+  const north = northDegrees * radians
+  const facing = cos0 - north * sin0
+  const ra = ra0 + Math.atan2(east, facing)
+  const dec = Math.atan(((north * cos0 + sin0) * Math.cos(ra - ra0)) / facing)
+
+  return { raDegrees: (((ra / radians) % 360) + 360) % 360, decDegrees: dec / radians }
+}
+
+export const surveyPixelDegrees = (order: number, tileWidth: number) => Math.sqrt(Math.PI / 3) / (2 ** order * tileWidth) / radians

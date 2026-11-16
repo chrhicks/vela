@@ -1,0 +1,61 @@
+.full {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow: hidden;
+  background: var(--picture-ground);
+  cursor: grab;
+  touch-action: none;
+}
+
+.full:active {
+  cursor: grabbing;
+}
+
+.sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: center;
+}
+
+.frame {
+  position: absolute;
+  border: 1px solid var(--ember);
+  pointer-events: none;
+}
+
+.top,
+.bottom {
+  position: absolute;
+  right: 0;
+  left: 0;
+  padding: var(--gap-page);
+  pointer-events: none;
+}
+
+.top {
+  top: 0;
+}
+
+.bottom {
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-row) var(--gap-section);
+}
+
+.top a,
+.bottom [role='group'] {
+  pointer-events: auto;
+}
+
+.credit {
+  margin: 0;
+  color: var(--ember-quiet);
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}

@@ -1,18 +1,18 @@
 import { Data, Effect } from 'effect'
 import { cutPlan, tilesOf, type SkyCut } from '../../../../../state/sky-cut.ts'
-import { surveyTilesPath, tileFile } from '../../../../../state/survey.ts'
+import { tileFile } from '../../../../../state/survey.ts'
 
 class TileMissing extends Data.TaggedError('TileMissing')<{ readonly tile: number }> {}
 
 const channels = 4
 const opaque = 255
 
-const tilePixels = (order: number, tileWidth: number, tile: number): Effect.Effect<Uint8ClampedArray | undefined> =>
+const tilePixels = (tilesPath: string, order: number, tileWidth: number, tile: number): Effect.Effect<Uint8ClampedArray | undefined> =>
   Effect.tryPromise({
     try: async () => {
       const image = new Image()
 
-      image.src = `${surveyTilesPath}/${tileFile(order, tile)}`
+      image.src = `${tilesPath}/${tileFile(order, tile)}`
       await image.decode()
 
       const scratch = new OffscreenCanvas(tileWidth, tileWidth).getContext('2d')
@@ -26,11 +26,11 @@ const tilePixels = (order: number, tileWidth: number, tile: number): Effect.Effe
     catch: () => new TileMissing({ tile }),
   }).pipe(Effect.catchTag('TileMissing', () => Effect.succeed(undefined)))
 
-const cutFrom = (cut: SkyCut): Effect.Effect<ImageData> =>
+const cutFrom = (cut: SkyCut, tilesPath: string): Effect.Effect<ImageData> =>
   Effect.gen(function* () {
     const plan = cutPlan(cut)
     const needed = tilesOf(plan)
-    const loaded = yield* Effect.forEach(needed, tile => tilePixels(cut.order, cut.tileWidth, tile), { concurrency: 'unbounded' })
+    const loaded = yield* Effect.forEach(needed, tile => tilePixels(tilesPath, cut.order, cut.tileWidth, tile), { concurrency: 'unbounded' })
     const pixelsOf = new Map(needed.map((tile, index) => [tile, loaded[index]]))
     const picture = new ImageData(cut.widthPixels, cut.heightPixels)
 
@@ -52,4 +52,4 @@ const cutFrom = (cut: SkyCut): Effect.Effect<ImageData> =>
     return picture
   })
 
-export const skyPictureOf = (cut: SkyCut): Promise<ImageData> => Effect.runPromise(cutFrom(cut))
+export const skyPictureOf = (cut: SkyCut, tilesPath: string): Promise<ImageData> => Effect.runPromise(cutFrom(cut, tilesPath))
