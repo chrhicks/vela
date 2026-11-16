@@ -7,8 +7,9 @@ describe('announcesFrame', () => {
     expect(announcesFrame(wire(startedAt, 'set', 'primary', 'CCD_FILE_PATH', { FILE_PATH: '/spool/test_001.fits' }, 'Ok'), 'primary')).toBe(true)
   })
 
-  it('is false for the empty path the driver defines first, another camera, another property, or a command', () => {
+  it('is false for a definition, which repeats the last saved path when the driver defines its properties again, another camera, another property, or a command', () => {
     expect(announcesFrame(wire(startedAt, 'def', 'primary', 'CCD_FILE_PATH', { FILE_PATH: '' }, 'Idle'), 'primary')).toBe(false)
+    expect(announcesFrame(wire(startedAt, 'def', 'primary', 'CCD_FILE_PATH', { FILE_PATH: '/spool/autofocus_light_030.fits' }, 'Idle'), 'primary')).toBe(false)
     expect(announcesFrame(wire(startedAt, 'set', 'guide', 'CCD_FILE_PATH', { FILE_PATH: '/spool/test_001.fits' }, 'Ok'), 'primary')).toBe(false)
     expect(announcesFrame(wire(startedAt, 'set', 'primary', 'CCD_EXPOSURE', { CCD_EXPOSURE_VALUE: 0 }, 'Ok'), 'primary')).toBe(false)
     expect(announcesFrame(wire(startedAt, 'new', 'primary', 'CCD_FILE_PATH', { FILE_PATH: '/spool/x.fits' }), 'primary')).toBe(false)
