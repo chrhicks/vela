@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { FrameFile, NightName, type RigEntry } from './entries.ts'
+import { FrameFile, NightName, SkyPosition, type RigEntry } from './entries.ts'
 
 export const Measurements = Schema.Struct({
   stars: Schema.NullOr(Schema.Number),
@@ -7,6 +7,7 @@ export const Measurements = Schema.Struct({
   elongation: Schema.NullOr(Schema.Number),
   sky: Schema.Number,
   noise: Schema.Number,
+  centre: Schema.optionalKey(Schema.NullOr(SkyPosition)),
 })
 
 export type Measurements = typeof Measurements.Type
@@ -39,12 +40,12 @@ export function frames(state: ReadonlyArray<Frame>, entry: RigEntry): ReadonlyAr
       return [...state, { night, file, ...(sequence === undefined ? {} : { sequence }), keptAt: entry.at, measurements: undefined }]
     }
     case 'vela.frame.stats': {
-      const { night, file, stars, hfdPixels, elongation, sky, noise } = entry.body
+      const { night, file, stars, hfdPixels, elongation, sky, noise, centre } = entry.body
       const isMeasured = sameFrame(night, file)
 
       if (!state.some(isMeasured)) return state
 
-      return state.map(frame => (isMeasured(frame) ? { ...frame, measurements: { stars, hfdPixels, elongation, sky, noise } } : frame))
+      return state.map(frame => (isMeasured(frame) ? { ...frame, measurements: { stars, hfdPixels, elongation, sky, noise, ...(centre === undefined ? {} : { centre }) } } : frame))
     }
     default:
       return state

@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process'
-import { readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { readFits, type HeaderValue } from './fits.ts'
 
@@ -7,13 +9,21 @@ const run = promisify(execFile)
 
 export interface StarSettings {
   readonly program: string
+  readonly catalog?: string
+  readonly solveRadiusDegrees: number
   readonly analyseSnr: number
   readonly shapeMinSnr: number
   readonly shapeStars: number
   readonly saturated: number
 }
 
+export interface SkyPosition {
+  readonly raDegrees: number
+  readonly decDegrees: number
+}
+
 export interface FrameStats {
+  readonly centre: SkyPosition | null
   readonly stars: number | null
   readonly hfdPixels: number | null
   readonly arcsecPerPixel: number | null
@@ -192,18 +202,54 @@ export async function listStars(program: string, path: string, snr: number): Pro
   }
 }
 
-export function makeFrameStats(settings: StarSettings | undefined, list: (program: string, path: string, snr: number) => Promise<string> = listStars) {
+const pointingOf = (header: ReadonlyMap<string, HeaderValue>): SkyPosition | undefined => {
+  const ra = header.get('RA')
+  const dec = header.get('DEC')
+
+  return typeof ra === 'number' && typeof dec === 'number' ? { raDegrees: ra, decDegrees: dec } : undefined
+}
+
+export function readSolution(ini: string): SkyPosition | null {
+  const values = new Map(ini.split(/\r?\n/).flatMap(line => {
+    const at = line.indexOf('=')
+
+    return at < 0 ? [] : [[line.slice(0, at).trim(), line.slice(at + 1).trim()] as const]
+  }))
+  const raDegrees = Number(values.get('CRVAL1'))
+  const decDegrees = Number(values.get('CRVAL2'))
+
+  return values.get('PLTSOLVD') === 'T' && Number.isFinite(raDegrees) && Number.isFinite(decDegrees) ? { raDegrees, decDegrees } : null
+}
+
+export type Solve = (program: string, catalog: string, path: string, near: SkyPosition, radiusDegrees: number) => Promise<string>
+
+export async function solveFrame(program: string, catalog: string, path: string, near: SkyPosition, radiusDegrees: number): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), 'vela-solve-'))
+  const base = join(directory, 'solved')
+
+  try {
+    await run(program, ['-f', path, '-o', base, '-ra', String(near.raDegrees / 15), '-spd', String(near.decDegrees + 90), '-r', String(radiusDegrees), '-fov', '0', '-d', catalog])
+
+    return await readFile(`${base}.ini`, 'utf8')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+}
+
+export function makeFrameStats(settings: StarSettings | undefined, list: (program: string, path: string, snr: number) => Promise<string> = listStars, solve: Solve = solveFrame) {
   return async function measure(path: string): Promise<FrameStats> {
     const fits = readFits(await readFile(path))
     const { sky, noise } = skyAndNoise(fits.pixels, fits.width, typeof fits.header.get('BAYERPAT') === 'string')
     const scale = arcsecPerPixel(fits.header)
 
-    if (settings === undefined || !isLight(fits.header)) return { stars: null, hfdPixels: null, arcsecPerPixel: scale, elongation: null, shapedStars: 0, sky, noise }
+    if (settings === undefined || !isLight(fits.header)) return { centre: null, stars: null, hfdPixels: null, arcsecPerPixel: scale, elongation: null, shapedStars: 0, sky, noise }
 
     const stars = readStarList(await list(settings.program, path, settings.analyseSnr).catch(() => ''))
     const hfd = median(stars.map(star => star.hfd))
+    const near = pointingOf(fits.header)
+    const centre = settings.catalog === undefined || near === undefined ? null : readSolution(await solve(settings.program, settings.catalog, path, near, settings.solveRadiusDegrees).catch(() => ''))
 
-    return { stars: stars.length, hfdPixels: hfd === undefined ? null : Math.round(hfd * 100) / 100, arcsecPerPixel: scale, ...shapeOf(stars, fits, settings), sky, noise }
+    return { centre, stars: stars.length, hfdPixels: hfd === undefined ? null : Math.round(hfd * 100) / 100, arcsecPerPixel: scale, ...shapeOf(stars, fits, settings), sky, noise }
   }
 }
 

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { syntheticFits } from '../testing/fits.ts'
-import { arcsecPerPixel, makeFrameStats, readStarList, saveStats, shapeOf, skyAndNoise, statsName } from './stats.ts'
+import { arcsecPerPixel, makeFrameStats, readSolution, readStarList, saveStats, shapeOf, skyAndNoise, statsName } from './stats.ts'
 
 let directory = ''
 
@@ -16,7 +16,7 @@ afterEach(async () => {
 })
 
 const shape = { shapeMinSnr: 30, shapeStars: 300, saturated: 60000 }
-const settings = { program: 'astap_cli', analyseSnr: 10, ...shape }
+const settings = { program: 'astap_cli', analyseSnr: 10, solveRadiusDegrees: 2, ...shape }
 
 function star(x: number, y: number, sigmaX: number, sigmaY: number) {
   return (px: number, py: number) => 20000 * Math.exp(-((px - x) ** 2) / (2 * sigmaX ** 2) - (py - y) ** 2 / (2 * sigmaY ** 2))
@@ -90,13 +90,37 @@ describe('frame statistics', () => {
 
     expect(await measure(light)).toMatchObject({ stars: 2, hfdPixels: 2.8, arcsecPerPixel: 1.94, shapedStars: 1, sky: 500 })
     expect((await measure(light)).elongation).toBeCloseTo(1, 1)
-    expect(await measure(dark)).toEqual({ stars: null, hfdPixels: null, arcsecPerPixel: null, elongation: null, shapedStars: 0, sky: 500, noise: 0 })
+    expect(await measure(dark)).toEqual({ centre: null, stars: null, hfdPixels: null, arcsecPerPixel: null, elongation: null, shapedStars: 0, sky: 500, noise: 0 })
     expect(asked).toEqual([light, light])
+  })
+
+  it("plate solves a light frame near the mount's pointing in its header, when a star database is set", async () => {
+    const solved: string[] = []
+    const measure = makeFrameStats({ ...settings, catalog: '/catalog' }, async () => 'x,y,hfd,snr,flux\n21,21,2.8,100,1000\n', async (program, catalog, path, near, radiusDegrees) => {
+      solved.push(`${program} ${catalog} ${path} ${near.raDegrees} ${near.decDegrees} ${radiusDegrees}`)
+      return 'PLTSOLVD=T\nCRVAL1= 2.3459289749219220E+001\nCRVAL2= 3.0648188779510235E+001\n'
+    })
+    const pointed = join(directory, 'pointed.fits')
+    const unpointed = join(directory, 'unpointed.fits')
+
+    await writeFile(pointed, syntheticFits({ width: 40, height: 40, pixel: (x, y) => Math.round(500 + round(x, y)), extra: { IMAGETYP: 'Light Frame', RA: 23.45079, DEC: 30.64996 } }))
+    await writeFile(unpointed, syntheticFits({ width: 40, height: 40, pixel: (x, y) => Math.round(500 + round(x, y)), extra: { IMAGETYP: 'Light Frame' } }))
+
+    expect((await measure(pointed)).centre).toEqual({ raDegrees: 23.45928974921922, decDegrees: 30.648188779510235 })
+    expect((await measure(unpointed)).centre).toBeNull()
+    expect((await makeFrameStats(settings, async () => '', async () => 'PLTSOLVD=T')(pointed)).centre).toBeNull()
+    expect(solved).toEqual([`astap_cli /catalog ${pointed} 23.45079 30.64996 2`])
+  })
+
+  it("reads ASTAP's solution, and nothing from a frame it could not solve", () => {
+    expect(readSolution('PLTSOLVD=T\r\nCRVAL1= 2.3459289749219220E+001\r\nCRVAL2= 3.0648188779510235E+001\r\nCROTA2=-7.0551224671978517E+001\r\n')).toEqual({ raDegrees: 23.45928974921922, decDegrees: 30.648188779510235 })
+    expect(readSolution('PLTSOLVD=F\nERROR=No star database found.\n')).toBeNull()
+    expect(readSolution('')).toBeNull()
   })
 
   it('saves the statistics next to the frame', async () => {
     const path = join(directory, 'a_001.fits')
-    const stats = { stars: 1, hfdPixels: 2, arcsecPerPixel: null, elongation: 1.04, shapedStars: 1, sky: 3, noise: 4 }
+    const stats = { centre: null, stars: 1, hfdPixels: 2, arcsecPerPixel: null, elongation: 1.04, shapedStars: 1, sky: 3, noise: 4 }
 
     await saveStats(path, stats)
 
