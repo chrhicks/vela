@@ -38,7 +38,7 @@ import { SkyNow } from '../feed/sky.ts'
 import { Targets } from '../feed/targets.ts'
 import { readSurvey, SurveySettings } from '../sky/survey.ts'
 import { skyTonight } from '../sky/tonight.ts'
-import { Previews } from '../feed/previews.ts'
+import { PreviewFailed, Previews } from '../feed/previews.ts'
 import { StackPictures } from '../feed/stack.ts'
 import { SurveyKept } from '../feed/survey.ts'
 import { CommandLog, CommandRefused, Operations } from '../feed/commands.ts'
@@ -360,7 +360,7 @@ const feedApp = FeedServer.pipe(
         })),
       }),
       Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
-      Layer.succeed(Previews, { get: (night, file) => Effect.promise(() => previews.get(night, file).catch(() => undefined)) }),
+      Layer.succeed(Previews, { get: (night, file) => Effect.tryPromise({ try: () => previews.get(night, file), catch: cause => new PreviewFailed({ night, file, cause }) }) }),
       Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)) }),
       Layer.succeed(CommandLog, {
         newId: Effect.sync(() => randomUUID()),
