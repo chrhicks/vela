@@ -3,6 +3,7 @@ import { framesOf, offCentreArcsec, versusBaseline, type FirstFramesChecked } fr
 import { previewAddress, type Frame } from '../../../../state/frames.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Devices } from '../../../../state/devices.ts'
+import type { NightName } from '../../../../state/entries.ts'
 import type { Run } from '../../../../state/run.ts'
 import type { Starting } from '../../../../state/starting.ts'
 import { stackPictureAddress, type Stacked } from '../../../../state/stack.ts'
@@ -21,8 +22,8 @@ const clock = (at: number, withSeconds = false) =>
 
 const fixed = (value: number | null, digits: number, unit = '') => (value === null ? unknown : `${value.toFixed(digits)}${unit}`)
 
-function stackView(run: Run, stack: Stacked | undefined): Capturing['stack'] {
-  const ours = stack !== undefined && stack.sequence === run.sequence ? stack : undefined
+function stackView(run: Run, stack: Stacked | undefined, night: NightName | undefined): Capturing['stack'] {
+  const ours = stack !== undefined && stack.sequence === run.sequence && stack.night === night ? stack : undefined
 
   if (ours === undefined || ours.frames === 0) return { detail: 'No frames yet', picture: undefined, counts: [] }
 
@@ -143,10 +144,11 @@ export interface Live {
   readonly trends: Trends
   readonly checked?: FirstFramesChecked | undefined
   readonly stack?: Stacked | undefined
+  readonly night?: NightName | undefined
   readonly starting?: Starting | undefined
 }
 
-export function liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack, starting }: Live): Capturing {
+export function liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack, night, starting }: Live): Capturing {
   const ours = framesOf(run, frames)
   const latest = latestMeasured(ours)
   const kept = ours.at(-1)
@@ -162,6 +164,6 @@ export function liveCapturing({ run, frames, devices, guiding, now, trends, chec
       picture: kept === undefined ? undefined : previewAddress(kept),
       stats: latestStats(run, latest, checked),
     },
-    stack: stackView(run, stack),
+    stack: stackView(run, stack, night),
   }
 }
