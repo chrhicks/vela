@@ -16,7 +16,7 @@ import { unknown } from '../../rig/words.ts'
 import { Checks } from './Checks.tsx'
 import { checkRows, pendingCheckRows } from './first-frames.ts'
 import layout from './layout.module.css'
-import { clockDuration, exposing, focusProgress, runningStep, startingRows, type StepRow } from './starting.ts'
+import { clockDuration, exposing, focusProgress, runningStep, startingRows, stepNames, type StepRow } from './starting.ts'
 import styles from './StartingView.module.css'
 
 interface StartingViewProps {
@@ -26,8 +26,6 @@ interface StartingViewProps {
   readonly autofocus: Autofocus
   readonly frames: ReadonlyArray<Frame>
 }
-
-const stepNames = { home: 'Home', 'stop-guiding': 'Stop guiding', centre: 'Slew and centre', autofocus: 'Autofocus', guiding: 'Guiding', capture: 'Capture' } as const
 
 function Steps({ rows }: { readonly rows: ReadonlyArray<StepRow> }) {
   return (

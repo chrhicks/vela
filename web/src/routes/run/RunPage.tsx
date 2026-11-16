@@ -36,5 +36,5 @@ export function RunPage() {
     return <StartingView starting={starting?.target.id === run.target?.id ? starting : undefined} run={run} found={found} autofocus={autofocus} frames={frames} />
   }
 
-  return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack })} />
+  return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack, starting: starting?.target.id === run.target?.id ? starting : undefined })} />
 }

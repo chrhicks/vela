@@ -4,6 +4,7 @@ import { previewAddress, type Frame } from '../../../../state/frames.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Devices } from '../../../../state/devices.ts'
 import type { Run } from '../../../../state/run.ts'
+import type { Starting } from '../../../../state/starting.ts'
 import { stackPictureAddress, type Stacked } from '../../../../state/stack.ts'
 import type { Span } from '../../components/Chart.tsx'
 import type { Reading } from '../../components/Readings.tsx'
@@ -12,6 +13,7 @@ import type { Point, Trends } from '../../../../state/trends.ts'
 import type { TrendWindowName } from './TrendWindow.tsx'
 import type { Capturing, Trend, TrendView } from './capturing.ts'
 import { poorAlert, verdictFact } from './first-frames.ts'
+import { failedSteps } from './starting.ts'
 import { duration, flipWord, guidingWord, mountWords, unknown } from '../../rig/words.ts'
 
 const clock = (at: number, withSeconds = false) =>
@@ -141,9 +143,10 @@ export interface Live {
   readonly trends: Trends
   readonly checked?: FirstFramesChecked | undefined
   readonly stack?: Stacked | undefined
+  readonly starting?: Starting | undefined
 }
 
-export function liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack }: Live): Capturing {
+export function liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack, starting }: Live): Capturing {
   const ours = framesOf(run, frames)
   const latest = latestMeasured(ours)
   const kept = ours.at(-1)
@@ -152,7 +155,7 @@ export function liveCapturing({ run, frames, devices, guiding, now, trends, chec
     rig: rigLine(devices, guiding, now),
     trendWindows: trendWindows(trends, now ?? run.startedAt),
     frame: run.frames,
-    facts: [run.object, `${run.exposureSeconds} s`, `Since ${clock(run.startedAt)}`, run.count === undefined ? 'Until stopped' : `${run.count} frames`, ...(checked === undefined ? [] : [verdictFact(checked)])],
+    facts: [run.object, `${run.exposureSeconds} s`, `Since ${clock(run.startedAt)}`, run.count === undefined ? 'Until stopped' : `${run.count} frames`, ...(checked === undefined ? [] : [verdictFact(checked)]), ...failedSteps(starting)],
     alert: checked === undefined ? undefined : poorAlert(checked),
     latest: {
       detail: latest === undefined ? unknown : `${run.frames} · ${clock(latest.keptAt, true)}`,
