@@ -55,6 +55,8 @@ const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 const entryOf = <const Kind extends string, const Body extends Schema.Struct.Fields>(kind: Kind, body: Body) =>
   Schema.Struct({ seq: StreamPosition, at: Schema.Number, kind: Schema.Literal(kind), body: Schema.Struct(body) })
 
+export const SkyPosition = Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number })
+
 export const RunStarted = entryOf('vela.run.started', {
   run: RunId,
   object: RunObjectName,
@@ -62,6 +64,7 @@ export const RunStarted = entryOf('vela.run.started', {
   exposureSeconds: Schema.Number,
   count: Schema.optionalKey(Count),
   target: Schema.optionalKey(RunTarget),
+  aim: Schema.optionalKey(SkyPosition),
   sequence: Schema.optionalKey(Schema.String),
   gain: Schema.optionalKey(Schema.Number),
   offset: Schema.optionalKey(Schema.Number),
@@ -74,8 +77,6 @@ export const RunFailed = entryOf('vela.run.failed', { run: RunId })
 export const RunEnded = entryOf('vela.run.ended', { run: RunId, reason: RunEnding, detail: Schema.optionalKey(Schema.String) })
 
 export const FrameKept = entryOf('vela.frame', { night: NightName, file: FrameFile, sequence: Schema.optionalKey(Schema.String) })
-
-export const SkyPosition = Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number })
 
 export const FrameMeasured = entryOf('vela.frame.stats', {
   night: NightName,

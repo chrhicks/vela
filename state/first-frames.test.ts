@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { NightName, FrameFile, RunId } from './entries.ts'
 import type { FirstFramesLimits } from './first-frames-check.ts'
-import { firstFrames, versusBaseline, type Seen } from './first-frames.ts'
+import { firstFrames, offCentreArcsec, versusBaseline, type Seen } from './first-frames.ts'
 import type { Frame } from './frames.ts'
 import type { Run } from './run.ts'
+import { TargetId } from './targets.ts'
 
 const limits: FirstFramesLimits = { skippedFrames: 2, checkedFrames: 3, focusRatio: 1.3, trailedElongation: 1.5 }
 
@@ -94,5 +95,15 @@ describe('a frame against the first frames', () => {
   it('leaves out what the frame or the first frames did not measure', () => {
     expect(versusBaseline({ stars: null, hfdPixels: null, elongation: null, sky: 1098, noise: 51.9 }, checked)).toEqual({ hfdPercent: undefined, starsPercent: undefined })
     expect(versusBaseline({ stars: 976, hfdPixels: 3.79, elongation: 1.06, sky: 1098, noise: 51.9 }, { checks: [] })).toEqual({ hfdPercent: undefined, starsPercent: undefined })
+  })
+
+  it('says how far the solved frame is from where centring aimed, else from the target', () => {
+    const measured = { stars: 985, hfdPixels: 3.85, elongation: 1.04, sky: 1092, noise: 51.9, centre: { raDegrees: 23.45928974921922, decDegrees: 30.648188779510235 } }
+    const target = { id: TargetId.make('stellarium-606'), name: 'M 33', raDegrees: 23.4621, decDegrees: 30.659942 }
+
+    expect(offCentreArcsec({ target, aim: { raDegrees: 23.45401, decDegrees: 30.652569 } }, measured)).toBeCloseTo(22.7, 1)
+    expect(offCentreArcsec({ target }, measured)).toBeCloseTo(43.2, 1)
+    expect(offCentreArcsec({ target }, { ...measured, centre: null })).toBeUndefined()
+    expect(offCentreArcsec({}, measured)).toBeUndefined()
   })
 })

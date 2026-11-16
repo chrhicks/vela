@@ -148,7 +148,7 @@ export const startControls = Effect.gen(function* () {
 
         const name = asciiName(found.name)
         const target: RunTarget = { id: found.id, name, raDegrees: found.raDegrees, decDegrees: found.decDegrees }
-        const request: CaptureRequest = { object: name, frameType: 'light', exposureSeconds, ...(frames === undefined ? {} : { count: frames }), gain, offset, cooler: 'keep', target }
+        const request: CaptureRequest = { object: name, frameType: 'light', exposureSeconds, ...(frames === undefined ? {} : { count: frames }), gain, offset, cooler: 'keep', target, ...(centre === undefined ? {} : { aim: { raDegrees: centre.raDegrees, decDegrees: centre.decDegrees } }) }
 
         const steps: ReadonlyArray<Step> = [
           ['home', home],

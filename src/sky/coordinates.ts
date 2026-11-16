@@ -13,8 +13,6 @@ export interface EquatorialPosition {
   decDegrees: number
 }
 
-const radians = Math.PI / 180
-
 const wrap = (degrees: number) => ((degrees % 360) + 360) % 360
 
 function vector(position: EquatorialPosition, date: Date) {
@@ -33,15 +31,4 @@ export function toMount(positionJ2000: EquatorialPosition, date: Date): Equatori
 
 export function fromMount(mountPosition: EquatorialPosition, date: Date): EquatorialPosition {
   return position(RotateVector(Rotation_EQD_EQJ(date), vector(mountPosition, date)))
-}
-
-export function angularDistance(a: EquatorialPosition, b: EquatorialPosition): number {
-  const dec1 = a.decDegrees * radians
-  const dec2 = b.decDegrees * radians
-
-  const half =
-    Math.sin((dec2 - dec1) / 2) ** 2 +
-    Math.cos(dec1) * Math.cos(dec2) * Math.sin(((b.raDegrees - a.raDegrees) * radians) / 2) ** 2
-
-  return (2 * Math.asin(Math.sqrt(Math.max(0, Math.min(1, half))))) / radians
 }

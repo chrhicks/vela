@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { FrameType } from '../../state/entries.ts'
+import { FrameType, SkyPosition } from '../../state/entries.ts'
 import { RunTarget } from '../../state/targets.ts'
 import { decodeConfig } from '../config.ts'
 
@@ -23,6 +23,7 @@ export const CaptureRequest = Schema.Struct({
   setpoint: Schema.optionalKey(Schema.Finite),
   waitForSetpoint: Schema.optionalKey(Schema.Boolean),
   target: Schema.optionalKey(RunTarget),
+  aim: Schema.optionalKey(SkyPosition),
 })
 
 export type CaptureRequest = typeof CaptureRequest.Type

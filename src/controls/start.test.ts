@@ -123,14 +123,14 @@ describe('Start a target', () => {
     expect(started).toEqual([])
   })
 
-  it('centres on a given position while the run stays on the target', async () => {
+  it('centres on a given position while the run stays on the target, and keeps that position as its aim', async () => {
     const { did, started, press, finished } = setup()
 
     await press('orion', 60, 300, { raDegrees: 83.9, decDegrees: -5.2 })
     await finished()
 
     expect(did).toContain('centre 83.900000 -5.200000')
-    expect(started[0]).toMatchObject({ object: 'M 42', target: { id: 'orion', raDegrees: 83.82 } })
+    expect(started[0]).toMatchObject({ object: 'M 42', target: { id: 'orion', raDegrees: 83.82 }, aim: { raDegrees: 83.9, decDegrees: -5.2 } })
   })
 
   it('names a typed position in plain letters, for the files and the header', async () => {

@@ -1,7 +1,8 @@
 import { Body, Equator, Observer, SiderealTime } from 'astronomy-engine'
 import type { Site } from '../pointing/target.ts'
 import type { Placement } from '../../state/targets.ts'
-import { angularDistance, toMount, type EquatorialPosition } from './coordinates.ts'
+import { angularDistance } from '../../state/angles.ts'
+import { toMount, type EquatorialPosition } from './coordinates.ts'
 
 const radians = Math.PI / 180
 const siderealHoursPerHour = 1.0027379093

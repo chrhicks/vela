@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { angularDistance } from './angles.ts'
 import { checkOf } from './autofocus.ts'
 import { RunId, type RigEntry } from './entries.ts'
 import { Check, CheckedFrames, FirstFramesVerdict, type FirstFramesLimits, type Verdict } from './first-frames-check.ts'
@@ -102,4 +103,10 @@ export function versusBaseline(measured: Measurements, checked: Pick<FirstFrames
   const stars = checked.checks.find(check => check.check === 'stars')
 
   return { hfdPercent: percentFrom(measured.hfdPixels, focus?.hfdPixels), starsPercent: percentFrom(measured.stars, stars?.stars) }
+}
+
+export function offCentreArcsec(run: Pick<Run, 'aim' | 'target'>, measured: Measurements): number | undefined {
+  const aim = run.aim ?? run.target
+
+  return aim === undefined || measured.centre == null ? undefined : angularDistance(measured.centre, aim) * 3600
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { angularDistance, fromMount, toMount, type EquatorialPosition } from './coordinates.ts'
+import { angularDistance } from '../../state/angles.ts'
+import { fromMount, toMount, type EquatorialPosition } from './coordinates.ts'
 
 function random(seed: number) {
   let state = seed
