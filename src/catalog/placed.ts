@@ -1,6 +1,7 @@
 import type { Site } from '../pointing/target.ts'
 import type { EquatorialPosition } from '../sky/coordinates.ts'
 import { moonPosition, placementOf } from '../sky/placement.ts'
+import { skyTonight } from '../sky/tonight.ts'
 import type { TargetFacts, TargetFound } from '../../state/targets.ts'
 import { summarised, type Catalog } from './catalog.ts'
 import { dualBandHint } from './dual-band.ts'
@@ -71,8 +72,10 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: P
       }
     },
 
-    bestPlaced: (at: number): ReadonlyArray<TargetFound> => {
-      const place = placer(at)
+    bestPlaced: (asked: number): ReadonlyArray<TargetFound> => {
+      const here = site()
+      const dark = here === undefined ? null : skyTonight(here, asked).dark
+      const place = placer(dark !== null && asked < dark.from ? dark.from : asked)
 
       if (place === undefined) return []
 

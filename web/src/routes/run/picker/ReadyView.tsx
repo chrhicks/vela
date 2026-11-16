@@ -21,7 +21,8 @@ const refreshMilliseconds = 60_000
 export function ReadyView() {
   const [typed, setTyped] = useState('')
   const [search] = useSearchParams()
-  const minute = Math.floor(useLocalNow(refreshMilliseconds) / refreshMilliseconds)
+  const now = useLocalNow(refreshMilliseconds)
+  const minute = Math.floor(now / refreshMilliseconds)
   const text = typed.trim()
 
   const listing = useAsked(() => (text === '' ? bestPlacedTargets() : findTargets(text)), text, minute)
@@ -52,7 +53,7 @@ export function ReadyView() {
       <div className={styles.picker} data-opened={search.has('target')}>
         <div className={styles.browse}>
           <div className={styles.find}>
-            <Caption>{text === '' ? 'Best placed now' : 'Matches'}</Caption>
+            <Caption>{text !== '' ? 'Matches' : tonight?.dark != null && now < tonight.dark.from ? `Best placed at ${clockTime(tonight.dark.from)}` : 'Best placed now'}</Caption>
 
             <div className={styles.search}>
               <Field name="Search" kind="search" value={typed} onChange={setTyped} />
