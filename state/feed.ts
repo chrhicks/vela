@@ -22,7 +22,7 @@ export const LaunchLimits = Schema.Struct({ alignGoodArcmin: Schema.Number, alig
 
 export type LaunchLimits = typeof LaunchLimits.Type
 
-export const PickerLimits = Schema.Struct({ wheelPixelsPerDoubling: Schema.Number })
+export const PickerLimits = Schema.Struct({ wheelPixelsPerDoubling: Schema.Number, zoomGlideMs: Schema.Number })
 
 export type PickerLimits = typeof PickerLimits.Type
 
