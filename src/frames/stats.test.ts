@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { syntheticFits } from '../testing/fits.ts'
-import { arcsecPerPixel, makeFrameStats, readSolution, readStarList, saveStats, shapeOf, skyAndNoise, statsName } from './stats.ts'
+import { arcsecPerPixel, fieldHeightDegrees, makeFrameStats, readSolution, readStarList, saveStats, shapeOf, skyAndNoise, statsName } from './stats.ts'
 
 let directory = ''
 
@@ -96,20 +96,20 @@ describe('frame statistics', () => {
 
   it("plate solves a light frame near the mount's pointing in its header, when a star database is set", async () => {
     const solved: string[] = []
-    const measure = makeFrameStats({ ...settings, catalog: '/catalog' }, async () => 'x,y,hfd,snr,flux\n21,21,2.8,100,1000\n', async (program, catalog, path, near, radiusDegrees) => {
-      solved.push(`${program} ${catalog} ${path} ${near.raDegrees} ${near.decDegrees} ${radiusDegrees}`)
+    const measure = makeFrameStats({ ...settings, catalog: '/catalog' }, async () => 'x,y,hfd,snr,flux\n21,21,2.8,100,1000\n', async (program, catalog, path, near, radiusDegrees, fieldDegrees) => {
+      solved.push(`${program} ${catalog} ${path} ${near.raDegrees} ${near.decDegrees} ${radiusDegrees} ${fieldDegrees?.toFixed(3)}`)
       return 'PLTSOLVD=T\nCRVAL1= 2.3459289749219220E+001\nCRVAL2= 3.0648188779510235E+001\nCRPIX1= 3124.5\nCRPIX2= 2088.5\nCD1_1= 1.786e-4\nCD1_2= 5.052e-4\nCD2_1= -5.051e-4\nCD2_2= 1.784e-4\n'
     })
     const pointed = join(directory, 'pointed.fits')
     const unpointed = join(directory, 'unpointed.fits')
 
-    await writeFile(pointed, syntheticFits({ width: 40, height: 40, pixel: (x, y) => Math.round(500 + round(x, y)), extra: { IMAGETYP: 'Light Frame', RA: 23.45079, DEC: 30.64996 } }))
+    await writeFile(pointed, syntheticFits({ width: 40, height: 40, pixel: (x, y) => Math.round(500 + round(x, y)), extra: { IMAGETYP: 'Light Frame', RA: 23.45079, DEC: 30.64996, YPIXSZ: 3.76, FOCALLEN: 400 } }))
     await writeFile(unpointed, syntheticFits({ width: 40, height: 40, pixel: (x, y) => Math.round(500 + round(x, y)), extra: { IMAGETYP: 'Light Frame' } }))
 
     expect((await measure(pointed)).centre).toEqual({ raDegrees: 23.45928974921922, decDegrees: 30.648188779510235 })
     expect((await measure(unpointed)).centre).toBeNull()
     expect((await makeFrameStats(settings, async () => '', async () => 'PLTSOLVD=T')(pointed)).centre).toBeNull()
-    expect(solved).toEqual([`astap_cli /catalog ${pointed} 23.45079 30.64996 2`])
+    expect(solved).toEqual([`astap_cli /catalog ${pointed} 23.45079 30.64996 2 0.022`])
   })
 
   it("reads ASTAP's solution, and nothing from a frame it could not solve or that lacks the pixel scale", () => {
@@ -126,5 +126,11 @@ describe('frame statistics', () => {
     await saveStats(path, stats)
 
     expect(JSON.parse(await readFile(statsName(path), 'utf8'))).toEqual(stats)
+  })
+
+  it('gives the height of the field from the pixel size, the rows and the focal length', () => {
+    expect(fieldHeightDegrees(new Map([['YPIXSZ', 3.76], ['FOCALLEN', 400]]), 4176)?.toFixed(3)).toBe('2.249')
+    expect(fieldHeightDegrees(new Map([['XPIXSZ', 3.76], ['FOCALLEN', 400]]), 4176)?.toFixed(3)).toBe('2.249')
+    expect(fieldHeightDegrees(new Map([['XPIXSZ', 3.76]]), 4176)).toBeUndefined()
   })
 })

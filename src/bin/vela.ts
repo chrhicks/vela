@@ -204,7 +204,7 @@ const stars = settings.stars
 const stacks = makeStacks({
   keepDir: frames.keepDir,
   preview: frames.preview,
-  solve: (path, near) => (stars?.catalog === undefined ? Promise.resolve('') : solveFrame(stars.program, stars.catalog, path, near, stars.solveRadiusDegrees)),
+  solve: (path, near, fieldDegrees) => (stars?.catalog === undefined ? Promise.resolve('') : solveFrame(stars.program, stars.catalog, path, near, stars.solveRadiusDegrees, fieldDegrees)),
 })
 const publishStack = (count: StackCount | undefined) => {
   if (count !== undefined) publishEntry(stream.vela('stack'), 'vela.stack', `${count.sequence}:${count.frames}:${count.leftOut}`, { ...count })

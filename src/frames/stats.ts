@@ -231,14 +231,22 @@ export function readSolution(ini: string): PlateSolution | null {
   return { centre: { raDegrees, decDegrees }, referencePixel: [x, y], matrix: [[a, b], [c, d]] }
 }
 
-export type Solve = (program: string, catalog: string, path: string, near: SkyPosition, radiusDegrees: number) => Promise<string>
+export function fieldHeightDegrees(header: ReadonlyMap<string, HeaderValue>, rows: number): number | undefined {
+  const number = (key: string) => Number(header.get(key))
+  const millimetres = (rows * (header.has('YPIXSZ') ? number('YPIXSZ') : number('XPIXSZ'))) / 1000
+  const degrees = (2 * Math.atan(millimetres / 2 / number('FOCALLEN')) * 180) / Math.PI
 
-export async function solveFrame(program: string, catalog: string, path: string, near: SkyPosition, radiusDegrees: number): Promise<string> {
+  return Number.isFinite(degrees) && degrees > 0 ? degrees : undefined
+}
+
+export type Solve = (program: string, catalog: string, path: string, near: SkyPosition, radiusDegrees: number, fieldDegrees: number | undefined) => Promise<string>
+
+export async function solveFrame(program: string, catalog: string, path: string, near: SkyPosition, radiusDegrees: number, fieldDegrees: number | undefined): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'vela-solve-'))
   const base = join(directory, 'solved')
 
   try {
-    await run(program, ['-f', path, '-o', base, '-ra', String(near.raDegrees / 15), '-spd', String(near.decDegrees + 90), '-r', String(radiusDegrees), '-fov', '0', '-d', catalog])
+    await run(program, ['-f', path, '-o', base, '-ra', String(near.raDegrees / 15), '-spd', String(near.decDegrees + 90), '-r', String(radiusDegrees), '-fov', fieldDegrees === undefined ? '0' : fieldDegrees.toFixed(3), '-d', catalog])
 
     return await readFile(`${base}.ini`, 'utf8')
   } finally {
@@ -257,7 +265,7 @@ export function makeFrameStats(settings: StarSettings | undefined, list: (progra
     const stars = readStarList(await list(settings.program, path, settings.analyseSnr, settings.listLimit).catch(() => ''))
     const hfd = median(stars.map(star => star.hfd))
     const near = pointingOf(fits.header)
-    const solution = settings.catalog === undefined || near === undefined ? null : readSolution(await solve(settings.program, settings.catalog, path, near, settings.solveRadiusDegrees).catch(() => ''))
+    const solution = settings.catalog === undefined || near === undefined ? null : readSolution(await solve(settings.program, settings.catalog, path, near, settings.solveRadiusDegrees, fieldHeightDegrees(fits.header, fits.height)).catch(() => ''))
 
     return { centre: solution?.centre ?? null, solution, stars: stars.length, hfdPixels: hfd === undefined ? null : Math.round(hfd * 100) / 100, arcsecPerPixel: scale, ...shapeOf(stars, fits, settings), sky, noise }
   }
