@@ -78,7 +78,7 @@ describe('frame statistics', () => {
 
   it('lists stars in a light frame, not in a dark, and always gives sky and noise', async () => {
     const asked: string[] = []
-    const measure = makeFrameStats(settings, async (_program, path, snr, limit) => {
+    const measure = makeFrameStats(settings, () => undefined, async (_program, path, snr, limit) => {
       asked.push(`${path} ${snr} ${limit}`)
       return 'x,y,hfd,snr,flux\n21,21,2.8,100,1000\n10,10,3.0,12,10\n'
     })
@@ -96,7 +96,7 @@ describe('frame statistics', () => {
 
   it("plate solves a light frame near the mount's pointing in its header, when a star database is set", async () => {
     const solved: string[] = []
-    const measure = makeFrameStats({ ...settings, catalog: '/catalog' }, async () => 'x,y,hfd,snr,flux\n21,21,2.8,100,1000\n', async (program, catalog, path, near, radiusDegrees, fieldDegrees) => {
+    const measure = makeFrameStats({ ...settings, catalog: '/catalog' }, () => undefined, async () => 'x,y,hfd,snr,flux\n21,21,2.8,100,1000\n', async (program, catalog, path, near, radiusDegrees, fieldDegrees) => {
       solved.push(`${program} ${catalog} ${path} ${near.raDegrees} ${near.decDegrees} ${radiusDegrees} ${fieldDegrees?.toFixed(3)}`)
       return 'PLTSOLVD=T\nCRVAL1= 2.3459289749219220E+001\nCRVAL2= 3.0648188779510235E+001\nCRPIX1= 3124.5\nCRPIX2= 2088.5\nCD1_1= 1.786e-4\nCD1_2= 5.052e-4\nCD2_1= -5.051e-4\nCD2_2= 1.784e-4\n'
     })
@@ -108,8 +108,19 @@ describe('frame statistics', () => {
 
     expect((await measure(pointed)).centre).toEqual({ raDegrees: 23.45928974921922, decDegrees: 30.648188779510235 })
     expect((await measure(unpointed)).centre).toBeNull()
-    expect((await makeFrameStats(settings, async () => '', async () => 'PLTSOLVD=T')(pointed)).centre).toBeNull()
+    expect((await makeFrameStats(settings, () => undefined, async () => '', async () => 'PLTSOLVD=T')(pointed)).centre).toBeNull()
     expect(solved).toEqual([`astap_cli /catalog ${pointed} 23.45079 30.64996 2 0.022`])
+  })
+
+  it('reports an ASTAP run that fails, and measures the frame without what it could not get', async () => {
+    const pointed = join(directory, 'failing.fits')
+    const failures: string[] = []
+    await writeFile(pointed, syntheticFits({ width: 40, height: 40, pixel: () => 500, extra: { IMAGETYP: 'Light Frame', RA: 23.45, DEC: 30.65 } }))
+
+    const measured = await makeFrameStats({ ...settings, catalog: '/catalog' }, (step, path, error) => void failures.push(`${step} ${path} ${String(error)}`), () => Promise.reject(new Error('no astap')), () => Promise.reject(new Error('no catalog')))(pointed)
+
+    expect({ centre: measured.centre, stars: measured.stars }).toEqual({ centre: null, stars: null })
+    expect(failures).toEqual([`stars ${pointed} Error: no astap`, `solve ${pointed} Error: no catalog`])
   })
 
   it("reads ASTAP's solution, and nothing from a frame it could not solve or that lacks the pixel scale", () => {

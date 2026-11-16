@@ -200,7 +200,7 @@ const page = makePage({
   copies: { left: () => keeper.left(), again: () => void keeper.requestScan() },
 })
 
-const measureStats = makeFrameStats(settings.stars)
+const measureStats = makeFrameStats(settings.stars, (step, path, error) => console.error(`vela: ASTAP ${step === 'solve' ? 'solve' : 'star list'} failed for ${path}: ${String(error)}`))
 const stars = settings.stars
 const stacks = makeStacks({
   keepDir: frames.keepDir,
