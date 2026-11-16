@@ -58,6 +58,14 @@ export const CommandRequest = Schema.Union([
 
 export type CommandRequest = typeof CommandRequest.Type
 
+export const GuidingSettle = Schema.Union([
+  Schema.Struct({ outcome: Schema.Literal('settled') }),
+  Schema.Struct({ outcome: Schema.Literal('not-settled'), text: Schema.String }),
+  Schema.Struct({ outcome: Schema.Literal('no-word'), seconds: Schema.Number }),
+])
+
+export type GuidingSettle = typeof GuidingSettle.Type
+
 export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('carried-out') }),
   Schema.Struct({ code: Schema.Literal('guiding-starting'), recalibrate: Schema.Boolean }),
@@ -81,7 +89,7 @@ export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('stopped-for-night'), endedRun: Schema.Boolean, missed: Schema.Array(NightStep) }),
   Schema.Struct({ code: Schema.Literal('tracking'), on: Schema.Boolean }),
   Schema.Struct({ code: Schema.Literal('centring'), target: Schema.String, endedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean) }),
-  Schema.Struct({ code: Schema.Literal('flip'), settled: Schema.Boolean, flipped: Schema.Boolean, pierSide: Schema.optionalKey(Schema.Literals(['east', 'west'])), pausedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean), restartedGuiding: Schema.optionalKey(Schema.Boolean) }),
+  Schema.Struct({ code: Schema.Literal('flip'), settled: Schema.Boolean, flipped: Schema.Boolean, pierSide: Schema.optionalKey(Schema.Literals(['east', 'west'])), pausedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean), restartedGuiding: Schema.optionalKey(Schema.Boolean), guidingSettle: Schema.optionalKey(GuidingSettle) }),
 ])
 
 export type Done = typeof Done.Type

@@ -22,6 +22,8 @@ const pointingNow = (state: string) => entry('wire', 2, { dir: 'in', device: 'mo
 
 const step = (rig: RigState, state: string) => ({ rig: foldRig([pointingNow(state)], rig), entry: pointingNow(state) })
 
+const settleDone = (rig: RigState, body: Readonly<Record<string, unknown>>) => ({ rig, entry: entry('phd2.SettleDone', 3, { Event: 'SettleDone', ...body }) })
+
 const written = () => Promise.resolve<Outcome>({ result: 'written' })
 
 type Controls = Effect.Success<typeof mountControls>
@@ -32,7 +34,7 @@ function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) =>
   const send = (command: Command, signal: AbortSignal) => (sent.push(`${command.device} ${command.property} ${JSON.stringify(command.values)}`), answer(command, signal))
   const ask = (request: Request, signal: AbortSignal) => (sent.push(`${request.device} ${request.id} ${JSON.stringify(request.body)}`), answer({ device: request.device, property: request.label, values: {} }, signal))
   const tell = (device: string, body: Readonly<Record<string, unknown>>) => void sent.push(`${device} told ${JSON.stringify(body)}`)
-  const settings = Layer.succeed(MountSettings, { nudgeRates: { slow: '7x', fast: '8x' }, flipSettleSeconds: 5 })
+  const settings = Layer.succeed(MountSettings, { nudgeRates: { slow: '7x', fast: '8x' }, flipSettleSeconds: 5, guidingSettleSeconds: 0.05 })
   const centring = Layer.succeed(Centring, { centreOn: (target: string) => Effect.sync(() => (sent.push(`centre on ${target}`), `${target} found`)) })
   const entries = Stream.fromIterable(later).pipe(Stream.map(next => ((now = next.rig), next.entry)))
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.succeed({ state: rig, entries }), current: Effect.sync(() => now) })
@@ -186,13 +188,29 @@ describe('guiding around mount moves', () => {
     expect(stop.sent).toEqual(['am5 TELESCOPE_ABORT_MOTION {"ABORT":true}', 'vela run stopped'])
   })
 
-  it('stops guiding for a flip and starts it again before the run resumes', async () => {
+  it('stops guiding for a flip, starts it again and waits for PHD2 to report it settled before the run resumes', async () => {
     const west = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false })], pointing)
     const eastSettled = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: false, PIER_EAST: true })], pointing)
-    const { sent, done } = setup(west, written, 10, [step(west, 'Busy'), step(eastSettled, 'Ok')], { guiding: true })
+    const { sent, done } = setup(west, written, 10, [step(west, 'Busy'), step(eastSettled, 'Ok'), settleDone(eastSettled, { Status: 0 })], { guiding: true })
 
-    expect(await done(mount => mount.flipNow)).toMatchObject({ value: { code: 'flip', flipped: true, stoppedGuiding: true, restartedGuiding: true } })
+    expect(await done(mount => mount.flipNow)).toMatchObject({ value: { code: 'flip', flipped: true, stoppedGuiding: true, restartedGuiding: true, guidingSettle: { outcome: 'settled' } } })
     expect(sent).toEqual(['run paused', 'guiding stopped', 'am5 ON_COORD_SET {"SLEW":false,"TRACK":true,"SYNC":false}', 'am5 EQUATORIAL_EOD_COORD {"RA":23.3,"DEC":61.2}', 'guiding started', 'run resumed'])
+  })
+
+  it("resumes the run after a flip when PHD2 reports guiding did not settle, and passes on PHD2's words", async () => {
+    const west = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false })], pointing)
+    const { sent, done } = setup(west, written, 10, [step(west, 'Busy'), step(west, 'Ok'), settleDone(west, { Status: 1, Error: 'timed-out waiting for guider to settle' })], { guiding: true })
+
+    expect(await done(mount => mount.flipNow)).toMatchObject({ value: { restartedGuiding: true, guidingSettle: { outcome: 'not-settled', text: 'timed-out waiting for guider to settle' } } })
+    expect(sent.at(-1)).toBe('run resumed')
+  })
+
+  it('resumes the run after a flip when PHD2 says nothing about settling within the wait, and says how long it waited', async () => {
+    const west = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false })], pointing)
+    const { sent, done } = setup(west, written, 10, [step(west, 'Busy'), step(west, 'Ok')], { guiding: true })
+
+    expect(await done(mount => mount.flipNow)).toMatchObject({ value: { restartedGuiding: true, guidingSettle: { outcome: 'no-word', seconds: 0.05 } } })
+    expect(sent.at(-1)).toBe('run resumed')
   })
 
   it('does not start guiding after a flip when it was not guiding before', async () => {
