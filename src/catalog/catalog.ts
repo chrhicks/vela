@@ -34,6 +34,24 @@ export const normalised = (text: string) =>
     .replace(/[^a-z0-9]/g, '')
     .replace(/([a-z])0+(?=\d)/g, '$1')
 
+const catalogLetters: Readonly<Record<string, string>> = {
+  messier: 'm',
+  caldwell: 'c',
+  barnard: 'b',
+  sharpless: 'sh2',
+  collinder: 'cr',
+  melotte: 'mel',
+  trumpler: 'tr',
+  ruprecht: 'ru',
+  stock: 'st',
+}
+
+const lettered = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/\bsharpless[\s-]*2[\s-]+(?=\d)/g, 'sh2 ')
+    .replace(/\b([a-z]+)[\s-]*(?=\d)/g, (word, name: string) => catalogLetters[name] ?? word)
+
 const rankOf = (key: string, query: string) => (key === query ? 0 : key.startsWith(query) ? 1 : key.includes(query) ? 2 : undefined)
 
 const better = (a: Match, b: Match) => a.rank - b.rank || Number(b.own) - Number(a.own) || a.length - b.length
@@ -94,7 +112,7 @@ export function catalogOf(targets: ReadonlyArray<CatalogTarget>, names: Readonly
 
       if (position !== undefined) return [summaryOf(position, null)]
 
-      const query = normalised(text)
+      const query = normalised(lettered(text))
 
       if (query === '') return []
 

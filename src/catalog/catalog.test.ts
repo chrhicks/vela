@@ -25,8 +25,11 @@ describe('catalog search', () => {
     expect(testCatalog.search(query, 10)[0]).toEqual({ id: 'andromeda', name: 'M 31', commonName: 'Andromeda Galaxy', type: 'Gx', constellation: 'Andromeda' })
   })
 
-  it('finds a target by part of any of its names', () => {
+  it("finds a target by part of any of its names, or by a catalog's full name before its number", () => {
     expect(testCatalog.search('horsehead', 10).map(found => found.id)).toEqual(['horsehead'])
+    expect(testCatalog.search('barnard 33', 10).map(found => found.id)).toEqual(['horsehead'])
+    expect(testCatalog.search('Messier 33', 10).map(found => found.id)).toEqual(['triangulum'])
+    expect(testCatalog.search('messier', 10)).toEqual([])
     expect(testCatalog.search('great orion', 10).map(found => found.id)).toEqual(['orion'])
   })
 
