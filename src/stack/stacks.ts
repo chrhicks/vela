@@ -88,11 +88,11 @@ export function makeStacks({ keepDir, preview, solve }: StacksOptions) {
     return countOf(frame.night, frame.sequence)
   }
 
-  function picture(asked: string, sequence: string): Buffer | undefined {
+  function picture(asked: string, sequence: string): { readonly png: Buffer; readonly frames: number } | undefined {
     const entry = asked === night ? kept.get(sequence) : undefined
 
     if (entry === undefined || entry.stack.frames === 0) return undefined
-    if (entry.picture !== undefined) return entry.picture
+    if (entry.picture !== undefined) return { png: entry.picture, frames: entry.stack.frames }
 
     const { width, height } = entry.stack
     const planes = entry.stack.mean()
@@ -109,7 +109,7 @@ export function makeStacks({ keepDir, preview, solve }: StacksOptions) {
 
     entry.picture = encodePng(width, height, rgb)
 
-    return entry.picture
+    return { png: entry.picture, frames: entry.stack.frames }
   }
 
   async function rebuild(tonight: string, each: (count: StackCount) => void) {

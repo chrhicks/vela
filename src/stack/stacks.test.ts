@@ -56,7 +56,8 @@ describe('the night stacks', () => {
     expect(await kept.add({ night, file: 'M-33_light_002.fits', sequence: 'M-33_light' }, solution)).toBeUndefined()
     expect(await kept.add({ night, file: 'test-frame_light_001.fits', sequence: 'test-frame_light' }, solution)).toBeUndefined()
     expect(await kept.add({ night, file: 'M-33_dark_001.fits', sequence: 'M-33_dark' }, solution)).toBeUndefined()
-    expect(kept.picture(night, 'M-33_light')?.subarray(1, 4).toString()).toBe('PNG')
+    expect(kept.picture(night, 'M-33_light')?.png.subarray(1, 4).toString()).toBe('PNG')
+    expect(kept.picture(night, 'M-33_light')?.frames).toBe(2)
     expect(kept.picture(night, 'NGC-7635_light')).toBeUndefined()
   })
 
