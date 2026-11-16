@@ -42,6 +42,7 @@ import { Previews } from '../feed/previews.ts'
 import { StackPictures } from '../feed/stack.ts'
 import { SurveyKept } from '../feed/survey.ts'
 import { CommandLog, CommandRefused, Operations } from '../feed/commands.ts'
+import { pressKey } from '../../state/pressing.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
 import { CalibrationSettings, cameraControls, Capturing } from '../controls/camera.ts'
@@ -362,7 +363,7 @@ const feedApp = FeedServer.pipe(
       Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)) }),
       Layer.succeed(CommandLog, {
         newId: Effect.sync(() => randomUUID()),
-        pressed: (id, command) => Effect.sync(() => publishEntry(stream.vela('command'), 'vela.command.pressed', id, { id, command })),
+        pressed: (id, request) => Effect.sync(() => publishEntry(stream.vela('command'), 'vela.command.pressed', id, { id, command: request.command, key: pressKey(request) })),
         answered: (id, command) => Effect.sync(() => publishEntry(stream.vela('command'), 'vela.command.answered', id, { id, command })),
       }),
       Layer.succeed(SkyNow, {

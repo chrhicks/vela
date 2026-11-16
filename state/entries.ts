@@ -179,7 +179,7 @@ export const FirstFramesAnnounced = entryOf('vela.first-frames', { run: RunId, v
 
 export type FirstFramesBody = typeof FirstFramesAnnounced.Type['body']
 
-export const CommandPressed = entryOf('vela.command.pressed', { id: Schema.String, command: Schema.String })
+export const CommandPressed = entryOf('vela.command.pressed', { id: Schema.String, command: Schema.String, key: Schema.optionalKey(Schema.String) })
 
 export const CommandAnswered = entryOf('vela.command.answered', { id: Schema.String, command: Schema.String })
 

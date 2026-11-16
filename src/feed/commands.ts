@@ -44,7 +44,7 @@ export class CommandLog extends Context.Service<
   CommandLog,
   {
     readonly newId: Effect.Effect<string>
-    readonly pressed: (id: string, command: CommandRequest['command']) => Effect.Effect<void>
+    readonly pressed: (id: string, request: CommandRequest) => Effect.Effect<void>
     readonly answered: (id: string, command: CommandRequest['command']) => Effect.Effect<void>
   }
 >()('vela/CommandLog') {}
@@ -106,7 +106,7 @@ export const CommandsRoute = HttpRouter.add(
             const log = yield* CommandLog
             const id = yield* log.newId
 
-            yield* log.pressed(id, request.command)
+            yield* log.pressed(id, request)
 
             return yield* carryOut(request).pipe(Effect.ensuring(log.answered(id, request.command)))
           }),

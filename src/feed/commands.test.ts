@@ -19,7 +19,7 @@ async function send(body: unknown, refuse?: string) {
   const { calls, operations } = fakeOperations(refuse)
   const logged: Array<string> = []
   let ids = 0
-  const log = { newId: Effect.sync(() => `press-${(ids += 1)}`), pressed: (id: string, command: string) => Effect.sync(() => void logged.push(`pressed ${id} ${command}`)), answered: (id: string, command: string) => Effect.sync(() => void logged.push(`answered ${id} ${command}`)) }
+  const log = { newId: Effect.sync(() => `press-${(ids += 1)}`), pressed: (id: string, request: { readonly command: string }) => Effect.sync(() => void logged.push(`pressed ${id} ${request.command}`)), answered: (id: string, command: string) => Effect.sync(() => void logged.push(`answered ${id} ${command}`)) }
   const { handler, dispose } = HttpRouter.toWebHandler(CommandsRoute, { disableLogger: true })
   const response = await handler(new Request(`http://localhost${commandsPath}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), Context.make(Operations, operations).pipe(Context.add(CommandLog, log)))
   const text = await response.text()
