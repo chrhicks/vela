@@ -23,7 +23,7 @@ export interface Capturing {
   readonly facts: ReadonlyArray<string>
   readonly alert: RunAlert | undefined
   readonly rig: ReadonlyArray<Reading>
-  readonly latest: { readonly detail: string; readonly stats: ReadonlyArray<Reading> }
+  readonly latest: { readonly detail: string; readonly picture: string | undefined; readonly stats: ReadonlyArray<Reading> }
   readonly trendWindows: Readonly<Record<TrendWindowName, TrendView>>
 }
 

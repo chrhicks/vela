@@ -1,6 +1,6 @@
 import { flip } from '../../../../state/flip.ts'
 import type { FirstFramesChecked } from '../../../../state/first-frames.ts'
-import type { Frame } from '../../../../state/frames.ts'
+import { previewAddress, type Frame } from '../../../../state/frames.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Devices } from '../../../../state/devices.ts'
 import type { Run } from '../../../../state/run.ts'
@@ -19,6 +19,8 @@ const clock = (at: number, withSeconds = false) =>
 const fixed = (value: number | null, digits: number, unit = '') => (value === null ? unknown : `${value.toFixed(digits)}${unit}`)
 
 const latestMeasured = (frames: ReadonlyArray<Frame>) => [...frames].reverse().find(frame => frame.measurements !== undefined)
+
+const latestOf = (frames: ReadonlyArray<Frame>, run: Run) => (run.sequence === undefined ? undefined : [...frames].reverse().find(frame => frame.sequence === run.sequence))
 
 function latestStats(frame: Frame | undefined): ReadonlyArray<Reading> {
   const measured = frame?.measurements
@@ -111,6 +113,7 @@ export interface Live {
 
 export function liveCapturing({ run, frames, devices, guiding, now, trends, checked }: Live): Capturing {
   const latest = latestMeasured(frames)
+  const kept = latestOf(frames, run)
 
   return {
     rig: rigLine(devices, guiding, now),
@@ -120,6 +123,7 @@ export function liveCapturing({ run, frames, devices, guiding, now, trends, chec
     alert: checked === undefined ? undefined : poorAlert(checked),
     latest: {
       detail: latest === undefined ? unknown : `${run.frames} · ${clock(latest.keptAt, true)}`,
+      picture: kept === undefined ? undefined : previewAddress(kept),
       stats: latestStats(latest),
     },
   }

@@ -21,6 +21,12 @@ export const Frame = Schema.Struct({
 
 export type Frame = typeof Frame.Type
 
+export const previewPath = '/preview'
+
+export const PreviewAsked = Schema.Struct({ night: NightName, file: FrameFile })
+
+export const previewAddress = ({ night, file }: Pick<Frame, 'night' | 'file'>) => `${previewPath}?${new URLSearchParams({ night, file }).toString()}`
+
 const sameFrame = (night: NightName, file: FrameFile) => (frame: Frame) => frame.night === night && frame.file === file
 
 export function frames(state: ReadonlyArray<Frame>, entry: RigEntry): ReadonlyArray<Frame> {

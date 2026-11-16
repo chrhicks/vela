@@ -10,7 +10,6 @@ import { PageHeader } from '../../components/PageHeader.tsx'
 import { Picture } from '../../components/Picture.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { StatusLine } from '../../components/StatusLine.tsx'
-import { StubSky } from '../../stub/StubSky.tsx'
 import layout from './layout.module.css'
 import type { Capturing } from './capturing.ts'
 import { Trends } from './Trends.tsx'
@@ -71,7 +70,7 @@ export function CapturingView({ run }: CapturingViewProps) {
 
           <div className={`${layout.latestPicture} ${layout.first}`}>
             <Picture label="Latest frame" detail={run.latest.detail} to={`/frame/${run.frame}`}>
-              <StubSky seed={run.frame} glow="faint" />
+              {run.latest.picture === undefined ? null : <img src={run.latest.picture} alt={`Frame ${run.frame}`} className={layout.frameImage} />}
             </Picture>
           </div>
 
