@@ -57,6 +57,8 @@ const entryOf = <const Kind extends string, const Body extends Schema.Struct.Fie
 
 export const SkyPosition = Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number })
 
+export type SkyPosition = typeof SkyPosition.Type
+
 export const RunStarted = entryOf('vela.run.started', {
   run: RunId,
   object: RunObjectName,

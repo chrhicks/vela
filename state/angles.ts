@@ -1,11 +1,8 @@
+import type { SkyPosition } from './entries.ts'
+
 const radians = Math.PI / 180
 
-export interface Position {
-  readonly raDegrees: number
-  readonly decDegrees: number
-}
-
-export function angularDistance(a: Position, b: Position): number {
+export function angularDistance(a: SkyPosition, b: SkyPosition): number {
   const dec1 = a.decDegrees * radians
   const dec2 = b.decDegrees * radians
 

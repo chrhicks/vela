@@ -4,7 +4,8 @@ import { readFits } from '../frames/fits.ts'
 import { listNight } from '../frames/library.ts'
 import { stretch, superpixels, text, type PreviewSettings } from '../frames/preview.ts'
 import { encodePng } from '../frames/png.ts'
-import { fieldHeightDegrees, isLight, pointingOf, readSolution, statsName, type PlateSolution, type SkyPosition } from '../frames/stats.ts'
+import type { SkyPosition } from '../../state/entries.ts'
+import { fieldHeightDegrees, isLight, pointingOf, readSolution, statsName, type PlateSolution } from '../frames/stats.ts'
 import { makeStack, type Stack } from './stack.ts'
 
 export interface StackedFrame {
