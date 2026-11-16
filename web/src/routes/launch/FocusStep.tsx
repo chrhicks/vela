@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
 
-import { checkOf, sweepOf } from '../../../../state/autofocus.ts'
+import { checkOf } from '../../../../state/autofocus.ts'
 import { cutShort } from '../../../../state/operations.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import { Chart } from '../../components/Chart.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { Statement } from '../../components/Statement.tsx'
-import { niceTicks } from '../../components/ticks.ts'
+import { autofocusChart } from '../../rig/autofocus-chart.ts'
 import { useRig } from '../../rig/store.ts'
 import { LaunchStep } from './LaunchStep.tsx'
 import { StoppedAlert } from './StoppedAlert.tsx'
@@ -29,13 +29,8 @@ export function FocusStep() {
   }, [focus, navigate])
 
   const stopped = cutShort(focus)
-  const sweep = sweepOf(state)
   const check = checkOf(state)
-  const measured = sweep.flatMap(sample => (sample.hfd === null ? [] : [{ x: -sample.position, y: sample.hfd }]))
   const total = state.positions.length + 1
-  const top = state.positions[0]
-  const bottom = state.positions.at(-1)
-  const marker = state.best === undefined ? undefined : { x: -state.best, y: check?.hfd ?? Math.min(...measured.map(point => point.y)) }
 
   return (
     <LaunchStep step={5} title="Autofocus" facts={[state.samples.length === 0 ? 'Starting' : `Sample ${state.samples.length} of ${total}`, `Filter ${filter ?? unknown}`]}>
@@ -45,13 +40,7 @@ export function FocusStep() {
         </StoppedAlert>
       )}
 
-      <Chart
-        title="HFD by position"
-        lines={[measured]}
-        yTicks={niceTicks([0, ...measured.map(point => point.y)])}
-        xLabels={[top === undefined ? unknown : String(top), bottom === undefined ? unknown : String(bottom)]}
-        {...(marker === undefined || !Number.isFinite(marker.y) ? {} : { marker })}
-      />
+      <Chart {...autofocusChart(state)} />
 
       <Readings
         rows={[

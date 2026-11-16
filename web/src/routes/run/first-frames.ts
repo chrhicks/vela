@@ -1,6 +1,5 @@
 import type { Check as Checked, Verdict } from '../../../../state/first-frames-check.ts'
 import type { FirstFrames, FirstFramesChecked } from '../../../../state/first-frames.ts'
-import type { Reading } from '../../components/Readings.tsx'
 import { clockTime } from '../../rig/clock.ts'
 import { guiderWords, unknown } from '../../rig/words.ts'
 import type { Check } from './Checks.tsx'
@@ -44,14 +43,7 @@ function valueOf(check: Checked): string {
 export const checkRows = (checks: ReadonlyArray<Checked>): ReadonlyArray<Check> =>
   checks.map(check => ({ label: labels[check.check], value: valueOf(check), verdict: verdictWords[check.verdict], attention: check.verdict === 'poor' }))
 
-export function frameRows({ stage, checked }: FirstFrames): ReadonlyArray<Reading> {
-  const settling = stage === 'settling'
-
-  return [
-    { label: `Frames 1 to ${checked.from - 1}`, value: settling ? 'SETTLING' : 'SKIPPED' },
-    { label: `Frames ${checked.from} to ${checked.to}`, value: settling ? 'WAITING' : stage === 'checking' ? 'CHECKING' : 'CHECKED' },
-  ]
-}
+export const pendingCheckRows: ReadonlyArray<Check> = Object.values(labels).map(label => ({ label, value: unknown, verdict: '' }))
 
 export const verdictFact = ({ verdict, at }: FirstFramesChecked) => `First frames ${verdict === 'passed' ? 'OK' : 'poor'} ${clockTime(at)}`
 
