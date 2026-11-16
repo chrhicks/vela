@@ -37,6 +37,7 @@ import { SkyNow } from '../feed/sky.ts'
 import { Targets } from '../feed/targets.ts'
 import { readSurvey, SurveySettings } from '../sky/survey.ts'
 import { skyTonight } from '../sky/tonight.ts'
+import { Previews } from '../feed/previews.ts'
 import { SurveyKept } from '../feed/survey.ts'
 import { CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
@@ -179,12 +180,14 @@ const centre = makeCentre({
   settings: { mount: devices.mount, camera: devices.primary, ...settings.centre },
   now: Date.now,
 })
+const previews = makePreviews(frames.keepDir, frames.preview)
+
 const page = makePage({
   night: () => makeNight(picture, nightSettings, Date.now()),
   focus: () => focusDrift.view(),
   refreshMs: settings.pageRefreshSeconds * 1000,
   frames: () => listNight(frames.keepDir, nightOf(Date.now(), naming)),
-  preview: makePreviews(frames.keepDir, frames.preview).get,
+  preview: previews.get,
   frame: (night, file) => frameDetail(frames.keepDir, night, file),
   activity: () => ({ ...activity.view(Date.now()), viewer: settings.streamViewer }),
   capture: { view: () => capture.view(), start: request => capture.start(request), stop: () => capture.stop() },
@@ -341,6 +344,7 @@ const feedApp = FeedServer.pipe(
         })),
       }),
       Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
+      Layer.succeed(Previews, { get: (night, file) => Effect.promise(() => previews.get(night, file).catch(() => undefined)) }),
       Layer.succeed(SkyNow, {
         tonight: Effect.map(Clock.currentTimeMillis, at => {
           const site = siteOf(picture, settings.devices.mount)

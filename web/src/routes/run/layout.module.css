@@ -81,3 +81,7 @@
 .tabs > * {
   flex: none;
 }
+
+.frameImage {
+  object-fit: contain;
+}
