@@ -9,7 +9,7 @@ import type { Reading } from '../../components/Readings.tsx'
 import { niceTicks } from '../../components/ticks.ts'
 import type { Point, Trends } from '../../../../state/trends.ts'
 import type { TrendWindowName } from './TrendWindow.tsx'
-import type { Capturing, Trend, TrendView } from './stub.ts'
+import type { Capturing, Trend, TrendView } from './capturing.ts'
 import { poorAlert, verdictFact } from './first-frames.ts'
 import { flipWord, guidingWord, mountWords, unknown } from '../../rig/words.ts'
 
@@ -100,7 +100,7 @@ function trendWindows(trends: Trends, now: number): Readonly<Record<TrendWindowN
 }
 
 export interface Live {
-  readonly run: Run | undefined
+  readonly run: Run
   readonly frames: ReadonlyArray<Frame>
   readonly devices: Devices
   readonly guiding: Guiding
@@ -109,15 +109,12 @@ export interface Live {
   readonly checked?: FirstFramesChecked | undefined
 }
 
-export function liveCapturing({ run, frames, devices, guiding, now, trends, checked }: Live, placeholder: Capturing): Capturing {
-  const live = { ...placeholder, rig: rigLine(devices, guiding, now), trendWindows: now === undefined ? placeholder.trendWindows : trendWindows(trends, now) }
-
-  if (run === undefined) return live
-
+export function liveCapturing({ run, frames, devices, guiding, now, trends, checked }: Live): Capturing {
   const latest = latestMeasured(frames)
 
   return {
-    ...live,
+    rig: rigLine(devices, guiding, now),
+    trendWindows: trendWindows(trends, now ?? run.startedAt),
     frame: run.frames,
     facts: [run.object, `${run.exposureSeconds} s`, `Since ${clock(run.startedAt)}`, run.count === undefined ? 'Until stopped' : `${run.count} frames`, ...(checked === undefined ? [] : [verdictFact(checked)])],
     alert: checked === undefined ? undefined : poorAlert(checked),

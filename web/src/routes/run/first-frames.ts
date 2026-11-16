@@ -4,7 +4,7 @@ import type { Reading } from '../../components/Readings.tsx'
 import { clockTime } from '../../rig/clock.ts'
 import { guiderWords, unknown } from '../../rig/words.ts'
 import type { Check } from './Checks.tsx'
-import type { RunAlert } from './stub.ts'
+import type { RunAlert } from './capturing.ts'
 
 const verdictWords: Readonly<Record<Verdict, string>> = { ok: 'OK', poor: 'POOR', 'not-judged': '' }
 

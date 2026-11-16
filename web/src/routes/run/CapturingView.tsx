@@ -5,7 +5,6 @@ import { ActionLink } from '../../components/ActionLink.tsx'
 import { CommandPill } from '../../components/CommandPill.tsx'
 import { Alert } from '../../components/Alert.tsx'
 import { Choices } from '../../components/Choices.tsx'
-import { Log } from '../../components/Log.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { Picture } from '../../components/Picture.tsx'
@@ -13,7 +12,7 @@ import { Readings } from '../../components/Readings.tsx'
 import { StatusLine } from '../../components/StatusLine.tsx'
 import { StubSky } from '../../stub/StubSky.tsx'
 import layout from './layout.module.css'
-import type { Capturing } from './stub.ts'
+import type { Capturing } from './capturing.ts'
 import { Trends } from './Trends.tsx'
 import { TrendWindow, type TrendWindowName } from './TrendWindow.tsx'
 
@@ -83,20 +82,10 @@ export function CapturingView({ run }: CapturingViewProps) {
 
         <div className={layout.column}>
           <div className={`${layout.stackPicture} ${layout.first}`}>
-            <Picture label="Stack so far" detail={run.stack.detail} to="/stack">
-              <StubSky seed={7} glow="bright" />
+            <Picture label="Stack so far" detail="Not built yet">
+              {null}
             </Picture>
           </div>
-
-          <div className={layout.third}>
-            <Readings rows={run.stack.counts} />
-          </div>
-
-          {run.handled.length === 0 ? null : (
-            <div className={layout.sixth}>
-              <Log heading="Handled without you" lines={run.handled} />
-            </div>
-          )}
         </div>
 
         <div className={layout.column}>
