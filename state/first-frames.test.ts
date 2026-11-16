@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { NightName, FrameFile, RunId } from './entries.ts'
 import type { FirstFramesLimits } from './first-frames-check.ts'
-import { firstFrames, type Seen } from './first-frames.ts'
+import { firstFrames, versusBaseline, type Seen } from './first-frames.ts'
 import type { Frame } from './frames.ts'
 import type { Run } from './run.ts'
 
@@ -80,5 +80,19 @@ describe('the first frames of a run', () => {
   it('is not made for calibration frames or with no run', () => {
     expect(firstFrames(seen(round, { run: { ...run, frameType: 'dark' } }), limits)).toBeUndefined()
     expect(firstFrames(seen(round, { run: undefined }), limits)).toBeUndefined()
+  })
+})
+
+describe('a frame against the first frames', () => {
+  const checked = { checks: [{ check: 'stars', verdict: 'ok', stars: 864 }, { check: 'focus', verdict: 'poor', hfdPixels: 4.34, focusedPixels: 3.2 }] } as const
+
+  it('says how much larger the stars are and how many fewer there are, in whole percent', () => {
+    expect(versusBaseline({ stars: 976, hfdPixels: 3.79, elongation: 1.06, sky: 1098, noise: 51.9 }, checked)).toEqual({ hfdPercent: -13, starsPercent: 13 })
+    expect(versusBaseline({ stars: 628, hfdPixels: 5.42, elongation: 1.07, sky: 1108, noise: 51.9 }, checked)).toEqual({ hfdPercent: 25, starsPercent: -27 })
+  })
+
+  it('leaves out what the frame or the first frames did not measure', () => {
+    expect(versusBaseline({ stars: null, hfdPixels: null, elongation: null, sky: 1098, noise: 51.9 }, checked)).toEqual({ hfdPercent: undefined, starsPercent: undefined })
+    expect(versusBaseline({ stars: 976, hfdPixels: 3.79, elongation: 1.06, sky: 1098, noise: 51.9 }, { checks: [] })).toEqual({ hfdPercent: undefined, starsPercent: undefined })
   })
 })

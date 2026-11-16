@@ -1,5 +1,5 @@
 import { flip } from '../../../../state/flip.ts'
-import type { FirstFramesChecked } from '../../../../state/first-frames.ts'
+import { framesOf, versusBaseline, type FirstFramesChecked } from '../../../../state/first-frames.ts'
 import { previewAddress, type Frame } from '../../../../state/frames.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Devices } from '../../../../state/devices.ts'
@@ -20,9 +20,18 @@ const fixed = (value: number | null, digits: number, unit = '') => (value === nu
 
 const latestMeasured = (frames: ReadonlyArray<Frame>) => [...frames].reverse().find(frame => frame.measurements !== undefined)
 
-const latestOf = (frames: ReadonlyArray<Frame>, run: Run) => (run.sequence === undefined ? undefined : [...frames].reverse().find(frame => frame.sequence === run.sequence))
+const signed = (percent: number) => `${percent < 0 ? '−' : '+'}${Math.abs(percent)} %`
 
-function latestStats(frame: Frame | undefined): ReadonlyArray<Reading> {
+function baselineWords(measured: Frame['measurements'], checked: FirstFramesChecked | undefined): string {
+  if (measured === undefined || checked === undefined) return unknown
+
+  const { hfdPercent, starsPercent } = versusBaseline(measured, checked)
+  const words = [...(hfdPercent === undefined ? [] : [`HFD ${signed(hfdPercent)}`]), ...(starsPercent === undefined ? [] : [`stars ${signed(starsPercent)}`])]
+
+  return words.length === 0 ? unknown : words.join(' · ')
+}
+
+function latestStats(frame: Frame | undefined, checked: FirstFramesChecked | undefined): ReadonlyArray<Reading> {
   const measured = frame?.measurements
 
   return [
@@ -31,7 +40,7 @@ function latestStats(frame: Frame | undefined): ReadonlyArray<Reading> {
     { label: 'Sky', value: measured === undefined ? unknown : fixed(measured.sky, 0) },
     { label: 'Noise', value: measured === undefined ? unknown : fixed(measured.noise, 1) },
     { label: 'Off centre', value: unknown },
-    { label: 'Vs baseline', value: unknown },
+    { label: 'Vs baseline', value: baselineWords(measured, checked) },
   ]
 }
 
@@ -112,8 +121,9 @@ export interface Live {
 }
 
 export function liveCapturing({ run, frames, devices, guiding, now, trends, checked }: Live): Capturing {
-  const latest = latestMeasured(frames)
-  const kept = latestOf(frames, run)
+  const ours = framesOf(run, frames)
+  const latest = latestMeasured(ours)
+  const kept = ours.at(-1)
 
   return {
     rig: rigLine(devices, guiding, now),
@@ -124,7 +134,7 @@ export function liveCapturing({ run, frames, devices, guiding, now, trends, chec
     latest: {
       detail: latest === undefined ? unknown : `${run.frames} · ${clock(latest.keptAt, true)}`,
       picture: kept === undefined ? undefined : previewAddress(kept),
-      stats: latestStats(latest),
+      stats: latestStats(latest, checked),
     },
   }
 }
