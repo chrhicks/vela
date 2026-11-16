@@ -79,13 +79,15 @@ export function framesOf(run: Run, frames: ReadonlyArray<Frame>): ReadonlyArray<
   return run.sequence === undefined ? [] : frames.filter(frame => frame.sequence === run.sequence && frame.keptAt >= run.startedAt).sort((a, b) => a.keptAt - b.keptAt)
 }
 
+export const checkedFrames = (limits: Pick<FirstFramesLimits, 'skippedFrames' | 'checkedFrames'>): typeof CheckedFrames.Type => ({ from: limits.skippedFrames + 1, to: limits.skippedFrames + limits.checkedFrames })
+
 export function firstFrames(seen: Seen, limits: FirstFramesLimits): FirstFrames | undefined {
   const { run } = seen
 
   if (run === undefined || run.frameType !== 'light' || run.sequence === undefined) return undefined
 
   const kept = framesOf(run, seen.frames)
-  const checked = { from: limits.skippedFrames + 1, to: limits.skippedFrames + limits.checkedFrames }
+  const checked = checkedFrames(limits)
   const measured = kept.slice(limits.skippedFrames, checked.to).flatMap(frame => (frame.measurements === undefined ? [] : [frame.measurements]))
   const exposed = { from: kept[limits.skippedFrames - 1]?.keptAt ?? run.startedAt, to: kept[checked.to - 1]?.keptAt ?? Infinity }
   const checks = checksOf(seen, measured, exposed, limits)

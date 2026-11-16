@@ -24,7 +24,7 @@ export function RunPage() {
   const announced = useRig(rig => rig.firstFrames)
   const stack = useRig(rig => rig.stack)
 
-  if (starting !== undefined && isStarting(starting)) return <StartingView starting={starting} run={undefined} found={undefined} autofocus={autofocus} frames={frames} />
+  if (starting !== undefined && isStarting(starting)) return <StartingView starting={starting} run={undefined} found={undefined} limits={link.firstFrames} autofocus={autofocus} frames={frames} />
   if (search.has('pick') || search.has('target')) return <ReadyView />
 
   if (run?.status !== 'capturing') return <BetweenRunsView />
@@ -33,7 +33,7 @@ export function RunPage() {
   const found = link.firstFrames === undefined ? undefined : firstFrames(seenIn({ run, frames, autofocus, operations, devices, guiding, trends }), link.firstFrames)
 
   if (checked === undefined && found !== undefined && found.frames <= found.checked.to) {
-    return <StartingView starting={starting?.target.id === run.target?.id ? starting : undefined} run={run} found={found} autofocus={autofocus} frames={frames} />
+    return <StartingView starting={starting?.target.id === run.target?.id ? starting : undefined} run={run} found={found} limits={link.firstFrames} autofocus={autofocus} frames={frames} />
   }
 
   return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack, night: link.night, starting: starting?.target.id === run.target?.id ? starting : undefined })} />

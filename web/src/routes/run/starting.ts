@@ -1,6 +1,7 @@
 import type { Autofocus } from '../../../../state/autofocus.ts'
 import type { StartStep } from '../../../../state/entries.ts'
-import { framesOf, type FirstFrames } from '../../../../state/first-frames.ts'
+import { checkedFrames, framesOf, type FirstFrames } from '../../../../state/first-frames.ts'
+import type { FirstFramesLimits } from '../../../../state/first-frames-check.ts'
 import type { Frame } from '../../../../state/frames.ts'
 import type { Run } from '../../../../state/run.ts'
 import type { Starting, StepReport } from '../../../../state/starting.ts'
@@ -79,9 +80,10 @@ export function exposing(run: Run, frames: ReadonlyArray<Frame>, now: number): E
 
 const exposingWords = ({ frame, leftMs }: Exposing) => (leftMs > 0 ? `Frame ${frame} · ${clockDuration(leftMs)} left` : `Frame ${frame} · saving`)
 
-function frameRows(run: Run | undefined, found: FirstFrames | undefined, frames: ReadonlyArray<Frame>, now: number): ReadonlyArray<StepRow> {
-  const settledLabel = found === undefined ? 'Frames 1 to 2' : `Frames 1 to ${found.checked.from - 1}`
-  const checkedLabel = found === undefined ? 'Frames 3 to 5' : `Frames ${found.checked.from} to ${found.checked.to}`
+function frameRows(run: Run | undefined, found: FirstFrames | undefined, limits: FirstFramesLimits | undefined, frames: ReadonlyArray<Frame>, now: number): ReadonlyArray<StepRow> {
+  const range = found?.checked ?? (limits === undefined ? undefined : checkedFrames(limits))
+  const settledLabel = range === undefined ? 'Settling frames' : `Frames 1 to ${range.from - 1}`
+  const checkedLabel = range === undefined ? 'Checked frames' : `Frames ${range.from} to ${range.to}`
 
   if (run === undefined || found === undefined) return [{ label: settledLabel, value: 'Next', tone: 'next' }, { label: checkedLabel, value: 'Next', tone: 'next' }]
 
@@ -94,10 +96,10 @@ function frameRows(run: Run | undefined, found: FirstFrames | undefined, frames:
   return [{ label: settledLabel, value: 'Skipped, settling', tone: 'done' }, { label: checkedLabel, ...checked }]
 }
 
-export function startingRows(starting: Starting | undefined, run: Run | undefined, found: FirstFrames | undefined, autofocus: Autofocus, frames: ReadonlyArray<Frame>, now: number): ReadonlyArray<StepRow> {
+export function startingRows(starting: Starting | undefined, run: Run | undefined, found: FirstFrames | undefined, limits: FirstFramesLimits | undefined, autofocus: Autofocus, frames: ReadonlyArray<Frame>, now: number): ReadonlyArray<StepRow> {
   const steps = starting === undefined ? [] : shownSteps.map(([step, label]) => stepRow(step, label, starting.steps.find(report => report.step === step), autofocus, now))
 
-  return [...steps, ...frameRows(run, found, frames, now)]
+  return [...steps, ...frameRows(run, found, limits, frames, now)]
 }
 
 export const runningStep = (starting: Starting | undefined): StartStep | undefined => starting?.steps.find(report => report.outcome === 'started')?.step
