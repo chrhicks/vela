@@ -64,6 +64,7 @@ import { streamOf } from '../../state/stream.ts'
 import { readWireBody } from '../stream/json.ts'
 import { Broker, brokerOf, followRig, type Followed } from '../stream/follow.ts'
 import { readHistory } from '../stream/history.ts'
+import { keep, readKept } from '../remembered/kept.ts'
 import { lastCentreNear, nothingRemembered, remember } from '../remembered/remembered.ts'
 import { Recalled } from '../feed/remembered.ts'
 
@@ -432,6 +433,11 @@ function observe(entry: Entry) {
 const logProblem = (line: string) => Effect.sync(() => console.error(`vela: ${line}`))
 
 let caughtUp = false
+let keptReadable = true
+
+const keepRemembered = Effect.suspend(() => (keptReadable ? keep(settings.rememberedFile, remembered) : Effect.void)).pipe(
+  Effect.catchTag('RememberedUnwritable', error => logProblem(`what Vela remembers could not be kept in ${error.path}: ${error.reason}`)),
+)
 
 const firstFramesCheck = makeFirstFramesCheck({
   limits: settings.firstFrames,
@@ -449,8 +455,12 @@ const handleMessage = (message: Message) =>
       ),
     ),
     Effect.tap(entry =>
-      Effect.sync(() => {
-        remembered = remember(remembered, entry)
+      Effect.suspend(() => {
+        const before = remembered
+
+        remembered = remember(before, entry)
+
+        return caughtUp && remembered !== before ? keepRemembered : Effect.void
       }),
     ),
     Effect.tap(entry => Effect.sync(() => observe(entry))),
@@ -466,8 +476,24 @@ const handleFollowed = (followed: Followed) =>
       Effect.sync(() => {
         caughtUp = true
         picture.caughtUp()
-      }),
+      }).pipe(Effect.andThen(keepRemembered)),
   })
+
+remembered = await runHandledPromise(
+  readKept(settings.rememberedFile).pipe(
+    Effect.catchTag('RememberedUnreadable', error =>
+      logProblem(`what Vela remembers could not be read from ${error.path}: ${error.reason}. Nothing is kept until that file is fixed or removed`).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            keptReadable = false
+
+            return remembered
+          }),
+        ),
+      ),
+    ),
+  ),
+)
 
 remembered = await runHandledPromise(
   readHistory({ stream, subjects: [stream.vela('run'), stream.vela('centre'), stream.client], readBatch: settings.historyReadBatch, read: readMessage }).pipe(
