@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import type { SkyPosition } from '../../state/entries.ts'
 import { readFits, type HeaderValue } from './fits.ts'
 
 const run = promisify(execFile)
@@ -16,11 +17,6 @@ export interface StarSettings {
   readonly shapeMinSnr: number
   readonly shapeStars: number
   readonly saturated: number
-}
-
-export interface SkyPosition {
-  readonly raDegrees: number
-  readonly decDegrees: number
 }
 
 export interface PlateSolution {
