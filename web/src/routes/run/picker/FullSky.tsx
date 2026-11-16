@@ -48,6 +48,22 @@ interface Range {
   readonly widest: number
 }
 
+interface Glide {
+  readonly frame: number
+  readonly aim: number
+}
+
+interface Shown {
+  readonly view: View
+  readonly bounds: Bounds
+}
+
+const easedOut = (progress: number) => 1 - (1 - progress) ** 3
+
+const scaleBetween = (from: number, to: number, progress: number) => from * (to / from) ** progress
+
+const between = (from: number, to: number, progress: number) => from + (to - from) * progress
+
 const unheld: Held = { centre: undefined, degreesPerPixel: undefined }
 
 interface FullSkyProps {
@@ -100,11 +116,14 @@ export function FullSky(props: FullSkyProps) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [bounds, setBounds] = useState<Bounds | undefined>(undefined)
   const [held, setHeld] = useState<Held>(unheld)
-  const wheelPixelsPerDoubling = useLink().picker?.wheelPixelsPerDoubling
+  const picker = useLink().picker
+  const wheelPixelsPerDoubling = picker?.wheelPixelsPerDoubling
+  const zoomGlideMs = picker?.zoomGlideMs
   const [undrawable, setUndrawable] = useState<string | undefined>(undefined)
   const [missing, setMissing] = useState(0)
   const drag = useRef<Drag | undefined>(undefined)
-  const latest = useRef<number | undefined>(undefined)
+  const shown = useRef<Shown | undefined>(undefined)
+  const glide = useRef<Glide | undefined>(undefined)
   const drawing = useRef<SkyDrawing | undefined>(undefined)
 
   useLayoutEffect(() => {
@@ -155,18 +174,67 @@ export function FullSky(props: FullSkyProps) {
 
   const view = bounds === undefined ? undefined : viewOf(bounds, held, props)
   const range: Range | undefined = bounds === undefined ? undefined : { finest: pixelDegrees(detail), widest: Math.max(fitDegreesPerPixel(bounds, angleDegrees), coarse === null ? 0 : pixelDegrees(coarse)) }
-  latest.current = view?.degreesPerPixel
 
-  const zoomAbout = useRef<((x: number, y: number, degreesPerPixel: number) => void) | undefined>(undefined)
+  shown.current = view === undefined || bounds === undefined ? undefined : { view, bounds }
 
-  zoomAbout.current =
-    view === undefined || bounds === undefined
-      ? undefined
-      : (x, y, degreesPerPixel) =>
-          setHeld({
-            centre: { eastDegrees: view.eastDegrees + (bounds.width / 2 - x) * (view.degreesPerPixel - degreesPerPixel), northDegrees: view.northDegrees + (bounds.height / 2 - y) * (view.degreesPerPixel - degreesPerPixel) },
-            degreesPerPixel,
-          })
+  const stopGlide = () => {
+    if (glide.current !== undefined) cancelAnimationFrame(glide.current.frame)
+
+    glide.current = undefined
+  }
+
+  const glideTo = (aim: number, heldAt: (progress: number) => Held, settled: Held) => {
+    stopGlide()
+
+    if (zoomGlideMs === undefined || zoomGlideMs <= 0) return setHeld(settled)
+
+    const began = performance.now()
+    const step = (now: number) => {
+      const progress = (now - began) / zoomGlideMs
+
+      if (progress >= 1) {
+        glide.current = undefined
+
+        return setHeld(settled)
+      }
+
+      setHeld(heldAt(easedOut(Math.max(0, progress))))
+      glide.current = { aim, frame: requestAnimationFrame(step) }
+    }
+
+    glide.current = { aim, frame: requestAnimationFrame(step) }
+  }
+
+  const zoomAbout = (x: number, y: number, aim: number) => {
+    if (shown.current === undefined) return
+
+    const { view: from, bounds: within } = shown.current
+    const left = within.width / 2 - x
+    const up = within.height / 2 - y
+    const east = from.eastDegrees + left * from.degreesPerPixel
+    const north = from.northDegrees + up * from.degreesPerPixel
+    const heldWith = (degreesPerPixel: number): Held => ({ centre: { eastDegrees: east - left * degreesPerPixel, northDegrees: north - up * degreesPerPixel }, degreesPerPixel })
+
+    glideTo(aim, progress => heldWith(scaleBetween(from.degreesPerPixel, aim, progress)), heldWith(aim))
+  }
+
+  const fit = () => {
+    if (shown.current === undefined) return
+
+    const { view: from, bounds: within } = shown.current
+    const to = viewOf(within, unheld, props)
+
+    glideTo(
+      to.degreesPerPixel,
+      progress => ({
+        centre: { eastDegrees: between(from.eastDegrees, to.eastDegrees, progress), northDegrees: between(from.northDegrees, to.northDegrees, progress) },
+        degreesPerPixel: scaleBetween(from.degreesPerPixel, to.degreesPerPixel, progress),
+      }),
+      unheld,
+    )
+  }
+
+  useEffect(() => stopGlide, [])
 
   useEffect(() => {
     const sky = canvas.current
@@ -176,15 +244,16 @@ export function FullSky(props: FullSkyProps) {
     const turned = (event: WheelEvent) => {
       event.preventDefault()
 
-      const now = latest.current
+      const from = glide.current?.aim ?? shown.current?.view.degreesPerPixel
 
-      if (now !== undefined) zoomAbout.current?.(event.clientX, event.clientY, Math.min(range.widest, Math.max(range.finest, now * 2 ** (event.deltaY / wheelPixelsPerDoubling))))
+      if (from !== undefined) zoomAbout(event.clientX, event.clientY, Math.min(range.widest, Math.max(range.finest, from * 2 ** (event.deltaY / wheelPixelsPerDoubling))))
     }
 
     sky.addEventListener('wheel', turned, { passive: false })
 
     return () => sky.removeEventListener('wheel', turned)
-  }, [wheelPixelsPerDoubling, range?.finest, range?.widest])
+  }, [wheelPixelsPerDoubling, zoomGlideMs, range?.finest, range?.widest])
+
   const fine = view !== undefined && (coarse === null || view.degreesPerPixel ** 2 < pixelDegrees(coarse) * pixelDegrees(detail))
   const key = view === undefined || bounds === undefined ? undefined : [view.eastDegrees, view.northDegrees, view.degreesPerPixel, bounds.width, bounds.height, fine].join(' ')
 
@@ -202,6 +271,7 @@ export function FullSky(props: FullSkyProps) {
   const press = (event: PointerEvent<HTMLCanvasElement>) => {
     if (view === undefined) return
 
+    stopGlide()
     event.currentTarget.setPointerCapture(event.pointerId)
     drag.current = { x: event.clientX, y: event.clientY, from: view }
   }
@@ -218,9 +288,9 @@ export function FullSky(props: FullSkyProps) {
     drag.current = undefined
   }
 
-  const zoomAt = (event: MouseEvent<HTMLCanvasElement>) => zoomAbout.current?.(event.clientX, event.clientY, pixelDegrees(detail))
+  const zoomAt = (event: MouseEvent<HTMLCanvasElement>) => zoomAbout(event.clientX, event.clientY, pixelDegrees(detail))
 
-  const choose = (chosen: Zoom) => setHeld(current => (chosen === 'fit' ? unheld : { centre: current.centre, degreesPerPixel: pixelDegrees(detail) }))
+  const choose = (chosen: Zoom) => (chosen === 'fit' ? fit() : shown.current === undefined ? undefined : zoomAbout(shown.current.bounds.width / 2, shown.current.bounds.height / 2, pixelDegrees(detail)))
 
   const chosen: Zoom | undefined = held.degreesPerPixel === undefined ? 'fit' : held.degreesPerPixel === pixelDegrees(detail) ? 'full' : undefined
 

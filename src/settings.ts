@@ -132,6 +132,7 @@ export const PointingSettings = Schema.Struct({
     10,
   ),
   wheelPixelsPerDoubling: described("Wheel scroll, in pixels, that halves or doubles the scale of the picker's full-size view", Schema.Number, 200),
+  zoomGlideMs: described("How long the picker's full-size view takes to glide to a new scale, in milliseconds", Schema.Number, 150),
   upLineDegrees: described(
     'The altitude, in degrees, a target must be above for the target list to count it as up',
     Schema.Number,
