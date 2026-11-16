@@ -109,7 +109,7 @@ function trendView(trends: Trends, span: Span): TrendView {
   }
 }
 
-function trendWindows(trends: Trends, now: number): Readonly<Record<TrendWindowName, TrendView>> {
+export function trendWindows(trends: Trends, now: number): Readonly<Record<TrendWindowName, TrendView>> {
   return {
     hour: trendView(trends, { from: now - hour, to: now }),
     run: trendView(trends, { from: trends.since ?? now - hour, to: now }),

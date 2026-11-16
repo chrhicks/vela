@@ -4,7 +4,7 @@ import { firstFrames, seenIn } from '../../../../state/first-frames.ts'
 import { isStarting } from '../../../../state/starting.ts'
 import { useLink, useRig } from '../../rig/store.ts'
 import { CapturingView } from './CapturingView.tsx'
-import { IdleView } from './IdleView.tsx'
+import { BetweenRunsView } from './BetweenRunsView.tsx'
 import { ReadyView } from './picker/ReadyView.tsx'
 import { liveCapturing } from './live.ts'
 import { StartingView } from './StartingView.tsx'
@@ -26,7 +26,7 @@ export function RunPage() {
   if (starting !== undefined && isStarting(starting)) return <StartingView starting={starting} run={undefined} found={undefined} autofocus={autofocus} frames={frames} />
   if (search.has('pick') || search.has('target')) return <ReadyView />
 
-  if (run?.status !== 'capturing') return <IdleView />
+  if (run?.status !== 'capturing') return <BetweenRunsView />
 
   const checked = announced?.run === run.id ? announced : undefined
   const found = link.firstFrames === undefined ? undefined : firstFrames(seenIn({ run, frames, autofocus, operations, devices, guiding }), link.firstFrames)
