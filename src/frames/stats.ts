@@ -3,7 +3,8 @@ import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import type { SkyPosition } from '../../state/entries.ts'
+import { Schema } from 'effect'
+import { SkyPosition } from '../../state/entries.ts'
 import { readFits, type HeaderValue } from './fits.ts'
 
 const run = promisify(execFile)
@@ -19,11 +20,11 @@ export interface StarSettings {
   readonly saturated: number
 }
 
-export interface PlateSolution {
-  readonly centre: SkyPosition
-  readonly referencePixel: readonly [number, number]
-  readonly matrix: readonly [readonly [number, number], readonly [number, number]]
-}
+const Pair = Schema.Tuple([Schema.Number, Schema.Number])
+
+export const PlateSolution = Schema.Struct({ centre: SkyPosition, referencePixel: Pair, matrix: Schema.Tuple([Pair, Pair]) })
+
+export type PlateSolution = typeof PlateSolution.Type
 
 export interface FrameStats {
   readonly centre: SkyPosition | null

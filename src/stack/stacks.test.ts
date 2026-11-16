@@ -19,6 +19,7 @@ const preview = { bin: 2, blackSigmas: 2.8, targetMedian: 0.25 }
 const night = '2026-11-15'
 let keepDir = ''
 const solved: string[] = []
+const failures: string[] = []
 
 const light = (imageType = 'Light Frame') => syntheticFits({ width: 80, height: 48, pattern: 'RGGB', pixel: (x, y) => 500 + ((x * 7 + y * 13) % 50), extra: { IMAGETYP: imageType, RA: 23.46, DEC: 30.65 } })
 
@@ -30,11 +31,13 @@ const stacks = () =>
       solved.push(path)
       return 'PLTSOLVD=T\nCRVAL1=23.46\nCRVAL2=30.65\nCRPIX1=40.5\nCRPIX2=24.5\nCD1_1=-0.000277777\nCD1_2=0\nCD2_1=0\nCD2_2=0.000277777\n'
     },
+    failed: file => void failures.push(file),
   })
 
 beforeEach(async () => {
   keepDir = await mkdtemp(join(tmpdir(), 'vela-stacks-'))
   solved.length = 0
+  failures.length = 0
   await mkdir(join(keepDir, night))
   await mkdir(join(keepDir, '2026-11-16'))
 
@@ -61,8 +64,8 @@ describe('the night stacks', () => {
     expect(kept.picture(night, 'NGC-7635_light')).toBeUndefined()
   })
 
-  it('solves a frame whose stats hold no solution, and counts one that does not solve as left out', async () => {
-    const kept = makeStacks({ keepDir, preview, solve: async () => 'PLTSOLVD=F' })
+  it('solves a frame that has no stats yet, and counts one that does not solve as left out', async () => {
+    const kept = makeStacks({ keepDir, preview, solve: async () => 'PLTSOLVD=F', failed: () => undefined })
 
     expect(await kept.add({ night, file: 'M-33_light_001.fits', sequence: 'M-33_light' }, undefined)).toEqual({ night, sequence: 'M-33_light', frames: 0, leftOut: 1 })
     expect(await stacks().add({ night, file: 'M-33_light_001.fits', sequence: 'M-33_light' }, undefined)).toEqual({ night, sequence: 'M-33_light', frames: 1, leftOut: 0 })
@@ -76,5 +79,23 @@ describe('the night stacks', () => {
 
     expect(await kept.add({ night: '2026-11-16', file: 'M-33_light_001.fits', sequence: 'M-33_light' }, solution)).toEqual({ night: '2026-11-16', sequence: 'M-33_light', frames: 1, leftOut: 0 })
     expect(kept.picture(night, 'M-33_light')).toBeUndefined()
+  })
+
+  it('does not solve again a frame already known not to solve', async () => {
+    const kept = stacks()
+    await writeFile(join(keepDir, night, 'M-33_light_002.fits.stats.json'), JSON.stringify({ solution: null }))
+
+    expect(await kept.add({ night, file: 'M-33_light_001.fits', sequence: 'M-33_light' }, null)).toEqual({ night, sequence: 'M-33_light', frames: 0, leftOut: 1 })
+    expect(await kept.add({ night, file: 'M-33_light_002.fits', sequence: 'M-33_light' }, undefined)).toEqual({ night, sequence: 'M-33_light', frames: 0, leftOut: 2 })
+    expect(solved).toEqual([])
+  })
+
+  it('reports a frame it cannot read and counts it as left out', async () => {
+    const kept = stacks()
+    await writeFile(join(keepDir, night, 'M-33_light_003.fits'), 'not a picture')
+
+    expect(await kept.add({ night, file: 'M-33_light_003.fits', sequence: 'M-33_light' }, undefined)).toEqual({ night, sequence: 'M-33_light', frames: 0, leftOut: 1 })
+    expect(await kept.add({ night, file: 'M-33_light_001.fits', sequence: 'M-33_light' }, solution)).toEqual({ night, sequence: 'M-33_light', frames: 1, leftOut: 1 })
+    expect(failures).toEqual(['M-33_light_003.fits'])
   })
 })
