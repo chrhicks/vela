@@ -40,6 +40,17 @@ export class Operations extends Context.Service<
   }
 >()('vela/Operations') {}
 
+export class CommandLog extends Context.Service<
+  CommandLog,
+  {
+    readonly newId: Effect.Effect<string>
+    readonly pressed: (id: string, command: CommandRequest['command']) => Effect.Effect<void>
+    readonly answered: (id: string, command: CommandRequest['command']) => Effect.Effect<void>
+  }
+>()('vela/CommandLog') {}
+
+const unlogged: ReadonlyArray<CommandRequest['command']> = ['nudge', 'holdNudge', 'releaseNudge']
+
 const refused = (status: number, refusal: Refusal) => HttpServerResponse.json(refusal, { status })
 
 const carriedOut = Effect.as<Done>({ code: 'carried-out' })
@@ -88,7 +99,18 @@ export const CommandsRoute = HttpRouter.add(
   'POST',
   commandsPath,
   HttpServerRequest.schemaBodyJson(CommandRequest).pipe(
-    Effect.flatMap(carryOut),
+    Effect.flatMap(request =>
+      unlogged.includes(request.command)
+        ? carryOut(request)
+        : Effect.gen(function* () {
+            const log = yield* CommandLog
+            const id = yield* log.newId
+
+            yield* log.pressed(id, request.command)
+
+            return yield* carryOut(request).pipe(Effect.ensuring(log.answered(id, request.command)))
+          }),
+    ),
     Effect.map(done => HttpServerResponse.jsonUnsafe(done, { status: 200 })),
     Effect.catchTags({
       CommandRefused: ({ refusal }) => refused(409, refusal),

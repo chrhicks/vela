@@ -41,7 +41,7 @@ import { skyTonight } from '../sky/tonight.ts'
 import { Previews } from '../feed/previews.ts'
 import { StackPictures } from '../feed/stack.ts'
 import { SurveyKept } from '../feed/survey.ts'
-import { CommandRefused, Operations } from '../feed/commands.ts'
+import { CommandLog, CommandRefused, Operations } from '../feed/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
 import { CalibrationSettings, cameraControls, Capturing } from '../controls/camera.ts'
@@ -360,6 +360,11 @@ const feedApp = FeedServer.pipe(
       Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
       Layer.succeed(Previews, { get: (night, file) => Effect.promise(() => previews.get(night, file).catch(() => undefined)) }),
       Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)) }),
+      Layer.succeed(CommandLog, {
+        newId: Effect.sync(() => randomUUID()),
+        pressed: (id, command) => Effect.sync(() => publishEntry(stream.vela('command'), 'vela.command.pressed', id, { id, command })),
+        answered: (id, command) => Effect.sync(() => publishEntry(stream.vela('command'), 'vela.command.answered', id, { id, command })),
+      }),
       Layer.succeed(SkyNow, {
         tonight: Effect.map(Clock.currentTimeMillis, at => {
           const site = siteOf(picture, settings.devices.mount)

@@ -16,6 +16,7 @@ import { noOperations, Operations, operations } from './operations.ts'
 import { Writes, writes } from './writes.ts'
 import { CalibrationSet, calibration } from './calibration.ts'
 import { FlatExposure, flatExposure } from './flats.ts'
+import { nothingPressed, Pressing, pressing } from './pressing.ts'
 import { Stacked, stacked } from './stack.ts'
 
 export const RigState = Schema.Struct({
@@ -37,11 +38,12 @@ export const RigState = Schema.Struct({
   calibration: Schema.optional(CalibrationSet),
   flatExposure: Schema.optional(FlatExposure),
   stack: Schema.optional(Stacked),
+  pressing: Pressing,
 })
 
 export type RigState = typeof RigState.Type
 
-export const emptyRig: RigState = { position: undefined, run: undefined, starting: undefined, firstFrames: undefined, frames: [], readings: {}, devices: noDevices, guiding: unknownGuiding, trends: noTrends, writes: {}, operations: noOperations, alignment: noAlignment, autofocus: noAutofocus, calibration: undefined, flatExposure: undefined, stack: undefined }
+export const emptyRig: RigState = { position: undefined, run: undefined, starting: undefined, firstFrames: undefined, frames: [], readings: {}, devices: noDevices, guiding: unknownGuiding, trends: noTrends, writes: {}, operations: noOperations, alignment: noAlignment, autofocus: noAutofocus, calibration: undefined, flatExposure: undefined, stack: undefined, pressing: nothingPressed }
 
 const fromRig = (entry: RigEntry) => entry.kind === 'wire' || entry.kind === 'client.connected' || entry.kind === 'client.connection' || isGuiderReport(entry)
 
@@ -68,6 +70,7 @@ export function rig(state: RigState, entry: RigEntry): Result.Result<RigState, M
       calibration: calibration(state.calibration, entry),
       flatExposure: flatExposure(state.flatExposure, entry),
       stack: stacked(state.stack, entry),
+      pressing: pressing(state.pressing, entry),
     })),
   )
 }
