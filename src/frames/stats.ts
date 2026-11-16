@@ -253,7 +253,9 @@ export async function solveFrame(program: string, catalog: string, path: string,
   }
 }
 
-export function makeFrameStats(settings: StarSettings | undefined, list: (program: string, path: string, snr: number, limit: number) => Promise<string> = listStars, solve: Solve = solveFrame) {
+export type MeasureStep = 'stars' | 'solve'
+
+export function makeFrameStats(settings: StarSettings | undefined, failed: (step: MeasureStep, path: string, error: unknown) => void, list: (program: string, path: string, snr: number, limit: number) => Promise<string> = listStars, solve: Solve = solveFrame) {
   return async function measure(path: string): Promise<FrameStats> {
     const fits = readFits(await readFile(path))
     const { sky, noise } = skyAndNoise(fits.pixels, fits.width, typeof fits.header.get('BAYERPAT') === 'string')
@@ -261,12 +263,17 @@ export function makeFrameStats(settings: StarSettings | undefined, list: (progra
 
     if (settings === undefined || !isLight(fits.header)) return { centre: null, solution: null, stars: null, hfdPixels: null, arcsecPerPixel: scale, elongation: null, shapedStars: 0, sky, noise }
 
-    const stars = readStarList(await list(settings.program, path, settings.analyseSnr, settings.listLimit).catch(() => ''))
+    const reported = (step: MeasureStep) => (error: unknown) => {
+      failed(step, path, error)
+      return undefined
+    }
+    const listed = await list(settings.program, path, settings.analyseSnr, settings.listLimit).then(readStarList, reported('stars'))
+    const stars = listed ?? []
     const hfd = median(stars.map(star => star.hfd))
     const near = pointingOf(fits.header)
-    const solution = settings.catalog === undefined || near === undefined ? null : readSolution(await solve(settings.program, settings.catalog, path, near, settings.solveRadiusDegrees, fieldHeightDegrees(fits.header, fits.height)).catch(() => ''))
+    const solution = settings.catalog === undefined || near === undefined ? null : ((await solve(settings.program, settings.catalog, path, near, settings.solveRadiusDegrees, fieldHeightDegrees(fits.header, fits.height)).then(readSolution, reported('solve'))) ?? null)
 
-    return { centre: solution?.centre ?? null, solution, stars: stars.length, hfdPixels: hfd === undefined ? null : Math.round(hfd * 100) / 100, arcsecPerPixel: scale, ...shapeOf(stars, fits, settings), sky, noise }
+    return { centre: solution?.centre ?? null, solution, stars: listed === undefined ? null : listed.length, hfdPixels: hfd === undefined ? null : Math.round(hfd * 100) / 100, arcsecPerPixel: scale, ...shapeOf(stars, fits, settings), sky, noise }
   }
 }
 
