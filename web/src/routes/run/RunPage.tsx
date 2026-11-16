@@ -22,6 +22,7 @@ export function RunPage() {
   const autofocus = useRig(rig => rig.autofocus)
   const operations = useRig(rig => rig.operations)
   const announced = useRig(rig => rig.firstFrames)
+  const stack = useRig(rig => rig.stack)
 
   if (starting !== undefined && isStarting(starting)) return <StartingView starting={starting} run={undefined} found={undefined} autofocus={autofocus} frames={frames} />
   if (search.has('pick') || search.has('target')) return <ReadyView />
@@ -35,5 +36,5 @@ export function RunPage() {
     return <StartingView starting={starting?.target.id === run.target?.id ? starting : undefined} run={run} found={found} autofocus={autofocus} frames={frames} />
   }
 
-  return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends, checked })} />
+  return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack })} />
 }

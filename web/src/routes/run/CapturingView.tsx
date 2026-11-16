@@ -81,10 +81,16 @@ export function CapturingView({ run }: CapturingViewProps) {
 
         <div className={layout.column}>
           <div className={`${layout.stackPicture} ${layout.first}`}>
-            <Picture label="Stack so far" detail="Not built yet">
-              {null}
+            <Picture label="Stack so far" detail={run.stack.detail}>
+              {run.stack.picture === undefined ? null : <img src={run.stack.picture} alt={`Stack of ${run.frame} frames`} className={layout.frameImage} />}
             </Picture>
           </div>
+
+          {run.stack.counts.length === 0 ? null : (
+            <div className={layout.third}>
+              <Readings rows={run.stack.counts} />
+            </div>
+          )}
         </div>
 
         <div className={layout.column}>
