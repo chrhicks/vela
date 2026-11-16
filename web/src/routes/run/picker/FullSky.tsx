@@ -8,6 +8,7 @@ import { ActionLink } from '../../../components/ActionLink.tsx'
 import { Choices } from '../../../components/Choices.tsx'
 import { PageHeader } from '../../../components/PageHeader.tsx'
 import { Statement } from '../../../components/Statement.tsx'
+import { useLink } from '../../../rig/store.ts'
 import { frameDegrees } from './frame.ts'
 import styles from './FullSky.module.css'
 import { makeSkyDrawing, type SkyDrawing } from './sky-drawing.ts'
@@ -36,6 +37,18 @@ interface Drag {
 }
 
 type Zoom = 'fit' | 'full'
+
+interface Held {
+  readonly centre: Offset | undefined
+  readonly degreesPerPixel: number | undefined
+}
+
+interface Range {
+  readonly finest: number
+  readonly widest: number
+}
+
+const unheld: Held = { centre: undefined, degreesPerPixel: undefined }
 
 interface FullSkyProps {
   readonly coarse: Survey | null
@@ -68,10 +81,10 @@ function fitDegreesPerPixel(bounds: Bounds, angleDegrees: number) {
   return Math.max(width / (bounds.width - 2 * bounds.side), height / (bounds.bottom - bounds.top))
 }
 
-function viewOf(bounds: Bounds, zoom: Zoom, centre: Offset | undefined, props: FullSkyProps): View {
-  const degreesPerPixel = zoom === 'fit' ? fitDegreesPerPixel(bounds, props.angleDegrees) : pixelDegrees(props.detail)
+function viewOf(bounds: Bounds, held: Held, props: FullSkyProps): View {
+  const degreesPerPixel = held.degreesPerPixel ?? fitDegreesPerPixel(bounds, props.angleDegrees)
 
-  if (centre !== undefined) return { ...centre, degreesPerPixel }
+  if (held.centre !== undefined) return { ...held.centre, degreesPerPixel }
 
   const bandMiddle = (bounds.top + bounds.bottom) / 2
 
@@ -86,11 +99,12 @@ export function FullSky(props: FullSkyProps) {
   const bottom = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [bounds, setBounds] = useState<Bounds | undefined>(undefined)
-  const [zoom, setZoom] = useState<Zoom>('fit')
-  const [centre, setCentre] = useState<Offset | undefined>(undefined)
+  const [held, setHeld] = useState<Held>(unheld)
+  const wheelPixelsPerDoubling = useLink().picker?.wheelPixelsPerDoubling
   const [undrawable, setUndrawable] = useState<string | undefined>(undefined)
   const [missing, setMissing] = useState(0)
   const drag = useRef<Drag | undefined>(undefined)
+  const latest = useRef<number | undefined>(undefined)
   const drawing = useRef<SkyDrawing | undefined>(undefined)
 
   useLayoutEffect(() => {
@@ -139,7 +153,38 @@ export function FullSky(props: FullSkyProps) {
     }
   }, [raDegrees, decDegrees])
 
-  const view = bounds === undefined ? undefined : viewOf(bounds, zoom, centre, props)
+  const view = bounds === undefined ? undefined : viewOf(bounds, held, props)
+  const range: Range | undefined = bounds === undefined ? undefined : { finest: pixelDegrees(detail), widest: Math.max(fitDegreesPerPixel(bounds, angleDegrees), coarse === null ? 0 : pixelDegrees(coarse)) }
+  latest.current = view?.degreesPerPixel
+
+  const zoomAbout = useRef<((x: number, y: number, degreesPerPixel: number) => void) | undefined>(undefined)
+
+  zoomAbout.current =
+    view === undefined || bounds === undefined
+      ? undefined
+      : (x, y, degreesPerPixel) =>
+          setHeld({
+            centre: { eastDegrees: view.eastDegrees + (bounds.width / 2 - x) * (view.degreesPerPixel - degreesPerPixel), northDegrees: view.northDegrees + (bounds.height / 2 - y) * (view.degreesPerPixel - degreesPerPixel) },
+            degreesPerPixel,
+          })
+
+  useEffect(() => {
+    const sky = canvas.current
+
+    if (sky === null || wheelPixelsPerDoubling === undefined || range === undefined) return
+
+    const turned = (event: WheelEvent) => {
+      event.preventDefault()
+
+      const now = latest.current
+
+      if (now !== undefined) zoomAbout.current?.(event.clientX, event.clientY, Math.min(range.widest, Math.max(range.finest, now * 2 ** (event.deltaY / wheelPixelsPerDoubling))))
+    }
+
+    sky.addEventListener('wheel', turned, { passive: false })
+
+    return () => sky.removeEventListener('wheel', turned)
+  }, [wheelPixelsPerDoubling, range?.finest, range?.widest])
   const fine = view !== undefined && (coarse === null || view.degreesPerPixel ** 2 < pixelDegrees(coarse) * pixelDegrees(detail))
   const key = view === undefined || bounds === undefined ? undefined : [view.eastDegrees, view.northDegrees, view.degreesPerPixel, bounds.width, bounds.height, fine].join(' ')
 
@@ -166,24 +211,18 @@ export function FullSky(props: FullSkyProps) {
 
     if (dragging === undefined || view === undefined) return
 
-    setCentre({ eastDegrees: dragging.from.eastDegrees + (event.clientX - dragging.x) * view.degreesPerPixel, northDegrees: dragging.from.northDegrees + (event.clientY - dragging.y) * view.degreesPerPixel })
+    setHeld({ centre: { eastDegrees: dragging.from.eastDegrees + (event.clientX - dragging.x) * view.degreesPerPixel, northDegrees: dragging.from.northDegrees + (event.clientY - dragging.y) * view.degreesPerPixel }, degreesPerPixel: view.degreesPerPixel })
   }
 
   const release = () => {
     drag.current = undefined
   }
 
-  const zoomAt = (event: MouseEvent<HTMLCanvasElement>) => {
-    if (view === undefined || bounds === undefined) return
+  const zoomAt = (event: MouseEvent<HTMLCanvasElement>) => zoomAbout.current?.(event.clientX, event.clientY, pixelDegrees(detail))
 
-    setCentre({ eastDegrees: view.eastDegrees + (bounds.width / 2 - event.clientX) * view.degreesPerPixel, northDegrees: view.northDegrees + (bounds.height / 2 - event.clientY) * view.degreesPerPixel })
-    setZoom('full')
-  }
+  const choose = (chosen: Zoom) => setHeld(current => (chosen === 'fit' ? unheld : { centre: current.centre, degreesPerPixel: pixelDegrees(detail) }))
 
-  const choose = (chosen: Zoom) => {
-    setZoom(chosen)
-    if (chosen === 'fit') setCentre(undefined)
-  }
+  const chosen: Zoom | undefined = held.degreesPerPixel === undefined ? 'fit' : held.degreesPerPixel === pixelDegrees(detail) ? 'full' : undefined
 
   const frameStyle =
     view === undefined || bounds === undefined
@@ -229,7 +268,7 @@ export function FullSky(props: FullSkyProps) {
             { value: 'fit', label: 'Fit' },
             { value: 'full', label: '1:1' },
           ]}
-          chosen={zoom}
+          chosen={chosen}
           onChoose={choose}
         />
       </div>
