@@ -22,8 +22,15 @@ export interface SkyPosition {
   readonly decDegrees: number
 }
 
+export interface PlateSolution {
+  readonly centre: SkyPosition
+  readonly referencePixel: readonly [number, number]
+  readonly matrix: readonly [readonly [number, number], readonly [number, number]]
+}
+
 export interface FrameStats {
   readonly centre: SkyPosition | null
+  readonly solution: PlateSolution | null
   readonly stars: number | null
   readonly hfdPixels: number | null
   readonly arcsecPerPixel: number | null
@@ -209,16 +216,18 @@ const pointingOf = (header: ReadonlyMap<string, HeaderValue>): SkyPosition | und
   return typeof ra === 'number' && typeof dec === 'number' ? { raDegrees: ra, decDegrees: dec } : undefined
 }
 
-export function readSolution(ini: string): SkyPosition | null {
+export function readSolution(ini: string): PlateSolution | null {
   const values = new Map(ini.split(/\r?\n/).flatMap(line => {
     const at = line.indexOf('=')
 
     return at < 0 ? [] : [[line.slice(0, at).trim(), line.slice(at + 1).trim()] as const]
   }))
-  const raDegrees = Number(values.get('CRVAL1'))
-  const decDegrees = Number(values.get('CRVAL2'))
+  const numbers = ['CRVAL1', 'CRVAL2', 'CRPIX1', 'CRPIX2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'].map(key => Number(values.get(key)))
+  const [raDegrees = NaN, decDegrees = NaN, x = NaN, y = NaN, a = NaN, b = NaN, c = NaN, d = NaN] = numbers
 
-  return values.get('PLTSOLVD') === 'T' && Number.isFinite(raDegrees) && Number.isFinite(decDegrees) ? { raDegrees, decDegrees } : null
+  if (values.get('PLTSOLVD') !== 'T' || !numbers.every(Number.isFinite)) return null
+
+  return { centre: { raDegrees, decDegrees }, referencePixel: [x, y], matrix: [[a, b], [c, d]] }
 }
 
 export type Solve = (program: string, catalog: string, path: string, near: SkyPosition, radiusDegrees: number) => Promise<string>
@@ -242,14 +251,14 @@ export function makeFrameStats(settings: StarSettings | undefined, list: (progra
     const { sky, noise } = skyAndNoise(fits.pixels, fits.width, typeof fits.header.get('BAYERPAT') === 'string')
     const scale = arcsecPerPixel(fits.header)
 
-    if (settings === undefined || !isLight(fits.header)) return { centre: null, stars: null, hfdPixels: null, arcsecPerPixel: scale, elongation: null, shapedStars: 0, sky, noise }
+    if (settings === undefined || !isLight(fits.header)) return { centre: null, solution: null, stars: null, hfdPixels: null, arcsecPerPixel: scale, elongation: null, shapedStars: 0, sky, noise }
 
     const stars = readStarList(await list(settings.program, path, settings.analyseSnr).catch(() => ''))
     const hfd = median(stars.map(star => star.hfd))
     const near = pointingOf(fits.header)
-    const centre = settings.catalog === undefined || near === undefined ? null : readSolution(await solve(settings.program, settings.catalog, path, near, settings.solveRadiusDegrees).catch(() => ''))
+    const solution = settings.catalog === undefined || near === undefined ? null : readSolution(await solve(settings.program, settings.catalog, path, near, settings.solveRadiusDegrees).catch(() => ''))
 
-    return { centre, stars: stars.length, hfdPixels: hfd === undefined ? null : Math.round(hfd * 100) / 100, arcsecPerPixel: scale, ...shapeOf(stars, fits, settings), sky, noise }
+    return { centre: solution?.centre ?? null, solution, stars: stars.length, hfdPixels: hfd === undefined ? null : Math.round(hfd * 100) / 100, arcsecPerPixel: scale, ...shapeOf(stars, fits, settings), sky, noise }
   }
 }
 
