@@ -18,7 +18,7 @@ const frame = (number: number, measured?: { readonly hfdPixels: number; readonly
   measurements: measured === undefined ? undefined : { stars: measured.stars === undefined ? 550 : measured.stars, hfdPixels: measured.hfdPixels, elongation: measured.elongation, sky: 508, noise: 7.4 },
 })
 
-const seen = (frames: ReadonlyArray<Frame>, more: Partial<Seen> = {}): Seen => ({ run, frames, focusedPixels: 2.9, filter: 'in', camera: { Gain: 100, Offset: 50 }, guiding: { activity: 'guiding', averagePixels: 0.4 }, ...more })
+const seen = (frames: ReadonlyArray<Frame>, more: Partial<Seen> = {}): Seen => ({ run, frames, focusedPixels: 2.9, filter: 'in', camera: { Gain: 100, Offset: 50 }, guiding: { activity: 'guiding', averagePixels: 0.4 }, guide: { steps: [], lost: [] }, ...more })
 
 const round = [frame(1, { hfdPixels: 3.09, elongation: 1.47 }), frame(2, { hfdPixels: 3.16, elongation: 1.06 }), frame(3, { hfdPixels: 3.18, elongation: 1.06 }), frame(4, { hfdPixels: 3.08, elongation: 1.06 }), frame(5, { hfdPixels: 3.26, elongation: 1.06 })]
 
@@ -39,7 +39,7 @@ describe('the first frames of a run', () => {
     expect(found).toMatchObject({ stage: 'passed' })
     expect(found?.checks).toEqual([
       { check: 'stars', verdict: 'ok', stars: 550 },
-      { check: 'focus', verdict: 'ok', hfdPixels: 3.18, focusedPixels: 2.9 },
+      { check: 'focus', verdict: 'ok', hfdPixels: 3.18, focusedPixels: 2.9, guideSteps: 0, guideLost: 0 },
       { check: 'trailing', verdict: 'ok', elongation: 1.06 },
       { check: 'sky', verdict: 'not-judged', sky: 508 },
       { check: 'filter', verdict: 'not-judged', filter: 'in' },
@@ -81,6 +81,18 @@ describe('the first frames of a run', () => {
   it('is not made for calibration frames or with no run', () => {
     expect(firstFrames(seen(round, { run: { ...run, frameType: 'dark' } }), limits)).toBeUndefined()
     expect(firstFrames(seen(round, { run: undefined }), limits)).toBeUndefined()
+  })
+})
+
+describe('star size in the first frames', () => {
+  it('counts the guide frames and lost guide stars while frames 3 to 5 were exposed', () => {
+    const exposedFrom = round[1]!.keptAt
+    const exposedTo = round[4]!.keptAt
+    const steps = [exposedFrom - 1, exposedFrom + 1000, exposedFrom + 4000, exposedTo, exposedTo + 1]
+    const lost = [exposedFrom - 5, exposedFrom + 2000, exposedTo - 10]
+    const focus = firstFrames(seen(round, { guide: { steps, lost } }), limits)?.checks.find(check => check.check === 'focus')
+
+    expect(focus).toMatchObject({ guideSteps: 3, guideLost: 2 })
   })
 })
 

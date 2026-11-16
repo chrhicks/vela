@@ -18,7 +18,7 @@ const reading = Schema.optionalKey(Schema.Number)
 
 export const Check = Schema.Union([
   Schema.Struct({ check: Schema.Literal('stars'), verdict: Verdict, stars: reading }),
-  Schema.Struct({ check: Schema.Literal('focus'), verdict: Verdict, hfdPixels: reading, focusedPixels: reading }),
+  Schema.Struct({ check: Schema.Literal('focus'), verdict: Verdict, hfdPixels: reading, focusedPixels: reading, guideSteps: reading, guideLost: reading }),
   Schema.Struct({ check: Schema.Literal('trailing'), verdict: Verdict, elongation: reading }),
   Schema.Struct({ check: Schema.Literal('sky'), verdict: Verdict, sky: reading }),
   Schema.Struct({ check: Schema.Literal('filter'), verdict: Verdict, filter: Schema.optionalKey(FilterAnswer) }),

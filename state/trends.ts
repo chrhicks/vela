@@ -18,6 +18,7 @@ export const Trends = Schema.Struct({
   stars: Line,
   guideRa: Line,
   guideDec: Line,
+  guideLost: Schema.Array(Schema.Number),
   airTemperature: Line,
   focuserTemperature: Line,
   humidity: Line,
@@ -31,6 +32,7 @@ export const noTrends: Trends = {
   stars: [],
   guideRa: [],
   guideDec: [],
+  guideLost: [],
   airTemperature: [],
   focuserTemperature: [],
   humidity: [],
@@ -60,6 +62,7 @@ function startedOver(state: Trends, object: string, at: number): Trends {
 }
 
 function guided(state: Trends, report: GuiderReport): Trends {
+  if (report.body.Event === 'StarLost') return { ...state, guideLost: [...state.guideLost, report.at] }
   if (report.body.Event !== 'GuideStep') return state
 
   return { ...state, guideRa: added(state.guideRa, report.at, report.body.RADistanceRaw), guideDec: added(state.guideDec, report.at, report.body.DECDistanceRaw) }

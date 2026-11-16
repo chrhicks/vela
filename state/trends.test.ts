@@ -13,11 +13,12 @@ const reduce = (entries: ReadonlyArray<Entry>): Trends => foldRig(entries).trend
 const then = (before: RigState, entries: ReadonlyArray<Entry>): Trends => foldRig(entries, before).trends
 
 describe('trends', () => {
-  it('keeps a point per measured frame, guide step and weather report, in the chart shape', () => {
+  it('keeps a point per measured frame, guide step and weather report, in the chart shape, and when the guide star was lost', () => {
     const state = reduce([
       runStarted('r1', 100),
       frameMeasured('m31_001.fits', 200, { hfdPixels: 2.9, stars: 846 }),
       guideStep(210, 0.18, -0.05),
+      entry('phd2.StarLost', 215, { Event: 'StarLost', Status: 'Star lost - low SNR', ErrorCode: 2 }),
       reported('box', 'WEATHER_PARAMETERS', { WEATHER_TEMPERATURE: 9.1, WEATHER_HUMIDITY: 74, WEATHER_DEWPOINT: 4.6 }, 220),
       reported('focuser', 'FOCUS_TEMPERATURE', { TEMPERATURE: 11 }, 230),
       reported('box', 'DEW_DUTY_CYCLES', { DEW_CHANNEL_1: 60, DEW_CHANNEL_2: 40 }, 240),
@@ -30,6 +31,7 @@ describe('trends', () => {
       stars: [{ x: 200, y: 846 }],
       guideRa: [{ x: 210, y: 0.18 }],
       guideDec: [{ x: 210, y: -0.05 }],
+      guideLost: [215],
       airTemperature: [{ x: 220, y: 9.1 }],
       focuserTemperature: [{ x: 230, y: 11 }],
       humidity: [{ x: 220, y: 74 }],
