@@ -22,7 +22,15 @@ export interface Seen {
   readonly filter: 'in' | 'out' | undefined
   readonly camera: { readonly Gain: number; readonly Offset: number } | undefined
   readonly guiding: { readonly activity?: string | undefined; readonly averagePixels?: number | undefined }
+  readonly guide: { readonly steps: ReadonlyArray<number>; readonly lost: ReadonlyArray<number> }
 }
+
+interface Span {
+  readonly from: number
+  readonly to: number
+}
+
+const within = (times: ReadonlyArray<number>, { from, to }: Span) => times.filter(at => at > from && at <= to).length
 
 export interface FirstFrames {
   readonly stage: 'settling' | 'checking' | 'passed' | 'poor'
@@ -39,7 +47,7 @@ const judged = (good: boolean | undefined): Verdict => (good === undefined ? 'no
 
 const given = <Key extends string>(key: Key, value: number | undefined) => (value === undefined ? {} : { [key]: value })
 
-function checksOf(seen: Seen, measured: ReadonlyArray<Measurements>, limits: FirstFramesLimits): ReadonlyArray<Check> {
+function checksOf(seen: Seen, measured: ReadonlyArray<Measurements>, exposed: Span, limits: FirstFramesLimits): ReadonlyArray<Check> {
   const stars = known(measured.map(frame => frame.stars))
   const sizes = known(measured.map(frame => frame.hfdPixels))
   const stretches = known(measured.map(frame => frame.elongation))
@@ -51,7 +59,14 @@ function checksOf(seen: Seen, measured: ReadonlyArray<Measurements>, limits: Fir
 
   return [
     { check: 'stars', verdict: judged(measured.length === 0 ? undefined : stars.length === measured.length && stars.every(count => count > 0)), ...given('stars', middle(stars)) },
-    { check: 'focus', verdict: judged(hfdPixels === undefined || focusedPixels === undefined ? undefined : hfdPixels <= focusedPixels * limits.focusRatio), ...given('hfdPixels', hfdPixels), ...given('focusedPixels', focusedPixels) },
+    {
+      check: 'focus',
+      verdict: judged(hfdPixels === undefined || focusedPixels === undefined ? undefined : hfdPixels <= focusedPixels * limits.focusRatio),
+      ...given('hfdPixels', hfdPixels),
+      ...given('focusedPixels', focusedPixels),
+      guideSteps: within(seen.guide.steps, exposed),
+      guideLost: within(seen.guide.lost, exposed),
+    },
     { check: 'trailing', verdict: judged(elongation === undefined ? undefined : elongation < limits.trailedElongation), ...given('elongation', elongation) },
     { check: 'sky', verdict: 'not-judged', ...given('sky', middle(measured.map(frame => frame.sky))) },
     { check: 'filter', verdict: 'not-judged', ...(filter === undefined ? {} : { filter }) },
@@ -72,7 +87,8 @@ export function firstFrames(seen: Seen, limits: FirstFramesLimits): FirstFrames 
   const kept = framesOf(run, seen.frames)
   const checked = { from: limits.skippedFrames + 1, to: limits.skippedFrames + limits.checkedFrames }
   const measured = kept.slice(limits.skippedFrames, checked.to).flatMap(frame => (frame.measurements === undefined ? [] : [frame.measurements]))
-  const checks = checksOf(seen, measured, limits)
+  const exposed = { from: kept[limits.skippedFrames - 1]?.keptAt ?? run.startedAt, to: kept[checked.to - 1]?.keptAt ?? Infinity }
+  const checks = checksOf(seen, measured, exposed, limits)
 
   return {
     stage: kept.length <= limits.skippedFrames ? 'settling' : measured.length < limits.checkedFrames ? 'checking' : checks.some(check => check.verdict === 'poor') ? 'poor' : 'passed',
@@ -82,13 +98,14 @@ export function firstFrames(seen: Seen, limits: FirstFramesLimits): FirstFrames 
   }
 }
 
-export const seenIn = (rig: Pick<RigState, 'run' | 'frames' | 'autofocus' | 'operations' | 'devices' | 'guiding'>): Seen => ({
+export const seenIn = (rig: Pick<RigState, 'run' | 'frames' | 'autofocus' | 'operations' | 'devices' | 'guiding' | 'trends'>): Seen => ({
   run: rig.run,
   frames: rig.frames,
   focusedPixels: checkOf(rig.autofocus)?.hfd ?? undefined,
   filter: rig.operations.filter,
   camera: rig.devices.primary.CCD_CONTROLS?.values,
   guiding: rig.guiding,
+  guide: { steps: rig.trends.guideRa.map(point => point.x), lost: rig.trends.guideLost },
 })
 
 export interface VersusBaseline {

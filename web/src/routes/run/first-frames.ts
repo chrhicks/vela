@@ -9,7 +9,7 @@ const verdictWords: Readonly<Record<Verdict, string>> = { ok: 'OK', poor: 'POOR'
 
 const labels: Readonly<Record<Checked['check'], string>> = {
   stars: 'Stars',
-  focus: 'HFD vs focus',
+  focus: 'Star size',
   trailing: 'Elongation',
   sky: 'Sky',
   filter: 'Filter',
@@ -26,7 +26,7 @@ function valueOf(check: Checked): string {
     case 'stars':
       return shown(check.stars, 0)
     case 'focus':
-      return `${shown(check.hfdPixels, 1)} / ${shown(check.focusedPixels, 1)}`
+      return `${shown(check.hfdPixels, 1)} / ${shown(check.focusedPixels, 1)}${check.guideLost === undefined || check.guideLost === 0 ? '' : ` · guide star lost ${check.guideLost} of ${check.guideLost + (check.guideSteps ?? 0)}`}`
     case 'trailing':
       return shown(check.elongation, 2)
     case 'sky':

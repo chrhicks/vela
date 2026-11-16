@@ -29,7 +29,7 @@ export function RunPage() {
   if (run?.status !== 'capturing') return <BetweenRunsView />
 
   const checked = announced?.run === run.id ? announced : undefined
-  const found = link.firstFrames === undefined ? undefined : firstFrames(seenIn({ run, frames, autofocus, operations, devices, guiding }), link.firstFrames)
+  const found = link.firstFrames === undefined ? undefined : firstFrames(seenIn({ run, frames, autofocus, operations, devices, guiding, trends }), link.firstFrames)
 
   if (checked === undefined && found !== undefined && found.frames <= found.checked.to) {
     return <StartingView starting={starting?.target.id === run.target?.id ? starting : undefined} run={run} found={found} autofocus={autofocus} frames={frames} />
