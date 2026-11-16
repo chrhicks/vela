@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import type { CommandRequest } from '../../../state/commands.ts'
-import { isPressed } from '../../../state/pressing.ts'
+import { isPressed, pressKey } from '../../../state/pressing.ts'
 import type { Answer } from '../rig/commands.ts'
 import { useRig } from '../rig/store.ts'
 import { useCommand } from '../rig/use-command.ts'
@@ -18,7 +18,7 @@ interface CommandButtonProps {
 
 export function CommandButton({ request, alwaysReady = false, disabled = false, onAnswer, children }: CommandButtonProps) {
   const { sending, press } = useCommand(request, onAnswer)
-  const pressedAnywhere = useRig(rig => isPressed(rig.pressing, request.command))
+  const pressedAnywhere = useRig(rig => isPressed(rig.pressing, pressKey(request)))
   const dimmed = disabled || ((sending || pressedAnywhere) && !alwaysReady)
 
   return (

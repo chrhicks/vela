@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import type { CommandRequest } from '../../../state/commands.ts'
-import { isPressed } from '../../../state/pressing.ts'
+import { isPressed, pressKey } from '../../../state/pressing.ts'
 import { useRig } from '../rig/store.ts'
 import { useCommand } from '../rig/use-command.ts'
 import styles from './CommandPill.module.css'
@@ -17,7 +17,7 @@ interface CommandPillProps {
 
 export function CommandPill({ request, waiting = false, onCarriedOut, children }: CommandPillProps) {
   const { sending, answer, press } = useCommand(request, received => (received.result === 'done' ? onCarriedOut?.() : undefined))
-  const pressedAnywhere = useRig(rig => isPressed(rig.pressing, request.command))
+  const pressedAnywhere = useRig(rig => isPressed(rig.pressing, pressKey(request)))
   const busy = sending || waiting || pressedAnywhere
 
   return (
