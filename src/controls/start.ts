@@ -19,6 +19,8 @@ export class TargetCatalog extends Context.Service<TargetCatalog, { readonly fin
 
 export class TargetCentring extends Context.Service<TargetCentring, { readonly centre: (id: string) => Effect.Effect<void, CommandRefused> }>()('vela/TargetCentring') {}
 
+export class FilterAnswers extends Context.Service<FilterAnswers, { readonly answer: (filter: FilterAnswer) => Effect.Effect<void> }>()('vela/FilterAnswers') {}
+
 export class StartLog extends Context.Service<StartLog, { readonly report: (step: TargetStepBody) => Effect.Effect<void> }>()('vela/StartLog') {}
 
 export class StartRunning extends Context.Service<StartRunning, { readonly busy: Effect.Effect<boolean>; readonly began: (routine: Fiber.Fiber<void>) => Effect.Effect<void> }>()('vela/StartRunning') {}
@@ -51,6 +53,7 @@ export const startControls = Effect.gen(function* () {
   const running = yield* StartRunning
   const guiding = yield* guidingControls
   const runs = yield* MountRuns
+  const filterAnswers = yield* FilterAnswers
   const { homeSeconds, guidingSeconds, rigSilentAfterSeconds, autofocusExposureSeconds, newId } = yield* StartSettings
 
   const operationDone = (what: string) => Effect.flatMap(capturing.finished, reason => (reason === 'done' ? Effect.void : refusedWith({ code: 'refused', text: `${what} ended ${reason ?? 'with no word'}` })))
@@ -68,12 +71,11 @@ export const startControls = Effect.gen(function* () {
     }),
   )
 
-  const autofocus = Effect.gen(function* () {
-    const filter = (yield* feed.current).operations.filter ?? 'out'
-
-    yield* autofocusing.start(autofocusExposureSeconds[filter])
-    yield* operationDone('autofocus')
-  })
+  const autofocus = (filter: FilterAnswer) =>
+    Effect.gen(function* () {
+      yield* autofocusing.start(autofocusExposureSeconds[filter])
+      yield* operationDone('autofocus')
+    })
 
   const guide = Effect.scoped(
     Effect.gen(function* () {
@@ -117,7 +119,7 @@ export const startControls = Effect.gen(function* () {
 
       return { code: 'stopped-for-night', endedRun, missed: missed.flat() } satisfies Done
     }),
-    startTarget: (id: string, exposureSeconds: number, frames: number | undefined, centre: EquatorialPosition | undefined) =>
+    startTarget: (id: string, exposureSeconds: number, frames: number | undefined, filter: FilterAnswer, centre: EquatorialPosition | undefined) =>
       Effect.gen(function* () {
         const found = catalog.find(id)
 
@@ -143,11 +145,12 @@ export const startControls = Effect.gen(function* () {
           ['home', home],
           ['stop-guiding', guiding.stopGuiding],
           ['centre', centring.centre(centre === undefined ? found.id : positionId(centre)).pipe(Effect.andThen(operationDone('centring')))],
-          ['autofocus', autofocus],
+          ['autofocus', autofocus(filter)],
           ['guiding', guide],
           ['capture', capturing.start(request)],
         ]
 
+        yield* filterAnswers.answer(filter)
         yield* running.began(yield* Effect.forkDetach(routine(yield* newId, target, steps)))
 
         return { code: 'starting-target', name, exposureSeconds, ...(frames === undefined ? {} : { frames }) } satisfies Done

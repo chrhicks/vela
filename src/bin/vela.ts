@@ -43,13 +43,14 @@ import { StackPictures } from '../feed/stack.ts'
 import { SurveyKept } from '../feed/survey.ts'
 import { CommandLog, CommandRefused, Operations } from '../feed/commands.ts'
 import { pressKey } from '../../state/pressing.ts'
+import type { FilterAnswer } from '../../state/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
 import { CalibrationSettings, cameraControls, Capturing } from '../controls/camera.ts'
 import { dewControls, DewSettings } from '../controls/dew.ts'
 import { flatControls, FlatSettings, FlatsLog } from '../controls/flats.ts'
 import { guidingControls, GuidingSettings, mountGuiding } from '../controls/guiding.ts'
-import { StartLog, StartRunning, StartSettings, startControls, TargetCatalog, TargetCentring } from '../controls/start.ts'
+import { FilterAnswers, StartLog, StartRunning, StartSettings, startControls, TargetCatalog, TargetCentring } from '../controls/start.ts'
 import { Centring, mountControls, MountGuiding, MountRuns, MountSettings } from '../controls/mount.ts'
 import { catalogOf, readCatalog } from '../catalog/catalog.ts'
 import { CatalogSettings } from '../catalog/database.ts'
@@ -262,6 +263,8 @@ function frameSaved(entry: Entry) {
 const started = (result: { readonly ok: true } | { readonly ok: false; readonly reason: string }) =>
   result.ok ? Effect.void : Effect.fail(new CommandRefused({ refusal: { code: 'refused', text: result.reason } }))
 
+const answerFilter = (filter: FilterAnswer) => Effect.sync(() => publishEntry(stream.vela('filter'), 'vela.filter', filter, { filter }))
+
 const launchOperations = {
   startAlignment: Effect.suspend(() => started(align.start({ exposureSeconds: settings.launch.alignExposureSeconds }))),
   finishAlignment: Effect.suspend(() =>
@@ -269,8 +272,8 @@ const launchOperations = {
       ? Effect.promise(() => capture.stop()).pipe(Effect.asVoid)
       : Effect.fail(new CommandRefused({ refusal: { code: 'refused', text: 'no alignment is running' } })),
   ),
-  answerFilter: (filter: 'in' | 'out') =>
-    Effect.sync(() => publishEntry(stream.vela('filter'), 'vela.filter', filter, { filter })).pipe(
+  answerFilter: (filter: FilterAnswer) =>
+    answerFilter(filter).pipe(
       Effect.andThen(
         Effect.suspend(() =>
           started(autofocus.start({ step: settings.launch.autofocusStep, samples: settings.launch.autofocusSamples, exposureSeconds: settings.launch.autofocusExposureSeconds[filter] })),
@@ -286,6 +289,7 @@ const cancelStart = Effect.suspend(() => (startRoutine === undefined ? Effect.vo
 const startServices = Layer.mergeAll(
   Layer.succeed(TargetCatalog, { find: id => catalog.find(id) }),
   Layer.succeed(TargetCentring, { centre: id => Effect.suspend(() => started(centre.start({ id, exposureSeconds: settings.controls.centreExposureSeconds }))) }),
+  Layer.succeed(FilterAnswers, { answer: answerFilter }),
   Layer.succeed(StartLog, { report: step => Effect.sync(() => publishEntry(stream.vela('target'), 'vela.target.step', `${step.start}:${step.step}:${step.outcome}`, step)) }),
   Layer.succeed(StartRunning, {
     busy: Effect.sync(() => startRoutine !== undefined),

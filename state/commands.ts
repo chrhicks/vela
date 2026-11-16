@@ -53,7 +53,7 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('testFrame'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
   Schema.Struct({ command: Schema.Literal('autofocus'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
   Schema.Struct({ command: Schema.Literal('stopForTheNight') }),
-  Schema.Struct({ command: Schema.Literal('startTarget'), target: Schema.NonEmptyString, exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), frames: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))), centre: Schema.optionalKey(Schema.Struct({ raDegrees: Schema.Finite, decDegrees: Schema.Finite })) }),
+  Schema.Struct({ command: Schema.Literal('startTarget'), target: Schema.NonEmptyString, exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), frames: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))), filter: FilterAnswer, centre: Schema.optionalKey(Schema.Struct({ raDegrees: Schema.Finite, decDegrees: Schema.Finite })) }),
 ])
 
 export type CommandRequest = typeof CommandRequest.Type

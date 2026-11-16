@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import type { FilterAnswer } from '../../../../../state/commands.ts'
 import { endsBy } from '../../../../../state/ends-by.ts'
 import type { RememberedAnswer } from '../../../../../state/remembered.ts'
 import type { Survey } from '../../../../../state/survey.ts'
@@ -14,7 +15,7 @@ import { Readings } from '../../../components/Readings.tsx'
 import { Statement } from '../../../components/Statement.tsx'
 import { useLocalNow } from '../../../rig/clock.ts'
 import { serviceNow } from '../../../rig/service-clock.ts'
-import { useLink } from '../../../rig/store.ts'
+import { useLink, useRig } from '../../../rig/store.ts'
 import { targetFacts } from '../../../rig/targets.ts'
 import { useAsked } from '../../../rig/use-asked.ts'
 import { FramedSky } from './FramedSky.tsx'
@@ -85,6 +86,8 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
   const [otherSeconds, setOtherSeconds] = useState(String(last.otherSeconds))
   const [stop, setStop] = useState<Stop>(last.stop)
   const [frames, setFrames] = useState(String(last.frames))
+  const filterIn = useRig(rig => rig.operations.filter)
+  const [filter, setFilter] = useState<FilterAnswer | undefined>(filterIn)
   const answer = useAsked(() => targetFacts(id), id, refreshed)
   const now = serviceNow(useLink(), useLocalNow(tickMilliseconds))
   const navigate = useNavigate()
@@ -200,11 +203,37 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
           </div>
         </div>
 
+        <div className={styles.setting}>
+          <Caption>Filter</Caption>
+
+          <div className={styles.answer}>
+            <Choices
+              name="Filter"
+              choices={[
+                { value: 'in', label: 'In' },
+                { value: 'out', label: 'Out' },
+              ]}
+              chosen={filter}
+              onChoose={setFilter}
+            />
+
+            {filter === undefined || filter === filterIn ? null : (
+              <span className={styles.typed}>
+                <span className={styles.unit}>Swap it first</span>
+              </span>
+            )}
+          </div>
+        </div>
+
         <Readings rows={[{ label: 'Ends by', value: ends }]} />
       </div>
 
       <div className={styles.start}>
-        <CommandPill request={{ command: 'startTarget', target: target.id, exposureSeconds, ...(stop === 'frames' ? { frames: frameCount } : {}), ...(centre === undefined ? {} : { centre }) }} onCarriedOut={() => navigate('/')}>
+        <CommandPill
+          request={{ command: 'startTarget', target: target.id, exposureSeconds, filter: filter ?? 'out', ...(stop === 'frames' ? { frames: frameCount } : {}), ...(centre === undefined ? {} : { centre }) }}
+          waiting={filter === undefined}
+          onCarriedOut={() => navigate('/')}
+        >
           Start
         </CommandPill>
       </div>

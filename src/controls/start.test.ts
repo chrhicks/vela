@@ -1,5 +1,6 @@
 import { Effect, Fiber, Layer, Stream } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
+import type { FilterAnswer } from '../../state/commands.ts'
 import { StartId, type RunEnding, type TargetStepBody } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
 import type { RigState } from '../../state/rig.ts'
@@ -14,7 +15,7 @@ import { deviceCommandsFrom } from './device-commands.ts'
 import { Autofocusing } from './focus.ts'
 import { GuidingSettings } from './guiding.ts'
 import { MountRuns } from './mount.ts'
-import { startControls, StartLog, StartRunning, StartSettings, TargetCatalog, TargetCentring } from './start.ts'
+import { FilterAnswers, startControls, StartLog, StartRunning, StartSettings, TargetCatalog, TargetCentring } from './start.ts'
 
 const deviceIds = { mount: 'mount', primary: 'asi', focuser: 'focuser', box: 'box', guide: 'guide' }
 
@@ -68,13 +69,14 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
     Layer.succeed(Autofocusing, { start: exposureSeconds => Effect.sync(() => void did.push(`autofocus ${exposureSeconds}`)) }),
     Layer.succeed(TargetCatalog, { find: id => testCatalog.find(id) }),
     Layer.succeed(StartLog, { report }),
+    Layer.succeed(FilterAnswers, { answer: filter => Effect.sync(() => void did.push(`filter ${filter}`)) }),
     Layer.succeed(StartRunning, { busy: Effect.sync(() => routine !== undefined), began: begun => Effect.sync(() => void (routine = begun)) }),
     Layer.succeed(MountRuns, { endRun: Effect.sync(() => (did.push('end run'), running)), idle: Effect.void, pause: Effect.succeed(false), resume: Effect.void }),
     Layer.succeed(StartSettings, { homeSeconds, guidingSeconds: 5, rigSilentAfterSeconds: 10, autofocusExposureSeconds: { in: 10, out: 2 }, newId: Effect.succeed(StartId.make('start-1')) }),
   )
 
-  const press = (id: string, exposureSeconds: number, frames: number | undefined, centre?: { readonly raDegrees: number; readonly decDegrees: number }) =>
-    Effect.runPromise(Effect.flatMap(startControls, controls => controls.startTarget(id, exposureSeconds, frames, centre)).pipe(Effect.result, Effect.provide(services)))
+  const press = (id: string, exposureSeconds: number, frames: number | undefined, centre?: { readonly raDegrees: number; readonly decDegrees: number }, filter: FilterAnswer = 'out') =>
+    Effect.runPromise(Effect.flatMap(startControls, controls => controls.startTarget(id, exposureSeconds, frames, filter, centre)).pipe(Effect.result, Effect.provide(services)))
 
   const stopForTheNight = () => Effect.runPromise(Effect.flatMap(startControls, controls => controls.stopForTheNight).pipe(Effect.result, Effect.provide(services)))
 
@@ -88,8 +90,25 @@ describe('Start a target', () => {
     expect(await press('orion', 120, 100)).toMatchObject({ success: { code: 'starting-target', name: 'M 42', exposureSeconds: 120, frames: 100 } })
     await finished()
 
-    expect(did).toEqual(['mount TELESCOPE_HOME', 'guider stop_capture', 'centre orion', 'autofocus 2', 'guider get_connected', 'guider guide'])
+    expect(did).toEqual(['filter out', 'mount TELESCOPE_HOME', 'guider stop_capture', 'centre orion', 'autofocus 2', 'guider get_connected', 'guider guide'])
     expect(started).toEqual([{ object: 'M 42', frameType: 'light', exposureSeconds: 120, count: 100, gain: 100, offset: 50, cooler: 'keep', target: { id: 'orion', name: 'M 42', raDegrees: 83.82, decDegrees: -5.39 } }])
+  })
+
+  it('records the filter chosen for the target before the routine starts, and focuses with that filter\'s exposure', async () => {
+    const { did, press, finished } = setup()
+
+    await press('orion', 120, undefined, undefined, 'in')
+    await finished()
+
+    expect(did[0]).toBe('filter in')
+    expect(did).toContain('autofocus 10')
+  })
+
+  it('records no filter when the start is refused', async () => {
+    const { did, press } = setup({ busy: true })
+
+    expect(await press('orion', 120, undefined, undefined, 'in')).toMatchObject({ failure: { refusal: { code: 'run-active' } } })
+    expect(did).not.toContain('filter in')
   })
 
   it('reports each step as it starts and as it ends', async () => {
