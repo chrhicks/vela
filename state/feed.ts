@@ -22,11 +22,15 @@ export const LaunchLimits = Schema.Struct({ alignGoodArcmin: Schema.Number, alig
 
 export type LaunchLimits = typeof LaunchLimits.Type
 
+export const PickerLimits = Schema.Struct({ wheelPixelsPerDoubling: Schema.Number })
+
+export type PickerLimits = typeof PickerLimits.Type
+
 export const ControlsLimits = Schema.Struct({ nudgeHoldMs: Schema.Number, focusSteps: Schema.Array(Schema.Int), autofocusExposureSeconds: Schema.Struct({ in: Schema.Number, out: Schema.Number }), coolerCelsius: Schema.Number, dewChannel: Schema.String, dewPercent: Schema.Number, testFrameSeconds: Schema.Number, calibrationFrames: Schema.Int })
 
 export type ControlsLimits = typeof ControlsLimits.Type
 
-export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, launch: LaunchLimits, controls: ControlsLimits, firstFrames: FirstFramesLimits, state: RigState })
+export const Bootstrap = Schema.Struct({ token: StartToken, at: Schema.Number, night: NightName, limits: LinkLimits, launch: LaunchLimits, picker: PickerLimits, controls: ControlsLimits, firstFrames: FirstFramesLimits, state: RigState })
 
 export type Bootstrap = typeof Bootstrap.Type
 
