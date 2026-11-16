@@ -1,5 +1,6 @@
 import { SiderealTime } from 'astronomy-engine'
 import { describe, expect, it } from 'vitest'
+import { skyTonight } from '../sky/tonight.ts'
 import { makePlacedTargets } from './placed.ts'
 import { testCatalog } from './testing.ts'
 
@@ -92,5 +93,15 @@ describe('targets with their place in the sky', () => {
 
     expect(placed.facts('05h35m17s -05d23m28s', orionOverhead)?.lastCentre).toBeNull()
     expect(placed.facts('orion', orionOverhead)?.lastCentre).not.toBeNull()
+  })
+
+  it('lists what will be best placed when it gets dark, when asked in daylight', () => {
+    const placed = makePlacedTargets({ catalog: testCatalog, lastCentreNear, site: () => phoenix, settings })
+    const noon = Date.UTC(2026, 10, 15, 19, 0)
+    const dark = skyTonight(phoenix, noon).dark
+
+    expect(dark).not.toBeNull()
+    expect(placed.bestPlaced(noon)).toEqual(placed.bestPlaced(dark?.from ?? noon))
+    expect(placed.bestPlaced(noon)).not.toEqual([])
   })
 })
