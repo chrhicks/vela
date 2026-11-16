@@ -57,4 +57,25 @@ describe('trends', () => {
     expect(then(before, [runStarted('r3', 300, 'M 42')])).toEqual({ ...noTrends, target: 'M 42', since: 300 })
     expect(then(before, [entry('vela.run.started', 300, { run: 'd', object: 'dark', frameType: 'dark', exposureSeconds: 60, count: 20 })])).toBe(before.trends)
   })
+
+  it('carries the last held reading into a new target, since the power box reports a dew heater only when it changes', () => {
+    const before = foldRig([
+      reported('box', 'DEW_DUTY_CYCLES', { DEW_CHANNEL_1: 0, DEW_CHANNEL_2: 0 }, 50),
+      reported('box', 'WEATHER_PARAMETERS', { WEATHER_TEMPERATURE: 5.3, WEATHER_HUMIDITY: 62, WEATHER_DEWPOINT: -1.4 }, 60),
+      reported('focuser', 'FOCUS_TEMPERATURE', { TEMPERATURE: 8 }, 70),
+      runStarted('r1', 100, 'M 31'),
+      frameMeasured('m31_001.fits', 200, { hfdPixels: 2.9, stars: 846 }),
+      guideStep(210, 0.18, -0.05),
+    ])
+
+    expect(then(before, [runStarted('r2', 300, 'M 33')])).toEqual({
+      ...noTrends,
+      target: 'M 33',
+      since: 300,
+      airTemperature: [{ x: 300, y: 5.3 }],
+      focuserTemperature: [{ x: 300, y: 8 }],
+      humidity: [{ x: 300, y: 62 }],
+      dewHeaters: { DEW_CHANNEL_1: [{ x: 300, y: 0 }], DEW_CHANNEL_2: [{ x: 300, y: 0 }] },
+    })
+  })
 })

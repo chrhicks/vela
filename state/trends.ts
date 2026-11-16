@@ -39,8 +39,24 @@ export const noTrends: Trends = {
 
 const added = (line: Line, x: number, y: number | null | undefined): Line => (y == null ? line : [...line, { x, y }])
 
+const carried = (line: Line, at: number): Line => {
+  const last = line.at(-1)
+
+  return last === undefined ? [] : [{ x: at, y: last.y }]
+}
+
 function startedOver(state: Trends, object: string, at: number): Trends {
-  return state.target === object ? state : { ...noTrends, target: object, since: at }
+  if (state.target === object) return state
+
+  return {
+    ...noTrends,
+    target: object,
+    since: at,
+    airTemperature: carried(state.airTemperature, at),
+    focuserTemperature: carried(state.focuserTemperature, at),
+    humidity: carried(state.humidity, at),
+    dewHeaters: Object.fromEntries(Object.entries(state.dewHeaters).map(([channel, line]) => [channel, carried(line, at)])),
+  }
 }
 
 function guided(state: Trends, report: GuiderReport): Trends {
