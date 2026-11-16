@@ -80,11 +80,11 @@ describe('Home', () => {
 })
 
 describe('Stop', () => {
-  it('ends whatever run is going, then aborts the motion', async () => {
+  it('aborts the motion first, then ends whatever run is going', async () => {
     const { sent, press } = setup(connected)
 
     expect(await press(mount => mount.stop)).toMatchObject({ _tag: 'None' })
-    expect(sent).toEqual(['vela run stopped', 'am5 TELESCOPE_ABORT_MOTION {"ABORT":true}'])
+    expect(sent).toEqual(['am5 TELESCOPE_ABORT_MOTION {"ABORT":true}', 'vela run stopped'])
   })
 
   it('sends the abort even when the page shows the mount as not connected', async () => {
@@ -176,14 +176,14 @@ describe('guiding around mount moves', () => {
     expect(centre.sent).toEqual(['vela run stopped', 'no run', 'guiding stopped', 'centre on M 33'])
   })
 
-  it('moves nothing when PHD2 does not answer the stop, except Stop, which aborts the motion anyway', async () => {
+  it('moves nothing when PHD2 does not answer the stop, except Stop, which aborts the motion before it asks PHD2', async () => {
     const home = setup(connected, written, 10, [], { refuses: true })
     const stop = setup(connected, written, 10, [], { refuses: true })
 
     expect(await home.press(mount => mount.home)).toMatchObject({ value: { refusal: { code: 'guider-silent' } } })
     expect(await stop.done(mount => mount.stop)).toMatchObject({ value: { code: 'stop', stoppedGuiding: false } })
     expect(home.sent).toEqual(['vela run stopped'])
-    expect(stop.sent).toEqual(['vela run stopped', 'am5 TELESCOPE_ABORT_MOTION {"ABORT":true}'])
+    expect(stop.sent).toEqual(['am5 TELESCOPE_ABORT_MOTION {"ABORT":true}', 'vela run stopped'])
   })
 
   it('stops guiding for a flip and starts it again before the run resumes', async () => {
@@ -200,6 +200,14 @@ describe('guiding around mount moves', () => {
     const { sent, done } = setup(west, written, 10, [step(west, 'Busy'), step(west, 'Ok')])
 
     expect(await done(mount => mount.flipNow)).toMatchObject({ value: { stoppedGuiding: false, restartedGuiding: false } })
+    expect(sent).not.toContain('guiding started')
+  })
+
+  it('does not start guiding again while the mount has not settled after a flip', async () => {
+    const west = foldRig([wire('mount', 'TELESCOPE_PIER_SIDE', { PIER_WEST: true, PIER_EAST: false })], pointing)
+    const { sent, done } = setup(west, written, 10, [step(west, 'Busy')], { guiding: true })
+
+    expect(await done(mount => mount.flipNow)).toMatchObject({ value: { settled: false, stoppedGuiding: true, restartedGuiding: false } })
     expect(sent).not.toContain('guiding started')
   })
 })
