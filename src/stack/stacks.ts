@@ -4,7 +4,7 @@ import { readFits } from '../frames/fits.ts'
 import { listNight } from '../frames/library.ts'
 import { stretch, superpixels, text, type PreviewSettings } from '../frames/preview.ts'
 import { encodePng } from '../frames/png.ts'
-import { isLight, pointingOf, readSolution, statsName, type PlateSolution, type SkyPosition } from '../frames/stats.ts'
+import { fieldHeightDegrees, isLight, pointingOf, readSolution, statsName, type PlateSolution, type SkyPosition } from '../frames/stats.ts'
 import { makeStack, type Stack } from './stack.ts'
 
 export interface StackedFrame {
@@ -23,7 +23,7 @@ export interface StackCount {
 export interface StacksOptions {
   readonly keepDir: string
   readonly preview: PreviewSettings
-  readonly solve: (path: string, near: SkyPosition) => Promise<string>
+  readonly solve: (path: string, near: SkyPosition, fieldDegrees: number | undefined) => Promise<string>
 }
 
 interface Kept {
@@ -69,7 +69,7 @@ export function makeStacks({ keepDir, preview, solve }: StacksOptions) {
     added.add(`${frame.night}/${frame.file}`)
 
     const near = pointingOf(fits.header)
-    const solution = known ?? (await keptSolution(path)) ?? (near === undefined ? null : readSolution(await solve(path, near).catch(() => '')))
+    const solution = known ?? (await keptSolution(path)) ?? (near === undefined ? null : readSolution(await solve(path, near, fieldHeightDegrees(fits.header, fits.height)).catch(() => '')))
     const binned = { ...superpixels(fits, preview.bin), cell: preview.bin * 2 }
 
     if (solution === null) {
