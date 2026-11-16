@@ -16,15 +16,15 @@ export function wire(device: string, property: string | undefined, elements: Rea
 }
 
 export function runStarted(run: string, at: number, object = 'M 31'): Entry {
-  return entry('vela.run.started', at, { run, object, frameType: 'light', exposureSeconds: 120, count: 30, gain: 100, offset: 50, sequence: 'M-31_light' })
+  return entry('vela.run.started', at, { run, object, frameType: 'light', exposureSeconds: 120, count: 30, gain: 100, offset: 50, sequence: `${object.replace(/[^A-Za-z0-9]+/g, '-')}_light` })
 }
 
 export function frameKept(file: string, at: number, night = '2026-11-08'): Entry {
   return entry('vela.frame', at, { night, file, bytes: 49_000_000, sha256: 'ab' })
 }
 
-export function frameMeasured(file: string, at: number, measurements: Readonly<Record<string, number | null>>, night = '2026-11-08'): Entry {
-  return entry('vela.frame.stats', at, { night, file, stars: 846, hfdPixels: 2.9, arcsecPerPixel: 1.45, elongation: 1.06, shapedStars: 40, sky: 1200, noise: 30, ...measurements })
+export function frameMeasured(file: string, at: number, measurements: Readonly<Record<string, number | null>>, night = '2026-11-08', sequence = 'M-31_light'): Entry {
+  return entry('vela.frame.stats', at, { night, file, sequence, stars: 846, hfdPixels: 2.9, arcsecPerPixel: 1.45, elongation: 1.06, shapedStars: 40, sky: 1200, noise: 30, ...measurements })
 }
 
 export function read(source: Entry): Option.Option<RigEntry> {

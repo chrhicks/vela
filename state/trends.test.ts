@@ -27,6 +27,7 @@ describe('trends', () => {
     expect(state).toEqual({
       target: 'M 31',
       since: 100,
+      sequence: 'M-31_light',
       hfd: [{ x: 200, y: 2.9 }],
       stars: [{ x: 200, y: 846 }],
       guideRa: [{ x: 210, y: 0.18 }],
@@ -56,7 +57,7 @@ describe('trends', () => {
 
     expect(then(before, [runStarted('r2', 300, 'M 31')])).toBe(before.trends)
     expect(then(before, [operation('polar-align'), operation('autofocus'), operation('centre')])).toBe(before.trends)
-    expect(then(before, [runStarted('r3', 300, 'M 42')])).toEqual({ ...noTrends, target: 'M 42', since: 300 })
+    expect(then(before, [runStarted('r3', 300, 'M 42')])).toEqual({ ...noTrends, target: 'M 42', since: 300, sequence: 'M-42_light' })
     expect(then(before, [entry('vela.run.started', 300, { run: 'd', object: 'dark', frameType: 'dark', exposureSeconds: 60, count: 20 })])).toBe(before.trends)
   })
 
@@ -74,10 +75,23 @@ describe('trends', () => {
       ...noTrends,
       target: 'M 33',
       since: 300,
+      sequence: 'M-33_light',
       airTemperature: [{ x: 300, y: 5.3 }],
       focuserTemperature: [{ x: 300, y: 8 }],
       humidity: [{ x: 300, y: 62 }],
       dewHeaters: { DEW_CHANNEL_1: [{ x: 300, y: 0 }], DEW_CHANNEL_2: [{ x: 300, y: 0 }] },
     })
+  })
+
+  it("keeps only the running target's frames, not a test frame or a frame of another target", () => {
+    const state = reduce([
+      runStarted('r1', 100, 'M 33'),
+      frameMeasured('M-33_light_001.fits', 200, { hfdPixels: 4.3, stars: 864 }, '2026-11-15', 'M-33_light'),
+      frameMeasured('test-frame_light_002.fits', 300, { hfdPixels: 5.5, stars: 249 }, '2026-11-15', 'test-frame_light'),
+      frameMeasured('M-31_light_001.fits', 400, { hfdPixels: 2.9, stars: 846 }, '2026-11-15', 'M-31_light'),
+    ])
+
+    expect(state.hfd).toEqual([{ x: 200, y: 4.3 }])
+    expect(state.stars).toEqual([{ x: 200, y: 864 }])
   })
 })

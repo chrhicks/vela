@@ -14,6 +14,7 @@ type Line = typeof Line.Type
 export const Trends = Schema.Struct({
   target: Schema.optional(Schema.String),
   since: Schema.optional(Schema.Number),
+  sequence: Schema.optional(Schema.String),
   hfd: Line,
   stars: Line,
   guideRa: Line,
@@ -47,13 +48,14 @@ const carried = (line: Line, at: number): Line => {
   return last === undefined ? [] : [{ x: at, y: last.y }]
 }
 
-function startedOver(state: Trends, object: string, at: number): Trends {
-  if (state.target === object) return state
+function startedOver(state: Trends, object: string, sequence: string | undefined, at: number): Trends {
+  if (state.target === object) return state.sequence === sequence ? state : { ...state, sequence }
 
   return {
     ...noTrends,
     target: object,
     since: at,
+    sequence,
     airTemperature: carried(state.airTemperature, at),
     focuserTemperature: carried(state.focuserTemperature, at),
     humidity: carried(state.humidity, at),
@@ -100,9 +102,9 @@ export function trends(state: Trends, entry: RigEntry, devices: Devices): Trends
 
   switch (entry.kind) {
     case 'vela.run.started':
-      return entry.body.frameType === 'light' && entry.body.object._tag === 'Target' ? startedOver(state, entry.body.object.name, entry.at) : state
+      return entry.body.frameType === 'light' && entry.body.object._tag === 'Target' ? startedOver(state, entry.body.object.name, entry.body.sequence, entry.at) : state
     case 'vela.frame.stats':
-      return { ...state, hfd: added(state.hfd, entry.at, entry.body.hfdPixels), stars: added(state.stars, entry.at, entry.body.stars) }
+      return state.sequence === undefined || entry.body.sequence !== state.sequence ? state : { ...state, hfd: added(state.hfd, entry.at, entry.body.hfdPixels), stars: added(state.stars, entry.at, entry.body.stars) }
     case 'wire':
       return deviceReported(state, entry.body, entry.at, devices)
     default:
