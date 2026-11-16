@@ -1,5 +1,5 @@
 import { flip } from '../../../../state/flip.ts'
-import { framesOf, versusBaseline, type FirstFramesChecked } from '../../../../state/first-frames.ts'
+import { framesOf, offCentreArcsec, versusBaseline, type FirstFramesChecked } from '../../../../state/first-frames.ts'
 import { previewAddress, type Frame } from '../../../../state/frames.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Devices } from '../../../../state/devices.ts'
@@ -31,7 +31,13 @@ function baselineWords(measured: Frame['measurements'], checked: FirstFramesChec
   return words.length === 0 ? unknown : words.join(' · ')
 }
 
-function latestStats(frame: Frame | undefined, checked: FirstFramesChecked | undefined): ReadonlyArray<Reading> {
+function offCentreWords(run: Run, measured: Frame['measurements']): string {
+  const arcsec = measured === undefined ? undefined : offCentreArcsec(run, measured)
+
+  return arcsec === undefined ? unknown : arcsec < 60 ? `${Math.round(arcsec)}″` : `${(arcsec / 60).toFixed(1)}′`
+}
+
+function latestStats(run: Run, frame: Frame | undefined, checked: FirstFramesChecked | undefined): ReadonlyArray<Reading> {
   const measured = frame?.measurements
 
   return [
@@ -39,7 +45,7 @@ function latestStats(frame: Frame | undefined, checked: FirstFramesChecked | und
     { label: 'Stars', value: measured === undefined ? unknown : fixed(measured.stars, 0) },
     { label: 'Sky', value: measured === undefined ? unknown : fixed(measured.sky, 0) },
     { label: 'Noise', value: measured === undefined ? unknown : fixed(measured.noise, 1) },
-    { label: 'Off centre', value: unknown },
+    { label: 'Off centre', value: offCentreWords(run, measured) },
     { label: 'Vs baseline', value: baselineWords(measured, checked) },
   ]
 }
@@ -134,7 +140,7 @@ export function liveCapturing({ run, frames, devices, guiding, now, trends, chec
     latest: {
       detail: latest === undefined ? unknown : `${run.frames} · ${clock(latest.keptAt, true)}`,
       picture: kept === undefined ? undefined : previewAddress(kept),
-      stats: latestStats(latest, checked),
+      stats: latestStats(run, latest, checked),
     },
   }
 }

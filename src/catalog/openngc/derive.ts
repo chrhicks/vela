@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { angularDistance } from '../../sky/coordinates.ts'
+import { angularDistance } from '../../../state/angles.ts'
 import { SourceUnreadable } from '../sources.ts'
 import type { StellariumObject } from '../stellarium/objects.ts'
 import type { OpenNgcObject } from './objects.ts'

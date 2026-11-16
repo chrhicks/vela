@@ -1,7 +1,8 @@
 import { Option, Result, Schema } from 'effect'
 import { operationObjects, readRigEntry } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
-import { angularDistance, type EquatorialPosition } from '../sky/coordinates.ts'
+import { angularDistance } from '../../state/angles.ts'
+import { type EquatorialPosition } from '../sky/coordinates.ts'
 
 export interface LastLight {
   readonly exposureSeconds: number
