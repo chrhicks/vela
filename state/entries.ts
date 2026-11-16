@@ -104,7 +104,7 @@ export type LinkStatus = typeof LinkStatus.Type
 
 export const RigLink = entryOf('client.connection', { target: LinkTarget, status: LinkStatus })
 
-export const GuiderEvent = Schema.Literals(['GuideStep', 'StartGuiding', 'GuidingStopped', 'LoopingExposures', 'LoopingExposuresStopped', 'StartCalibration', 'StarSelected', 'StarLost', 'Paused', 'Resumed', 'SettleDone'])
+export const GuiderEvent = Schema.Literals(['GuideStep', 'StartGuiding', 'GuidingStopped', 'LoopingExposures', 'LoopingExposuresStopped', 'StartCalibration', 'StarSelected', 'StarLost', 'Paused', 'Resumed', 'SettleBegin', 'Settling', 'SettleDone'])
 
 export type GuiderEvent = typeof GuiderEvent.Type
 

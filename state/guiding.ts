@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { isGuiderReport, type GuiderEvent, type GuiderReport, type LinkStatus, type RigEntry } from './entries.ts'
 
-export const GuiderActivity = Schema.Literals(['guiding', 'looping', 'calibrating', 'starPicked', 'starLost', 'paused', 'stopped'])
+export const GuiderActivity = Schema.Literals(['guiding', 'settling', 'looping', 'calibrating', 'starPicked', 'starLost', 'paused', 'stopped'])
 
 export type GuiderActivity = typeof GuiderActivity.Type
 
@@ -23,6 +23,8 @@ const activityOf: Readonly<Record<GuiderEvent, GuiderActivity>> = {
   GuideStep: 'guiding',
   StartGuiding: 'guiding',
   Resumed: 'guiding',
+  SettleBegin: 'settling',
+  Settling: 'settling',
   SettleDone: 'guiding',
   GuidingStopped: 'stopped',
   LoopingExposuresStopped: 'stopped',
@@ -40,7 +42,7 @@ function guiderLinkChanged(state: Guiding, status: LinkStatus): Guiding {
 }
 
 function guiderReported(state: Guiding, report: GuiderReport['body'], at: number): Guiding {
-  const activity = activityOf[report.Event]
+  const activity = report.Event === 'GuideStep' && state.activity === 'settling' ? 'settling' : activityOf[report.Event]
   const guided = activity === 'guiding'
 
   return {

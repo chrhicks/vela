@@ -103,6 +103,13 @@ describe('guiding around a mount move', () => {
     expect(asked).toEqual(['phd2 {"method":"stop_capture"}'])
   })
 
+  it('stops PHD2 while it settles and counts that as guiding', async () => {
+    const { asked, around } = setup(() => ({ result: 0 }), undefined, { link: 'connected', activity: 'settling' })
+
+    expect(await around(guider => guider.stop)).toMatchObject({ success: true })
+    expect(asked).toEqual(['phd2 {"method":"stop_capture"}'])
+  })
+
   it('stops a loop without counting it as guiding, and leaves a stopped or unlinked PHD2 alone', async () => {
     const looping = setup(() => ({ result: 0 }), undefined, { link: 'connected', activity: 'looping' })
     const stopped = setup(() => ({ result: 0 }), undefined, { link: 'connected', activity: 'stopped' })

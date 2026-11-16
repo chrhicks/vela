@@ -29,7 +29,7 @@ const replyTo =
       },
     })
 
-const guidingActivities: ReadonlyArray<GuiderActivity> = ['guiding', 'calibrating', 'starLost', 'paused']
+const guidingActivities: ReadonlyArray<GuiderActivity> = ['guiding', 'settling', 'calibrating', 'starLost', 'paused']
 
 const capturingActivities: ReadonlyArray<GuiderActivity> = [...guidingActivities, 'looping', 'starPicked']
 

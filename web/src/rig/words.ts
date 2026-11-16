@@ -105,6 +105,7 @@ export const mountWords: Readonly<Record<MountActivity, string>> = { parked: 'Pa
 
 export const guiderWords: Readonly<Record<GuiderActivity, string>> = {
   guiding: 'On',
+  settling: 'Settling',
   looping: 'Looping',
   calibrating: 'Calibrating',
   starPicked: 'Star picked',

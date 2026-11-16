@@ -21,6 +21,14 @@ describe('guiding', () => {
     expect(reduce([guider('LoopingExposures', 1, { Frame: 1, ErrorCode: 8, Status: 'No star selected' })])).toMatchObject({ activity: 'looping' })
   })
 
+  it('says settling from SettleBegin until SettleDone, through the guide steps PHD2 sends while it settles', () => {
+    const settling = [guider('StartGuiding', 1), guider('SettleBegin', 2), guider('GuideStep', 3, { AvgDist: 0.19 }), guider('Settling', 4, { Distance: 0.19, Time: 0, SettleTime: 10 }), guider('GuideStep', 5, { AvgDist: 0.16 })]
+
+    expect(reduce(settling)).toMatchObject({ activity: 'settling', averagePixels: undefined })
+    expect(reduce([...settling, guider('SettleDone', 6, { Status: 0 }), guider('GuideStep', 7, { AvgDist: 0.12 })])).toMatchObject({ activity: 'guiding', averagePixels: 0.12 })
+    expect(reduce([...settling, guider('GuidingStopped', 6)])).toMatchObject({ activity: 'stopped' })
+  })
+
   it('follows the link to PHD2 and starts over when the rig program reconnects', () => {
     const state = reduce([guider('GuideStep', 1, { AvgDist: 0.2 })])
 
