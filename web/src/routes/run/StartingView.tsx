@@ -1,5 +1,6 @@
 import type { Autofocus } from '../../../../state/autofocus.ts'
 import { framesOf, type FirstFrames } from '../../../../state/first-frames.ts'
+import type { FirstFramesLimits } from '../../../../state/first-frames-check.ts'
 import { previewAddress, type Frame } from '../../../../state/frames.ts'
 import type { Run } from '../../../../state/run.ts'
 import type { Starting } from '../../../../state/starting.ts'
@@ -23,6 +24,7 @@ interface StartingViewProps {
   readonly starting: Starting | undefined
   readonly run: Run | undefined
   readonly found: FirstFrames | undefined
+  readonly limits: FirstFramesLimits | undefined
   readonly autofocus: Autofocus
   readonly frames: ReadonlyArray<Frame>
 }
@@ -54,7 +56,7 @@ function Count({ big, small, done }: { readonly big: string; readonly small: str
   )
 }
 
-function StepPicture({ starting, run, autofocus, frames, now }: Omit<StartingViewProps, 'found'> & { readonly now: number }) {
+function StepPicture({ starting, run, autofocus, frames, now }: Omit<StartingViewProps, 'found' | 'limits'> & { readonly now: number }) {
   const step = runningStep(starting)
 
   if (step === 'autofocus') {
@@ -97,9 +99,9 @@ function StepPicture({ starting, run, autofocus, frames, now }: Omit<StartingVie
   )
 }
 
-export function StartingView({ starting, run, found, autofocus, frames }: StartingViewProps) {
+export function StartingView({ starting, run, found, limits, autofocus, frames }: StartingViewProps) {
   const now = useLocalNow(1000)
-  const rows = startingRows(starting, run, found, autofocus, frames, now)
+  const rows = startingRows(starting, run, found, limits, autofocus, frames, now)
   const at = rows.findIndex(row => row.tone === 'running')
   const facts = [
     ...(run === undefined ? [] : [`${run.exposureSeconds} s`, run.count === undefined ? 'Until stopped' : `${run.count} frames`]),
