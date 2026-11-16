@@ -154,6 +154,8 @@ export const PointingSettings = Schema.Struct({
 
 export const StarSettings = Schema.Struct({
   program: Schema.String.annotate({ description: 'The ASTAP command-line program (astap_cli) on this machine, which counts and sizes the stars of each kept imaging frame' }),
+  catalog: Schema.optionalKey(Schema.String.annotate({ description: "The folder of ASTAP's star database on this machine. With it, each kept imaging frame is also plate solved to find where it points" })),
+  solveRadiusDegrees: described('How far from the pointing in the frame header ASTAP searches when it solves a kept frame, in degrees', Schema.Number, 2),
   analyseSnr: described(
     'The signal to noise a star needs to be counted',
     Schema.Number,

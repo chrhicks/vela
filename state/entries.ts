@@ -75,10 +75,13 @@ export const RunEnded = entryOf('vela.run.ended', { run: RunId, reason: RunEndin
 
 export const FrameKept = entryOf('vela.frame', { night: NightName, file: FrameFile, sequence: Schema.optionalKey(Schema.String) })
 
+export const SkyPosition = Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number })
+
 export const FrameMeasured = entryOf('vela.frame.stats', {
   night: NightName,
   file: FrameFile,
   sequence: Schema.optionalKey(Schema.String),
+  centre: Schema.optionalKey(Schema.NullOr(SkyPosition)),
   stars: Schema.NullOr(Count),
   hfdPixels: Schema.NullOr(Schema.Number),
   elongation: Schema.NullOr(Schema.Number),
