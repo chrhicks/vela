@@ -162,7 +162,7 @@ export const StarSettings = Schema.Struct({
     10,
   ),
   listLimit: described(
-    "The most stars ASTAP lists for a kept frame, set above any frame's star count so the list holds every star with the signal asked for",
+    'The most stars ASTAP lists for a kept frame',
     Schema.Int.check(Schema.isGreaterThan(0)),
     10000,
   ),
