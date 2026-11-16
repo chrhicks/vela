@@ -1,6 +1,6 @@
 import { Chart } from '../../components/Chart.tsx'
 import styles from './Trends.module.css'
-import type { Trend } from './stub.ts'
+import type { Trend } from './capturing.ts'
 
 interface TrendsProps {
   readonly trends: ReadonlyArray<Trend>

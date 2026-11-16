@@ -9,7 +9,6 @@ import { IdleView } from './IdleView.tsx'
 import { ReadyView } from './picker/ReadyView.tsx'
 import { liveCapturing } from './live.ts'
 import { StartView } from './StartView.tsx'
-import { capturing } from './stub.ts'
 
 export function RunPage() {
   const [search] = useSearchParams()
@@ -37,5 +36,5 @@ export function RunPage() {
     return <FirstFramesView run={run} found={found} starting={starting?.target.id === run.target?.id ? starting : undefined} />
   }
 
-  return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends, checked }, capturing.steady)} />
+  return <CapturingView run={liveCapturing({ run, frames, devices, guiding, now, trends, checked })} />
 }
