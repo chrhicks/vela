@@ -24,6 +24,7 @@ export interface Capturing {
   readonly alert: RunAlert | undefined
   readonly rig: ReadonlyArray<Reading>
   readonly latest: { readonly detail: string; readonly picture: string | undefined; readonly stats: ReadonlyArray<Reading> }
+  readonly stack: { readonly detail: string; readonly picture: string | undefined; readonly counts: ReadonlyArray<Reading> }
   readonly trendWindows: Readonly<Record<TrendWindowName, TrendView>>
 }
 

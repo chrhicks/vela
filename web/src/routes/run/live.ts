@@ -4,6 +4,7 @@ import { previewAddress, type Frame } from '../../../../state/frames.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Devices } from '../../../../state/devices.ts'
 import type { Run } from '../../../../state/run.ts'
+import { stackPictureAddress, type Stacked } from '../../../../state/stack.ts'
 import type { Span } from '../../components/Chart.tsx'
 import type { Reading } from '../../components/Readings.tsx'
 import { niceTicks } from '../../components/ticks.ts'
@@ -11,12 +12,27 @@ import type { Point, Trends } from '../../../../state/trends.ts'
 import type { TrendWindowName } from './TrendWindow.tsx'
 import type { Capturing, Trend, TrendView } from './capturing.ts'
 import { poorAlert, verdictFact } from './first-frames.ts'
-import { flipWord, guidingWord, mountWords, unknown } from '../../rig/words.ts'
+import { duration, flipWord, guidingWord, mountWords, unknown } from '../../rig/words.ts'
 
 const clock = (at: number, withSeconds = false) =>
   new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(withSeconds ? { second: '2-digit' } : {}), hour12: false })
 
 const fixed = (value: number | null, digits: number, unit = '') => (value === null ? unknown : `${value.toFixed(digits)}${unit}`)
+
+function stackView(run: Run, stack: Stacked | undefined): Capturing['stack'] {
+  const ours = stack !== undefined && stack.sequence === run.sequence ? stack : undefined
+
+  if (ours === undefined || ours.frames === 0) return { detail: 'No frames yet', picture: undefined, counts: [] }
+
+  return {
+    detail: `${ours.frames} frames · ${duration(ours.frames * run.exposureSeconds)}`,
+    picture: stackPictureAddress(ours),
+    counts: [
+      { label: 'Frames', value: String(ours.frames) },
+      { label: 'Left out', value: String(ours.leftOut), attention: ours.leftOut > 0 },
+    ],
+  }
+}
 
 const latestMeasured = (frames: ReadonlyArray<Frame>) => [...frames].reverse().find(frame => frame.measurements !== undefined)
 
@@ -124,9 +140,10 @@ export interface Live {
   readonly now: number | undefined
   readonly trends: Trends
   readonly checked?: FirstFramesChecked | undefined
+  readonly stack?: Stacked | undefined
 }
 
-export function liveCapturing({ run, frames, devices, guiding, now, trends, checked }: Live): Capturing {
+export function liveCapturing({ run, frames, devices, guiding, now, trends, checked, stack }: Live): Capturing {
   const ours = framesOf(run, frames)
   const latest = latestMeasured(ours)
   const kept = ours.at(-1)
@@ -142,5 +159,6 @@ export function liveCapturing({ run, frames, devices, guiding, now, trends, chec
       picture: kept === undefined ? undefined : previewAddress(kept),
       stats: latestStats(run, latest, checked),
     },
+    stack: stackView(run, stack),
   }
 }
