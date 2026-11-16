@@ -20,6 +20,12 @@ export interface RefusalWords {
 
 const nightStepWords: Readonly<Record<NightStep, string>> = { guiding: 'guiding off', home: 'home', tracking: 'tracking off', cooler: 'cooler off' }
 
+const afterwards = (endedRun: boolean, stoppedGuiding: boolean | undefined) => {
+  const done = [...(endedRun ? ['Run stopped'] : []), ...(stoppedGuiding === true ? ['guiding stopped'] : [])]
+
+  return done.length === 0 ? {} : { toDo: done.join(' · ') }
+}
+
 export const doneWords = (done: Done): RefusalWords =>
   Match.value(done).pipe(
     Match.discriminatorsExhaustive('code')({
@@ -40,14 +46,15 @@ export const doneWords = (done: Done): RefusalWords =>
       flats: ({ frames, celsius }) => ({ happened: `Flats ${frames} frames`, toDo: `at ${celsius} °C · finding the exposure` }),
       bias: ({ frames, celsius }) => ({ happened: `Bias ${frames} frames`, toDo: `at ${celsius} °C` }),
       autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
-      home: ({ endedRun }) => ({ happened: 'Going home', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
-      stop: ({ endedRun }) => ({ happened: 'Stopped', ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
+      home: ({ endedRun, stoppedGuiding }) => ({ happened: 'Going home', ...afterwards(endedRun, stoppedGuiding) }),
+      stop: ({ endedRun, stoppedGuiding }) => ({ happened: 'Stopped', ...afterwards(endedRun, stoppedGuiding) }),
       'stopped-for-night': ({ missed }) => ({ happened: 'Stopped for the night', ...(missed.length === 0 ? {} : { toDo: `not done: ${missed.map(step => nightStepWords[step]).join(', ')}` }) }),
       tracking: ({ on }) => ({ happened: on ? 'Tracking on' : 'Tracking off' }),
-      centring: ({ target, endedRun }) => ({ happened: `Centring ${target}`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
-      flip: ({ settled, flipped, pierSide, pausedRun }) => {
+      centring: ({ target, endedRun, stoppedGuiding }) => ({ happened: `Centring ${target}`, ...afterwards(endedRun, stoppedGuiding) }),
+      flip: ({ settled, flipped, pierSide, pausedRun, stoppedGuiding, restartedGuiding }) => {
         const side = pierSide === undefined ? [] : [`pier ${pierSide}`]
-        const run = pausedRun ? ['run resumed'] : []
+        const guiding = stoppedGuiding === true ? [restartedGuiding === true ? 'guiding restarted' : 'guiding off'] : []
+        const run = [...guiding, ...(pausedRun ? ['run resumed'] : [])]
 
         if (!settled) return { happened: 'Flip sent', toDo: ['mount still moving', ...run].join(' · ') }
 

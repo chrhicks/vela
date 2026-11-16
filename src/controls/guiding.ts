@@ -1,6 +1,7 @@
 import { Context, Duration, Effect, Option, Result, Schema, Stream } from 'effect'
 import type { Done } from '../../state/commands.ts'
 import { readRigEntry } from '../../state/entries.ts'
+import type { GuiderActivity } from '../../state/guiding.ts'
 import type { Entry } from '../../state/entry.ts'
 import { CommandRefused } from '../feed/commands.ts'
 import { Feed } from '../feed/feed.ts'
@@ -64,5 +65,27 @@ export const guidingControls = Effect.gen(function* () {
     calibrateGuiding: guide(true),
     stopGuiding: call('stop_capture').pipe(Effect.as<Done>({ code: 'guiding-stopped' })),
     pickGuideStar: connected.pipe(Effect.andThen(call('loop')), Effect.andThen(call('find_star')), Effect.andThen(call('guide', { settle, recalibrate: false })), Effect.as<Done>({ code: 'guiding-starting', recalibrate: false })),
+  }
+})
+
+const guidingActivities: ReadonlyArray<GuiderActivity> = ['guiding', 'calibrating', 'starLost', 'paused']
+
+const capturingActivities: ReadonlyArray<GuiderActivity> = [...guidingActivities, 'looping', 'starPicked']
+
+export const mountGuiding = Effect.gen(function* () {
+  const feed = yield* Feed
+  const guiding = yield* guidingControls
+
+  return {
+    stop: Effect.gen(function* () {
+      const { link, activity } = (yield* feed.current).guiding
+
+      if (link !== 'connected' || activity === undefined || !capturingActivities.includes(activity)) return false
+
+      yield* guiding.stopGuiding
+
+      return guidingActivities.includes(activity)
+    }),
+    start: Effect.map(Effect.result(guiding.startGuiding), Result.isSuccess),
   }
 })
