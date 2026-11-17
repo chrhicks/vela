@@ -1,30 +1,43 @@
 import { useParams } from 'react-router'
 
+import { framesOf } from '../../../../state/first-frames.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
-import { Inspector } from './Inspector.tsx'
-import { frameFacts, latestFrame } from './stub.ts'
-
-function frameAsked(number: string | undefined): number {
-  const asked = Number.parseInt(number ?? '', 10)
-
-  return Number.isInteger(asked) && asked >= 1 && asked <= latestFrame ? asked : latestFrame
-}
+import { Statement } from '../../components/Statement.tsx'
+import { clockSeconds } from '../../rig/clock.ts'
+import { useRig } from '../../rig/store.ts'
+import { FrameInspector } from './FrameInspector.tsx'
 
 export function FramePage() {
-  const frame = frameAsked(useParams().number)
+  const asked = Number.parseInt(useParams().number ?? '', 10)
+  const run = useRig(rig => rig.run)
+  const kept = useRig(rig => rig.frames)
+  const ours = run === undefined ? [] : framesOf(run, kept)
+  const frame = ours[asked - 1]
+  const measured = frame?.measurements
+
+  const facts =
+    run === undefined || frame === undefined
+      ? []
+      : [
+          run.object,
+          `${run.exposureSeconds} s`,
+          clockSeconds(frame.keptAt),
+          ...(measured?.hfdPixels == null ? [] : [`HFD ${measured.hfdPixels.toFixed(2)}`]),
+          ...(measured?.stars == null ? [] : [`${measured.stars} stars`]),
+        ]
 
   return (
     <Page width="wide">
-      <PageHeader title={`Frame ${frame}`} facts={frameFacts}>
-        {frame > 1 ? <ActionLink to={`/frame/${frame - 1}`}>← {frame - 1}</ActionLink> : null}
-        {frame < latestFrame ? <ActionLink to={`/frame/${frame + 1}`}>{frame + 1} →</ActionLink> : null}
+      <PageHeader title={`Frame ${Number.isNaN(asked) ? '' : asked}`} facts={facts}>
+        {frame !== undefined && asked > 1 ? <ActionLink to={`/frame/${asked - 1}`}>← {asked - 1}</ActionLink> : null}
+        {frame !== undefined && asked < ours.length ? <ActionLink to={`/frame/${asked + 1}`}>{asked + 1} →</ActionLink> : null}
         <ActionLink to="/stack">Stack</ActionLink>
         <ActionLink to="/">Close</ActionLink>
       </PageHeader>
 
-      <Inspector key={frame} seed={frame} glow="faint" />
+      {frame === undefined ? <Statement size="instruction">{ours.length === 0 ? 'No frames kept in this run yet' : `This run has frames 1 to ${ours.length}`}</Statement> : <FrameInspector key={frame.file} frame={frame} />}
     </Page>
   )
 }
