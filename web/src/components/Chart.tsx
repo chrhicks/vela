@@ -51,16 +51,16 @@ function heldUntil(line: ReadonlyArray<Point>, end: number | undefined): Readonl
   return last === undefined || end === undefined || end <= last.x ? steps : [...steps, { x: end, y: last.y }]
 }
 
-function within(line: ReadonlyArray<Point>, span: Span): ReadonlyArray<Point> {
+function within(line: ReadonlyArray<Point>, span: Span, held: boolean): ReadonlyArray<Point> {
   const inside = line.filter(point => point.x >= span.from && point.x <= span.to)
-  const before = line.filter(point => point.x < span.from).at(-1)
+  const before = held ? line.filter(point => point.x < span.from).at(-1) : undefined
 
   return before === undefined ? inside : [{ x: span.from, y: before.y }, ...inside]
 }
 
 export function Chart({ title, current, lines, yTicks, xLabels, band, marker, span, held = false }: ChartProps) {
   const drawn = held ? lines.map(line => heldUntil(line, span?.to)) : lines
-  const shown = span === undefined ? drawn : drawn.map(line => within(line, span))
+  const shown = span === undefined ? drawn : drawn.map(line => within(line, span, held))
   const xs = span === undefined ? rangeOf(shown.flatMap(line => line.map(point => point.x))) : { min: span.from, max: span.to }
   const ys = rangeOf(yTicks)
   const left = (x: number) => along(x, xs)
