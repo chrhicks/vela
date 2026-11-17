@@ -15,7 +15,7 @@ import { announcesFrame } from '../frames/announce.ts'
 import { frameEntry } from '../frames/entry.ts'
 import { makeKeeper } from '../frames/keeper.ts'
 import { makeNamer } from '../frames/names.ts'
-import { frameDetail, listNight, makePreviews } from '../frames/library.ts'
+import { frameDetail, listNight, makeDeveloped, makePreviews } from '../frames/library.ts'
 import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
 import { makeFrameStats, saveStats, solveFrame } from '../frames/stats.ts'
@@ -38,6 +38,7 @@ import { SkyNow } from '../feed/sky.ts'
 import { Targets } from '../feed/targets.ts'
 import { readSurvey, SurveySettings } from '../sky/survey.ts'
 import { skyTonight } from '../sky/tonight.ts'
+import { DevelopedFrames, FrameUndeveloped } from '../feed/crops.ts'
 import { PreviewFailed, Previews } from '../feed/previews.ts'
 import { StackPictures } from '../feed/stack.ts'
 import { DetailSurveyKept, SurveyKept } from '../feed/survey.ts'
@@ -191,6 +192,7 @@ const centre = makeCentre({
   now: Date.now,
 })
 const previews = makePreviews(frames.keepDir, frames.preview)
+const developedFrames = makeDeveloped(frames.keepDir, frames.preview)
 
 const page = makePage({
   night: () => makeNight(picture, nightSettings, Date.now()),
@@ -371,6 +373,7 @@ const feedApp = FeedServer.pipe(
       }),
       Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
       Layer.succeed(DetailSurveyKept, { survey: detailSurveyKept, tilesDir: settings.skyDetail.tilesDir }),
+      Layer.succeed(DevelopedFrames, { get: (night, file) => Effect.tryPromise({ try: () => developedFrames.get(night, file), catch: cause => new FrameUndeveloped({ night, file, cause }) }) }),
       Layer.succeed(Previews, { get: (night, file) => Effect.tryPromise({ try: () => previews.get(night, file), catch: cause => new PreviewFailed({ night, file, cause }) }) }),
       Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)) }),
       Layer.succeed(CommandLog, {
