@@ -23,7 +23,7 @@ function offset(header: ReadonlyMap<string, HeaderValue>, key: string) {
   return typeof value === 'number' ? value : 0
 }
 
-export function superpixels(fits: Fits, bin: number) {
+export function colourAtOf(fits: Fits): (x: number, y: number) => number {
   const pattern = text(fits.header, 'BAYERPAT')?.toUpperCase()
 
   if (pattern === undefined || !/^[RGB]{4}$/.test(pattern)) throw new Error('the frame has no Bayer pattern')
@@ -31,6 +31,14 @@ export function superpixels(fits: Fits, bin: number) {
   const layout = [...pattern].map(letter => channels.indexOf(letter as (typeof channels)[number]))
   const xOffset = offset(fits.header, 'XBAYROFF')
   const yOffset = offset(fits.header, 'YBAYROFF')
+
+  return (x, y) => layout[((y + yOffset) & 1) * 2 + ((x + xOffset) & 1)] ?? 0
+}
+
+export const isTopDown = (fits: Fits) => text(fits.header, 'ROWORDER')?.toUpperCase() === 'TOP-DOWN'
+
+export function superpixels(fits: Fits, bin: number) {
+  const colourAt = colourAtOf(fits)
   const cell = bin * 2
   const width = Math.floor(fits.width / cell)
   const height = Math.floor(fits.height / cell)
@@ -43,7 +51,7 @@ export function superpixels(fits: Fits, bin: number) {
 
       for (let y = oy * cell; y < (oy + 1) * cell; y += 1) {
         for (let x = ox * cell; x < (ox + 1) * cell; x += 1) {
-          const channel = layout[((y + yOffset) & 1) * 2 + ((x + xOffset) & 1)] ?? 0
+          const channel = colourAt(x, y)
 
           sums[channel] = (sums[channel] ?? 0) + (fits.pixels[y * fits.width + x] ?? 0)
           counts[channel] = (counts[channel] ?? 0) + 1
@@ -108,7 +116,7 @@ export function makePreview(bytes: Buffer, settings: PreviewSettings) {
   const fits = readFits(bytes)
   const { width, height, planes } = superpixels(fits, settings.bin)
   const tables = planes.map(plane => stretch(plane, settings))
-  const topDown = text(fits.header, 'ROWORDER')?.toUpperCase() === 'TOP-DOWN'
+  const topDown = isTopDown(fits)
   const rgb = new Uint8Array(width * height * 3)
 
   for (let row = 0; row < height; row += 1) {

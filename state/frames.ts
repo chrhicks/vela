@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import type { PixelBox } from './crop-box.ts'
 import { FrameFile, NightName, SkyPosition, type RigEntry } from './entries.ts'
 
 export const Measurements = Schema.Struct({
@@ -26,7 +27,22 @@ export const previewPath = '/preview'
 
 export const PreviewAsked = Schema.Struct({ night: NightName, file: FrameFile })
 
+export const frameShapePath = '/frame-shape'
+
+export const FrameShape = Schema.Struct({ width: Schema.Int, height: Schema.Int })
+
+export type FrameShape = typeof FrameShape.Type
+
+export const frameCropPath = '/frame-crop'
+
+export const CropAsked = Schema.Struct({ night: NightName, file: FrameFile, x: Schema.FiniteFromString, y: Schema.FiniteFromString, width: Schema.FiniteFromString, height: Schema.FiniteFromString })
+
 export const previewAddress = ({ night, file }: Pick<Frame, 'night' | 'file'>) => `${previewPath}?${new URLSearchParams({ night, file }).toString()}`
+
+export const frameShapeAddress = ({ night, file }: Pick<Frame, 'night' | 'file'>) => `${frameShapePath}?${new URLSearchParams({ night, file }).toString()}`
+
+export const cropAddress = ({ night, file }: Pick<Frame, 'night' | 'file'>, { x, y, width, height }: PixelBox) =>
+  `${frameCropPath}?${new URLSearchParams({ night, file, x: String(x), y: String(y), width: String(width), height: String(height) }).toString()}`
 
 const sameFrame = (night: NightName, file: FrameFile) => (frame: Frame) => frame.night === night && frame.file === file
 

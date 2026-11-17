@@ -1,5 +1,6 @@
 import { open, readdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { develop, type Developed } from './crop.ts'
 import { headerCards, type Card } from './fits.ts'
 import { frameNamePattern, previewName, sidecarName, type Sidecar } from './keeper.ts'
 import { nightPattern } from './night.ts'
@@ -131,6 +132,36 @@ export function makePreviews(keepDir: string, settings: PreviewSettings) {
       inFlight.set(key, pending)
 
       return pending
+    },
+  }
+}
+
+export function makeDeveloped(keepDir: string, settings: PreviewSettings) {
+  let last: { readonly key: string; readonly developed: Promise<Developed> } | undefined
+
+  return {
+    async get(night: string, file: string): Promise<Developed | undefined> {
+      if (!nightPattern.test(night) || !frameNamePattern.test(file)) return undefined
+
+      const directory = join(keepDir, night)
+      const kept = await readFile(join(directory, sidecarName(file))).then(
+        () => true,
+        () => false,
+      )
+
+      if (!kept) return undefined
+
+      const key = join(night, file)
+
+      if (last?.key !== key) last = { key, developed: readFile(join(directory, file)).then(bytes => develop(bytes, settings)) }
+
+      const asked = last
+
+      return asked.developed.catch((cause: unknown) => {
+        if (last === asked) last = undefined
+
+        throw cause
+      })
     },
   }
 }
