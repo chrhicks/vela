@@ -1,9 +1,9 @@
 import { Context, Effect } from 'effect'
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
 import type { Refusal } from '../../state/commands.ts'
-import { bestPlacedPath, catalogPath, TargetAsked, targetPath, TargetSearch, targetsPath, type TargetFacts, type TargetFound } from '../../state/targets.ts'
+import { BestPlacedAsked, bestPlacedPath, catalogPath, TargetAsked, targetPath, TargetSearch, targetsPath, type TargetFacts, type TargetFound } from '../../state/targets.ts'
 
-export class Targets extends Context.Service<Targets, { readonly search: (text: string) => Effect.Effect<ReadonlyArray<TargetFound>>; readonly bestPlaced: Effect.Effect<ReadonlyArray<TargetFound>>; readonly facts: (id: string) => Effect.Effect<TargetFacts | undefined>; readonly size: number }>()('vela/Targets') {}
+export class Targets extends Context.Service<Targets, { readonly search: (text: string) => Effect.Effect<ReadonlyArray<TargetFound>>; readonly bestPlaced: (asked: BestPlacedAsked) => Effect.Effect<ReadonlyArray<TargetFound>>; readonly facts: (id: string) => Effect.Effect<TargetFacts | undefined>; readonly size: number }>()('vela/Targets') {}
 
 const malformed: Refusal = { code: 'malformed' }
 
@@ -11,7 +11,16 @@ const refused = (status: number, refusal: Refusal) => HttpServerResponse.jsonUns
 
 const answer = (found: ReadonlyArray<TargetFound> | TargetFacts) => HttpServerResponse.jsonUnsafe(found, { headers: { 'cache-control': 'no-store' } })
 
-export const BestPlacedRoute = HttpRouter.add('GET', bestPlacedPath, Effect.map(Effect.flatMap(Targets, targets => targets.bestPlaced), answer))
+export const BestPlacedRoute = HttpRouter.add(
+  'GET',
+  bestPlacedPath,
+  Effect.gen(function* () {
+    const targets = yield* Targets
+    const asked = yield* HttpServerRequest.schemaSearchParams(BestPlacedAsked)
+
+    return answer(yield* targets.bestPlaced(asked))
+  }).pipe(Effect.catchTag('SchemaError', () => Effect.succeed(refused(400, malformed)))),
+)
 
 export const TargetsRoute = HttpRouter.add(
   'GET',

@@ -390,7 +390,7 @@ const feedApp = FeedServer.pipe(
       }),
       Layer.succeed(Targets, {
         search: text => Effect.map(Clock.currentTimeMillis, at => placedTargets.search(text, at)),
-        bestPlaced: Effect.map(Clock.currentTimeMillis, at => placedTargets.bestPlaced(at)),
+        bestPlaced: asked => Effect.map(Clock.currentTimeMillis, at => placedTargets.bestPlaced(at, asked)),
         facts: id => Effect.map(Clock.currentTimeMillis, at => placedTargets.facts(id, at)),
         size: catalog.size,
       }),

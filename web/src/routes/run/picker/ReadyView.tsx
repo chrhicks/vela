@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 
 import { ActionLink } from '../../../components/ActionLink.tsx'
+import type { ListOrder, ListShown } from '../../../../../state/targets.ts'
 import { Caption } from '../../../components/Caption.tsx'
+import { Choices } from '../../../components/Choices.tsx'
 import { Field } from '../../../components/Field.tsx'
 import { Page } from '../../../components/Page.tsx'
 import { PageHeader } from '../../../components/PageHeader.tsx'
@@ -18,14 +20,18 @@ import { moonWords } from './words.ts'
 
 const refreshMilliseconds = 60_000
 
+const listedWords: Readonly<Record<ListOrder, string>> = { placed: 'Best placed', largest: 'Largest up' }
+
 export function ReadyView() {
   const [typed, setTyped] = useState('')
+  const [show, setShow] = useState<ListShown>('all')
+  const [order, setOrder] = useState<ListOrder>('placed')
   const [search] = useSearchParams()
   const now = useLocalNow(refreshMilliseconds)
   const minute = Math.floor(now / refreshMilliseconds)
   const text = typed.trim()
 
-  const listing = useAsked(() => (text === '' ? bestPlacedTargets() : findTargets(text)), text, minute)
+  const listing = useAsked(() => (text === '' ? bestPlacedTargets({ show, order }) : findTargets(text)), text === '' ? `${show} ${order}` : `typed ${text}`, minute)
   const sky = useAsked(skyTonight, 'sky', minute)
   const recalled = useAsked(rememberedNow, 'remembered', minute)
   const survey = useAsked(surveyKept, 'survey', 0)
@@ -54,12 +60,36 @@ export function ReadyView() {
       <div className={styles.picker} data-opened={search.has('target')}>
         <div className={styles.browse}>
           <div className={styles.find}>
-            <Caption>{text !== '' ? 'Matches' : tonight?.dark != null && now < tonight.dark.from ? `Best placed at ${clockTime(tonight.dark.from)}` : 'Best placed now'}</Caption>
+            <Caption>{text !== '' ? 'Matches' : tonight?.dark != null && now < tonight.dark.from ? `${listedWords[order]} at ${clockTime(tonight.dark.from)}` : `${listedWords[order]} now`}</Caption>
 
             <div className={styles.search}>
               <Field name="Search" kind="search" value={typed} onChange={setTyped} />
             </div>
           </div>
+
+          {text !== '' ? null : (
+            <div className={styles.narrow}>
+              <Choices
+                name="Show"
+                choices={[
+                  { value: 'all', label: 'All' },
+                  { value: 'dual-band', label: 'Dual band' },
+                ]}
+                chosen={show}
+                onChoose={setShow}
+              />
+
+              <Choices
+                name="Order"
+                choices={[
+                  { value: 'placed', label: 'Best placed' },
+                  { value: 'largest', label: 'Largest' },
+                ]}
+                chosen={order}
+                onChoose={setOrder}
+              />
+            </div>
+          )}
 
           {listing?.status === 'unreachable' ? <Statement size="instruction">Vela did not answer</Statement> : null}
           {catalog?.targets === 0 ? (

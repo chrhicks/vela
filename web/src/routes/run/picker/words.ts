@@ -1,7 +1,8 @@
 import type { EndsBy, Limit } from '../../../../../state/ends-by.ts'
 import type { Sky } from '../../../../../state/sky.ts'
-import type { Placement, TargetFacts } from '../../../../../state/targets.ts'
+import type { Placement, SizeArcminutes } from '../../../../../state/targets.ts'
 import { clockTime } from '../../../rig/clock.ts'
+import { frameDegrees } from './frame.ts'
 
 export const unknown = '—'
 
@@ -125,11 +126,15 @@ export const isUp = (placement: Placement | null) => placement === null || place
 
 const arcminutes = (value: number) => `${Number(value.toFixed(value < 10 ? 1 : 0))}′`
 
-export function sizeOf(size: TargetFacts['sizeArcminutes']) {
+export function sizeOf(size: SizeArcminutes) {
   if (size === null) return unknown
 
   return size.short === null || size.short === size.long ? arcminutes(size.long) : `${arcminutes(size.long)} × ${arcminutes(size.short)}`
 }
+
+const frameArcminutes = frameDegrees.width * 60
+
+export const frameShareOf = (size: SizeArcminutes) => (size === null ? unknown : `${Math.round((size.long / frameArcminutes) * 100)}%`)
 
 const limitWords: Readonly<Record<Limit['by'], string>> = { 'target-low': 'TARGET LOW', dark: 'DARK ENDS' }
 
