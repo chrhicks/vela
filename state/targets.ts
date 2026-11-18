@@ -20,6 +20,18 @@ export const TargetSearch = Schema.Struct({ q: Schema.String })
 
 export const TargetAsked = Schema.Struct({ id: Schema.String })
 
+export const ListShown = Schema.Literals(['all', 'dual-band'])
+
+export type ListShown = typeof ListShown.Type
+
+export const ListOrder = Schema.Literals(['placed', 'largest'])
+
+export type ListOrder = typeof ListOrder.Type
+
+export const BestPlacedAsked = Schema.Struct({ show: ListShown, order: ListOrder })
+
+export type BestPlacedAsked = typeof BestPlacedAsked.Type
+
 export const Placement = Schema.Struct({
   altitudeDegrees: Schema.Number,
   lineDegrees: Schema.Number,
@@ -43,7 +55,11 @@ export const TargetSummary = Schema.Struct({
 
 export type TargetSummary = typeof TargetSummary.Type
 
-export const TargetFound = Schema.Struct({ ...TargetSummary.fields, placement: Schema.NullOr(Placement), dualBandHint: Schema.Boolean })
+export const SizeArcminutes = Schema.NullOr(Schema.Struct({ long: Schema.Number, short: Schema.NullOr(Schema.Number) }))
+
+export type SizeArcminutes = typeof SizeArcminutes.Type
+
+export const TargetFound = Schema.Struct({ ...TargetSummary.fields, placement: Schema.NullOr(Placement), dualBandHint: Schema.Boolean, sizeArcminutes: SizeArcminutes })
 
 export type TargetFound = typeof TargetFound.Type
 
@@ -54,7 +70,6 @@ export const TargetFacts = Schema.Struct({
   raDegrees: Schema.Number,
   decDegrees: Schema.Number,
   otherNames: Schema.Array(Schema.String),
-  sizeArcminutes: Schema.NullOr(Schema.Struct({ long: Schema.Number, short: Schema.NullOr(Schema.Number) })),
   lastCentre: Schema.NullOr(Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number, at: Schema.Number, eastDegrees: Schema.Number, northDegrees: Schema.Number })),
 })
 

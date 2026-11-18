@@ -5,7 +5,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 2.2fr 0.6fr 1.1fr 0.8fr 0.8fr;
+  grid-template-columns: 2.2fr 0.6fr 1.1fr 0.8fr 0.8fr 0.7fr;
   align-items: baseline;
   gap: 1rem;
   min-height: 2.75rem;

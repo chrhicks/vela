@@ -2,7 +2,7 @@ import { Effect, Schema } from 'effect'
 import { RememberedAnswer, rememberedPath } from '../../../state/remembered.ts'
 import { SkyAnswer, skyPath, type Sky } from '../../../state/sky.ts'
 import { detailSurveyPath, SurveyAnswer, surveyPath, type Survey } from '../../../state/survey.ts'
-import { bestPlacedPath, catalogPath, CatalogSize, TargetFacts, targetPath, TargetsFound, targetsPath, type TargetFound } from '../../../state/targets.ts'
+import { type BestPlacedAsked, bestPlacedPath, catalogPath, CatalogSize, TargetFacts, targetPath, TargetsFound, targetsPath, type TargetFound } from '../../../state/targets.ts'
 
 export type Listing = { readonly status: 'listed'; readonly targets: ReadonlyArray<TargetFound> } | { readonly status: 'unreachable' }
 
@@ -48,7 +48,7 @@ const sky: Effect.Effect<SkyReading> = asked(skyPath).pipe(
 
 export const findTargets = (text: string): Promise<Listing> => Effect.runPromise(listing(`${targetsPath}?q=${encodeURIComponent(text)}`))
 
-export const bestPlacedTargets = (): Promise<Listing> => Effect.runPromise(listing(bestPlacedPath))
+export const bestPlacedTargets = (asked: BestPlacedAsked): Promise<Listing> => Effect.runPromise(listing(`${bestPlacedPath}?${new URLSearchParams(asked)}`))
 
 export const targetFacts = (id: string): Promise<FactsAnswer> => Effect.runPromise(facts(id))
 

@@ -2,7 +2,7 @@ import type { Site } from '../pointing/target.ts'
 import type { EquatorialPosition } from '../sky/coordinates.ts'
 import { moonPosition, placementOf } from '../sky/placement.ts'
 import { skyTonight } from '../sky/tonight.ts'
-import type { TargetFacts, TargetFound } from '../../state/targets.ts'
+import type { BestPlacedAsked, SizeArcminutes, TargetFacts, TargetFound } from '../../state/targets.ts'
 import { summarised, type Catalog } from './catalog.ts'
 import { dualBandHint } from './dual-band.ts'
 import { positionTarget } from './position.ts'
@@ -21,6 +21,10 @@ export interface PlacedOptions {
   readonly lastCentreNear: (position: EquatorialPosition) => (EquatorialPosition & { readonly at: number }) | undefined
   readonly settings: PlacedSettings
 }
+
+const longSideOf = (target: CatalogTarget) => target.majorAxisArcminutes ?? 0
+
+const sizeOf = (target: CatalogTarget): SizeArcminutes => (target.majorAxisArcminutes === null ? null : { long: target.majorAxisArcminutes, short: target.minorAxisArcminutes })
 
 const signedDegrees = (degrees: number) => ((((degrees + 180) % 360) + 360) % 360) - 180
 
@@ -47,7 +51,7 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: P
       return catalog.search(text, settings.searchResults).flatMap(found => {
         const target = catalog.find(found.id)
 
-        return target === undefined ? [] : [{ ...found, placement: place?.(target) ?? null, dualBandHint: dualBandHint(target) }]
+        return target === undefined ? [] : [{ ...found, placement: place?.(target) ?? null, dualBandHint: dualBandHint(target), sizeArcminutes: sizeOf(target) }]
       })
     },
 
@@ -67,24 +71,26 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: P
         placement: placer(at)?.(target) ?? null,
         dualBandHint: dualBandHint(target),
         otherNames: catalog.namesOf(target).filter(name => !shown.includes(name)),
-        sizeArcminutes: target.majorAxisArcminutes === null ? null : { long: target.majorAxisArcminutes, short: target.minorAxisArcminutes },
+        sizeArcminutes: sizeOf(target),
         lastCentre: centred === undefined ? null : { raDegrees: centred.raDegrees, decDegrees: centred.decDegrees, at: centred.at, ...offsetFrom(target, centred) },
       }
     },
 
-    bestPlaced: (asked: number): ReadonlyArray<TargetFound> => {
+    bestPlaced: (asked: number, { show, order }: BestPlacedAsked): ReadonlyArray<TargetFound> => {
       const here = site()
       const dark = here === undefined ? null : skyTonight(here, asked).dark
       const place = placer(dark !== null && asked < dark.from ? dark.from : asked)
 
       if (place === undefined) return []
 
-      return catalog.mostCited
-        .filter(target => target.commonName !== null && (target.majorAxisArcminutes ?? 0) >= settings.bestPlacedMinArcminutes)
+      const listed = catalog.mostCited.filter(target => target.commonName !== null && longSideOf(target) >= settings.bestPlacedMinArcminutes && (show === 'all' || dualBandHint(target)))
+      const ordered = order === 'largest' ? [...listed].sort((a, b) => longSideOf(b) - longSideOf(a)) : listed
+
+      return ordered
         .map(target => ({ target, placement: place(target) }))
         .filter(({ placement }) => placement.line.above !== 'no')
         .slice(0, settings.bestPlacedRows)
-        .map(({ target, placement }) => ({ ...summarised(target), placement, dualBandHint: dualBandHint(target) }))
+        .map(({ target, placement }) => ({ ...summarised(target), placement, dualBandHint: dualBandHint(target), sizeArcminutes: sizeOf(target) }))
     },
   }
 }

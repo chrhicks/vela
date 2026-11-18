@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 
 import type { TargetFound } from '../../../../../state/targets.ts'
-import { aboveLineOf, altitudeOf, degrees, isUp, moonOf, unknown } from './words.ts'
+import { aboveLineOf, altitudeOf, degrees, frameShareOf, isUp, moonOf, unknown } from './words.ts'
 import styles from './TargetList.module.css'
 
 interface TargetListProps {
@@ -22,6 +22,7 @@ export function TargetList({ targets, chosen }: TargetListProps) {
         <span>Above {line === undefined ? unknown : degrees(line)} until</span>
         <span>From moon</span>
         <span>Dual band</span>
+        <span>Of frame</span>
       </div>
 
       {targets.map(target => (
@@ -50,6 +51,11 @@ export function TargetList({ targets, chosen }: TargetListProps) {
           <span className={styles.detail}>
             <span className={styles.prefix}>Dual </span>
             {target.dualBandHint ? 'Yes' : 'No'}
+          </span>
+
+          <span className={styles.detail}>
+            <span className={styles.prefix}>Frame </span>
+            {frameShareOf(target.sizeArcminutes)}
           </span>
         </Link>
       ))}

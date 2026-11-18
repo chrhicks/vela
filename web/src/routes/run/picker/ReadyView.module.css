@@ -23,6 +23,12 @@
   width: 16rem;
 }
 
+.narrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-fact) var(--gap-page);
+}
+
 @media (max-width: 60rem) {
   .picker {
     display: block;
