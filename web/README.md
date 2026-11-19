@@ -12,6 +12,7 @@ Each route serves one moment of the night.
 | `/` | The run | A desktop second monitor, then a phone |
 | `/controls` | Something needs correcting | Either |
 | `/frame/<number>`, `/stack` | Judging a picture by eye | Either |
+| `/review` | Reading why Claude thinks the stats changed | Either |
 
 ## Where things are
 
@@ -46,6 +47,10 @@ Amber appears only in the alert and on the readings it concerns, so a page with 
 ## /frame/<number> and /stack
 
 Clicking the latest frame or the stack on the run page opens it for judging the stars by eye: the whole picture with a box that follows a click, that box at 100 %, and nine crops at 100 % from the corners, edges and centre, since stars are often fine in the middle and stretched in one corner. A frame links to the one before and after it; the stack is a quick one for inspection, not a finished image.
+
+## /review
+
+Tonight's frame reviews, newest first (`routes/review/`, on real data from `state/review.ts`). Each one shows the last good frame and the frame that was asked about with their stats, then the answer of every model side by side: what it sees, the likely cause, its confidence, the suggested fix, how long it took and its tokens, or the typed reason it failed. The capturing page shows the latest review under the stats (`LatestReview`): each model's one line, cause and confidence, with a link here. Report only; nothing here acts on the rig.
 
 ## /controls
 

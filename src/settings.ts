@@ -4,6 +4,7 @@ import { described } from './config.ts'
 import { BrokerSettings } from './stream/broker.ts'
 import { CatalogConfig } from './catalog/database.ts'
 import { SurveyConfig } from './sky/survey.ts'
+import { ReviewSettings } from './review/settings.ts'
 
 export const FrameSettings = Schema.Struct({
   rig: described("The rig's id on the entries Vela publishes, the same id the rig program's entries carry", Schema.String, 'fra-cria'),
@@ -319,6 +320,7 @@ export const VelaSettings = Schema.Struct({
   controls: described('The controls page', ControlsSettings, {}),
   centre: described('Settings for slew and centre', CentreSettings, {}),
   firstFrames: described('The check of the first frames of a run on a target', FirstFramesSettings, {}),
+  review: described('Asking models to look at a light frame and say why its stats changed. Report only: it never acts on the rig', ReviewSettings, {}),
   rememberedFile: described('The file Vela keeps what it remembers in: the last light run, the camera angle and the centres that centring reached', Schema.String, '/mnt/storage/vela/remembered.json'),
   start: described('Starting a target from the picker: home, stop guiding, slew and centre, autofocus, guiding, then the run', StartRoutineSettings, {}),
   streamViewer: Schema.optionalKey(

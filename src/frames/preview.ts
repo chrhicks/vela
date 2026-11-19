@@ -112,7 +112,7 @@ export function stretch(plane: Uint16Array, settings: Pick<PreviewSettings, 'bla
   return table
 }
 
-export function makePreview(bytes: Buffer, settings: PreviewSettings) {
+export function makePreviewRgb(bytes: Buffer, settings: PreviewSettings) {
   const fits = readFits(bytes)
   const { width, height, planes } = superpixels(fits, settings.bin)
   const tables = planes.map(plane => stretch(plane, settings))
@@ -128,6 +128,12 @@ export function makePreview(bytes: Buffer, settings: PreviewSettings) {
       }
     }
   }
+
+  return { width, height, rgb }
+}
+
+export function makePreview(bytes: Buffer, settings: PreviewSettings) {
+  const { width, height, rgb } = makePreviewRgb(bytes, settings)
 
   return encodePng(width, height, rgb)
 }

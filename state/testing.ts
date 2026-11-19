@@ -38,3 +38,26 @@ export function fold<S>(reduce: (state: S, entry: RigEntry) => S, initial: S, en
 export function foldRig(entries: ReadonlyArray<Entry>, initial: RigState = emptyRig): RigState {
   return entries.reduce((state, source) => Result.getOrThrow(advance(state, source)), initial)
 }
+
+export function reviewAsked(review: string, at: number, file: string, overrides: Readonly<Record<string, unknown>> = {}, night = '2026-11-08'): Entry {
+  return entry('vela.review.asked', at, {
+    review,
+    run: 'r1',
+    night,
+    file,
+    goodFile: 'M-31_light_0004.fits',
+    reasons: ['hfd', 'stars'],
+    baseline: { hfdPixels: 2.4, stars: 2900, elongation: null },
+    current: { hfdPixels: 3.2, stars: 1900, elongation: 1.1 },
+    models: ['claude-opus-5-5', 'claude-haiku-5-5'],
+    ...overrides,
+  })
+}
+
+export function reviewAnswered(review: string, at: number, file: string, model: string, outcome: unknown, night = '2026-11-08'): Entry {
+  return entry('vela.review.answer', at, { review, night, file, model, seconds: 12.5, outcome, usage: { inputTokens: 3000, outputTokens: 400 } })
+}
+
+export const answered = { _tag: 'Answered', answer: { sees: 'Stars are cut off along the bottom edge.', cause: 'obstruction', confidence: 0.8, fix: 'Pick a target that clears the roofline.', line: 'Target behind an obstruction' } }
+
+export const failed = { _tag: 'Failed', failure: { kind: 'no-credential', message: 'Could not resolve authentication method' } }

@@ -1,0 +1,31 @@
+.reviews {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-page);
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section);
+  padding-top: var(--gap-section);
+  border-top: 1px solid var(--rule);
+}
+
+.pictures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--gap-section) var(--gap-page);
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.empty {
+  margin: 0;
+  color: var(--ember-quiet);
+}

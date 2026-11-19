@@ -2,6 +2,7 @@ import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effe
 import { FilterAnswer, Refusal } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
 import { Check, CheckedFrames, FirstFramesVerdict } from './first-frames-check.ts'
+import { ReviewId, ReviewOutcome, ReviewReason, ReviewStats, ReviewUsage } from './review-answer.ts'
 import { RunTarget } from './targets.ts'
 
 export const RunId = Schema.NonEmptyString.pipe(Schema.brand('RunId'))
@@ -70,6 +71,7 @@ export const RunStarted = entryOf('vela.run.started', {
   sequence: Schema.optionalKey(Schema.String),
   gain: Schema.optionalKey(Schema.Number),
   offset: Schema.optionalKey(Schema.Number),
+  filter: Schema.optionalKey(FilterAnswer),
 })
 
 export const RunExposed = entryOf('vela.run.exposed', { run: RunId, frame: Count })
@@ -187,7 +189,29 @@ export const CommandAnswered = entryOf('vela.command.answered', { id: Schema.Str
 
 export const StackGrew = entryOf('vela.stack', { night: NightName, sequence: Schema.String, frames: Schema.Number, leftOut: Schema.Number })
 
-export const RigEntry = Schema.Union([TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
+export const ReviewAsked = entryOf('vela.review.asked', {
+  review: ReviewId,
+  run: RunId,
+  night: NightName,
+  file: FrameFile,
+  goodFile: FrameFile,
+  reasons: Schema.Array(ReviewReason),
+  baseline: ReviewStats,
+  current: ReviewStats,
+  models: Schema.Array(Schema.NonEmptyString),
+})
+
+export const ReviewAnswered = entryOf('vela.review.answer', {
+  review: ReviewId,
+  night: NightName,
+  file: FrameFile,
+  model: Schema.NonEmptyString,
+  seconds: Schema.Number,
+  outcome: ReviewOutcome,
+  usage: Schema.optionalKey(ReviewUsage),
+})
+
+export const RigEntry = Schema.Union([ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 
