@@ -37,11 +37,22 @@ describe('where a target is in the sky', () => {
     expect(placementOf(overheadAt(at, 0, -60), phoenix, at, lineDegrees, elsewhere).line).toEqual({ above: 'no' })
   })
 
-  it('is not above the line while it is still rising toward it', () => {
-    const rising = placementOf(overheadAt(at, -8, 20), phoenix, at, lineDegrees, elsewhere)
+  it('says when a target still below the line rises to it, and it is on the line at that time', () => {
+    const target = overheadAt(at, -6, 20)
+    const rising = placementOf(target, phoenix, at, lineDegrees, elsewhere)
 
-    expect(rising.line).toEqual({ above: 'no' })
     expect(rising.altitudeDegrees).toBeLessThan(lineDegrees)
+    expect(rising.line.above).toBe('rises')
+
+    const rises = rising.line.above === 'rises' ? rising.line.at : at
+
+    expect(rises).toBeGreaterThan(at)
+    expect(placementOf(target, phoenix, rises, lineDegrees, elsewhere).altitudeDegrees).toBeCloseTo(lineDegrees, 1)
+    expect(placementOf(target, phoenix, rises + 600_000, lineDegrees, elsewhere).line.above).toBe('until')
+  })
+
+  it('is not up once it has set below the line', () => {
+    expect(placementOf(overheadAt(at, 6, 20), phoenix, at, lineDegrees, elsewhere).line).toEqual({ above: 'no' })
   })
 
   it('measures its distance from the Moon', () => {

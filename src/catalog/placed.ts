@@ -88,7 +88,7 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: P
 
       return ordered
         .map(target => ({ target, placement: place(target) }))
-        .filter(({ placement }) => placement.line.above !== 'no')
+        .filter(({ placement }) => placement.line.above === 'until' || placement.line.above === 'always')
         .slice(0, settings.bestPlacedRows)
         .map(({ target, placement }) => ({ ...summarised(target), placement, dualBandHint: dualBandHint(target), sizeArcminutes: sizeOf(target) }))
     },

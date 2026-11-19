@@ -119,10 +119,19 @@ export const moonOf = (placement: Placement | null) => (placement === null ? unk
 export function aboveLineOf(placement: Placement | null) {
   if (placement === null) return unknown
 
-  return placement.line.above === 'until' ? clockTime(placement.line.until) : placement.line.above === 'always' ? 'All night' : 'Not up'
+  switch (placement.line.above) {
+    case 'until':
+      return clockTime(placement.line.until)
+    case 'always':
+      return 'All night'
+    case 'rises':
+      return `Rises ${clockTime(placement.line.at)}`
+    case 'no':
+      return 'Not up'
+  }
 }
 
-export const isUp = (placement: Placement | null) => placement === null || placement.line.above !== 'no'
+export const isUp = (placement: Placement | null) => placement === null || placement.line.above === 'until' || placement.line.above === 'always'
 
 const arcminutes = (value: number) => `${Number(value.toFixed(value < 10 ? 1 : 0))}′`
 
