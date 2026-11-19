@@ -8,7 +8,7 @@ import { endOfMove, nextIdle } from './settle.ts'
 
 export class FocusSettings extends Context.Service<FocusSettings, { readonly moveSeconds: number }>()('vela/FocusSettings') {}
 
-export class Autofocusing extends Context.Service<Autofocusing, { readonly start: (exposureSeconds: number) => Effect.Effect<void, CommandRefused> }>()('vela/Autofocusing') {}
+export class Autofocusing extends Context.Service<Autofocusing, { readonly start: (exposureSeconds: number) => Effect.Effect<void, CommandRefused>; readonly run: (exposureSeconds: number) => Effect.Effect<string, CommandRefused> }>()('vela/Autofocusing') {}
 
 const notConnected = new CommandRefused({ refusal: { code: 'not-connected', device: 'focuser' } })
 

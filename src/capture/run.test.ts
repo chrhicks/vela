@@ -273,6 +273,60 @@ describe('a capture run on a scripted camera', () => {
     expect(camera.capture.view().last).toMatchObject({ reason: 'done', counted: 2, failed: 0 })
   })
 
+  it('lends the camera to one run while paused, then carries the paused run on with its own settings, file and count', async () => {
+    const camera = fakeCamera({ exposures: ['file', 'nothing', 'file', 'file'] })
+    const target = camera.capture.start({ ...request, count: 2, exposureSeconds: 5 })
+
+    if (!target.ok) throw new Error(target.reason)
+
+    while (camera.capture.view().run?.counted !== 1 || camera.capture.view().run?.secondsLeft === undefined) await new Promise(resolve => setTimeout(resolve, 2))
+
+    expect(camera.capture.start({ ...request, object: 'autofocus', count: 1 })).toMatchObject({ ok: false })
+    expect(camera.capture.pause()).toBe(true)
+    expect(await camera.capture.whenParked()).toBe(true)
+
+    const lent = camera.capture.start({ ...request, object: 'autofocus', count: 1 })
+
+    if (!lent.ok) throw new Error(lent.reason)
+
+    expect(camera.capture.start({ ...request, object: 'autofocus', count: 1 })).toMatchObject({ ok: false })
+    expect(camera.runFile.read()).toMatchObject({ run: target.run, counted: 1 })
+    expect(await lent.done).toMatchObject({ run: lent.run, reason: 'done', counted: 1 })
+    expect(camera.capture.view().run).toMatchObject({ id: target.run, counted: 1 })
+    expect(camera.runFile.read()).toMatchObject({ run: target.run })
+
+    camera.capture.resume()
+
+    expect(await target.done).toMatchObject({ run: target.run, reason: 'done', counted: 2, failed: 0 })
+    expect(camera.script.sent.filter(sent => sent.property === 'UPLOAD_SETTINGS').map(sent => sent.values['UPLOAD_PREFIX'])).toEqual(['M-31_dark_001', 'M-31_dark_002', 'autofocus_dark_001', 'M-31_dark_002'])
+    expect(camera.runFile.read()).toBeUndefined()
+  })
+
+  it('stops the paused run too when Stop is pressed while it lends the camera', async () => {
+    const camera = fakeCamera({ exposures: ['nothing', 'nothing'] })
+    const target = camera.capture.start({ ...request, count: 2, exposureSeconds: 5 })
+
+    if (!target.ok) throw new Error(target.reason)
+
+    while (camera.capture.view().run?.secondsLeft === undefined) await new Promise(resolve => setTimeout(resolve, 2))
+
+    camera.capture.pause()
+    await camera.capture.whenParked()
+
+    const lent = camera.capture.start({ ...request, object: 'autofocus', count: 1, exposureSeconds: 5 })
+
+    if (!lent.ok) throw new Error(lent.reason)
+
+    while (camera.capture.view().run?.secondsLeft === undefined) await new Promise(resolve => setTimeout(resolve, 2))
+    await camera.capture.stop()
+    await camera.capture.whenIdle()
+
+    expect(await target.done).toMatchObject({ reason: 'stopped' })
+    expect(await lent.done).toMatchObject({ reason: 'stopped' })
+    expect(camera.capture.view().run).toBeUndefined()
+    expect(camera.runFile.read()).toBeUndefined()
+  })
+
   it('says when no run is left, at once when idle and only after a stopped run has ended', async () => {
     const camera = fakeCamera({ exposures: ['file', 'nothing'] })
 

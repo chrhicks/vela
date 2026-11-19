@@ -12,6 +12,7 @@ export class MountRuns extends Context.Service<
     readonly endRun: Effect.Effect<boolean>
     readonly idle: Effect.Effect<void>
     readonly pause: Effect.Effect<boolean>
+    readonly parked: Effect.Effect<boolean>
     readonly resume: Effect.Effect<void>
   }
 >()('vela/MountRuns') {}

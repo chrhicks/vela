@@ -331,6 +331,7 @@ const mountRuns = Layer.succeed(MountRuns, {
   endRun: cancelStart.pipe(Effect.andThen(Effect.promise(() => capture.stop()))),
   idle: Effect.promise(() => capture.whenIdle()),
   pause: Effect.sync(() => capture.pause()),
+  parked: Effect.promise(() => capture.whenParked()),
   resume: Effect.sync(() => capture.resume()),
 })
 
@@ -347,6 +348,12 @@ const centring = Layer.succeed(Centring, {
 
 const autofocusing = Layer.succeed(Autofocusing, {
   start: exposureSeconds => Effect.suspend(() => started(autofocus.start({ step: settings.launch.autofocusStep, samples: settings.launch.autofocusSamples, exposureSeconds }))),
+  run: exposureSeconds =>
+    Effect.suspend(() => {
+      const result = autofocus.start({ step: settings.launch.autofocusStep, samples: settings.launch.autofocusSamples, exposureSeconds })
+
+      return result.ok ? Effect.promise(() => result.done).pipe(Effect.map(ending => ending.reason)) : Effect.fail(new CommandRefused({ refusal: { code: 'refused', text: result.reason } }))
+    }),
 })
 
 const capturing = Layer.succeed(Capturing, {

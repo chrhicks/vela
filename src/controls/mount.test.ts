@@ -38,7 +38,7 @@ function setup(rig: RigState, answer: (command: Command, signal: AbortSignal) =>
   const centring = Layer.succeed(Centring, { centreOn: (target: string) => Effect.sync(() => (sent.push(`centre on ${target}`), `${target} found`)) })
   const entries = Stream.fromIterable(later).pipe(Stream.map(next => ((now = next.rig), next.entry)))
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.succeed({ state: rig, entries }), current: Effect.sync(() => now) })
-  const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('vela run stopped'), true)), idle: Effect.sync(() => void sent.push('no run')), pause: Effect.sync(() => (sent.push('run paused'), true)), resume: Effect.sync(() => void sent.push('run resumed')) })
+  const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('vela run stopped'), true)), idle: Effect.sync(() => void sent.push('no run')), pause: Effect.sync(() => (sent.push('run paused'), true)), parked: Effect.succeed(true), resume: Effect.sync(() => void sent.push('run resumed')) })
   const guiding = Layer.succeed(MountGuiding, {
     stop: guider.refuses === true ? Effect.fail(new CommandRefused({ refusal: { code: 'guider-silent', seconds: 30 } })) : guider.guiding === true ? Effect.sync(() => (sent.push('guiding stopped'), true)) : Effect.succeed(false),
     start: Effect.sync(() => (sent.push('guiding started'), true)),
