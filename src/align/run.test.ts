@@ -179,3 +179,49 @@ describe('a polar alignment run on a scripted camera and mount', () => {
     expect(slews).toHaveLength(2)
   })
 })
+
+describe('a polar alignment run whose first slew the mount program refuses', () => {
+  function refusedRun(mountProperties: Record<string, Record<string, boolean | number>>, refusing: string | undefined) {
+    const camera = fakeCamera()
+    let at = startedAt + 1000
+
+    camera.feed(wire((at += 1), 'def', 'primary', 'GEOGRAPHIC_COORD', phoenix, 'Ok'))
+
+    for (const [property, values] of Object.entries(mountProperties)) camera.feed(wire((at += 1), 'def', 'primary', property, values, 'Ok'))
+
+    const align = makeAlign({
+      picture: camera.picture,
+      sender: { send: async command => (command.property === refusing ? { result: 'refused', reason: 'the mount program said no' } : camera.sender.send(command)) },
+      capture: camera.capture,
+      publish: () => undefined,
+      settings: { mount: 'primary', camera: 'primary', declinationDegrees: 80, hourAnglesDegrees: [-130, -73, -16] },
+      now: () => startedAt,
+    })
+
+    return { align, camera }
+  }
+
+  async function problemOf(run: ReturnType<typeof refusedRun>) {
+    expect(run.align.start({ exposureSeconds: 0.01 })).toEqual({ ok: true })
+
+    while (run.align.view().problem === undefined) await new Promise(resolve => setTimeout(resolve, 2))
+
+    await run.camera.capture.stop()
+
+    return run.align.view().problem
+  }
+
+  const onCoordSet = { SLEW: false, TRACK: true, SYNC: false }
+
+  it('says the coordinates were refused, with the hour angle', async () => {
+    expect(await problemOf(refusedRun({ ON_COORD_SET: onCoordSet, EQUATORIAL_EOD_COORD: { RA: 0, DEC: 90 } }, 'EQUATORIAL_EOD_COORD'))).toBe('slew to hour angle -130°: the mount program said no')
+  })
+
+  it('says the tracking mode was refused', async () => {
+    expect(await problemOf(refusedRun({ ON_COORD_SET: onCoordSet }, 'ON_COORD_SET'))).toBe('ON_COORD_SET: the mount program said no')
+  })
+
+  it('says the mount has no TRACK element', async () => {
+    expect(await problemOf(refusedRun({ ON_COORD_SET: { SLEW: true, SYNC: false } }, undefined))).toBe('primary has no TRACK element in ON_COORD_SET')
+  })
+})
