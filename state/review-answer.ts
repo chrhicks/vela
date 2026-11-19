@@ -15,7 +15,7 @@ export const ReviewAnswer = Schema.Struct({
 
 export type ReviewAnswer = typeof ReviewAnswer.Type
 
-export const ReviewFailureKind = Schema.Literals(['no-credential', 'rejected', 'no-credit', 'rate-limited', 'unreachable', 'refused', 'truncated', 'unreadable-answer', 'no-picture', 'other'])
+export const ReviewFailureKind = Schema.Literals(['no-credential', 'rejected', 'no-credit', 'rate-limited', 'unreachable', 'refused', 'truncated', 'unreadable-answer', 'no-picture', 'restarted', 'other'])
 
 export type ReviewFailureKind = typeof ReviewFailureKind.Type
 

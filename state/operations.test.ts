@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cutShort, isRunning, noOperations, operations, type Operations } from './operations.ts'
-import { entry, fold } from './testing.ts'
+import { entry, fold, velaStarted } from './testing.ts'
 
 const reduce = (entries: Parameters<typeof fold>[2]) => fold<Operations>(operations, noOperations, entries)
 
@@ -28,5 +28,19 @@ describe('operations', () => {
     expect(cutShort(fold(operations, started, [entry('vela.run.ended', 120, { run: 'a1', reason: 'stopped', detail: 'Stop pressed' })]).align)).toBeUndefined()
     expect(cutShort(fold(operations, started, [entry('vela.run.ended', 120, { run: 'a1', reason: 'done' })]).align)).toBeUndefined()
     expect(cutShort(started.align)).toBeUndefined()
+  })
+
+  it('ends the operations under way as interrupted when Vela starts again, and keeps the filter answer', () => {
+    const running = reduce([entry('vela.filter', 50, { filter: 'in' }), entry('vela.align.started', 100, { run: 'a1' }), entry('vela.focus.started', 110, { run: 'f1', positions: [1, 2] })])
+    const restarted = fold(operations, running, [velaStarted(200)])
+
+    expect(restarted).toMatchObject({ filter: 'in', align: { status: 'ended', run: 'a1', endedAt: 200, ending: 'interrupted' }, focus: { status: 'ended', run: 'f1', endedAt: 200, ending: 'interrupted' } })
+    expect(cutShort(restarted.focus)).toMatchObject({ ending: 'interrupted', detail: expect.stringContaining('Vela restarted') })
+  })
+
+  it('leaves operations that had ended as they were when Vela starts again', () => {
+    const done = reduce([entry('vela.align.started', 100, { run: 'a1' }), entry('vela.run.ended', 120, { run: 'a1', reason: 'done' })])
+
+    expect(fold(operations, done, [velaStarted(200)])).toEqual(done)
   })
 })

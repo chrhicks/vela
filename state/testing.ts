@@ -19,6 +19,10 @@ export function runStarted(run: string, at: number, object = 'M 31'): Entry {
   return entry('vela.run.started', at, { run, object, frameType: 'light', exposureSeconds: 120, count: 30, gain: 100, offset: 50, sequence: `${object.replace(/[^A-Za-z0-9]+/g, '-')}_light` })
 }
 
+export function velaStarted(at: number, token = '1794500000000'): Entry {
+  return entry('vela.started', at, { token })
+}
+
 export function frameKept(file: string, at: number, night = '2026-11-08'): Entry {
   return entry('vela.frame', at, { night, file, bytes: 49_000_000, sha256: 'ab' })
 }

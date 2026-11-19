@@ -1,7 +1,7 @@
 import { Option, Result } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { readRigEntry } from './entries.ts'
-import { entry, frameKept } from './testing.ts'
+import { entry, frameKept, velaStarted } from './testing.ts'
 
 describe('readRigEntry', () => {
   it('reads a kind the reducers use into its typed shape, leaving out fields they do not', () => {
@@ -58,5 +58,10 @@ describe('readRigEntry', () => {
     expect(Result.isSuccess(readRigEntry(entry('client.connection', 1, { target: 'phd2', status: 'failed', error: 'refused' })))).toBe(true)
     expect(Result.isFailure(readRigEntry(entry('client.connection', 1, { target: 'broker', status: 'connected' })))).toBe(true)
     expect(Result.isFailure(readRigEntry(entry('client.connection', 1, { target: 'indiserver', status: 'reconnecting' })))).toBe(true)
+  })
+
+  it('reads Vela starting with its start token, and refuses one without', () => {
+    expect(Result.getOrThrow(readRigEntry(velaStarted(1000)))).toMatchObject({ _tag: 'Some', value: { kind: 'vela.started', at: 1000, body: { token: '1794500000000' } } })
+    expect(Result.isFailure(readRigEntry(entry('vela.started', 1000, {})))).toBe(true)
   })
 })

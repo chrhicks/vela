@@ -5,4 +5,8 @@ export const FlatExposure = Schema.Struct({ exposureSeconds: Schema.Number, sky:
 
 export type FlatExposure = typeof FlatExposure.Type
 
-export const flatExposure = (state: FlatExposure | undefined, entry: RigEntry): FlatExposure | undefined => (entry.kind === 'vela.flats.exposure' ? { ...entry.body, at: entry.at } : state)
+export function flatExposure(state: FlatExposure | undefined, entry: RigEntry): FlatExposure | undefined {
+  if (entry.kind === 'vela.flats.exposure') return { ...entry.body, at: entry.at }
+
+  return entry.kind === 'vela.started' && state?.verdict === 'trying' ? { ...state, verdict: 'stopped', at: entry.at } : state
+}

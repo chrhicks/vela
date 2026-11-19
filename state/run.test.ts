@@ -1,7 +1,7 @@
 import { Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { run, type Run } from './run.ts'
-import { entry, fold, read, runStarted } from './testing.ts'
+import { entry, fold, read, runStarted, velaStarted } from './testing.ts'
 
 const reduce = (entries: Parameters<typeof fold>[2]) => fold<Run | undefined>(run, undefined, entries)
 
@@ -66,6 +66,19 @@ describe('run', () => {
     const state = reduce([runStarted('r1', 1000), entry('vela.run.ended', 1100, { run: 'r1', reason: 'done' }), runStarted('r2', 2000, 'M 42')])
 
     expect(state).toMatchObject({ status: 'capturing', id: 'r2', object: 'M 42' })
+  })
+
+  it('ends a capturing run as interrupted when Vela starts again, saying why', () => {
+    const state = reduce([runStarted('r1', 1000), entry('vela.run.exposed', 1130, { run: 'r1', frame: 3 }), velaStarted(1500)])
+
+    expect(state).toMatchObject({ status: 'ended', id: 'r1', frames: 3, endedAt: 1500, reason: 'interrupted', detail: expect.stringContaining('Vela restarted') })
+  })
+
+  it('leaves a run that had ended as it was when Vela starts again', () => {
+    const ended = reduce([runStarted('r1', 1000), entry('vela.run.ended', 1100, { run: 'r1', reason: 'done' })])
+
+    expect(run(ended, Option.getOrThrow(read(velaStarted(1500))))).toBe(ended)
+    expect(reduce([velaStarted(1500)])).toBeUndefined()
   })
 
   it('returns the same object for an entry that does not concern it', () => {

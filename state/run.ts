@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { FrameType, RunEnding, RunId, SkyPosition, type RigEntry } from './entries.ts'
+import { FrameType, RunEnding, RunId, SkyPosition, restartDetail, type RigEntry } from './entries.ts'
 import { RunTarget } from './targets.ts'
 
 const runFacts = {
@@ -20,7 +20,7 @@ const runFacts = {
 
 export const Run = Schema.Union([
   Schema.Struct({ status: Schema.Literal('capturing'), ...runFacts }),
-  Schema.Struct({ status: Schema.Literal('ended'), ...runFacts, endedAt: Schema.Number, reason: RunEnding }),
+  Schema.Struct({ status: Schema.Literal('ended'), ...runFacts, endedAt: Schema.Number, reason: RunEnding, detail: Schema.optional(Schema.String) }),
 ])
 
 export type Run = typeof Run.Type
@@ -42,7 +42,9 @@ export function run(state: Run | undefined, entry: RigEntry): Run | undefined {
     case 'vela.run.failed':
       return entry.body.run === state.id ? { ...state, failures: state.failures + 1 } : state
     case 'vela.run.ended':
-      return entry.body.run === state.id ? { ...state, status: 'ended', endedAt: entry.at, reason: entry.body.reason } : state
+      return entry.body.run === state.id ? { ...state, status: 'ended', endedAt: entry.at, reason: entry.body.reason, detail: entry.body.detail } : state
+    case 'vela.started':
+      return { ...state, status: 'ended', endedAt: entry.at, reason: 'interrupted', detail: restartDetail }
     default:
       return state
   }

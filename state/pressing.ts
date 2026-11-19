@@ -13,6 +13,8 @@ export function pressing(state: Pressing, entry: RigEntry): Pressing {
       return { ...state, [entry.body.id]: { command: entry.body.command, key: entry.body.key, at: entry.at } }
     case 'vela.command.answered':
       return Object.fromEntries(Object.entries(state).filter(([id]) => id !== entry.body.id))
+    case 'vela.started':
+      return nothingPressed
     default:
       return state
   }

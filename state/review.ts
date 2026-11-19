@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { FrameFile, NightName, RunId, type RigEntry } from './entries.ts'
+import { FrameFile, NightName, RunId, restartDetail, type RigEntry } from './entries.ts'
 import { ReviewId, ReviewOutcome, ReviewUsage } from './review-answer.ts'
 
 export const ReviewReply = Schema.Struct({
@@ -43,6 +43,16 @@ export function reviews(state: Reviews, entry: RigEntry): Reviews {
 
       return state.map(known => (known.id === review ? { ...known, replies: [...known.replies.filter(reply => reply.model !== model), { model, seconds, outcome, usage }] } : known))
     }
+    case 'vela.started':
+      return state.map(known => ({
+        ...known,
+        replies: [
+          ...known.replies,
+          ...known.models
+            .filter(model => !known.replies.some(reply => reply.model === model))
+            .map((model): ReviewReply => ({ model, seconds: (entry.at - known.at) / 1000, outcome: { _tag: 'Failed', failure: { kind: 'restarted', message: restartDetail } }, usage: undefined })),
+        ],
+      }))
     default:
       return state
   }

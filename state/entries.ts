@@ -5,6 +5,12 @@ import { Check, CheckedFrames, FirstFramesVerdict } from './first-frames-check.t
 import { ReviewId, ReviewOutcome, ReviewUsage } from './review-answer.ts'
 import { RunTarget } from './targets.ts'
 
+export const StartToken = Schema.String.pipe(Schema.brand('StartToken'))
+
+export type StartToken = typeof StartToken.Type
+
+export const restartDetail = 'Vela restarted while this was under way; it was not resumed'
+
 export const RunId = Schema.NonEmptyString.pipe(Schema.brand('RunId'))
 
 export type RunId = typeof RunId.Type
@@ -207,7 +213,9 @@ export const ReviewAnswered = entryOf('vela.review.answer', {
   usage: Schema.optionalKey(ReviewUsage),
 })
 
-export const RigEntry = Schema.Union([ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
+export const VelaStarted = entryOf('vela.started', { token: StartToken })
+
+export const RigEntry = Schema.Union([VelaStarted, ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 

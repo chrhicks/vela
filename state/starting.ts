@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { Refusal } from './commands.ts'
-import { StartId, StartStep, StepOutcome, type RigEntry, type TargetStepBody } from './entries.ts'
+import { StartId, StartStep, StepOutcome, type RigEntry } from './entries.ts'
 import { RunTarget } from './targets.ts'
 
 export const StepReport = Schema.Struct({ step: StartStep, outcome: StepOutcome, since: Schema.Number, at: Schema.Number, refusal: Schema.optional(Refusal) })
@@ -12,6 +12,9 @@ export const Starting = Schema.Struct({ start: StartId, target: RunTarget, start
 export type Starting = typeof Starting.Type
 
 export function starting(state: Starting | undefined, entry: RigEntry): Starting | undefined {
+  if (entry.kind === 'vela.started')
+    return state === undefined || !isStarting(state) ? state : { ...state, steps: state.steps.map((report): StepReport => (report.outcome === 'started' ? { ...report, outcome: 'stopped', at: entry.at } : report)) }
+
   if (entry.kind !== 'vela.target.step') return state
 
   const { start, target, step, outcome, refusal } = entry.body
@@ -23,6 +26,3 @@ export function starting(state: Starting | undefined, entry: RigEntry): Starting
 }
 
 export const isStarting = (state: Starting | undefined) => state?.steps.some(report => report.outcome === 'started') === true
-
-export const stoppedSteps = (state: Starting | undefined): ReadonlyArray<TargetStepBody> =>
-  state === undefined ? [] : state.steps.filter(report => report.outcome === 'started').map(report => ({ start: state.start, target: state.target, step: report.step, outcome: 'stopped' }))
