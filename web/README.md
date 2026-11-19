@@ -12,6 +12,7 @@ Each route serves one moment of the night.
 | `/` | The run | A desktop second monitor, then a phone |
 | `/controls` | Something needs correcting | Either |
 | `/frame/<number>`, `/stack` | Judging a picture by eye | Either |
+| `/review` | Seeing whether Claude calls each frame obstructed | Either |
 
 ## Where things are
 
@@ -48,6 +49,10 @@ Amber appears only in the alert and on the readings it concerns, so a page with 
 ## /frame/<number> and /stack
 
 Clicking the latest frame or the stack on the run page opens it for judging the stars by eye: the whole picture with a box that follows a click, that box at 100 %, and nine crops at 100 % from the corners, edges and centre, since stars are often fine in the middle and stretched in one corner. A frame links to the one before and after it; the stack is a quick one for inspection, not a finished image.
+
+## /review
+
+Tonight's frames as the models judged them, newest first (`routes/review/`, on real data from `state/review.ts`). A strip across the top marks every frame per model, oldest first: a tall amber mark for obstructed, a short one for clear, an outline for a failed answer; hovering gives the time, the verdict, the confidence and the hazard, and a mark links to its frame below. Each frame shows its preview and, for each model, the verdict (obstructed or clear) and confidence first, then the hazard and the one sentence, with the time it took and its tokens, or the typed reason it failed. The capturing page shows the newest frame's verdicts under the stats (`LatestReview`) with a link here. Report only; nothing here acts on the rig.
 
 ## /controls
 

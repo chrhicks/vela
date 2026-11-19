@@ -10,6 +10,7 @@
     "verify": "./verify.sh"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "@effect/platform-node": "4.0.3",
     "@nats-io/jetstream": "3.4.0",
     "@nats-io/transport-node": "3.4.0",

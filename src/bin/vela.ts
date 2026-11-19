@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { readdir } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { jetstream } from '@nats-io/jetstream'
@@ -16,6 +16,7 @@ import { frameEntry } from '../frames/entry.ts'
 import { makeKeeper } from '../frames/keeper.ts'
 import { makeNamer } from '../frames/names.ts'
 import { frameDetail, listNight, makeDeveloped, makePreviews } from '../frames/library.ts'
+import { makePreviewRgb } from '../frames/preview.ts'
 import { nightOf } from '../frames/night.ts'
 import { makeSsh } from '../frames/ssh.ts'
 import { makeFrameStats, saveStats, solveFrame } from '../frames/stats.ts'
@@ -68,6 +69,9 @@ import { readHistory } from '../stream/history.ts'
 import { keep, readKept } from '../remembered/kept.ts'
 import { lastCentreNear, nothingRemembered, remember } from '../remembered/remembered.ts'
 import { Recalled } from '../feed/remembered.ts'
+import { keepLine } from '../review/keep.ts'
+import { makeReview, PictureUnavailable } from '../review/review.ts'
+import { anthropicMessages, makeReviewer } from '../review/reviewer.ts'
 
 const settings = readConfig(VelaSettings, process.argv[2])
 const stream = streamOf(settings.environment)
@@ -220,6 +224,21 @@ const stacks = makeStacks({
 const publishStack = (count: StackCount | undefined) => {
   if (count !== undefined) publishEntry(stream.vela('stack'), 'vela.stack', `${count.sequence}:${count.frames}:${count.leftOut}`, { ...count })
 }
+const review = makeReview({
+  settings: settings.review,
+  reviewer: makeReviewer(settings.review, anthropicMessages()),
+  picture: (night, file) =>
+    Effect.tryPromise({ try: () => readFile(join(frames.keepDir, night, file)).then(bytes => makePreviewRgb(bytes, frames.preview)), catch: cause => new PictureUnavailable({ night, file, cause }) }),
+  publish: (kind, id, body) => publishEntry(stream.vela('review'), `vela.review.${kind}`, id, body),
+  keep: keepLine(settings.review.answersFile),
+  report: line => console.error(`vela: ${line}`),
+  live: () => caughtUp,
+  now: Date.now,
+  newId: () => randomUUID(),
+})
+
+if (settings.review.enabled) console.error(`vela: frame review is on, asking ${settings.review.models.join(' and ')}; it needs the sign-in from ant auth login`)
+
 let statsQueue: Promise<void> = Promise.resolve()
 
 function measureKept(frame: { readonly night: string; readonly file: string; readonly sequence?: string }) {
@@ -423,6 +442,7 @@ function observe(entry: Entry) {
   capture.observe(entry)
   pointing.observe(entry)
   focusDrift.observe(entry)
+  review.observe(entry)
   autofocus.observe(entry)
   align.observe(entry)
   centre.observe(entry)

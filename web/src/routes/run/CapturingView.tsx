@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/PageHeader.tsx'
 import { Picture } from '../../components/Picture.tsx'
 import { Readings } from '../../components/Readings.tsx'
 import { StatusLine } from '../../components/StatusLine.tsx'
+import { LatestReview } from '../review/LatestReview.tsx'
 import layout from './layout.module.css'
 import type { Capturing } from './capturing.ts'
 import { Trends } from './Trends.tsx'
@@ -78,6 +79,10 @@ export function CapturingView({ run }: CapturingViewProps) {
 
           <div className={layout.second}>
             <Readings rows={run.latest.stats} />
+          </div>
+
+          <div className={layout.second}>
+            <LatestReview />
           </div>
         </div>
 

@@ -38,3 +38,17 @@ export function fold<S>(reduce: (state: S, entry: RigEntry) => S, initial: S, en
 export function foldRig(entries: ReadonlyArray<Entry>, initial: RigState = emptyRig): RigState {
   return entries.reduce((state, source) => Result.getOrThrow(advance(state, source)), initial)
 }
+
+export function reviewAsked(review: string, at: number, file: string, overrides: Readonly<Record<string, unknown>> = {}, night = '2026-11-08'): Entry {
+  return entry('vela.review.asked', at, { review, run: 'r1', night, file, models: ['claude-opus-5-5', 'claude-haiku-5-5'], ...overrides })
+}
+
+export function reviewAnswered(review: string, at: number, file: string, model: string, outcome: unknown, night = '2026-11-08'): Entry {
+  return entry('vela.review.answer', at, { review, night, file, model, seconds: 12.5, outcome, usage: { inputTokens: 1800, outputTokens: 90 } })
+}
+
+export const obstructed = { _tag: 'Answered', answer: { obstructed: true, confidence: 0.8, hazard: 'high-tension power poles/lines', what: 'Two soft bright bands cross the frame, like lit power lines.' } }
+
+export const clear = { _tag: 'Answered', answer: { obstructed: false, confidence: 0.93, hazard: 'none', what: 'A clear star field.' } }
+
+export const failed = { _tag: 'Failed', failure: { kind: 'no-credential', message: 'Could not resolve authentication method' } }
