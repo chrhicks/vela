@@ -39,6 +39,7 @@ export const Placement = Schema.Struct({
   line: Schema.Union([
     Schema.Struct({ above: Schema.Literal('until'), until: Schema.Number }),
     Schema.Struct({ above: Schema.Literal('always') }),
+    Schema.Struct({ above: Schema.Literal('rises'), at: Schema.Number }),
     Schema.Struct({ above: Schema.Literal('no') }),
   ]),
 })
