@@ -28,6 +28,8 @@ export class Operations extends Context.Service<
     readonly coolTo: (celsius: number) => Effect.Effect<Done, CommandRefused>
     readonly coolerOff: Effect.Effect<Done, CommandRefused>
     readonly stopForTheNight: Effect.Effect<Done, CommandRefused>
+    readonly refocus: Effect.Effect<Done, CommandRefused>
+    readonly reguide: Effect.Effect<Done, CommandRefused>
     readonly dewAuto: Effect.Effect<Done, CommandRefused>
     readonly dewFixed: (percent: number) => Effect.Effect<Done, CommandRefused>
     readonly dewOff: Effect.Effect<Done, CommandRefused>
@@ -87,6 +89,8 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         testFrame: ({ exposureSeconds }) => operations.testFrame(exposureSeconds),
         startTarget: ({ target, exposureSeconds, frames, filter, centre }) => operations.startTarget(target, exposureSeconds, frames, filter, centre),
         stopForTheNight: () => operations.stopForTheNight,
+        refocus: () => operations.refocus,
+        reguide: () => operations.reguide,
         takeDarks: ({ frames, exposureSeconds, celsius }) => operations.takeDarks(frames, exposureSeconds, celsius),
         takeDarkFlats: ({ frames, exposureSeconds, celsius }) => operations.takeDarkFlats(frames, exposureSeconds, celsius),
         takeFlats: ({ frames, celsius }) => operations.takeFlats(frames, celsius),

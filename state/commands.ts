@@ -53,6 +53,8 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('testFrame'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
   Schema.Struct({ command: Schema.Literal('autofocus'), exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)) }),
   Schema.Struct({ command: Schema.Literal('stopForTheNight') }),
+  Schema.Struct({ command: Schema.Literal('refocus') }),
+  Schema.Struct({ command: Schema.Literal('reguide') }),
   Schema.Struct({ command: Schema.Literal('startTarget'), target: Schema.NonEmptyString, exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), frames: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))), filter: FilterAnswer, centre: Schema.optionalKey(Schema.Struct({ raDegrees: Schema.Finite, decDegrees: Schema.Finite })) }),
 ])
 
@@ -84,6 +86,8 @@ export const Done = Schema.Union([
   Schema.Struct({ code: Schema.Literal('test-frame'), exposureSeconds: Schema.Number, sequence: Schema.String }),
   Schema.Struct({ code: Schema.Literal('starting-target'), name: Schema.String, exposureSeconds: Schema.Number, frames: Schema.optionalKey(Schema.Number) }),
   Schema.Struct({ code: Schema.Literal('autofocusing'), exposureSeconds: Schema.Number, endedRun: Schema.Boolean }),
+  Schema.Struct({ code: Schema.Literal('refocused'), exposureSeconds: Schema.Number, ending: Schema.String }),
+  Schema.Struct({ code: Schema.Literal('reguided') }),
   Schema.Struct({ code: Schema.Literal('home'), endedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean) }),
   Schema.Struct({ code: Schema.Literal('stop'), endedRun: Schema.Boolean, stoppedGuiding: Schema.optionalKey(Schema.Boolean) }),
   Schema.Struct({ code: Schema.Literal('stopped-for-night'), endedRun: Schema.Boolean, missed: Schema.Array(NightStep) }),
@@ -105,6 +109,7 @@ export const Refusal = Schema.Union([
   Schema.Struct({ code: Schema.Literal('unknown-target'), text: Schema.String }),
   Schema.Struct({ code: Schema.Literal('move-failed'), device: DeviceName }),
   Schema.Struct({ code: Schema.Literal('run-active') }),
+  Schema.Struct({ code: Schema.Literal('no-run') }),
   Schema.Struct({ code: Schema.Literal('rig-silent'), seconds: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('out-of-range'), value: Schema.Number, min: Schema.Number, max: Schema.Number }),
   Schema.Struct({ code: Schema.Literal('malformed') }),

@@ -36,11 +36,11 @@ export function develop(bytes: Buffer, settings: PreviewSettings): Developed {
   }
 }
 
-const inside = ({ x, y, width, height }: CropBox, frame: Developed) =>
-  [x, y, width, height].every(Number.isInteger) && x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= frame.width && y + height <= frame.height
+export const isInside = ({ x, y, width, height }: CropBox, whole: { readonly width: number; readonly height: number }) =>
+  [x, y, width, height].every(Number.isInteger) && x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= whole.width && y + height <= whole.height
 
 export function cropOf(frame: Developed, box: CropBox): Result.Result<Buffer, CropOutside> {
-  if (!inside(box, frame)) return Result.fail(new CropOutside({ box, width: frame.width, height: frame.height }))
+  if (!isInside(box, frame)) return Result.fail(new CropOutside({ box, width: frame.width, height: frame.height }))
 
   const rgb = new Uint8Array(box.width * box.height * colours)
 

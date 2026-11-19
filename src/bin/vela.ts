@@ -350,6 +350,7 @@ const mountRuns = Layer.succeed(MountRuns, {
   endRun: cancelStart.pipe(Effect.andThen(Effect.promise(() => capture.stop()))),
   idle: Effect.promise(() => capture.whenIdle()),
   pause: Effect.sync(() => capture.pause()),
+  parked: Effect.promise(() => capture.whenParked()),
   resume: Effect.sync(() => capture.resume()),
 })
 
@@ -366,6 +367,12 @@ const centring = Layer.succeed(Centring, {
 
 const autofocusing = Layer.succeed(Autofocusing, {
   start: exposureSeconds => Effect.suspend(() => started(autofocus.start({ step: settings.launch.autofocusStep, samples: settings.launch.autofocusSamples, exposureSeconds }))),
+  run: exposureSeconds =>
+    Effect.suspend(() => {
+      const result = autofocus.start({ step: settings.launch.autofocusStep, samples: settings.launch.autofocusSamples, exposureSeconds })
+
+      return result.ok ? Effect.promise(() => result.done).pipe(Effect.map(ending => ending.reason)) : Effect.fail(new CommandRefused({ refusal: { code: 'refused', text: result.reason } }))
+    }),
 })
 
 const capturing = Layer.succeed(Capturing, {
@@ -394,7 +401,7 @@ const feedApp = FeedServer.pipe(
       Layer.succeed(DetailSurveyKept, { survey: detailSurveyKept, tilesDir: settings.skyDetail.tilesDir }),
       Layer.succeed(DevelopedFrames, { get: (night, file) => Effect.tryPromise({ try: () => developedFrames.get(night, file), catch: cause => new FrameUndeveloped({ night, file, cause }) }) }),
       Layer.succeed(Previews, { get: (night, file) => Effect.tryPromise({ try: () => previews.get(night, file), catch: cause => new PreviewFailed({ night, file, cause }) }) }),
-      Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)) }),
+      Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)), shape: (night, sequence) => Effect.sync(() => stacks.shape(night, sequence)), crop: (night, sequence, box) => Effect.sync(() => stacks.crop(night, sequence, box)) }),
       Layer.succeed(CommandLog, {
         newId: Effect.sync(() => randomUUID()),
         pressed: (id, request) => Effect.sync(() => publishEntry(stream.vela('command'), 'vela.command.pressed', id, { id, command: request.command, key: pressKey(request) })),

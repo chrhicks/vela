@@ -28,9 +28,11 @@ Every screen is drawn. Real data reaches the page through `src/rig/`: the servic
 
 The target picker asks the service: `GET /targets/best-placed` with nothing typed, `GET /targets?q=` for a search, `GET /target?id=` for the chosen target, `GET /sky` for the header and `GET /remembered` for the last exposure and count and the camera angle (`src/rig/targets.ts`), each again every minute. Start sends `startTarget` with the chosen exposure and count; the service then homes, stops guiding, slews and centres, focuses, guides and starts the run, and `/` lists those steps (`StartView.tsx`) until the run is capturing. Its sky picture is cut in the browser from the sky survey's tiles (`state/sky-cut.ts` finds, for each pixel of a 7° field, the tile and the pixel in it; `sky-picture.ts` loads the tiles from `/sky-tiles/` and draws), with the camera's frame over it to scale, turned and placed as it would be.
 
-The rest still reads a `stub.ts` beside its page, shaped like what the stream will give, so wiring it changes the source and leaves the components alone: the capture checks and the starting and night-over views, the ready step on `/launch`, `/controls`, and the stack inspect view.
+The rest still reads a `stub.ts` beside its page, shaped like what the stream will give, so wiring it changes the source and leaves the components alone: the capture checks and the starting and night-over views, the ready step on `/launch` and `/controls`.
 
 The frame inspect view (`/frame/N`, `routes/inspect/FrameInspector.tsx`) shows the Nth kept frame of the run: its preview with a box to place by a click or a drag, that box at one screen pixel a camera pixel, and nine crops at the same scale from the corners, the edges and the centre. The crops come from `GET /frame-crop`, cut from the camera's file with the preview's brightness curves; `GET /frame-shape` gives the frame's size in camera pixels, and `state/crop-box.ts` works out each box.
+
+The stack inspect view (`/stack`) is the same `routes/inspect/Inspector.tsx` over tonight's latest stack: `GET /stack-picture` for the whole, `GET /stack-crop` for each box and `GET /stack-shape` for its size. A stack pixel is a 2 × 2 colour superpixel binned again by the preview's `bin`, so 100 % on the stack is coarser than 100 % on a frame. Each crop address carries the stack's frame count, so a new frame brings new crops.
 
 ## /launch
 
@@ -38,7 +40,7 @@ Six steps, one address each, on a phone: `set-up` (the checklist), `bring-up` (t
 
 ## / (the run)
 
-One address whose content follows the run: no run, the target picker (`READY`), the first-frames check (`LEAVE THE SCREEN`), capturing, capturing with an alert, and the night over (`READY TO CARRY IN`). On a desktop it is three columns to glance at; on a phone the same pieces are one column in a different order, with one picture and a switch between the latest frame and the stack. `routes/run/layout.module.css` holds both arrangements.
+One address whose content follows the run: no run, the target picker (`READY`), the first-frames check (`LEAVE THE SCREEN`), capturing, capturing with an alert, and the night over (`READY TO CARRY IN`). On a desktop it is three columns to glance at; on a phone the same pieces are one column in a different order, with one picture and a switch between the latest frame and the stack. `routes/run/layout.module.css` holds both arrangements. While capturing, the header's Refocus and Re-guide pause the run, fix focus or guiding, and carry the same run on, with no stop and no new start.
 
 The picker (`routes/run/picker/`) lists what is best placed now, all of it or only what is hinted for dual band, the most cited or the largest first, with how much of the frame's width each target spans; it filters as you type on any of a target's names, and shows the chosen target with the camera's frame drawn over it. Two things are set there, the exposure and when the run stops; the end time is worked out from them (`ends-by.ts`). The chosen target is in the address (`&target=`), so on a phone the list and the chosen target are two screens.
 

@@ -77,18 +77,32 @@ export const startControls = Effect.gen(function* () {
       yield* operationDone('autofocus')
     })
 
-  const guide = Effect.scoped(
+  const settledAfter = (begin: Effect.Effect<Done, CommandRefused>) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { entries } = yield* feed.subscribe
+
+        yield* begin
+
+        const settle = yield* guidingSettled(entries, guidingSeconds)
+
+        if (Option.isNone(settle)) return yield* refusedWith({ code: 'guider-silent', seconds: guidingSeconds })
+        if (settle.value.status !== 0) return yield* refusedWith({ code: 'guider-refused', text: settle.value.error ?? 'guiding did not settle' })
+      }),
+    )
+
+  const guide = settledAfter(guiding.startGuiding)
+
+  const whilePaused = <A>(work: Effect.Effect<A, CommandRefused>) =>
     Effect.gen(function* () {
-      const { entries } = yield* feed.subscribe
+      if ((yield* feed.current).run?.status !== 'capturing' || (yield* running.busy)) return yield* refusedWith({ code: 'no-run' })
+      if (!(yield* runs.pause)) return yield* refusedWith({ code: 'no-run' })
 
-      yield* guiding.startGuiding
-
-      const settle = yield* guidingSettled(entries, guidingSeconds)
-
-      if (Option.isNone(settle)) return yield* refusedWith({ code: 'guider-silent', seconds: guidingSeconds })
-      if (settle.value.status !== 0) return yield* refusedWith({ code: 'guider-refused', text: settle.value.error ?? 'guiding did not settle' })
-    }),
-  )
+      return yield* runs.parked.pipe(
+        Effect.flatMap(parked => (parked ? work : refusedWith({ code: 'no-run' }))),
+        Effect.ensuring(runs.resume),
+      )
+    })
 
   const routine = (start: StartId, target: RunTarget, steps: ReadonlyArray<Step>) =>
     Effect.forEach(
@@ -113,6 +127,13 @@ export const startControls = Effect.gen(function* () {
   ]
 
   return {
+    refocus: Effect.gen(function* () {
+      const exposureSeconds = autofocusExposureSeconds[(yield* feed.current).operations.filter ?? 'in']
+      const ending = yield* whilePaused(autofocusing.run(exposureSeconds))
+
+      return { code: 'refocused', exposureSeconds, ending } satisfies Done
+    }),
+    reguide: whilePaused(settledAfter(guiding.pickGuideStar)).pipe(Effect.as<Done>({ code: 'reguided' })),
     stopForTheNight: Effect.gen(function* () {
       const endedRun = yield* runs.endRun
       const missed = yield* Effect.forEach(nightSteps, ([step, work]) => Effect.map(Effect.result(work), done => (Result.isFailure(done) ? [step] : [])))

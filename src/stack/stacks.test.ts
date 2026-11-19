@@ -1,9 +1,11 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Result } from 'effect'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { PlateSolution } from '../frames/stats.ts'
 import { syntheticFits } from '../testing/fits.ts'
+import { decodePng } from '../testing/png.ts'
 import { makeStacks } from './stacks.ts'
 
 const solution: PlateSolution = {
@@ -22,6 +24,8 @@ const solved: string[] = []
 const failures: string[] = []
 
 const light = (imageType = 'Light Frame') => syntheticFits({ width: 80, height: 48, pattern: 'RGGB', pixel: (x, y) => 500 + ((x * 7 + y * 13) % 50), extra: { IMAGETYP: imageType, RA: 23.46, DEC: 30.65 } })
+
+const rowOf = ({ width, rgb }: { readonly width: number; readonly rgb: Uint8Array }, row: number) => [...rgb.subarray(row * width * 3, (row + 1) * width * 3)]
 
 const stacks = () =>
   makeStacks({
@@ -62,6 +66,24 @@ describe('the night stacks', () => {
     expect(kept.picture(night, 'M-33_light')?.png.subarray(1, 4).toString()).toBe('PNG')
     expect(kept.picture(night, 'M-33_light')?.frames).toBe(2)
     expect(kept.picture(night, 'NGC-7635_light')).toBeUndefined()
+  })
+
+  it('gives the stack in its own pixels and a box of it at full size, with the frames it holds', async () => {
+    const kept = stacks()
+
+    await kept.add({ night, file: 'M-33_light_001.fits', sequence: 'M-33_light' }, solution)
+
+    const shape = kept.shape(night, 'M-33_light')
+    const whole = kept.picture(night, 'M-33_light')
+    const box = kept.crop(night, 'M-33_light', { x: 2, y: 1, width: 10, height: 6 })
+
+    expect(shape).toEqual({ width: 20, height: 12 })
+    expect(whole === undefined ? undefined : decodePng(whole.png)).toMatchObject({ width: 20, height: 12 })
+    expect(box !== undefined && Result.isSuccess(box) ? [decodePng(box.success.png), box.success.frames] : undefined).toMatchObject([{ width: 10, height: 6 }, 1])
+    expect(box !== undefined && Result.isSuccess(box) && whole !== undefined ? rowOf(decodePng(box.success.png), 0) : undefined).toEqual(whole === undefined ? undefined : rowOf(decodePng(whole.png), 1).slice(2 * 3, 12 * 3))
+    expect(kept.crop(night, 'M-33_light', { x: 15, y: 0, width: 10, height: 6 })).toMatchObject({ _tag: 'Failure' })
+    expect(kept.crop(night, 'NGC-7635_light', { x: 0, y: 0, width: 10, height: 6 })).toBeUndefined()
+    expect(kept.shape('2026-11-16', 'M-33_light')).toBeUndefined()
   })
 
   it('solves a frame that has no stats yet, and counts one that does not solve as left out', async () => {

@@ -29,6 +29,8 @@ export function CapturingView({ run }: CapturingViewProps) {
   return (
     <Page width="wide">
       <PageHeader title={`Capturing ${run.frame}`} facts={run.facts}>
+        <CommandPill request={{ command: 'refocus' }}>Refocus</CommandPill>
+        <CommandPill request={{ command: 'reguide' }}>Re-guide</CommandPill>
         <ActionLink to="/?pick">Change target</ActionLink>
         <ActionLink to="/controls">Controls</ActionLink>
 

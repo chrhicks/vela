@@ -101,7 +101,7 @@ async function scriptedSweep(stars: number, refuseMoves?: string, missFrame = 0)
 
   focus.autofocus = autofocus
   if (refuseMoves !== undefined) camera.script.refuse.set('ABS_FOCUS_POSITION', refuseMoves)
-  expect(autofocus.start({ step: 50, samples: 5, exposureSeconds: 0.01 })).toEqual({ ok: true })
+  expect(autofocus.start({ step: 50, samples: 5, exposureSeconds: 0.01 })).toMatchObject({ ok: true })
 
   await new Promise<void>(resolve => {
     const check = setInterval(() => {

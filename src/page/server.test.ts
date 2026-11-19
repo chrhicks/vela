@@ -146,7 +146,7 @@ describe('page server', () => {
 
   it('starts a capture run from a json body and says why when it will not start', async () => {
     const started: unknown[] = []
-    const base = await serve(20, { capture: { ...idleCapture, start: request => (started.push(request), { ok: true, run: 'run-1', done: Promise.resolve() }) } })
+    const base = await serve(20, { capture: { ...idleCapture, start: request => (started.push(request), { ok: true, run: 'run-1', done: Promise.resolve({ run: 'run-1', reason: 'done', detail: '0 frames', counted: 0, failed: 0, at: 0 }) }) } })
     const post = (body: string) => fetch(`${base}/capture`, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
     const accepted = await post('{"object":"M 31"}')
 
