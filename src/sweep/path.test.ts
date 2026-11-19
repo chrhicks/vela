@@ -2,7 +2,7 @@ import { Observer, SiderealTime } from 'astronomy-engine'
 import { describe, expect, it } from 'vitest'
 import { decodeConfig } from '../config.ts'
 import { equatorialOfDate } from '../sky/horizontal.ts'
-import { columns, legs, poseAt, poseOfAxes, rehearsalPath, type Pose } from './path.ts'
+import { columns, legs, poseAt, poseOfAxes, rehearsalPath, rehearsalRoute, type Pose } from './path.ts'
 import { SweepSettings } from './settings.ts'
 
 const phoenix = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
@@ -295,5 +295,50 @@ describe('the rehearsal path', () => {
   it('has more moves for closer columns and fewer for a lower ceiling', () => {
     expect(rehearsalPath(phoenix, { ...settings, rehearsal: { ...settings.rehearsal, columnDegrees: 30 } }).length).toBeLessThan(path.length)
     expect(rehearsalPath(phoenix, { ...settings, ceilingDegrees: 40 }).length).toBeLessThan(path.length)
+  })
+})
+
+describe('the rehearsal route from where the mount is', () => {
+  const path = rehearsalPath(phoenix, settings)
+  const far = poseOfAxes({ hourAngleDegrees: 120, declinationDegrees: 80 }, phoenix, settings)
+  const route = rehearsalRoute(far, phoenix, settings)
+
+  it('chains legs from the mount to the first pose, then visits the rest of the rehearsal path in order', () => {
+    const chain = legs(far, path[0]!.pose, phoenix, settings)
+
+    expect(chain.length).toBeGreaterThan(10)
+    expect(route).toHaveLength(chain.length + path.length - 1)
+    expect(route.slice(0, chain.length).map(move => move.pose)).toEqual(chain)
+    expect(route.slice(chain.length)).toEqual(path.slice(1))
+    expect(route[chain.length - 1]!.pose).toEqual(path[0]!.pose)
+  })
+
+  it('turns neither axis more than the leg limit from the far-off pose to the end of the rehearsal', () => {
+    let previous = far
+
+    for (const move of route) {
+      const turn = axisTurn(previous, move.pose)
+
+      expect(turn.hourAngle).toBeLessThanOrEqual(settings.legDegrees + 1e-6)
+      expect(turn.declination).toBeLessThanOrEqual(settings.legDegrees + 1e-6)
+      previous = move.pose
+    }
+  })
+
+  it('marks the flip where the chain leaves the flipped side, and nowhere else in the chain', () => {
+    const chain = route.slice(0, legs(far, path[0]!.pose, phoenix, settings).length)
+    const flips = chain.filter(move => move.flipExpected)
+
+    expect(far.predictedPierSide).toBe('PIER_EAST')
+    expect(flips).toHaveLength(1)
+    expect(flips[0]!.pose.predictedPierSide).toBe('PIER_WEST')
+    expect(route.slice(chain.length).map(move => move.flipExpected)).toEqual(path.slice(1).map(move => move.flipExpected))
+  })
+
+  it('is one move to the first pose when the mount is already one leg away, and the whole path when it stands on it', () => {
+    const near = poseAt(7, 180, phoenix, settings)
+
+    expect(rehearsalRoute(near, phoenix, settings)).toHaveLength(path.length)
+    expect(rehearsalRoute(path[0]!.pose, phoenix, settings)).toHaveLength(path.length)
   })
 })

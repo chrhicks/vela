@@ -6,7 +6,8 @@ import { CommandButton } from '../../components/CommandButton.tsx'
 import { latestSaid, PressLine, saidOf, type Pressed, type Said } from '../../components/PressLine.tsx'
 import type { Answer } from '../../rig/commands.ts'
 import { useLink, useRig } from '../../rig/store.ts'
-import { autofocusEndWords, flatExposureWords } from '../../rig/words.ts'
+import { autofocusEndWords, flatExposureWords, rehearsalWords } from '../../rig/words.ts'
+import type { Rehearsal } from '../../../../state/rehearsal.ts'
 import type { Frame } from '../../../../state/frames.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import styles from './areas.module.css'
@@ -17,6 +18,7 @@ import { Field } from '../../components/Field.tsx'
 import { ActionRow, Area } from './Area.tsx'
 import { NudgePad } from './NudgePad.tsx'
 import { calibrationFirstStep, CalibrationSetKind, calibrationSetWords } from './calibration-sets.ts'
+import { rehearsalBlock, rehearsalBlockWords } from './live.ts'
 
 function TrackingButton({ onAnswer }: { readonly onAnswer: (answer: Answer) => void }) {
   const tracking = useRig(rig => rig.devices.mount.TELESCOPE_TRACK_STATE?.values.TRACK_ON)
@@ -32,6 +34,14 @@ function TrackingButton({ onAnswer }: { readonly onAnswer: (answer: Answer) => v
   )
 }
 
+function rehearsalSaid(state: Rehearsal | undefined): Said | undefined {
+  if (state === undefined) return undefined
+
+  const { troubled, ...words } = rehearsalWords(state)
+
+  return { words, troubled, at: state.updatedAt }
+}
+
 export function MountArea() {
   const runTarget = useRig(rig => rig.run?.object)
   const [typed, setTyped] = useState<string | undefined>(undefined)
@@ -39,10 +49,13 @@ export function MountArea() {
   const [rate, setRate] = useState<NudgeRate>('slow')
   const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
   const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
+  const rehearsal = useRig(rig => rig.rehearsal)
+  const blocked = useRig(rehearsalBlock)
+  const block = blocked === undefined ? undefined : rehearsalBlockWords[blocked]
 
   return (
     <Area id="mount">
-      <PressLine said={pressed === undefined ? undefined : saidOf(pressed)} />
+      <PressLine said={latestSaid(pressed === undefined ? undefined : saidOf(pressed), rehearsalSaid(rehearsal))} />
 
       <ActionRow>
         <CommandButton request={{ command: 'home' }} onAnswer={answered}>
@@ -62,6 +75,18 @@ export function MountArea() {
           Slew and centre
         </CommandButton>
         <Field name="Target" kind="text" value={target} onChange={setTyped} />
+      </ActionRow>
+
+      <ActionRow>
+        <CommandButton request={{ command: 'rehearseSweep' }} disabled={block !== undefined} onAnswer={answered}>
+          Rehearse sweep
+        </CommandButton>
+        {block === undefined ? null : (
+          <>
+            <span className={styles.note}>{block.note}</span>
+            {block.link === undefined ? null : <ActionLink to={block.link.to}>{block.link.text}</ActionLink>}
+          </>
+        )}
       </ActionRow>
 
       <NudgePad rate={rate} onRefused={answered} />

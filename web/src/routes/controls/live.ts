@@ -5,7 +5,10 @@ import type { CalibrationType } from '../../../../state/entries.ts'
 import { flip } from '../../../../state/flip.ts'
 import type { Guiding } from '../../../../state/guiding.ts'
 import { dewHeaters, focusPosition, mountActivity, sensorCelsius, type Box, type Mount, type Primary } from '../../../../state/devices.ts'
+import { isRunning } from '../../../../state/operations.ts'
+import { isRehearsing } from '../../../../state/rehearsal.ts'
 import type { RigState } from '../../../../state/rig.ts'
+import { isStarting } from '../../../../state/starting.ts'
 import type { Run } from '../../../../state/run.ts'
 import type { Reading } from '../../components/Readings.tsx'
 import { clockTime } from '../../rig/clock.ts'
@@ -163,3 +166,17 @@ export function liveAreas(rig: RigState, rigUp: boolean, now: number | undefined
 }
 
 export const runFacts = (run: Run | undefined): ReadonlyArray<string> => (run?.status === 'capturing' ? ['Run active', run.object, `Frame ${run.frames}`] : ['No run'])
+
+export const RehearsalBlock = Schema.Literals(['run', 'start', 'alignment', 'rehearsal'])
+
+export type RehearsalBlock = typeof RehearsalBlock.Type
+
+export const rehearsalBlock = (rig: RigState): RehearsalBlock | undefined =>
+  rig.run?.status === 'capturing' ? 'run' : isStarting(rig.starting) ? 'start' : isRunning(rig.operations.align) ? 'alignment' : isRehearsing(rig.rehearsal) ? 'rehearsal' : undefined
+
+export const rehearsalBlockWords: Readonly<Record<RehearsalBlock, { readonly note: string; readonly link?: { readonly to: string; readonly text: string } }>> = {
+  run: { note: 'Run active', link: { to: '/', text: 'See latest frame' } },
+  start: { note: 'Start going', link: { to: '/', text: 'See the start' } },
+  alignment: { note: 'Alignment going', link: { to: '/launch', text: 'See alignment' } },
+  rehearsal: { note: 'Rehearsal going' },
+}

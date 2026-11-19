@@ -1,9 +1,6 @@
 import { Schema } from 'effect'
+import type { PierSide } from '../../state/entries.ts'
 import type { SweepSettings } from './settings.ts'
-
-export const PierSide = Schema.Literals(['PIER_WEST', 'PIER_EAST'])
-
-export type PierSide = typeof PierSide.Type
 
 export const Half = Schema.Literals(['east', 'west'])
 
@@ -155,4 +152,16 @@ export function rehearsalPath(latitude: Latitude, settings: SweepSettings): Read
   })
 
   return moves
+}
+
+export function rehearsalRoute(from: Pose, latitude: Latitude, settings: SweepSettings): ReadonlyArray<Move> {
+  const path = rehearsalPath(latitude, settings)
+  const first = path[0]
+
+  if (first === undefined) return []
+
+  const chain = legs(from, first.pose, latitude, settings)
+  const joined = chain.map((pose, index): Move => ({ column: first.column, kind: 'join', pose, flipExpected: (chain[index - 1] ?? from).predictedPierSide !== pose.predictedPierSide }))
+
+  return [...joined, ...path.slice(1)]
 }
