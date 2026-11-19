@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { FilterAnswer } from './commands.ts'
-import { RunEnding, RunId, type RigEntry } from './entries.ts'
+import { RunEnding, RunId, restartDetail, type RigEntry } from './entries.ts'
 
 const started = { run: RunId, startedAt: Schema.Number }
 
@@ -26,10 +26,10 @@ export const noOperations: Operations = {}
 
 type RunEnd = Extract<RigEntry, { readonly kind: 'vela.run.ended' }>
 
-const ended = (operation: Operation | undefined, end: RunEnd): Operation | undefined =>
-  operation?.run === end.body.run && operation.status === 'running'
-    ? { status: 'ended', run: operation.run, startedAt: operation.startedAt, endedAt: end.at, ending: end.body.reason, ...(end.body.detail === undefined ? {} : { detail: end.body.detail }) }
-    : operation
+const endedAs = (operation: Operation | undefined, at: number, ending: RunEnding, detail: string | undefined): Operation | undefined =>
+  operation?.status === 'running' ? { status: 'ended', run: operation.run, startedAt: operation.startedAt, endedAt: at, ending, ...(detail === undefined ? {} : { detail }) } : operation
+
+const ended = (operation: Operation | undefined, end: RunEnd): Operation | undefined => (operation?.run === end.body.run ? endedAs(operation, end.at, end.body.reason, end.body.detail) : operation)
 
 export function operations(state: Operations, entry: RigEntry): Operations {
   switch (entry.kind) {
@@ -45,6 +45,8 @@ export function operations(state: Operations, entry: RigEntry): Operations {
 
       return align === state.align && focus === state.focus ? state : { ...state, align, focus }
     }
+    case 'vela.started':
+      return { ...state, align: endedAs(state.align, entry.at, 'interrupted', restartDetail), focus: endedAs(state.focus, entry.at, 'interrupted', restartDetail) }
     default:
       return state
   }

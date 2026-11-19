@@ -1,12 +1,10 @@
 import { Schema } from 'effect'
-import { NightName } from './entries.ts'
+import { NightName, StartToken } from './entries.ts'
 import { StreamPosition, type Entry } from './entry.ts'
 import { FirstFramesLimits } from './first-frames-check.ts'
 import { RigState } from './rig.ts'
 
-export const StartToken = Schema.String.pipe(Schema.brand('StartToken'))
-
-export type StartToken = typeof StartToken.Type
+export { StartToken }
 
 export const feedPath = '/feed'
 

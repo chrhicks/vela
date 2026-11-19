@@ -12,6 +12,7 @@ export const failureWords: Record<ReviewFailureKind, string> = {
   truncated: 'The answer was cut off',
   'unreadable-answer': 'The answer could not be read',
   'no-picture': 'No picture to send',
+  restarted: 'Vela restarted before the answer came',
   other: 'Failed',
 }
 

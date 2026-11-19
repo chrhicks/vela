@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { latestReview, noReviews, reviews, tonightsReviews, type Reviews } from './review.ts'
-import { clear, failed, fold, obstructed, reviewAnswered, reviewAsked } from './testing.ts'
+import { clear, failed, fold, obstructed, reviewAnswered, reviewAsked, velaStarted } from './testing.ts'
 
 const reduce = (entries: Parameters<typeof fold>[2]) => fold<Reviews>(reviews, noReviews, entries)
 
@@ -62,5 +62,20 @@ describe('reviews', () => {
     const bad = { _tag: 'Answered', answer: { ...clear.answer, confidence: 1.4 } }
 
     expect(() => reduce([reviewAsked('rv1', 1000, 'a.fits'), reviewAnswered('rv1', 1010, 'a.fits', 'claude-opus-5-5', bad)])).toThrow()
+  })
+
+  it('fails the replies still waiting when Vela starts again, and keeps those that came', () => {
+    const state = reduce([reviewAsked('rv1', 1000, 'M-31_light_0009.fits'), reviewAnswered('rv1', 1010, 'M-31_light_0009.fits', 'claude-opus-5-5', obstructed), velaStarted(1030)])
+
+    expect(state[0]?.replies).toHaveLength(2)
+    expect(state[0]?.replies[0]).toMatchObject({ model: 'claude-opus-5-5', outcome: { _tag: 'Answered' } })
+    expect(state[0]?.replies[1]).toMatchObject({ model: 'claude-haiku-5-5', seconds: 0.03, outcome: { _tag: 'Failed', failure: { kind: 'restarted' } } })
+  })
+
+  it('lets an answer that did arrive replace the failure', () => {
+    const state = reduce([reviewAsked('rv1', 1000, 'M-31_light_0009.fits'), velaStarted(1030), reviewAnswered('rv1', 1040, 'M-31_light_0009.fits', 'claude-haiku-5-5', clear)])
+
+    expect(state[0]?.replies.filter(reply => reply.model === 'claude-haiku-5-5')).toHaveLength(1)
+    expect(state[0]?.replies.find(reply => reply.model === 'claude-haiku-5-5')?.outcome._tag).toBe('Answered')
   })
 })

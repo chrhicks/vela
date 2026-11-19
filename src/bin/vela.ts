@@ -45,7 +45,6 @@ import { StackPictures } from '../feed/stack.ts'
 import { DetailSurveyKept, SurveyKept } from '../feed/survey.ts'
 import { CommandLog, CommandRefused, Operations } from '../feed/commands.ts'
 import { pressKey } from '../../state/pressing.ts'
-import { stoppedSteps } from '../../state/starting.ts'
 import type { FilterAnswer } from '../../state/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
@@ -61,7 +60,7 @@ import { makePlacedTargets } from '../catalog/placed.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName, StartId } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
-import { ServiceStartNow } from '../feed/start.ts'
+import { ServiceStart, ServiceStartNow } from '../feed/start.ts'
 import { makeReader, type Entry, type Message } from '../../state/entry.ts'
 import { streamOf } from '../../state/stream.ts'
 import { readWireBody } from '../stream/json.ts'
@@ -386,9 +385,23 @@ const flatsLog = Layer.succeed(FlatsLog, { tried: flatTry => Effect.sync(() => p
 
 const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls, flatControls, guidingControls, startControls]), ([mount, focus, camera, dew, flats, guiding, start]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew, ...flats, ...guiding, ...start }))).pipe(Layer.provide(Layer.effect(MountGuiding, mountGuiding)), Layer.provide(startServices), Layer.provide(Layer.succeed(GuidingSettings, { settle: { pixels: settings.controls.guideSettlePixels, time: settings.controls.guideSettleSeconds, timeout: settings.controls.guideSettleTimeoutSeconds }, replySeconds: settings.controls.guiderReplySeconds, connectSeconds: settings.controls.guiderConnectSeconds, newId: Effect.sync(() => `vela-guider-${randomUUID()}`) })), Layer.provide(flatsLog), Layer.provide(Layer.succeed(FlatSettings, { startSeconds: settings.controls.flatStartSeconds, lowAdu: settings.controls.flatLowAdu, highAdu: settings.controls.flatHighAdu, minSeconds: settings.controls.biasExposureSeconds, maxSeconds: settings.controls.flatMaxSeconds, tries: settings.controls.flatTries, measureSeconds: settings.controls.flatMeasureSeconds })), Layer.provide(Layer.succeed(CalibrationSettings, { biasExposureSeconds: settings.controls.biasExposureSeconds })), Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds, guidingSettleSeconds: settings.controls.guideSettleTimeoutSeconds + settings.controls.guiderReplySeconds })))
 
+const startAnnounced = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const { connection } = yield* Broker
+    const { token } = yield* ServiceStart
+    const at = Date.now()
+
+    yield* Effect.tryPromise({
+      try: () => jetstream(connection).publish(stream.vela('started'), JSON.stringify({ v: 2, id: `vela.started:${token}:${at}`, rig: frames.rig, kind: 'vela.started', at, source: 'vela', body: { token } })),
+      catch: error => String(error),
+    }).pipe(Effect.catch(issue => Effect.sync(() => console.error(`vela: could not publish vela.started: ${issue}`))))
+  }),
+)
+
 const feedApp = FeedServer.pipe(
   Layer.provide(OperationsLive),
   Layer.provideMerge(FeedLive),
+  Layer.provide(startAnnounced),
   Layer.provide(Layer.mergeAll(
       ServiceStartNow,
       Layer.succeed(Tonight, { nightOf: at => NightName.make(nightOf(at, naming)) }),
@@ -427,7 +440,7 @@ const feedApp = FeedServer.pipe(
 )
 const servicesScope = runHandledSync(Scope.make())
 const { feed, broker } = await runHandledPromise(
-  Layer.buildWithScope(Layer.mergeAll(feedApp, brokerOf(settings.broker)), servicesScope).pipe(
+  Layer.buildWithScope(Layer.provideMerge(feedApp, brokerOf(settings.broker)), servicesScope).pipe(
     Effect.map(context => ({ feed: Context.get(context, Feed), broker: Context.get(context, Broker) })),
     Effect.catchTags({
       BrokerUnreachable: error => Effect.sync(() => lost(`the broker at ${error.servers} could not be reached: ${error.issue}`)),
@@ -508,11 +521,7 @@ const handleFollowed = (followed: Followed) =>
         caughtUp = true
         picture.caughtUp()
         capture.recoverInterrupted()
-      }).pipe(
-        Effect.andThen(feed.current),
-        Effect.tap(rig => Effect.sync(() => stoppedSteps(rig.starting).forEach(step => publishEntry(stream.vela('target'), 'vela.target.step', `${step.start}:${step.step}:${step.outcome}`, step)))),
-        Effect.andThen(keepRemembered),
-      ),
+      }).pipe(Effect.andThen(keepRemembered)),
   })
 
 remembered = await runHandledPromise(
