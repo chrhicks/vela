@@ -13,6 +13,7 @@ import { DeviceCommands } from './device-commands.ts'
 import { Autofocusing } from './focus.ts'
 import { guidingControls } from './guiding.ts'
 import { MountRuns } from './mount.ts'
+import { RehearsalRunning } from './rehearsing.ts'
 import { endOfMove, guidingSettled } from './settle.ts'
 
 export class TargetCatalog extends Context.Service<TargetCatalog, { readonly find: (id: string) => CatalogTarget | undefined }>()('vela/TargetCatalog') {}
@@ -53,6 +54,7 @@ export const startControls = Effect.gen(function* () {
   const running = yield* StartRunning
   const guiding = yield* guidingControls
   const runs = yield* MountRuns
+  const rehearsing = yield* RehearsalRunning
   const filterAnswers = yield* FilterAnswers
   const { homeSeconds, guidingSeconds, rigSilentAfterSeconds, autofocusExposureSeconds, newId } = yield* StartSettings
 
@@ -166,6 +168,7 @@ export const startControls = Effect.gen(function* () {
         if (rig.devices.mount.CONNECTION?.values.CONNECT !== true) return yield* refusedWith({ code: 'not-connected', device: 'mount' })
         if (gain === undefined || offset === undefined) return yield* refusedWith({ code: 'not-connected', device: 'primary' })
         if (cooler.state === 'on' && limits !== undefined && (cooler.celsius < limits.min || cooler.celsius > limits.max)) return yield* refusedWith({ code: 'out-of-range', value: cooler.celsius, ...limits })
+        if (yield* rehearsing.busy) return yield* refusedWith({ code: 'rehearsal-active' })
         if ((yield* capturing.busy) || (yield* running.busy)) return yield* refusedWith({ code: 'run-active' })
 
         const name = asciiName(found.name)

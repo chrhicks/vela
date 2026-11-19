@@ -10,6 +10,7 @@ export class MountRuns extends Context.Service<
   MountRuns,
   {
     readonly endRun: Effect.Effect<boolean>
+    readonly stopRehearsal: Effect.Effect<boolean>
     readonly idle: Effect.Effect<void>
     readonly pause: Effect.Effect<boolean>
     readonly parked: Effect.Effect<boolean>
@@ -79,6 +80,7 @@ export const mountControls = Effect.gen(function* () {
       return { code: 'home', endedRun, stoppedGuiding } satisfies Done
     }),
     stop: Effect.gen(function* () {
+      yield* runs.stopRehearsal
       yield* commands.write('mount', 'TELESCOPE_ABORT_MOTION', { ABORT: true })
 
       const endedRun = yield* runs.endRun

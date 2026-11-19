@@ -2,6 +2,8 @@ import { Match } from 'effect'
 import type { Done, GuidingSettle, NightStep, NudgeDirection, Refusal } from '../../../state/commands.ts'
 import type { DeviceName } from '../../../state/devices.ts'
 import type { RunEnding } from '../../../state/entries.ts'
+import type { PierSide } from '../../../state/entries.ts'
+import type { Rehearsal } from '../../../state/rehearsal.ts'
 import type { FlatExposure } from '../../../state/flats.ts'
 import type { Flip } from '../../../state/flip.ts'
 import type { GuiderActivity, Guiding } from '../../../state/guiding.ts'
@@ -57,6 +59,7 @@ export const doneWords = (done: Done): RefusalWords =>
       bias: ({ frames, celsius }) => ({ happened: `Bias ${frames} frames`, toDo: `at ${celsius} °C` }),
       autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       refocused: ({ exposureSeconds, ending }) => ({ happened: ending === 'done' ? `Refocused at ${exposureSeconds} s` : `Refocus ${ending}`, toDo: 'Run carried on' }),
+      'rehearsing-sweep': ({ moves }) => ({ happened: 'Rehearsing the sweep', toDo: `${moves} moves, Stop ends it` }),
       reguided: () => ({ happened: 'Guiding settled on a new star', toDo: 'Run carried on' }),
       home: ({ endedRun, stoppedGuiding }) => ({ happened: 'Going home', ...afterwards(endedRun, stoppedGuiding) }),
       stop: ({ endedRun, stoppedGuiding }) => ({ happened: 'Stopped', ...afterwards(endedRun, stoppedGuiding) }),
@@ -83,6 +86,38 @@ export const autofocusEndWords = (ending: RunEnding, best: number | undefined, c
     Match.orElse(() => ({ happened: 'Autofocus ended', toDo: ending })),
   )
 
+const pierWords: Readonly<Record<PierSide, string>> = { PIER_WEST: 'west', PIER_EAST: 'east' }
+
+const counted = (count: number, what: string) => `${count} ${what}${count === 1 ? '' : 's'}`
+
+const rehearsalFacts = ({ last, flipped, alerts, refused }: Rehearsal): ReadonlyArray<string> => [
+  ...(last === undefined
+    ? []
+    : [
+        `column ${last.column + 1}`,
+        `alt ${Math.round(last.altitudeDegrees)}° az ${Math.round(last.azimuthDegrees)}°`,
+        last.TELESCOPE_PIER_SIDE === undefined ? 'pier not reported' : `pier ${pierWords[last.TELESCOPE_PIER_SIDE]}`,
+      ]),
+  ...(flipped ? ['flipped'] : []),
+  ...(alerts > 0 ? [counted(alerts, 'alert')] : []),
+  ...(refused > 0 ? [`${refused} refused`] : []),
+]
+
+export const rehearsalWords = (state: Rehearsal): RefusalWords & { readonly troubled: boolean } => {
+  const at = `move ${state.moved} of ${state.total}`
+  const facts = rehearsalFacts(state)
+  const troubled = state.last !== undefined && state.last.outcome !== 'arrived'
+
+  return Match.value(state.ending).pipe(
+    Match.when(undefined, () => ({ happened: `Rehearsing the sweep: ${at}`, ...(facts.length === 0 ? {} : { toDo: facts.join(' · ') }), troubled })),
+    Match.when('finished', () => ({ happened: 'Sweep rehearsal done', toDo: `${counted(state.moved, 'move')}, ${counted(state.alerts, 'alert')}${state.refused > 0 ? `, ${state.refused} refused` : ''}`, troubled: state.alerts + state.refused > 0 })),
+    Match.when('stopped', () => ({ happened: 'Sweep rehearsal stopped', toDo: `at ${at}${facts.length === 0 ? '' : ` · ${facts.join(' · ')}`}`, troubled: false })),
+    Match.when('pressed', () => ({ happened: 'Sweep rehearsal ended by another press', toDo: `at ${at}`, troubled: false })),
+    Match.when('restarted', () => ({ happened: 'Sweep rehearsal ended: Vela restarted', toDo: `at ${at}`, troubled: true })),
+    Match.exhaustive,
+  )
+}
+
 export const refusalWords = (refusal: Refusal): RefusalWords =>
   Match.value(refusal).pipe(
     Match.discriminatorsExhaustive('code')({
@@ -95,6 +130,7 @@ export const refusalWords = (refusal: Refusal): RefusalWords =>
       'guider-silent': ({ seconds }) => ({ happened: `No reply from PHD2 ${seconds} s`, toDo: 'Check PHD2' }),
       'unknown-target': ({ text }) => ({ happened: `${text} not found`, toDo: 'Check the name' }),
       'run-active': () => ({ happened: 'Run active', toDo: 'See latest frame' }),
+      'rehearsal-active': () => ({ happened: 'Sweep rehearsal going', toDo: 'Stop it first' }),
       'no-run': () => ({ happened: 'No run to pause' }),
       'rig-silent': ({ seconds }) => ({ happened: 'Rig silent', toDo: `nothing heard for ${seconds} s` }),
       'move-failed': ({ device }) => ({ happened: `${deviceWords[device]} did not move`, toDo: 'Driver refused the move' }),

@@ -15,6 +15,7 @@ import { deviceCommandsFrom } from './device-commands.ts'
 import { Autofocusing } from './focus.ts'
 import { GuidingSettings } from './guiding.ts'
 import { MountRuns } from './mount.ts'
+import { RehearsalRunning } from './rehearsing.ts'
 import { FilterAnswers, startControls, StartLog, StartRunning, StartSettings, TargetCatalog, TargetCentring } from './start.ts'
 
 const deviceIds = { mount: 'mount', primary: 'asi', focuser: 'focuser', box: 'box', guide: 'guide' }
@@ -41,9 +42,10 @@ interface Options {
   readonly parks?: boolean
   readonly focusEnds?: string
   readonly coolerRefused?: boolean
+  readonly rehearsing?: boolean
 }
 
-function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswers = true, guiderAnswers = true, running = false, homeSeconds = 5, parks = true, focusEnds = 'done', coolerRefused = false }: Options = {}) {
+function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswers = true, guiderAnswers = true, running = false, homeSeconds = 5, parks = true, focusEnds = 'done', coolerRefused = false, rehearsing = false }: Options = {}) {
   const did: Array<string> = []
   const reported: Array<string> = []
   const started: Array<CaptureRequest> = []
@@ -74,7 +76,8 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
     Layer.succeed(StartLog, { report }),
     Layer.succeed(FilterAnswers, { answer: filter => Effect.sync(() => void did.push(`filter ${filter}`)) }),
     Layer.succeed(StartRunning, { busy: Effect.sync(() => routine !== undefined), began: begun => Effect.sync(() => void (routine = begun)) }),
-    Layer.succeed(MountRuns, { endRun: Effect.sync(() => (did.push('end run'), running)), idle: Effect.void, pause: Effect.sync(() => (did.push('pause'), true)), parked: Effect.sync(() => (did.push('parked'), parks)), resume: Effect.sync(() => void did.push('resume')) }),
+    Layer.succeed(MountRuns, { stopRehearsal: Effect.succeed(false), endRun: Effect.sync(() => (did.push('end run'), running)), idle: Effect.void, pause: Effect.sync(() => (did.push('pause'), true)), parked: Effect.sync(() => (did.push('parked'), parks)), resume: Effect.sync(() => void did.push('resume')) }),
+    Layer.succeed(RehearsalRunning, { busy: Effect.succeed(rehearsing), began: () => Effect.void, cancelled: Effect.succeed<'pressed'>('pressed') }),
     Layer.succeed(StartSettings, { homeSeconds, guidingSeconds: 5, rigSilentAfterSeconds: 10, autofocusExposureSeconds: { in: 10, out: 2 }, newId: Effect.succeed(StartId.make('start-1')) }),
   )
 
@@ -206,7 +209,7 @@ describe('Start a target', () => {
     expect(started[0]).toMatchObject({ object: '23h18m56s +61d33m37s', target: { name: '23h18m56s +61d33m37s' } })
   })
 
-  it('refuses at the press, and moves nothing, for an unknown target, a silent rig, a mount or camera that has not reported, and a run already going', async () => {
+  it('refuses at the press, and moves nothing, for an unknown target, a silent rig, a mount or camera that has not reported, a run already going, and a sweep rehearsal going', async () => {
     const silent = { ...ready(), heardAt: Date.now() - 60_000 }
     const noMount = { ...foldRig([wire('primary', 'CCD_CONTROLS', { Gain: 100, Offset: 50 })]), heardAt: Date.now() }
     const noCamera = { ...foldRig([wire('mount', 'CONNECTION', { CONNECT: true, DISCONNECT: false })]), heardAt: Date.now() }
@@ -216,6 +219,7 @@ describe('Start a target', () => {
       [setup({ rig: noMount }), 'orion', { code: 'not-connected', device: 'mount' }],
       [setup({ rig: noCamera }), 'orion', { code: 'not-connected', device: 'primary' }],
       [setup({ busy: true }), 'orion', { code: 'run-active' }],
+      [setup({ rehearsing: true }), 'orion', { code: 'rehearsal-active' }],
     ] as const
 
     for (const [rig, id, refusal] of cases) {

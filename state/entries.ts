@@ -213,9 +213,48 @@ export const ReviewAnswered = entryOf('vela.review.answer', {
   usage: Schema.optionalKey(ReviewUsage),
 })
 
+export const PierSide = Schema.Literals(['PIER_WEST', 'PIER_EAST'])
+
+export type PierSide = typeof PierSide.Type
+
+export const RehearsalId = Schema.String.pipe(Schema.brand('RehearsalId'))
+
+export type RehearsalId = typeof RehearsalId.Type
+
+export const RehearsalEnding = Schema.Literals(['finished', 'stopped', 'pressed', 'restarted'])
+
+export type RehearsalEnding = typeof RehearsalEnding.Type
+
+export const MoveOutcome = Schema.Literals(['arrived', 'alert', 'refused'])
+
+export type MoveOutcome = typeof MoveOutcome.Type
+
+export const SweepStarted = entryOf('vela.sweep.started', { rehearsal: RehearsalId, total: Count })
+
+export const SweepMoved = entryOf('vela.sweep.move', {
+  rehearsal: RehearsalId,
+  move: Count,
+  total: Count,
+  column: Count,
+  altitudeDegrees: Schema.Number,
+  azimuthDegrees: Schema.Number,
+  hourAngleDegrees: Schema.Number,
+  declinationDegrees: Schema.Number,
+  predictedPierSide: PierSide,
+  flipExpected: Schema.Boolean,
+  outcome: MoveOutcome,
+  reason: Schema.optionalKey(Schema.String),
+  EQUATORIAL_EOD_COORD: Schema.optionalKey(Schema.Struct({ RA: Schema.Number, DEC: Schema.Number })),
+  TELESCOPE_PIER_SIDE: Schema.optionalKey(PierSide),
+})
+
+export type SweepMoveBody = typeof SweepMoved.Type['body']
+
+export const SweepEnded = entryOf('vela.sweep.ended', { rehearsal: RehearsalId, total: Count, ending: RehearsalEnding })
+
 export const VelaStarted = entryOf('vela.started', { token: StartToken })
 
-export const RigEntry = Schema.Union([VelaStarted, ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
+export const RigEntry = Schema.Union([VelaStarted, SweepStarted, SweepMoved, SweepEnded, ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 
