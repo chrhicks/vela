@@ -45,6 +45,7 @@ import { StackPictures } from '../feed/stack.ts'
 import { DetailSurveyKept, SurveyKept } from '../feed/survey.ts'
 import { CommandLog, CommandRefused, Operations } from '../feed/commands.ts'
 import { pressKey } from '../../state/pressing.ts'
+import { stoppedSteps } from '../../state/starting.ts'
 import type { FilterAnswer } from '../../state/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
@@ -506,7 +507,12 @@ const handleFollowed = (followed: Followed) =>
       Effect.sync(() => {
         caughtUp = true
         picture.caughtUp()
-      }).pipe(Effect.andThen(keepRemembered)),
+        capture.recoverInterrupted()
+      }).pipe(
+        Effect.andThen(feed.current),
+        Effect.tap(rig => Effect.sync(() => stoppedSteps(rig.starting).forEach(step => publishEntry(stream.vela('target'), 'vela.target.step', `${step.start}:${step.step}:${step.outcome}`, step)))),
+        Effect.andThen(keepRemembered),
+      ),
   })
 
 remembered = await runHandledPromise(

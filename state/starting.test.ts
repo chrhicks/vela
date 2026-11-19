@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyRig, advance } from './rig.ts'
-import { isStarting } from './starting.ts'
+import { isStarting, stoppedSteps } from './starting.ts'
 import { entry } from './testing.ts'
 import { Result } from 'effect'
 
@@ -28,5 +28,13 @@ describe('starting a target', () => {
     const state = reduce([step(100, 's1', 'home', 'done'), step(900, 's2', 'home', 'started')])
 
     expect(state).toMatchObject({ start: 's2', startedAt: 900, steps: [{ step: 'home', outcome: 'started' }] })
+  })
+
+  it('lists the steps a start left under way, to be reported stopped', () => {
+    const state = reduce([step(100, 's1', 'centre', 'started'), step(200, 's1', 'centre', 'done'), step(201, 's1', 'autofocus', 'started')])
+
+    expect(stoppedSteps(state)).toEqual([{ start: 's1', target, step: 'autofocus', outcome: 'stopped' }])
+    expect(stoppedSteps(reduce([step(100, 's1', 'home', 'done')]))).toEqual([])
+    expect(stoppedSteps(undefined)).toEqual([])
   })
 })
