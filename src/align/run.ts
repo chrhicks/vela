@@ -5,10 +5,11 @@ import type { Sender } from '../commands/sender.ts'
 import { decodeConfig } from '../config.ts'
 import type { Card } from '../frames/fits.ts'
 import type { Measured, Measurement } from '../measure/rig.ts'
+import { makeGoto } from '../pointing/goto.ts'
 import { siteOf, type Site } from '../pointing/target.ts'
 import type { Picture } from '../rig/picture.ts'
 import type { Entry } from '../../state/entry.ts'
-import { readWireBody, recordOf } from '../stream/json.ts'
+import { recordOf } from '../stream/json.ts'
 import { errorNow, polarError, poleOf, referenceFrom, type PolarError, type Reference, type Solve } from './polar.ts'
 import { operationObjects } from '../../state/entries.ts'
 
@@ -65,7 +66,7 @@ export function makeAlign({ picture, sender, capture, publish, settings, now }: 
   let site: Site | undefined
   let solves = new Map<number, Solve>()
   let reference: Reference | undefined
-  let slew: { phase: 'sent' | 'moving' | 'arrived' | 'alert' } | undefined
+  const goto = makeGoto({ picture, sender, mount: settings.mount })
   const listeners = new Set<() => void>()
 
   function until(check: () => boolean, signal: AbortSignal) {
@@ -89,27 +90,15 @@ export function makeAlign({ picture, sender, capture, publish, settings, now }: 
   }
 
   async function slewTo(hourAngle: number, signal: AbortSignal): Promise<string | undefined> {
-    const onCoordSet = picture.property(settings.mount, 'ON_COORD_SET')
-
     if (site === undefined) return 'the mount gives no site'
-    if (onCoordSet === undefined || !('TRACK' in onCoordSet.values)) return `${settings.mount} has no TRACK element in ON_COORD_SET`
 
-    const mode = await sender.send({ device: settings.mount, property: 'ON_COORD_SET', values: Object.fromEntries(Object.keys(onCoordSet.values).map(element => [element, element === 'TRACK'])) }, signal)
+    const moved = await goto.to({ raHours: raForHourAngle(hourAngle, site, now()), decDegrees: settings.declinationDegrees }, signal)
 
-    if (mode.result !== 'written') return `ON_COORD_SET: ${mode.reason}`
+    if (moved.ok || moved.refusal === 'aborted') return undefined
+    if (moved.refusal === 'coordinates') return `slew to hour angle ${hourAngle}°: ${moved.reason}`
+    if (moved.refusal === 'alert') return `the mount answered the slew to hour angle ${hourAngle}° with an alert`
 
-    slew = { phase: 'sent' }
-
-    const target = { RA: raForHourAngle(hourAngle, site, now()), DEC: settings.declinationDegrees }
-    const sent = await sender.send({ device: settings.mount, property: 'EQUATORIAL_EOD_COORD', values: target }, signal)
-
-    if (sent.result !== 'written') return `slew to hour angle ${hourAngle}°: ${sent.reason}`
-
-    const current = slew
-
-    await until(() => current.phase === 'arrived' || current.phase === 'alert', signal)
-
-    return current.phase === 'alert' ? `the mount answered the slew to hour angle ${hourAngle}° with an alert` : undefined
+    return moved.reason
   }
 
   const solvedOf = (frame: number) => view.frames.find(candidate => candidate.frame === frame)
@@ -214,15 +203,9 @@ export function makeAlign({ picture, sender, capture, publish, settings, now }: 
         view = { ...view, lastFrameAt: entry.at, frames, first: frame === 3 && error !== undefined ? error : view.first, error: newer ? error : view.error, previous: newer ? view.error : view.previous }
       } else if (body['run'] === view.run && entry.kind === 'vela.run.ended') {
         view = { ...view, ended: typeof body['reason'] === 'string' ? body['reason'] : 'ended' }
-      } else if (slew !== undefined && entry.kind === 'wire') {
-        const wire = readWireBody(entry)
-
-        if (wire?.dir === 'in' && wire.device === settings.mount && wire.property === 'EQUATORIAL_EOD_COORD') {
-          if (wire.state === 'Alert') slew.phase = 'alert'
-          else if (wire.state === 'Busy') slew.phase = 'moving'
-          else if ((wire.state === 'Ok' || wire.state === 'Idle') && slew.phase === 'moving') slew.phase = 'arrived'
-        }
       }
+
+      goto.observe(entry)
 
       for (const listener of [...listeners]) listener()
     },
