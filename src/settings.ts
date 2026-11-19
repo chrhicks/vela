@@ -217,7 +217,7 @@ export const ControlsSettings = Schema.Struct({
   biasExposureSeconds: described("The exposure of a bias frame, in seconds: the camera's shortest", Schema.Number, 0.000032),
   dewChannel: described("The power box's dew output the controls page switches, as its DEW_CHANNELS element", Schema.NonEmptyString, 'DEW_CHANNEL_1'),
   dewPercent: described('The fixed dew heater level the controls page offers first, in percent', Schema.Number, 60),
-  coolerCelsius: described('The cooler setpoint the controls page offers first, in degrees Celsius', Schema.Number, -10),
+  coolerCelsius: described('The cooler setpoint the controls page offers first, and Start offers when no cooler is remembered for the target or any other, in degrees Celsius', Schema.Number, -10),
   focusMoveSeconds: described('How long one focuser move may take before its answer says the focuser is still moving, in seconds', Schema.Number, 300),
   focusSteps: described('Focuser steps for the Step buttons on the controls page, each shown inward and outward', Schema.Array(Schema.Int), [10, 50]),
   flipSettleSeconds: described('How long Flip now waits for the mount to finish its goto before answering, in seconds', Schema.Number, 120),
@@ -321,7 +321,7 @@ export const VelaSettings = Schema.Struct({
   centre: described('Settings for slew and centre', CentreSettings, {}),
   firstFrames: described('The check of the first frames of a run on a target', FirstFramesSettings, {}),
   review: described('Asking models whether each light frame is obstructed. Report only: it never acts on the rig', ReviewSettings, {}),
-  rememberedFile: described('The file Vela keeps what it remembers in: the last light run, the camera angle and the centres that centring reached', Schema.String, '/mnt/storage/vela/remembered.json'),
+  rememberedFile: described('The file Vela keeps what it remembers in: the last light run, the camera angle, the centres that centring reached and the cooler each target was last started with', Schema.String, '/mnt/storage/vela/remembered.json'),
   start: described('Starting a target from the picker: home, stop guiding, slew and centre, autofocus, guiding, then the run', StartRoutineSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({

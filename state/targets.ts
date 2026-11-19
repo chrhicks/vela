@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { CoolerAtStart } from './remembered.ts'
 
 export const targetsPath = '/targets'
 
@@ -72,6 +73,7 @@ export const TargetFacts = Schema.Struct({
   decDegrees: Schema.Number,
   otherNames: Schema.Array(Schema.String),
   lastCentre: Schema.NullOr(Schema.Struct({ raDegrees: Schema.Number, decDegrees: Schema.Number, at: Schema.Number, eastDegrees: Schema.Number, northDegrees: Schema.Number })),
+  lastCooler: Schema.NullOr(CoolerAtStart),
 })
 
 export type TargetFacts = typeof TargetFacts.Type

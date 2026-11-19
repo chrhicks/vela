@@ -2,6 +2,7 @@ import type { Site } from '../pointing/target.ts'
 import type { EquatorialPosition } from '../sky/coordinates.ts'
 import { moonPosition, placementOf } from '../sky/placement.ts'
 import { skyTonight } from '../sky/tonight.ts'
+import type { CoolerAtStart } from '../../state/remembered.ts'
 import type { BestPlacedAsked, SizeArcminutes, TargetFacts, TargetFound } from '../../state/targets.ts'
 import { summarised, type Catalog } from './catalog.ts'
 import { dualBandHint } from './dual-band.ts'
@@ -19,6 +20,7 @@ export interface PlacedOptions {
   readonly catalog: Catalog
   readonly site: () => Site | undefined
   readonly lastCentreNear: (position: EquatorialPosition) => (EquatorialPosition & { readonly at: number }) | undefined
+  readonly lastCoolerFor: (id: string) => CoolerAtStart | undefined
   readonly settings: PlacedSettings
 }
 
@@ -33,7 +35,7 @@ const offsetFrom = (target: EquatorialPosition, centre: EquatorialPosition) => (
   northDegrees: centre.decDegrees - target.decDegrees,
 })
 
-export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: PlacedOptions) {
+export function makePlacedTargets({ catalog, site, lastCentreNear, lastCoolerFor, settings }: PlacedOptions) {
   const placer = (at: number) => {
     const here = site()
 
@@ -73,6 +75,7 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, settings }: P
         otherNames: catalog.namesOf(target).filter(name => !shown.includes(name)),
         sizeArcminutes: sizeOf(target),
         lastCentre: centred === undefined ? null : { raDegrees: centred.raDegrees, decDegrees: centred.decDegrees, at: centred.at, ...offsetFrom(target, centred) },
+        lastCooler: lastCoolerFor(id) ?? null,
       }
     },
 

@@ -173,7 +173,7 @@ export const StartId = Schema.String.pipe(Schema.brand('StartId'))
 
 export type StartId = typeof StartId.Type
 
-export const StartStep = Schema.Literals(['home', 'stop-guiding', 'centre', 'autofocus', 'guiding', 'capture'])
+export const StartStep = Schema.Literals(['cooler', 'home', 'stop-guiding', 'centre', 'autofocus', 'guiding', 'capture'])
 
 export type StartStep = typeof StartStep.Type
 

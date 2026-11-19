@@ -15,7 +15,7 @@ export interface StepRow {
   readonly tone: Tone
 }
 
-export const stepNames: Readonly<Record<StartStep, string>> = { home: 'Home', 'stop-guiding': 'Stop guiding', centre: 'Slew and centre', autofocus: 'Autofocus', guiding: 'Guiding', capture: 'Capture' }
+export const stepNames: Readonly<Record<StartStep, string>> = { cooler: 'Cooler', home: 'Home', 'stop-guiding': 'Stop guiding', centre: 'Slew and centre', autofocus: 'Autofocus', guiding: 'Guiding', capture: 'Capture' }
 
 export const failedSteps = (starting: Starting | undefined): ReadonlyArray<string> =>
   (starting?.steps ?? []).filter(report => report.outcome === 'failed').map(report => `${stepNames[report.step]} failed at start`)

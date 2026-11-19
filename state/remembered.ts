@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { CoolerSetting } from './commands.ts'
 
 export const rememberedPath = '/remembered'
 
@@ -8,3 +9,7 @@ export const RememberedAnswer = Schema.Struct({
 })
 
 export type RememberedAnswer = typeof RememberedAnswer.Type
+
+export const CoolerAtStart = Schema.Struct({ setting: CoolerSetting, at: Schema.Finite })
+
+export type CoolerAtStart = typeof CoolerAtStart.Type

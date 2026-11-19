@@ -15,6 +15,9 @@ const earlier: Remembered = {
   lastLight: { exposureSeconds: 60, frames: undefined, at: 1 * day },
   cameraAngle: { degrees: 109.2, at: 1 * day },
   centres: [{ run: 'centre-a', raDegrees: 23.4531, decDegrees: 30.6442, at: 1 * day, reached: true }],
+  camera: { on: true, setpoint: -10, sensorCelsius: undefined, wrote: 1 * day },
+  targetCoolers: [{ target: 'orion', setting: { state: 'on', celsius: -10 }, at: 1 * day }],
+  lastCooler: { setting: { state: 'on', celsius: -10 }, at: 1 * day },
 }
 
 describe('what Vela remembers, kept in a file', () => {
@@ -25,6 +28,14 @@ describe('what Vela remembers, kept in a file', () => {
 
     expect(await Effect.runPromise(readKept(path))).toEqual(earlier)
     expect(await Effect.runPromise(keep(path, nothingRemembered).pipe(Effect.andThen(readKept(path))))).toEqual(nothingRemembered)
+  })
+
+  it('reads a file kept before the cooler was remembered, as remembering no cooler', async () => {
+    const path = join(await folder(), 'remembered.json')
+
+    await writeFile(path, JSON.stringify({ lastLight: null, cameraAngle: null, centres: [] }))
+
+    expect(await Effect.runPromise(readKept(path))).toEqual(nothingRemembered)
   })
 
   it('remembers nothing when there is no file yet', async () => {

@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { entry } from '../../state/testing.ts'
-import { lastCentreNear, nothingRemembered, remember } from './remembered.ts'
+import { coolerFor, lastCentreNear, nothingRemembered, remember } from './remembered.ts'
 
 const fold = (entries: ReadonlyArray<ReturnType<typeof entry>>) => entries.reduce(remember, nothingRemembered)
 
 const light = (at: number, run: string, exposureSeconds: number, count?: number) => entry('vela.run.started', at, { run, object: 'NGC 7635', frameType: 'light', exposureSeconds, ...(count === undefined ? {} : { count }) })
 const pass = (at: number, run: string, raDegrees: number, decDegrees: number, rotationDegrees?: number) =>
   entry('vela.centre.pass', at, { run, frame: 1, solved: true, raDegrees, decDegrees, ...(rotationDegrees === undefined ? {} : { rotationDegrees }) })
+const lightOn = (at: number, run: string, id: string) =>
+  entry('vela.run.started', at, { run, object: id, frameType: 'light', exposureSeconds: 60, target: { id, name: id, raDegrees: 83.82, decDegrees: -5.39 } })
+const sent = (at: number, property: string, elements: Readonly<Record<string, number | boolean>>, device = 'primary') => entry('wire', at, { dir: 'out', device, type: 'new', property, elements })
+const setpoint = (at: number, celsius: number) => sent(at, 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: celsius })
+const coolerSwitched = (at: number, on: boolean) => sent(at, 'CCD_COOLER', { COOLER_ON: on, COOLER_OFF: !on })
+const sensorReads = (at: number, celsius: number) => entry('wire', at, { dir: 'in', device: 'primary', type: 'set', property: 'CCD_TEMPERATURE', state: 'Busy', elements: { CCD_TEMPERATURE_VALUE: celsius } })
 const ended = (at: number, run: string, reason: string) => entry('vela.run.ended', at, { run, reason })
 
 describe('what Vela remembers from the stream', () => {
@@ -55,5 +61,68 @@ describe('what Vela remembers from the stream', () => {
 
     expect(lastCentreNear(state, bubble, 1.1)).toMatchObject({ run: 'c1', raDegrees: 349.735, decDegrees: 61.561, at: 110 })
     expect(lastCentreNear(state, { raDegrees: 10.7, decDegrees: 41.3 }, 1.1)).toBeUndefined()
+  })
+
+  it('keeps the setpoint each light run on a target started with, and the latest of any target, but not a run started with the cooler off', () => {
+    const state = fold([
+      setpoint(100, -10),
+      coolerSwitched(101, true),
+      lightOn(200, 'a', 'orion'),
+      coolerSwitched(300, false),
+      lightOn(400, 'b', 'rosette'),
+    ])
+
+    expect(state.targetCoolers).toEqual([
+      { target: 'orion', setting: { state: 'on', celsius: -10 }, at: 200 },
+    ])
+    expect(state.lastCooler).toEqual({ setting: { state: 'on', celsius: -10 }, at: 200 })
+  })
+
+  it('offers a target its own cooler, and the latest of any target when it has none', () => {
+    const state = fold([setpoint(100, -10), coolerSwitched(101, true), lightOn(200, 'a', 'orion'), setpoint(300, -5), lightOn(400, 'b', 'rosette')])
+
+    expect(coolerFor(state, 'orion')).toEqual({ setting: { state: 'on', celsius: -10 }, at: 200 })
+    expect(coolerFor(state, 'rosette')).toEqual({ setting: { state: 'on', celsius: -5 }, at: 400 })
+    expect(coolerFor(state, 'bubble')).toEqual({ setting: { state: 'on', celsius: -5 }, at: 400 })
+    expect(coolerFor(nothingRemembered, 'orion')).toBeUndefined()
+  })
+
+  it('rounds the reported sensor temperature when the cooler is on and no setpoint was recorded', () => {
+    const state = fold([coolerSwitched(100, true), sensorReads(110, 14.2), sensorReads(120, -9.7), lightOn(200, 'a', 'orion')])
+
+    expect(state.lastCooler).toEqual({ setting: { state: 'on', celsius: -10 }, at: 200 })
+  })
+
+  it('remembers no cooler for a run that starts before the camera was seen written, or for a run that is not a light run on a target', () => {
+    const state = fold([
+      lightOn(50, 'a', 'orion'),
+      setpoint(100, -10),
+      coolerSwitched(101, true),
+      entry('vela.run.started', 200, { run: 'c', object: 'dark', frameType: 'dark', exposureSeconds: 120, count: 30 }),
+      entry('vela.run.started', 300, { run: 'd', object: 'centre', frameType: 'light', exposureSeconds: 2 }),
+    ])
+
+    expect(state.targetCoolers).toEqual([])
+    expect(state.lastCooler).toBeUndefined()
+  })
+
+  it("ignores another device's cooler and what the camera reports about its cooler", () => {
+    const state = fold([
+      setpoint(100, -10),
+      coolerSwitched(101, true),
+      sent(150, 'CCD_COOLER', { COOLER_ON: false, COOLER_OFF: true }, 'guide'),
+      entry('wire', 160, { dir: 'in', device: 'primary', type: 'set', property: 'CCD_COOLER', state: 'Ok', elements: { COOLER_ON: false, COOLER_OFF: true } }),
+      lightOn(200, 'a', 'orion'),
+    ])
+
+    expect(state.lastCooler).toEqual({ setting: { state: 'on', celsius: -10 }, at: 200 })
+  })
+
+  it('does not give an earlier run the cooler of a later write when the stream is replayed over what is already known', () => {
+    const night = [setpoint(100, -10), coolerSwitched(101, true), lightOn(200, 'a', 'orion'), coolerSwitched(300, false)]
+    const state = fold([...night, ...night])
+
+    expect(state.targetCoolers).toEqual([{ target: 'orion', setting: { state: 'on', celsius: -10 }, at: 200 }])
+    expect(state.camera).toMatchObject({ on: false, setpoint: -10, wrote: 300 })
   })
 })

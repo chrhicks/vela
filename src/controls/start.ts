@@ -3,7 +3,7 @@ import type { CaptureRequest } from '../capture/request.ts'
 import { positionId } from '../catalog/position.ts'
 import type { CatalogTarget } from '../catalog/types.ts'
 import type { EquatorialPosition } from '../sky/coordinates.ts'
-import type { Done, FilterAnswer, NightStep, Refusal } from '../../state/commands.ts'
+import type { CoolerSetting, Done, FilterAnswer, NightStep, Refusal } from '../../state/commands.ts'
 import type { StartId, StartStep, TargetStepBody } from '../../state/entries.ts'
 import type { RunTarget } from '../../state/targets.ts'
 import { CommandRefused } from '../feed/commands.ts'
@@ -55,6 +55,14 @@ export const startControls = Effect.gen(function* () {
   const runs = yield* MountRuns
   const filterAnswers = yield* FilterAnswers
   const { homeSeconds, guidingSeconds, rigSilentAfterSeconds, autofocusExposureSeconds, newId } = yield* StartSettings
+
+  const setCooler = (cooler: CoolerSetting) =>
+    cooler.state === 'on'
+      ? commands.write('primary', 'CCD_TEMPERATURE', { CCD_TEMPERATURE_VALUE: cooler.celsius }).pipe(Effect.andThen(commands.write('primary', 'CCD_COOLER', { COOLER_ON: true, COOLER_OFF: false })))
+      : commands.write('primary', 'CCD_COOLER', { COOLER_ON: false, COOLER_OFF: true })
+
+  const coolerOfCapture = (cooler: CoolerSetting): Pick<CaptureRequest, 'cooler' | 'setpoint' | 'waitForSetpoint'> =>
+    cooler.state === 'on' ? { cooler: 'on', setpoint: cooler.celsius, waitForSetpoint: true } : { cooler: 'off' }
 
   const operationDone = (what: string) => Effect.flatMap(capturing.finished, reason => (reason === 'done' ? Effect.void : refusedWith({ code: 'refused', text: `${what} ended ${reason ?? 'with no word'}` })))
 
@@ -140,7 +148,7 @@ export const startControls = Effect.gen(function* () {
 
       return { code: 'stopped-for-night', endedRun, missed: missed.flat() } satisfies Done
     }),
-    startTarget: (id: string, exposureSeconds: number, frames: number | undefined, filter: FilterAnswer, centre: EquatorialPosition | undefined) =>
+    startTarget: (id: string, exposureSeconds: number, frames: number | undefined, filter: FilterAnswer, centre: EquatorialPosition | undefined, cooler: CoolerSetting) =>
       Effect.gen(function* () {
         const found = catalog.find(id)
 
@@ -152,17 +160,20 @@ export const startControls = Effect.gen(function* () {
         const controls = rig.devices.primary.CCD_CONTROLS?.values
         const gain = controls?.Gain
         const offset = controls?.Offset
+        const limits = rig.devices.primary.CCD_TEMPERATURE?.limits?.['CCD_TEMPERATURE_VALUE']
 
         if (silentSeconds === undefined || silentSeconds > rigSilentAfterSeconds) return yield* refusedWith({ code: 'rig-silent', seconds: Math.round(silentSeconds ?? 0) })
         if (rig.devices.mount.CONNECTION?.values.CONNECT !== true) return yield* refusedWith({ code: 'not-connected', device: 'mount' })
         if (gain === undefined || offset === undefined) return yield* refusedWith({ code: 'not-connected', device: 'primary' })
+        if (cooler.state === 'on' && limits !== undefined && (cooler.celsius < limits.min || cooler.celsius > limits.max)) return yield* refusedWith({ code: 'out-of-range', value: cooler.celsius, ...limits })
         if ((yield* capturing.busy) || (yield* running.busy)) return yield* refusedWith({ code: 'run-active' })
 
         const name = asciiName(found.name)
         const target: RunTarget = { id: found.id, name, raDegrees: found.raDegrees, decDegrees: found.decDegrees }
-        const request: CaptureRequest = { object: name, frameType: 'light', exposureSeconds, filter, ...(frames === undefined ? {} : { count: frames }), gain, offset, cooler: 'keep', target, ...(centre === undefined ? {} : { aim: { raDegrees: centre.raDegrees, decDegrees: centre.decDegrees } }) }
+        const request: CaptureRequest = { object: name, frameType: 'light', exposureSeconds, filter, ...(frames === undefined ? {} : { count: frames }), gain, offset, ...coolerOfCapture(cooler), target, ...(centre === undefined ? {} : { aim: { raDegrees: centre.raDegrees, decDegrees: centre.decDegrees } }) }
 
         const steps: ReadonlyArray<Step> = [
+          ['cooler', setCooler(cooler)],
           ['home', home],
           ['stop-guiding', guiding.stopGuiding],
           ['centre', centring.centre(centre === undefined ? found.id : positionId(centre)).pipe(Effect.andThen(operationDone('centring')))],
