@@ -322,6 +322,7 @@ export const VelaSettings = Schema.Struct({
   firstFrames: described('The check of the first frames of a run on a target', FirstFramesSettings, {}),
   review: described('Asking models whether each light frame is obstructed. Report only: it never acts on the rig', ReviewSettings, {}),
   rememberedFile: described('The file Vela keeps what it remembers in: the last light run, the camera angle, the centres that centring reached and the cooler each target was last started with', Schema.String, '/mnt/storage/vela/remembered.json'),
+  horizonFile: described('The file the horizon is read from: the lowest altitude above which the sky is open, in each 1 degree of azimuth (version 2). Without the file, every direction is unknown', Schema.String, '/mnt/storage/vela/horizon.json'),
   start: described('Starting a target from the picker: home, stop guiding, slew and centre, autofocus, guiding, then the run', StartRoutineSettings, {}),
   streamViewer: Schema.optionalKey(
     Schema.NonEmptyString.annotate({
