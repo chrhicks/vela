@@ -1,26 +1,25 @@
 import { Data, Effect, Result, Schema } from 'effect'
-import { FrameKept, FrameMeasured, GuiderReported, RunEnded, RunStarted } from '../../state/entries.ts'
-import type { FilterAnswer } from '../../state/commands.ts'
+import { FrameKept, RunEnded, RunStarted } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
-import type { ReviewFailureKind, ReviewOutcome, ReviewStats, ReviewUsage } from '../../state/review-answer.ts'
+import type { ReviewFailureKind, ReviewOutcome, ReviewUsage } from '../../state/review-answer.ts'
 import { runHandledPromise } from '../edge.ts'
-import type { Aim } from './aim.ts'
 import { pictureFor, type Rgb } from './image.ts'
-import type { ReviewEvent, ReviewFacts, ReviewRequest, TrendRow } from './request.ts'
+import type { ReviewRequest } from './request.ts'
 import { ReviewFailed, type Reply, type Reviewer } from './reviewer.ts'
 import type { ReviewSettings } from './settings.ts'
-import { newTrigger, observe as observeFrame, type Ask, type Sample, type Trigger } from './trigger.ts'
 
 export class PictureUnavailable extends Data.TaggedError('PictureUnavailable')<{ readonly night: string; readonly file: string; readonly cause: unknown }> {}
 
 export class NotKept extends Data.TaggedError('NotKept')<{ readonly path: string; readonly cause: unknown }> {}
 
+export interface Shot extends Rgb {
+  readonly exposureSeconds: number | undefined
+}
+
 export interface ReviewPorts {
   readonly settings: ReviewSettings
-  readonly filterNames: Readonly<Record<FilterAnswer, string>>
   readonly reviewer: Reviewer['Service']
-  readonly picture: (night: string, file: string) => Effect.Effect<Rgb, PictureUnavailable>
-  readonly aim: (at: number) => Aim | undefined
+  readonly picture: (night: string, file: string) => Effect.Effect<Shot, PictureUnavailable>
   readonly publish: (kind: 'asked' | 'answer', id: string, body: Readonly<Record<string, unknown>>) => void
   readonly keep: (line: string) => Effect.Effect<void, NotKept>
   readonly report: (line: string) => void
@@ -29,7 +28,7 @@ export interface ReviewPorts {
   readonly newId: () => string
 }
 
-const Observed = Schema.Union([RunStarted, RunEnded, FrameKept, FrameMeasured, GuiderReported])
+const Observed = Schema.Union([RunStarted, RunEnded, FrameKept])
 
 const isObservedKind = Schema.is(Schema.Union(Observed.members.map(member => member.fields.kind)))
 
@@ -39,32 +38,15 @@ const loud: ReadonlySet<ReviewFailureKind> = new Set(['no-credential', 'rejected
 
 interface Running {
   readonly id: string
-  readonly target: string
   readonly exposureSeconds: number
-  readonly filter: string | undefined
   readonly sequence: string | undefined
-  readonly startedAt: number
 }
 
-interface Row {
-  readonly night: string
-  readonly file: string
-  readonly row: TrendRow
-}
-
-const minutesOf = (from: number, at: number) => Math.round(((at - from) / 60000) * 10) / 10
-
-const statsOf = ({ hfdPixels, stars, elongation }: Sample): ReviewStats => ({ hfdPixels, stars, elongation })
+const tenths = (value: number) => Math.round(value * 10) / 10
 
 export function makeReview(ports: ReviewPorts) {
   const { settings } = ports
-  const limits = settings
   let running: Running | undefined
-  let trigger: Trigger = newTrigger
-  let rows: ReadonlyArray<Row> = []
-  let events: ReadonlyArray<{ readonly at: number; readonly event: ReviewEvent['event'] }> = []
-  let lostSinceFrame = 0
-  const keptAt = new Map<string, number>()
   const told = new Set<ReviewFailureKind>()
   let keepReported = false
   let queue: Promise<void> = Promise.resolve()
@@ -107,72 +89,22 @@ export function makeReview(ports: ReviewPorts) {
         ports.report(`frame review: ${model}: ${outcome.failure.kind}: ${outcome.failure.message}`)
       }
 
-      yield* record('answer', `${review}:${model}`, { review, night, file, model, seconds: Math.round(((ports.now() - started) / 1000) * 10) / 10, outcome, ...(usage === undefined ? {} : { usage }) })
+      yield* record('answer', `${review}:${model}`, { review, night, file, model, seconds: tenths((ports.now() - started) / 1000), outcome, ...(usage === undefined ? {} : { usage }) })
     })
 
-  const ask = (current: Row, run: Running, asked: Ask, taken: ReadonlyArray<Row>, happened: typeof events) =>
+  const ask = (night: string, file: string, run: Running) =>
     Effect.gen(function* () {
       const review = ports.newId()
-      const good = taken.find(each => each.file === asked.good.file)
 
-      yield* record('asked', review, {
-        review,
-        run: run.id,
-        night: current.night,
-        file: current.file,
-        goodFile: asked.good.file,
-        reasons: asked.reasons,
-        baseline: { hfdPixels: asked.baseline.hfdPixels, stars: asked.baseline.stars, elongation: null },
-        current: statsOf({ file: current.file, hfdPixels: current.row.hfdPixels, stars: current.row.stars, elongation: current.row.elongation, guideLost: 0 }),
-        models: settings.models,
-      })
+      yield* record('asked', review, { review, run: run.id, night, file, models: settings.models })
 
-      const window = taken.slice(-settings.trendFrames)
-      const since = window[0]?.row.minutes ?? 0
-      const facts: ReviewFacts = {
-        target: run.target,
-        exposureSeconds: run.exposureSeconds,
-        ...(run.filter === undefined ? {} : { filter: run.filter }),
-        reasons: asked.reasons,
-        baseline: { hfdPixels: asked.baseline.hfdPixels, stars: asked.baseline.stars },
-        lastGood: good?.row ?? current.row,
-        current: current.row,
-        trend: window.map(each => each.row),
-        events: happened
-          .map(each => ({ minutes: minutesOf(run.startedAt, each.at), event: each.event }))
-          .filter(each => each.minutes >= since)
-          .slice(-settings.eventsSent),
-      }
-      const picture = (night: string, file: string) => ports.picture(night, file).pipe(Effect.map(rgb => pictureFor(rgb, settings.imageLongSide, settings.imageMaxBytes)))
-      const request = Effect.all({ good: picture(good?.night ?? current.night, asked.good.file), current: picture(current.night, current.file) }).pipe(Effect.map(({ good: goodPicture, current: currentPicture }) => ({ good: goodPicture, current: currentPicture, facts })))
+      const request = ports.picture(night, file).pipe(
+        Effect.map(shot => ({ picture: pictureFor(shot, settings.imageLongSide, settings.imageMaxBytes), exposureSeconds: tenths(shot.exposureSeconds ?? run.exposureSeconds) })),
+      )
       const built = yield* Effect.cached(request)
 
-      yield* Effect.forEach(settings.models, model => askModel(review, current.night, current.file, model, built), { concurrency: 'unbounded', discard: true })
+      yield* Effect.forEach(settings.models, model => askModel(review, night, file, model, built), { concurrency: 'unbounded', discard: true })
     })
-
-  const frameMeasured = (entry: { readonly at: number; readonly body: typeof FrameMeasured.Type['body'] }, run: Running) => {
-    const { night, file, stars, hfdPixels, elongation, sky, noise, sequence } = entry.body
-
-    if (sequence !== undefined && run.sequence !== undefined && sequence !== run.sequence) return
-
-    const at = keptAt.get(file) ?? entry.at
-    const aim = ports.aim(at)
-    const row: Row = { night, file, row: { minutes: minutesOf(run.startedAt, at), hfdPixels, stars, elongation, sky, noise, altitudeDegrees: aim?.altitudeDegrees ?? null, azimuthDegrees: aim?.azimuthDegrees ?? null } }
-    const sample: Sample = { file, hfdPixels, stars, elongation, guideLost: lostSinceFrame }
-    const next = observeFrame(limits, trigger, sample)
-
-    lostSinceFrame = 0
-    trigger = next.state
-    rows = [...rows, row]
-
-    if (next.ask === undefined || !ports.live()) return
-
-    const asked = next.ask
-    const taken = rows
-    const happened = events
-
-    queue = queue.then(() => runHandledPromise(ask(row, run, asked, taken, happened)))
-  }
 
   function observe(entry: Entry) {
     if (!settings.enabled || !isObservedKind(entry.kind)) return
@@ -185,32 +117,26 @@ export function makeReview(ports: ReviewPorts) {
 
     switch (seen.kind) {
       case 'vela.run.started': {
-        const { run: id, object, frameType, exposureSeconds, target, sequence, filter } = seen.body
+        const { run: id, object, frameType, exposureSeconds, sequence } = seen.body
 
-        running = object._tag === 'Target' && frameType === 'light' ? { id, target: target?.name ?? object.name, exposureSeconds, filter: filter === undefined ? undefined : ports.filterNames[filter], sequence, startedAt: seen.at } : undefined
-        trigger = newTrigger
-        rows = []
-        events = []
-        lostSinceFrame = 0
+        running = object._tag === 'Target' && frameType === 'light' ? { id, exposureSeconds, sequence } : undefined
 
         return
       }
-      case 'vela.frame':
-        keptAt.set(seen.body.file, seen.at)
+      case 'vela.frame': {
+        const { night, file, sequence } = seen.body
+
+        if (running === undefined || !ports.live()) return
+        if (sequence !== undefined && running.sequence !== undefined && sequence !== running.sequence) return
+
+        const run = running
+
+        queue = queue.then(() => runHandledPromise(ask(night, file, run)))
 
         return
-      case 'vela.frame.stats':
-        if (running !== undefined) frameMeasured(seen, running)
-
-        return
+      }
       case 'vela.run.ended':
         return
-      default:
-        if (running === undefined) return
-        if (seen.body.Event === 'StarLost') {
-          lostSinceFrame += 1
-          events = [...events, { at: seen.at, event: 'StarLost' }]
-        } else if (seen.body.Event === 'SettleDone' && seen.body.Error !== undefined) events = [...events, { at: seen.at, event: 'SettleFailed' }]
     }
   }
 

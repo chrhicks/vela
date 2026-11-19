@@ -33,22 +33,22 @@ export function failureOf(error: unknown): ReviewFailed {
   return new ReviewFailed({ kind: 'other', message })
 }
 
-function replyOf(response: Anthropic.Message): Result.Result<Reply, ReviewFailed> {
+function replyOf(hazards: ReadonlyArray<string>, response: Anthropic.Message): Result.Result<Reply, ReviewFailed> {
   if (response.stop_reason === 'refusal') return Result.fail(new ReviewFailed({ kind: 'refused', message: 'the model declined to answer' }))
   if (response.stop_reason === 'max_tokens') return Result.fail(new ReviewFailed({ kind: 'truncated', message: 'the answer was cut off by the token limit' }))
 
   const text = response.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('')
 
-  return decodeAnswer(text).pipe(
+  return decodeAnswer(hazards)(text).pipe(
     Result.map(answer => ({ answer, usage: { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens } })),
     Result.mapError(error => new ReviewFailed({ kind: 'unreadable-answer', message: error.issue })),
   )
 }
 
-export function makeReviewer(settings: Pick<ReviewSettings, 'effort' | 'maxTokens'>, messages: Messages): Reviewer['Service'] {
+export function makeReviewer(settings: Pick<ReviewSettings, 'effort' | 'maxTokens' | 'hazards'>, messages: Messages): Reviewer['Service'] {
   return {
     ask: (model, request) =>
-      Effect.tryPromise({ try: () => Promise.resolve(messages.create(messageParams(settings, model, request))), catch: failureOf }).pipe(Effect.flatMap(response => Effect.fromResult(replyOf(response)))),
+      Effect.tryPromise({ try: () => Promise.resolve(messages.create(messageParams(settings, model, request))), catch: failureOf }).pipe(Effect.flatMap(response => Effect.fromResult(replyOf(settings.hazards, response)))),
   }
 }
 

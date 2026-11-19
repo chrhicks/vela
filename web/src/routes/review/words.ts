@@ -1,18 +1,6 @@
 import type { Review, ReviewReply } from '../../../../state/review.ts'
-import type { ReviewCause, ReviewFailureKind, ReviewReason, ReviewStats } from '../../../../state/review-answer.ts'
+import type { ReviewFailureKind } from '../../../../state/review-answer.ts'
 import type { Reading } from '../../components/Readings.tsx'
-import { unknown } from '../../rig/words.ts'
-
-export const causeWords: Record<ReviewCause, string> = {
-  obstruction: 'Obstruction',
-  cloud: 'Cloud',
-  focus: 'Focus',
-  'tracking-or-guiding': 'Tracking or guiding',
-  'dew-or-frost': 'Dew or frost',
-  'bright-sky-or-moon': 'Bright sky or moon',
-  'normal-variation': 'Normal variation',
-  unknown: 'Unknown',
-}
 
 export const failureWords: Record<ReviewFailureKind, string> = {
   'no-credential': 'No sign-in. Run ant auth login.',
@@ -27,52 +15,47 @@ export const failureWords: Record<ReviewFailureKind, string> = {
   other: 'Failed',
 }
 
-export const reasonWords: Record<ReviewReason, string> = {
-  hfd: 'HFD up',
-  stars: 'Stars down',
-  elongation: 'Stars elongated',
-  'guide-lost': 'Guide star lost',
-  'worse-again': 'Worse again',
+export type Verdict = 'clear' | 'obstructed' | 'failed' | 'waiting'
+
+export const verdictOf = (reply: ReviewReply | undefined): Verdict => {
+  if (reply === undefined) return 'waiting'
+  if (reply.outcome._tag === 'Failed') return 'failed'
+
+  return reply.outcome.answer.obstructed ? 'obstructed' : 'clear'
 }
+
+export const verdictWords: Record<Verdict, string> = { clear: 'Clear', obstructed: 'Obstructed', failed: 'Failed', waiting: 'Waiting for an answer' }
+
+export const replyOf = (review: Review, model: string): ReviewReply | undefined => review.replies.find(reply => reply.model === model)
 
 const percent = (confidence: number) => `${Math.round(confidence * 100)} %`
-
-export function replyLine(reply: ReviewReply | undefined): string {
-  if (reply === undefined) return 'Waiting for an answer'
-
-  return reply.outcome._tag === 'Answered' ? reply.outcome.answer.line : failureWords[reply.outcome.failure.kind]
-}
 
 export function replyReadings(reply: ReviewReply | undefined): ReadonlyArray<Reading> {
   if (reply === undefined) return []
 
   if (reply.outcome._tag === 'Failed') return [{ label: 'Failed', value: failureWords[reply.outcome.failure.kind], attention: true }]
 
-  const { cause, confidence } = reply.outcome.answer
+  const { obstructed, confidence, hazard } = reply.outcome.answer
 
   return [
-    { label: 'Cause', value: causeWords[cause] },
+    { label: 'Verdict', value: verdictWords[obstructed ? 'obstructed' : 'clear'], attention: obstructed },
     { label: 'Confidence', value: percent(confidence) },
+    { label: 'Hazard', value: hazard },
   ]
 }
 
 export function detailReadings(reply: ReviewReply | undefined): ReadonlyArray<Reading> {
   if (reply === undefined) return []
 
-  const timing: ReadonlyArray<Reading> = [
-    { label: 'Took', value: `${reply.seconds.toFixed(1)} s` },
-    ...(reply.usage === undefined ? [] : [{ label: 'Tokens', value: `${reply.usage.inputTokens} in · ${reply.usage.outputTokens} out` }]),
-  ]
-
-  return [...replyReadings(reply), ...timing]
+  return [...replyReadings(reply), { label: 'Took', value: `${reply.seconds.toFixed(1)} s` }, ...(reply.usage === undefined ? [] : [{ label: 'Tokens', value: `${reply.usage.inputTokens} in · ${reply.usage.outputTokens} out` }])]
 }
 
-export const replyOf = (review: Review, model: string): ReviewReply | undefined => review.replies.find(reply => reply.model === model)
+export const sentenceOf = (reply: ReviewReply | undefined): string | undefined => (reply?.outcome._tag === 'Answered' ? reply.outcome.answer.what : undefined)
 
-const fixed = (value: number | null, digits: number, unit = '') => (value === null ? unknown : `${value.toFixed(digits)}${unit}`)
+export function summaryOf(reply: ReviewReply | undefined): string {
+  if (reply === undefined || reply.outcome._tag === 'Failed') return verdictWords[verdictOf(reply)]
 
-export function statsWords({ hfdPixels, stars, elongation }: ReviewStats): string {
-  return `HFD ${fixed(hfdPixels, 2, ' px')} · ${fixed(stars, 0)} stars · elongation ${fixed(elongation, 2)}`
+  const { obstructed, confidence, hazard } = reply.outcome.answer
+
+  return `${verdictWords[obstructed ? 'obstructed' : 'clear']} ${percent(confidence)}, ${hazard}`
 }
-
-export const reasonsWords = (review: Review): string => review.reasons.map(reason => reasonWords[reason]).join(' · ')

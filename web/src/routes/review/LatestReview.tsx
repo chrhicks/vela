@@ -4,8 +4,7 @@ import { ActionLink } from '../../components/ActionLink.tsx'
 import { clockTime } from '../../rig/clock.ts'
 import { useRig } from '../../rig/store.ts'
 import styles from './LatestReview.module.css'
-import { ReviewAnswers } from './ReviewAnswers.tsx'
-import { reasonsWords } from './words.ts'
+import { Verdicts } from './Verdicts.tsx'
 
 export function LatestReview() {
   const review = useRig(rig => latestReview(rig.reviews))
@@ -14,15 +13,13 @@ export function LatestReview() {
 
   return (
     <section className={styles.latest}>
-      <h2 className={styles.heading}>Why the stats changed</h2>
+      <h2 className={styles.heading}>Is the frame obstructed?</h2>
 
-      <p className={styles.why}>
-        {clockTime(review.at)} · {reasonsWords(review)}
-      </p>
+      <p className={styles.why}>Newest frame · asked {clockTime(review.at)}</p>
 
-      <ReviewAnswers review={review} full={false} />
+      <Verdicts review={review} detailed={false} />
 
-      <ActionLink to={reviewPath}>All reviews tonight</ActionLink>
+      <ActionLink to={reviewPath}>All frames tonight</ActionLink>
     </section>
   )
 }

@@ -129,7 +129,9 @@ export function makePreviewRgb(bytes: Buffer, settings: PreviewSettings) {
     }
   }
 
-  return { width, height, rgb }
+  const exposure = fits.header.get('EXPTIME')
+
+  return { width, height, rgb, exposureSeconds: typeof exposure === 'number' ? exposure : undefined }
 }
 
 export function makePreview(bytes: Buffer, settings: PreviewSettings) {

@@ -4,24 +4,11 @@ import { describe, expect, it } from 'vitest'
 import type { ReviewRequest } from './request.ts'
 import { failureOf, makeReviewer, type Messages } from './reviewer.ts'
 
-const request: ReviewRequest = {
-  good: new Uint8Array([1]),
-  current: new Uint8Array([2]),
-  facts: {
-    target: 'IC 1396',
-    exposureSeconds: 180,
-    reasons: ['hfd'],
-    baseline: { hfdPixels: 2.4, stars: 2900 },
-    lastGood: { minutes: 90, hfdPixels: 2.4, stars: 2900, elongation: 1.1, sky: 1200, noise: 30, altitudeDegrees: 48, azimuthDegrees: 61 },
-    current: { minutes: 100, hfdPixels: 3.3, stars: 1900, elongation: 1.1, sky: 1200, noise: 30, altitudeDegrees: 45, azimuthDegrees: 64 },
-    trend: [],
-    events: [],
-  },
-}
+const request: ReviewRequest = { picture: new Uint8Array([1]), exposureSeconds: 120 }
 
-const settings = { effort: 'high', maxTokens: 16000 } as Parameters<typeof makeReviewer>[0]
+const settings = { effort: 'low', maxTokens: 16000, hazards: ['trees', 'high-tension power poles/lines'] } as Parameters<typeof makeReviewer>[0]
 
-const good = { sees: 'Stars are cut off along one edge.', cause: 'obstruction', confidence: 0.8, fix: 'Pick a target that clears the roofline.', line: 'Target behind an obstruction' }
+const good = { obstructed: true, confidence: 0.8, hazard: 'high-tension power poles/lines', what: 'Two soft bright bands cross the frame.' }
 
 const message = (overrides: Partial<Anthropic.Message>): Anthropic.Message =>
   ({
@@ -32,7 +19,7 @@ const message = (overrides: Partial<Anthropic.Message>): Anthropic.Message =>
     content: [{ type: 'text', text: JSON.stringify(good) }],
     stop_reason: 'end_turn',
     stop_sequence: null,
-    usage: { input_tokens: 3100, output_tokens: 420 },
+    usage: { input_tokens: 1800, output_tokens: 90 },
     ...overrides,
   }) as Anthropic.Message
 
@@ -63,8 +50,16 @@ describe('asking a model', () => {
   it('decodes the structured answer and the token usage', async () => {
     const { result, sent } = await asked(message({}))
 
-    expect(result).toMatchObject({ _tag: 'Success', success: { answer: good, usage: { inputTokens: 3100, outputTokens: 420 } } })
+    expect(result).toMatchObject({ _tag: 'Success', success: { answer: good, usage: { inputTokens: 1800, outputTokens: 90 } } })
     expect(sent[0]?.model).toBe('claude-opus-5-5')
+  })
+
+  it('accepts none and other as hazards, and a hazard from the configured list', async () => {
+    for (const hazard of ['none', 'other', 'trees']) {
+      const { result } = await asked(message({ content: [{ type: 'text', text: JSON.stringify({ ...good, hazard }) }] as Anthropic.Message['content'] }))
+
+      expect(result).toMatchObject({ _tag: 'Success', success: { answer: { hazard } } })
+    }
   })
 
   it('reads the answer from the text after thinking blocks', async () => {
@@ -73,8 +68,8 @@ describe('asking a model', () => {
     expect(result).toMatchObject({ _tag: 'Success' })
   })
 
-  it('fails with a typed error when the answer is not JSON, names a cause outside the set or has a confidence outside 0 to 1', async () => {
-    for (const text of ['I think it is a tree', JSON.stringify({ ...good, cause: 'aliens' }), JSON.stringify({ ...good, confidence: 1.4 }), JSON.stringify({ sees: 'x' })]) {
+  it('fails with a typed error when the answer is not JSON, names a hazard that is not in the list or has a confidence outside 0 to 1', async () => {
+    for (const text of ['I think it is a tree', JSON.stringify({ ...good, hazard: 'aliens' }), JSON.stringify({ ...good, confidence: 1.4 }), JSON.stringify({ what: 'x' })]) {
       const { result } = await asked(message({ content: [{ type: 'text', text }] as Anthropic.Message['content'] }))
 
       expect(result).toMatchObject({ _tag: 'Failure', failure: { _tag: 'ReviewFailed', kind: 'unreadable-answer' } })

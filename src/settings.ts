@@ -320,7 +320,7 @@ export const VelaSettings = Schema.Struct({
   controls: described('The controls page', ControlsSettings, {}),
   centre: described('Settings for slew and centre', CentreSettings, {}),
   firstFrames: described('The check of the first frames of a run on a target', FirstFramesSettings, {}),
-  review: described('Asking models to look at a light frame and say why its stats changed. Report only: it never acts on the rig', ReviewSettings, {}),
+  review: described('Asking models whether each light frame is obstructed. Report only: it never acts on the rig', ReviewSettings, {}),
   rememberedFile: described('The file Vela keeps what it remembers in: the last light run, the camera angle and the centres that centring reached', Schema.String, '/mnt/storage/vela/remembered.json'),
   start: described('Starting a target from the picker: home, stop guiding, slew and centre, autofocus, guiding, then the run', StartRoutineSettings, {}),
   streamViewer: Schema.optionalKey(

@@ -2,7 +2,7 @@ import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effe
 import { FilterAnswer, Refusal } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
 import { Check, CheckedFrames, FirstFramesVerdict } from './first-frames-check.ts'
-import { ReviewId, ReviewOutcome, ReviewReason, ReviewStats, ReviewUsage } from './review-answer.ts'
+import { ReviewId, ReviewOutcome, ReviewUsage } from './review-answer.ts'
 import { RunTarget } from './targets.ts'
 
 export const RunId = Schema.NonEmptyString.pipe(Schema.brand('RunId'))
@@ -194,10 +194,6 @@ export const ReviewAsked = entryOf('vela.review.asked', {
   run: RunId,
   night: NightName,
   file: FrameFile,
-  goodFile: FrameFile,
-  reasons: Schema.Array(ReviewReason),
-  baseline: ReviewStats,
-  current: ReviewStats,
   models: Schema.Array(Schema.NonEmptyString),
 })
 

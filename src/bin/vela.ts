@@ -69,7 +69,6 @@ import { readHistory } from '../stream/history.ts'
 import { keep, readKept } from '../remembered/kept.ts'
 import { lastCentreNear, nothingRemembered, remember } from '../remembered/remembered.ts'
 import { Recalled } from '../feed/remembered.ts'
-import { aimAt } from '../review/aim.ts'
 import { keepLine } from '../review/keep.ts'
 import { makeReview, PictureUnavailable } from '../review/review.ts'
 import { anthropicMessages, makeReviewer } from '../review/reviewer.ts'
@@ -227,18 +226,9 @@ const publishStack = (count: StackCount | undefined) => {
 }
 const review = makeReview({
   settings: settings.review,
-  filterNames: settings.capture.filterNames,
   reviewer: makeReviewer(settings.review, anthropicMessages()),
   picture: (night, file) =>
     Effect.tryPromise({ try: () => readFile(join(frames.keepDir, night, file)).then(bytes => makePreviewRgb(bytes, frames.preview)), catch: cause => new PictureUnavailable({ night, file, cause }) }),
-  aim: at => {
-    const site = siteOf(picture, devices.mount)
-    const pointing = picture.property(devices.mount, 'EQUATORIAL_EOD_COORD')?.values
-    const ra = pointing?.['RA']
-    const dec = pointing?.['DEC']
-
-    return site === undefined || typeof ra !== 'number' || typeof dec !== 'number' ? undefined : aimAt(site, ra, dec, at)
-  },
   publish: (kind, id, body) => publishEntry(stream.vela('review'), `vela.review.${kind}`, id, body),
   keep: keepLine(settings.review.answersFile),
   report: line => console.error(`vela: ${line}`),

@@ -12,7 +12,7 @@ Each route serves one moment of the night.
 | `/` | The run | A desktop second monitor, then a phone |
 | `/controls` | Something needs correcting | Either |
 | `/frame/<number>`, `/stack` | Judging a picture by eye | Either |
-| `/review` | Reading why Claude thinks the stats changed | Either |
+| `/review` | Seeing whether Claude calls each frame obstructed | Either |
 
 ## Where things are
 
@@ -50,7 +50,7 @@ Clicking the latest frame or the stack on the run page opens it for judging the 
 
 ## /review
 
-Tonight's frame reviews, newest first (`routes/review/`, on real data from `state/review.ts`). Each one shows the last good frame and the frame that was asked about with their stats, then the answer of every model side by side: what it sees, the likely cause, its confidence, the suggested fix, how long it took and its tokens, or the typed reason it failed. The capturing page shows the latest review under the stats (`LatestReview`): each model's one line, cause and confidence, with a link here. Report only; nothing here acts on the rig.
+Tonight's frames as the models judged them, newest first (`routes/review/`, on real data from `state/review.ts`). A strip across the top marks every frame per model, oldest first: a tall amber mark for obstructed, a short one for clear, an outline for a failed answer; hovering gives the time, the verdict, the confidence and the hazard, and a mark links to its frame below. Each frame shows its preview and, for each model, the verdict (obstructed or clear) and confidence first, then the hazard and the one sentence, with the time it took and its tokens, or the typed reason it failed. The capturing page shows the newest frame's verdicts under the stats (`LatestReview`) with a link here. Report only; nothing here acts on the rig.
 
 ## /controls
 

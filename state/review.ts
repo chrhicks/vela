@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { FrameFile, NightName, RunId, type RigEntry } from './entries.ts'
-import { ReviewId, ReviewOutcome, ReviewReason, ReviewStats, ReviewUsage } from './review-answer.ts'
+import { ReviewId, ReviewOutcome, ReviewUsage } from './review-answer.ts'
 
 export const ReviewReply = Schema.Struct({
   model: Schema.NonEmptyString,
@@ -17,10 +17,6 @@ export const Review = Schema.Struct({
   run: RunId,
   night: NightName,
   file: FrameFile,
-  goodFile: FrameFile,
-  reasons: Schema.Array(ReviewReason),
-  baseline: ReviewStats,
-  current: ReviewStats,
   models: Schema.Array(Schema.NonEmptyString),
   replies: Schema.Array(ReviewReply),
 })
@@ -36,11 +32,11 @@ export const noReviews: Reviews = []
 export function reviews(state: Reviews, entry: RigEntry): Reviews {
   switch (entry.kind) {
     case 'vela.review.asked': {
-      const { review, run, night, file, goodFile, reasons, baseline, current, models } = entry.body
+      const { review, run, night, file, models } = entry.body
 
       if (state.some(known => known.id === review)) return state
 
-      return [...state, { id: review, at: entry.at, run, night, file, goodFile, reasons, baseline, current, models, replies: [] }]
+      return [...state.filter(known => known.night === night), { id: review, at: entry.at, run, night, file, models, replies: [] }]
     }
     case 'vela.review.answer': {
       const { review, model, seconds, outcome, usage } = entry.body

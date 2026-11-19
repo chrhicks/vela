@@ -1,24 +1,35 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { Data, Result, Schema } from 'effect'
-import { ReviewAnswer, ReviewCause } from '../../state/review-answer.ts'
+import { ReviewAnswer } from '../../state/review-answer.ts'
 
 export class AnswerUnreadable extends Data.TaggedError('AnswerUnreadable')<{ readonly issue: string }> {}
 
-const AnswerAsked = Schema.Struct({
-  sees: Schema.String.annotate({ description: 'What the two pictures show, in at most three short sentences' }),
-  cause: ReviewCause.annotate({
-    description:
-      'The most likely cause: obstruction is something blocking part of the sky such as trees, buildings or power lines; cloud is cloud or haze; focus is the focus having drifted; tracking-or-guiding is the mount or guiding; dew-or-frost is moisture on the optics; bright-sky-or-moon is a brighter sky; normal-variation is a change within what the run varies by; unknown is when the evidence does not decide',
-  }),
-  confidence: Schema.Finite.annotate({ description: 'How sure the cause is, from 0 to 1, lower when the evidence is thin' }),
-  fix: Schema.String.annotate({ description: 'One concrete thing to try, or that nothing needs doing' }),
-  line: Schema.String.annotate({ description: 'One short line in plain words for the run page, at most 100 characters' }),
+export const noHazard = 'none'
+
+export const otherHazard = 'other'
+
+export const hazardChoices = (hazards: ReadonlyArray<string>): ReadonlyArray<string> => [...new Set([...hazards, noHazard, otherHazard])]
+
+const answerFor = (hazards: ReadonlyArray<string>) =>
+  Schema.Struct({
+    obstructed: Schema.Boolean.annotate({ description: 'Whether something is in the way of the sky in this frame' }),
+    confidence: Schema.Finite.annotate({ description: 'How sure obstructed is right, from 0 to 1' }),
+    hazard: Schema.Literals(hazardChoices(hazards)).annotate({ description: `Which hazard it is, ${noHazard} when the frame is clear, ${otherHazard} when it is something not listed` }),
+    what: Schema.String.annotate({ description: 'One short sentence on what the frame shows' }),
+  })
+
+export const answerFormat = (hazards: ReadonlyArray<string>): Anthropic.JSONOutputFormat => ({
+  type: 'json_schema',
+  schema: { ...Schema.toJsonSchemaDocument(answerFor(hazards)).schema, additionalProperties: false },
 })
 
-const asked = Schema.toJsonSchemaDocument(AnswerAsked).schema
+export const decodeAnswer = (hazards: ReadonlyArray<string>) => {
+  const decode = Schema.decodeUnknownResult(Schema.fromJsonString(answerFor(hazards)))
+  const inRange = Schema.decodeUnknownResult(ReviewAnswer)
 
-export const answerFormat: Anthropic.JSONOutputFormat = { type: 'json_schema', schema: { ...asked, additionalProperties: false } }
-
-const decodeAnswerText = Schema.decodeUnknownResult(Schema.fromJsonString(ReviewAnswer))
-
-export const decodeAnswer = (text: string): Result.Result<ReviewAnswer, AnswerUnreadable> => decodeAnswerText(text).pipe(Result.mapError(error => new AnswerUnreadable({ issue: error.message })))
+  return (text: string): Result.Result<ReviewAnswer, AnswerUnreadable> =>
+    decode(text).pipe(
+      Result.flatMap(inRange),
+      Result.mapError(error => new AnswerUnreadable({ issue: error.message })),
+    )
+}
