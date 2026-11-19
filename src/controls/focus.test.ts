@@ -35,8 +35,8 @@ function setup(rig: RigState, subscriptions: ReadonlyArray<ReadonlyArray<Entry>>
   })
   const feed = Layer.succeed(Feed, { receive: () => Effect.void, subscribe, current: Effect.sync(() => now) })
   const commands = deviceCommandsFrom({ send, ask: () => Promise.resolve({ result: 'written' }), tell: () => undefined, deviceIds, answerSeconds: 10 })
-  const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('run ended'), true)), idle: Effect.sync(() => void sent.push('no run')), pause: Effect.succeed(false), resume: Effect.void })
-  const autofocusing = Layer.succeed(Autofocusing, { start: (exposureSeconds: number) => Effect.sync(() => void sent.push(`autofocus at ${exposureSeconds} s`)) })
+  const runs = Layer.succeed(MountRuns, { endRun: Effect.sync(() => (sent.push('run ended'), true)), idle: Effect.sync(() => void sent.push('no run')), pause: Effect.succeed(false), parked: Effect.succeed(false), resume: Effect.void })
+  const autofocusing = Layer.succeed(Autofocusing, { start: (exposureSeconds: number) => Effect.sync(() => void sent.push(`autofocus at ${exposureSeconds} s`)), run: () => Effect.succeed('done') })
   const settings = Layer.succeed(FocusSettings, { moveSeconds })
   const press = (choose: (controls: Controls) => Effect.Effect<unknown, unknown>) => Effect.runPromise(Effect.flatMap(focusControls, choose).pipe(Effect.result, Effect.provide(Layer.mergeAll(feed, commands, runs, autofocusing, settings))))
 

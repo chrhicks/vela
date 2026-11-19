@@ -76,7 +76,7 @@ export interface AutofocusOptions {
   readonly settings: AutofocusSettings
 }
 
-type Result = { readonly ok: true } | { readonly ok: false; readonly reason: string }
+type Result = { readonly ok: true; readonly done: Promise<{ readonly reason: string }> } | { readonly ok: false; readonly reason: string }
 
 const empty: AutofocusView = { run: undefined, startedAt: undefined, positions: [], samples: [], best: undefined, check: undefined, ended: undefined, problem: undefined }
 
@@ -186,7 +186,7 @@ export function makeAutofocus({ picture, sender, capture, publish, settings }: A
       run = started.run
       publish('started', { run, positions, step: request.step, exposureSeconds: request.exposureSeconds })
 
-      return { ok: true }
+      return { ok: true, done: started.done }
     },
 
     measured(answer: Measured) {

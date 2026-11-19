@@ -4,7 +4,7 @@ import type { FilterAnswer } from '../../state/commands.ts'
 import { StartId, type RunEnding, type TargetStepBody } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
 import type { RigState } from '../../state/rig.ts'
-import { entry, foldRig, wire } from '../../state/testing.ts'
+import { entry, foldRig, runStarted, wire } from '../../state/testing.ts'
 import type { CaptureRequest } from '../capture/request.ts'
 import { testCatalog } from '../catalog/testing.ts'
 import type { Command, Outcome, Request } from '../commands/sender.ts'
@@ -38,9 +38,11 @@ interface Options {
   readonly guiderAnswers?: boolean
   readonly running?: boolean
   readonly homeSeconds?: number
+  readonly parks?: boolean
+  readonly focusEnds?: string
 }
 
-function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswers = true, guiderAnswers = true, running = false, homeSeconds = 5 }: Options = {}) {
+function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswers = true, guiderAnswers = true, running = false, homeSeconds = 5, parks = true, focusEnds = 'done' }: Options = {}) {
   const did: Array<string> = []
   const reported: Array<string> = []
   const started: Array<CaptureRequest> = []
@@ -66,12 +68,12 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
     Layer.succeed(TargetCentring, {
       centre: id => (centreRefused ? Effect.fail(new CommandRefused({ refusal: { code: 'refused', text: 'the mount is parked' } })) : Effect.sync(() => void did.push(`centre ${id}`))),
     }),
-    Layer.succeed(Autofocusing, { start: exposureSeconds => Effect.sync(() => void did.push(`autofocus ${exposureSeconds}`)) }),
+    Layer.succeed(Autofocusing, { start: exposureSeconds => Effect.sync(() => void did.push(`autofocus ${exposureSeconds}`)), run: exposureSeconds => Effect.sync(() => (did.push(`autofocus run ${exposureSeconds}`), focusEnds)) }),
     Layer.succeed(TargetCatalog, { find: id => testCatalog.find(id) }),
     Layer.succeed(StartLog, { report }),
     Layer.succeed(FilterAnswers, { answer: filter => Effect.sync(() => void did.push(`filter ${filter}`)) }),
     Layer.succeed(StartRunning, { busy: Effect.sync(() => routine !== undefined), began: begun => Effect.sync(() => void (routine = begun)) }),
-    Layer.succeed(MountRuns, { endRun: Effect.sync(() => (did.push('end run'), running)), idle: Effect.void, pause: Effect.succeed(false), resume: Effect.void }),
+    Layer.succeed(MountRuns, { endRun: Effect.sync(() => (did.push('end run'), running)), idle: Effect.void, pause: Effect.sync(() => (did.push('pause'), true)), parked: Effect.sync(() => (did.push('parked'), parks)), resume: Effect.sync(() => void did.push('resume')) }),
     Layer.succeed(StartSettings, { homeSeconds, guidingSeconds: 5, rigSilentAfterSeconds: 10, autofocusExposureSeconds: { in: 10, out: 2 }, newId: Effect.succeed(StartId.make('start-1')) }),
   )
 
@@ -80,7 +82,10 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
 
   const stopForTheNight = () => Effect.runPromise(Effect.flatMap(startControls, controls => controls.stopForTheNight).pipe(Effect.result, Effect.provide(services)))
 
-  return { did, reported, started, press, stopForTheNight, finished: () => Effect.runPromise(Fiber.await(routine!)), stop: () => Effect.runPromise(Fiber.interrupt(routine!)), underWay: () => vi.waitFor(() => expect(reported).toContain('home started')) }
+  const refocus = () => Effect.runPromise(Effect.flatMap(startControls, controls => controls.refocus).pipe(Effect.result, Effect.provide(services)))
+  const reguide = () => Effect.runPromise(Effect.flatMap(startControls, controls => controls.reguide).pipe(Effect.result, Effect.provide(services)))
+
+  return { did, reported, started, press, stopForTheNight, refocus, reguide, finished: () => Effect.runPromise(Fiber.await(routine!)), stop: () => Effect.runPromise(Fiber.interrupt(routine!)), underWay: () => vi.waitFor(() => expect(reported).toContain('home started')) }
 }
 
 describe('Start a target', () => {
@@ -191,5 +196,40 @@ describe('Start a target', () => {
 
     expect(await stopForTheNight()).toMatchObject({ success: { code: 'stopped-for-night', endedRun: false, missed: ['guiding', 'home'] } })
     expect(did).toEqual(['end run', 'guider stop_capture', 'mount TELESCOPE_HOME', 'mount TELESCOPE_TRACK_STATE', 'asi CCD_COOLER'])
+  })
+})
+
+describe('Refocus and re-guide during a run', () => {
+  const capturing = (filter?: FilterAnswer) => ({ ...foldRig([wire('mount', 'CONNECTION', { CONNECT: true, DISCONNECT: false }), runStarted('run-1', 1, 'IC 1396'), ...(filter === undefined ? [] : [entry('vela.filter', 1, { filter })])]), heardAt: Date.now() })
+
+  it('pauses the run, focuses with the filter answered, then carries the same run on', async () => {
+    const { did, refocus } = setup({ rig: capturing('in') })
+
+    expect(await refocus()).toMatchObject({ success: { code: 'refocused', exposureSeconds: 10, ending: 'done' } })
+    expect(did).toEqual(['pause', 'parked', 'autofocus run 10', 'resume'])
+  })
+
+  it('carries the run on even when the focus sweep fails, and says how it ended', async () => {
+    const { did, refocus } = setup({ rig: capturing('out'), focusEnds: 'refused' })
+
+    expect(await refocus()).toMatchObject({ success: { code: 'refocused', exposureSeconds: 2, ending: 'refused' } })
+    expect(did.at(-1)).toBe('resume')
+  })
+
+  it('pauses the run, picks a guide star again and waits for guiding to settle, then carries the run on', async () => {
+    const { did, reguide } = setup({ rig: capturing() })
+
+    expect(await reguide()).toMatchObject({ success: { code: 'reguided' } })
+    expect(did).toEqual(['pause', 'parked', 'guider get_connected', 'guider guide', 'resume'])
+  })
+
+  it('refuses with no run going, and carries the run on if it stopped before it was paused', async () => {
+    const idle = setup()
+    const stopped = setup({ rig: capturing(), parks: false })
+
+    expect(await idle.refocus()).toMatchObject({ failure: { refusal: { code: 'no-run' } } })
+    expect(idle.did).toEqual([])
+    expect(await stopped.reguide()).toMatchObject({ failure: { refusal: { code: 'no-run' } } })
+    expect(stopped.did).toEqual(['pause', 'parked', 'resume'])
   })
 })

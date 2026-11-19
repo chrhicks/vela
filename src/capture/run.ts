@@ -81,7 +81,7 @@ export interface CaptureView {
 
 export type Between = (frame: number, signal: AbortSignal) => Promise<string | { readonly done: string } | undefined>
 
-export type StartResult = { readonly ok: true; readonly run: string; readonly done: Promise<void> } | { readonly ok: false; readonly reason: string }
+export type StartResult = { readonly ok: true; readonly run: string; readonly done: Promise<Ending> } | { readonly ok: false; readonly reason: string }
 
 interface Active {
   readonly id: string
@@ -103,6 +103,7 @@ interface Active {
   waiting: { readonly what: string; readonly since: () => number; readonly alertAfterMs: number } | undefined
   readonly refused: Map<string, string>
   paused: boolean
+  parked: boolean
   setpointState: string | undefined
 }
 
@@ -114,6 +115,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   const changes = makeChanges()
   const labels = new Map<string, FrameLabel>()
   let active: Active | undefined
+  let held: Active | undefined
   let filter: FilterAnswer | undefined
   const filterNameOf = (answer: FilterAnswer | undefined) => (answer === undefined ? undefined : settings.filterNames[answer])
   let last: Ending | undefined
@@ -122,7 +124,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   const read = (property: string) => picture.property(settings.device, property)
 
   function refusalToStart(request: CaptureRequest, wanted: Wanted): string | undefined {
-    if (active !== undefined) return 'a capture is already running'
+    if (active !== undefined && (!active.paused || held !== undefined)) return 'a capture is already running'
     if (picture.rig() === undefined) return 'the stream shows no rig connection'
     if (read('CCD_EXPOSURE') === undefined) return `${settings.device} has no CCD_EXPOSURE on the stream`
 
@@ -136,16 +138,28 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     return 'missing' in plan ? `the camera has no ${plan.missing} on the stream` : undefined
   }
 
+  const remember = (run: Active) => runFile.write({ run: run.id, startedAt: run.startedAt, object: run.request.object, frameType: run.request.frameType, count: run.request.count, counted: run.counted })
+
   function finish(run: Active, stop: Stop): Ending {
     const ending: Ending = { run: run.id, reason: stop.reason, detail: stop.detail, counted: run.counted, failed: run.failed, at: now() }
 
-    runFile.clear()
-    active = undefined
+    if (run === held) held = undefined
+    else if (run === active) {
+      active = held
+      held = undefined
+    }
+
+    if (active === undefined) runFile.clear()
+    else remember(active)
+
     last = ending
     emit({ kind: 'ended', run: run.id, body: { reason: ending.reason, detail: ending.detail, counted: ending.counted, failed: ending.failed } })
     onChange()
-    for (const idle of idleWaiters) idle()
-    idleWaiters.clear()
+
+    if (active === undefined) {
+      for (const idle of idleWaiters) idle()
+      idleWaiters.clear()
+    }
 
     return ending
   }
@@ -265,18 +279,29 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
     return { frame: 'failed', why: 'alert' }
   }
 
-  async function execute(run: Active) {
+  async function execute(run: Active): Promise<Ending> {
     try {
-      await runFrames(run)
+      return await runFrames(run)
     } catch (error) {
-      await finishWith(run, { reason: 'unknown', detail: `Vela failed: ${error instanceof Error ? error.message : String(error)}` })
+      return await finishWith(run, { reason: 'unknown', detail: `Vela failed: ${error instanceof Error ? error.message : String(error)}` })
     }
   }
 
-  async function runFrames(run: Active) {
+  async function runFrames(run: Active): Promise<Ending> {
     let first = true
 
     while (run.request.count === undefined || run.counted < run.request.count) {
+      if (run.paused) {
+        run.parked = true
+        changes.announce()
+        await changes.until(() => !run.paused && active === run, undefined, run.abort.signal)
+        run.parked = false
+
+        if (run.abort.signal.aborted) return finishWith(run, { reason: 'stopped', detail: 'Stop pressed' })
+
+        await sender.send(abortCommand(settings.device), run.abort.signal)
+      }
+
       const stop = await prepare(run, first)
 
       if (stop !== undefined) return finishWith(run, stop)
@@ -295,13 +320,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
       if (typeof next === 'string') return finishWith(run, { reason: 'refused', detail: next })
       if (next !== undefined) return finishWith(run, { reason: 'done', detail: next.done })
 
-      if (run.paused) {
-        await changes.until(() => !run.paused, undefined, run.abort.signal)
-
-        if (run.abort.signal.aborted) return finishWith(run, { reason: 'stopped', detail: 'Stop pressed' })
-
-        await sender.send(abortCommand(settings.device), run.abort.signal)
-      }
+      if (run.paused) continue
 
       const result = await expose(run)
 
@@ -313,7 +332,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         run.counted += 1
         run.inARow = 0
         emit({ kind: 'exposed', run: run.id, body: { frame: run.counted, sequence: run.sequence, file: basename(result.path) } })
-        runFile.write({ run: run.id, startedAt: run.startedAt, object: run.request.object, frameType: run.request.frameType, count: run.request.count, counted: run.counted })
+        if (held === undefined) remember(run)
       } else {
         run.failed += 1
         run.inARow += 1
@@ -324,16 +343,16 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
       if (run.abort.signal.aborted) return finishWith(run, { reason: 'stopped', detail: 'Stop pressed' })
     }
 
-    await finishWith(run, { reason: 'done', detail: `${run.counted} frames` })
+    return finishWith(run, { reason: 'done', detail: `${run.counted} frames` })
   }
 
-  async function finishWith(run: Active, stop: Stop) {
+  async function finishWith(run: Active, stop: Stop): Promise<Ending> {
     run.phase = 'ending'
     onChange()
 
     const stopped = run.stopping === undefined ? undefined : await Promise.race([run.stopping, Promise.resolve('Stop pressed, abort sent')])
 
-    finish(run, stopped === undefined || stop.reason !== 'stopped' ? stop : { reason: 'stopped', detail: stopped })
+    return finish(run, stopped === undefined || stop.reason !== 'stopped' ? stop : { reason: 'stopped', detail: stopped })
   }
 
   return {
@@ -367,11 +386,13 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         waiting: undefined,
         refused: new Map(),
         paused: false,
+        parked: false,
         setpointState: undefined,
       }
 
+      held = active
       active = run
-      runFile.write({ run: run.id, startedAt: run.startedAt, object: run.request.object, frameType: run.request.frameType, count: run.request.count, counted: 0 })
+      if (held === undefined) remember(run)
       emit({ kind: 'started', run: run.id, body: { rigRun: picture.rig()?.run, ...parsed.request, sequence: parsed.sequence } })
       onChange()
 
@@ -385,6 +406,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
       run.stopping ??= sender.send(abortCommand(settings.device)).then(outcome => (outcome.result === 'written' ? 'Stop pressed, abort written' : `Stop pressed, abort ${outcome.result}: ${outcome.reason}`))
       run.abort.abort()
+      held?.abort.abort()
 
       return true
     },
@@ -457,6 +479,16 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
       run.paused = false
       changes.announce()
       onChange()
+    },
+
+    async whenParked(): Promise<boolean> {
+      const run = active
+
+      if (run === undefined || !run.paused) return false
+
+      await changes.until(() => run.parked || active !== run, undefined, run.abort.signal)
+
+      return run.parked && active === run
     },
 
     whenIdle(): Promise<void> {
