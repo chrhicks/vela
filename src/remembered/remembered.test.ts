@@ -63,7 +63,7 @@ describe('what Vela remembers from the stream', () => {
     expect(lastCentreNear(state, { raDegrees: 10.7, decDegrees: 41.3 }, 1.1)).toBeUndefined()
   })
 
-  it('keeps the cooler each light run on a target started with, and the latest of any target', () => {
+  it('keeps the setpoint each light run on a target started with, and the latest of any target, but not a run started with the cooler off', () => {
     const state = fold([
       setpoint(100, -10),
       coolerSwitched(101, true),
@@ -74,9 +74,8 @@ describe('what Vela remembers from the stream', () => {
 
     expect(state.targetCoolers).toEqual([
       { target: 'orion', setting: { state: 'on', celsius: -10 }, at: 200 },
-      { target: 'rosette', setting: { state: 'off' }, at: 400 },
     ])
-    expect(state.lastCooler).toEqual({ setting: { state: 'off' }, at: 400 })
+    expect(state.lastCooler).toEqual({ setting: { state: 'on', celsius: -10 }, at: 200 })
   })
 
   it('offers a target its own cooler, and the latest of any target when it has none', () => {

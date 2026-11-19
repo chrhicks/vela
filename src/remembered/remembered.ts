@@ -125,9 +125,9 @@ function coolerAt(camera: CoolerCamera | undefined, at: number): CoolerSetting |
 function lightStarted(state: Remembered, start: { readonly at: number; readonly target: string | undefined }): Remembered {
   const setting = coolerAt(state.camera, start.at)
 
-  if (setting === undefined) return state
+  if (setting === undefined || setting.state === 'off') return state
 
-  const seen = { setting, at: start.at }
+  const seen: CoolerAtStart = { setting, at: start.at }
   const before = state.targetCoolers.find(known => known.target === start.target)
 
   return {

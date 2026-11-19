@@ -111,7 +111,7 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
   const remembered = target.lastCooler
   const rememberedOn = remembered?.setting.state === 'on' ? remembered : undefined
   const coolerCelsius = rememberedOn?.setting.state === 'on' ? rememberedOn.setting.celsius : offeredCelsius
-  const coolerWanted = coolerChoice ?? remembered?.setting.state ?? 'on'
+  const coolerWanted = coolerChoice ?? 'on'
   const cooler: CoolerSetting | undefined = coolerWanted === 'off' ? { state: 'off' } : coolerCelsius === undefined ? undefined : { state: 'on', celsius: coolerCelsius }
   const fullOpen = new URLSearchParams(search)
   const fullClosed = new URLSearchParams(search)
@@ -265,7 +265,7 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
               name="Cooler"
               choices={[
                 { value: 'on', label: `${coolerCelsius === undefined ? 'On' : celsiusWords(coolerCelsius)}${rememberedOn === undefined ? '' : `, as ${dayOf(rememberedOn.at)}`}` },
-                { value: 'off', label: `Off${remembered?.setting.state === 'off' ? `, as ${dayOf(remembered.at)}` : ''}` },
+                { value: 'off', label: 'Off' },
               ]}
               chosen={coolerWanted}
               onChoose={setCoolerChoice}
