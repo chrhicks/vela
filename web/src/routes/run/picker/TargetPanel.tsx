@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
-import type { FilterAnswer } from '../../../../../state/commands.ts'
+import type { CoolerSetting, FilterAnswer } from '../../../../../state/commands.ts'
 import { endsBy } from '../../../../../state/ends-by.ts'
 import type { RememberedAnswer } from '../../../../../state/remembered.ts'
 import type { Survey } from '../../../../../state/survey.ts'
@@ -75,6 +75,8 @@ type Framing = 'catalog' | 'last'
 
 const dayOf = (at: number) => new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' })
 
+const celsiusWords = (celsius: number) => `${celsius} °C`
+
 const wholeNumber = (typed: string, fallback: number) => {
   const value = Number.parseInt(typed, 10)
 
@@ -90,6 +92,8 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
   const [frames, setFrames] = useState(String(last.frames))
   const filterIn = useRig(rig => rig.operations.filter)
   const [filter, setFilter] = useState<FilterAnswer | undefined>(filterIn)
+  const [coolerChoice, setCoolerChoice] = useState<CoolerSetting['state']>()
+  const offeredCelsius = useLink().controls?.coolerCelsius
   const answer = useAsked(() => targetFacts(id), id, refreshed)
   const now = serviceNow(useLink(), useLocalNow(tickMilliseconds))
   const navigate = useNavigate()
@@ -104,6 +108,11 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
   const frameCount = wholeNumber(frames, last.frames)
   const centre = framing === 'last' && target.lastCentre !== null ? { raDegrees: target.lastCentre.raDegrees, decDegrees: target.lastCentre.decDegrees } : undefined
   const offset = framing === 'last' && target.lastCentre !== null ? target.lastCentre : undefined
+  const remembered = target.lastCooler
+  const rememberedOn = remembered?.setting.state === 'on' ? remembered : undefined
+  const coolerCelsius = rememberedOn?.setting.state === 'on' ? rememberedOn.setting.celsius : offeredCelsius
+  const coolerWanted = coolerChoice ?? remembered?.setting.state ?? 'on'
+  const cooler: CoolerSetting | undefined = coolerWanted === 'off' ? { state: 'off' } : coolerCelsius === undefined ? undefined : { state: 'on', celsius: coolerCelsius }
   const fullOpen = new URLSearchParams(search)
   const fullClosed = new URLSearchParams(search)
 
@@ -248,13 +257,29 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
           </div>
         </div>
 
+        <div className={styles.setting}>
+          <Caption>Cooler</Caption>
+
+          <div className={styles.answer}>
+            <Choices
+              name="Cooler"
+              choices={[
+                { value: 'on', label: `${coolerCelsius === undefined ? 'On' : celsiusWords(coolerCelsius)}${rememberedOn === undefined ? '' : `, as ${dayOf(rememberedOn.at)}`}` },
+                { value: 'off', label: `Off${remembered?.setting.state === 'off' ? `, as ${dayOf(remembered.at)}` : ''}` },
+              ]}
+              chosen={coolerWanted}
+              onChoose={setCoolerChoice}
+            />
+          </div>
+        </div>
+
         <Readings rows={[{ label: 'Ends by', value: ends }]} />
       </div>
 
       <div className={styles.start}>
         <CommandPill
-          request={{ command: 'startTarget', target: target.id, exposureSeconds, filter: filter ?? 'out', ...(stop === 'frames' ? { frames: frameCount } : {}), ...(centre === undefined ? {} : { centre }) }}
-          waiting={filter === undefined}
+          request={{ command: 'startTarget', target: target.id, exposureSeconds, filter: filter ?? 'out', ...(stop === 'frames' ? { frames: frameCount } : {}), ...(centre === undefined ? {} : { centre }), cooler: cooler ?? { state: 'off' } }}
+          waiting={filter === undefined || cooler === undefined}
           onCarriedOut={() => navigate('/')}
         >
           Start

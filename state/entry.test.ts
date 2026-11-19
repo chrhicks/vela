@@ -43,6 +43,7 @@ describe('streamOf', () => {
   it('names the stream and its subjects after the environment', () => {
     expect(streamOf(Environment.make('prod'))).toMatchObject({ name: 'RIG_PROD', client: 'rig-prod.client', followed: ['rig-prod.wire.>', 'rig-prod.client', 'rig-prod.phd2', 'rig-prod.vela.>', 'rig-prod.command.>'] })
     expect(stream.vela('frame')).toBe('rig-test.vela.frame')
+    expect(stream.sent('primary')).toBe('rig-test.wire.primary.out')
     expect(stream.commandDevice('rig-test.command.mount')).toBe('mount')
     expect(stream.commandDevice('rig-dev.command.mount')).toBeUndefined()
   })

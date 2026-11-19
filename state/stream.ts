@@ -9,6 +9,7 @@ export interface Stream {
   readonly client: string
   readonly followed: ReadonlyArray<string>
   readonly vela: (family: string) => string
+  readonly sent: (device: string) => string
   readonly command: (device: string) => string
   readonly commandDevice: (subject: string) => string | undefined
 }
@@ -22,6 +23,7 @@ export function streamOf(environment: Environment): Stream {
     client: `${prefix}.client`,
     followed: [`${prefix}.wire.>`, `${prefix}.client`, `${prefix}.phd2`, `${prefix}.vela.>`, `${commandPrefix}>`],
     vela: family => `${prefix}.vela.${family}`,
+    sent: device => `${prefix}.wire.${device}.out`,
     command: device => `${commandPrefix}${device}`,
     commandDevice: subject => (subject.startsWith(commandPrefix) ? subject.slice(commandPrefix.length) : undefined),
   }

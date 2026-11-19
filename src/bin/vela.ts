@@ -67,7 +67,7 @@ import { readWireBody } from '../stream/json.ts'
 import { Broker, brokerOf, followRig, type Followed } from '../stream/follow.ts'
 import { readHistory } from '../stream/history.ts'
 import { keep, readKept } from '../remembered/kept.ts'
-import { lastCentreNear, nothingRemembered, remember } from '../remembered/remembered.ts'
+import { coolerFor, lastCentreNear, nothingRemembered, remember } from '../remembered/remembered.ts'
 import { Recalled } from '../feed/remembered.ts'
 import { keepLine } from '../review/keep.ts'
 import { makeReview, PictureUnavailable } from '../review/review.ts'
@@ -137,6 +137,7 @@ const placedTargets = makePlacedTargets({
   catalog,
   site: () => siteOf(picture, settings.devices.mount),
   lastCentreNear: position => lastCentreNear(remembered, position, settings.pointing.sameFramingDegrees),
+  lastCoolerFor: id => coolerFor(remembered, id),
   settings: settings.pointing,
 })
 const pointing = makePointing({ picture, catalog, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
@@ -541,7 +542,7 @@ remembered = await runHandledPromise(
 )
 
 remembered = await runHandledPromise(
-  readHistory({ stream, subjects: [stream.vela('run'), stream.vela('centre'), stream.client], readBatch: settings.historyReadBatch, read: readMessage }).pipe(
+  readHistory({ stream, subjects: [stream.vela('run'), stream.vela('centre'), stream.client, stream.sent(settings.devices.primary)], readBatch: settings.historyReadBatch, read: readMessage }).pipe(
     Effect.map(entries => entries.reduce(remember, remembered)),
     Effect.provideService(Broker, broker),
     Effect.catchTag('StreamUnreadable', error => logProblem(`what was used last could not be read from ${error.stream}: ${error.issue}`).pipe(Effect.as(remembered))),

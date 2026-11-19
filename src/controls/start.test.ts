@@ -1,6 +1,6 @@
 import { Effect, Fiber, Layer, Stream } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
-import type { FilterAnswer } from '../../state/commands.ts'
+import type { CoolerSetting, FilterAnswer } from '../../state/commands.ts'
 import { StartId, type RunEnding, type TargetStepBody } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
 import type { RigState } from '../../state/rig.ts'
@@ -40,9 +40,10 @@ interface Options {
   readonly homeSeconds?: number
   readonly parks?: boolean
   readonly focusEnds?: string
+  readonly coolerRefused?: boolean
 }
 
-function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswers = true, guiderAnswers = true, running = false, homeSeconds = 5, parks = true, focusEnds = 'done' }: Options = {}) {
+function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswers = true, guiderAnswers = true, running = false, homeSeconds = 5, parks = true, focusEnds = 'done', coolerRefused = false }: Options = {}) {
   const did: Array<string> = []
   const reported: Array<string> = []
   const started: Array<CaptureRequest> = []
@@ -50,7 +51,7 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
   let ids = 0
   let routine: Fiber.Fiber<void> | undefined
 
-  const send = (command: Command) => (did.push(`${command.device} ${command.property}`), Promise.resolve<Outcome>({ result: 'written' }))
+  const send = (command: Command) => (did.push(`${command.device} ${command.property}`), Promise.resolve<Outcome>(coolerRefused && command.property === 'CCD_TEMPERATURE' ? { result: 'refused', reason: 'camera busy' } : { result: 'written' }))
   const ask = (request: Request) => {
     did.push(`guider ${String(request.body['method'])}`)
     if (guiderAnswers) heard.push(entry('phd2.reply', 1, { jsonrpc: '2.0', id: request.id, result: true }))
@@ -77,8 +78,8 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
     Layer.succeed(StartSettings, { homeSeconds, guidingSeconds: 5, rigSilentAfterSeconds: 10, autofocusExposureSeconds: { in: 10, out: 2 }, newId: Effect.succeed(StartId.make('start-1')) }),
   )
 
-  const press = (id: string, exposureSeconds: number, frames: number | undefined, centre?: { readonly raDegrees: number; readonly decDegrees: number }, filter: FilterAnswer = 'out') =>
-    Effect.runPromise(Effect.flatMap(startControls, controls => controls.startTarget(id, exposureSeconds, frames, filter, centre)).pipe(Effect.result, Effect.provide(services)))
+  const press = (id: string, exposureSeconds: number, frames: number | undefined, centre?: { readonly raDegrees: number; readonly decDegrees: number }, filter: FilterAnswer = 'out', cooler: CoolerSetting = { state: 'on', celsius: -10 }) =>
+    Effect.runPromise(Effect.flatMap(startControls, controls => controls.startTarget(id, exposureSeconds, frames, filter, centre, cooler)).pipe(Effect.result, Effect.provide(services)))
 
   const stopForTheNight = () => Effect.runPromise(Effect.flatMap(startControls, controls => controls.stopForTheNight).pipe(Effect.result, Effect.provide(services)))
 
@@ -89,14 +90,53 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
 }
 
 describe('Start a target', () => {
-  it('goes home, stops guiding, centres, focuses, guides and then starts the run, in that order', async () => {
+  it('sets the cooler, goes home, stops guiding, centres, focuses, guides and then starts the run, in that order', async () => {
     const { did, started, press, finished } = setup()
 
     expect(await press('orion', 120, 100)).toMatchObject({ success: { code: 'starting-target', name: 'M 42', exposureSeconds: 120, frames: 100 } })
     await finished()
 
-    expect(did).toEqual(['filter out', 'mount TELESCOPE_HOME', 'guider stop_capture', 'centre orion', 'autofocus 2', 'guider get_connected', 'guider guide'])
-    expect(started).toEqual([{ object: 'M 42', frameType: 'light', exposureSeconds: 120, filter: 'out', count: 100, gain: 100, offset: 50, cooler: 'keep', target: { id: 'orion', name: 'M 42', raDegrees: 83.82, decDegrees: -5.39 } }])
+    expect(did).toEqual(['filter out', 'asi CCD_TEMPERATURE', 'asi CCD_COOLER', 'mount TELESCOPE_HOME', 'guider stop_capture', 'centre orion', 'autofocus 2', 'guider get_connected', 'guider guide'])
+    expect(started).toEqual([{ object: 'M 42', frameType: 'light', exposureSeconds: 120, filter: 'out', count: 100, gain: 100, offset: 50, cooler: 'on', setpoint: -10, waitForSetpoint: true, target: { id: 'orion', name: 'M 42', raDegrees: 83.82, decDegrees: -5.39 } }])
+  })
+
+  it('turns the cooler off, and asks for no setpoint, when the press says off', async () => {
+    const { did, started, press, finished } = setup()
+
+    await press('orion', 60, 300, undefined, 'out', { state: 'off' })
+    await finished()
+
+    expect(did.slice(1, 3)).toEqual(['asi CCD_COOLER', 'mount TELESCOPE_HOME'])
+    expect(started[0]).toMatchObject({ cooler: 'off' })
+    expect(started[0]).not.toHaveProperty('setpoint')
+    expect(started[0]).not.toHaveProperty('waitForSetpoint')
+  })
+
+  it('goes on to the run when the cooler is not set, and the run asks for the cooler again', async () => {
+    const { started, reported, press, finished } = setup({ coolerRefused: true })
+
+    await press('orion', 60, 300)
+    await finished()
+
+    expect(reported).toContain('cooler failed rig-refused')
+    expect(reported.slice(-2)).toEqual(['capture started', 'capture done'])
+    expect(started[0]).toMatchObject({ cooler: 'on', setpoint: -10, waitForSetpoint: true })
+  })
+
+  it('refuses at the press a setpoint outside what the camera reports it can reach, and moves nothing', async () => {
+    const limited = {
+      ...foldRig([
+        wire('mount', 'CONNECTION', { CONNECT: true, DISCONNECT: false }),
+        wire('primary', 'CCD_CONTROLS', { Gain: 100, Offset: 50 }),
+        entry('wire', 1, { dir: 'in', device: 'primary', type: 'def', property: 'CCD_TEMPERATURE', state: 'Ok', elements: { CCD_TEMPERATURE_VALUE: 20 }, numbers: { CCD_TEMPERATURE_VALUE: { min: -30, max: 30 } } }),
+      ]),
+      heardAt: Date.now(),
+    }
+    const rig = setup({ rig: limited })
+
+    expect(await rig.press('orion', 60, 1, undefined, 'out', { state: 'on', celsius: -45 })).toMatchObject({ failure: { refusal: { code: 'out-of-range', value: -45, min: -30, max: 30 } } })
+    expect([...rig.did, ...rig.reported, ...rig.started]).toEqual([])
+    expect(await rig.press('orion', 60, 1, undefined, 'out', { state: 'off' })).toMatchObject({ success: { code: 'starting-target' } })
   })
 
   it('records the filter chosen for the target before the routine starts, and focuses with that filter\'s exposure', async () => {
@@ -122,7 +162,7 @@ describe('Start a target', () => {
     await press('orion', 60, undefined)
     await finished()
 
-    expect(reported).toEqual(['home started', 'home done', 'stop-guiding started', 'stop-guiding done', 'centre started', 'centre done', 'autofocus started', 'autofocus done', 'guiding started', 'guiding done', 'capture started', 'capture done'])
+    expect(reported).toEqual(['cooler started', 'cooler done', 'home started', 'home done', 'stop-guiding started', 'stop-guiding done', 'centre started', 'centre done', 'autofocus started', 'autofocus done', 'guiding started', 'guiding done', 'capture started', 'capture done'])
   })
 
   it('says why a step failed and goes on to the next', async () => {
@@ -143,7 +183,7 @@ describe('Start a target', () => {
     await underWay()
     await stop()
 
-    expect(reported).toEqual(['home started', 'home stopped'])
+    expect(reported).toEqual(['cooler started', 'cooler done', 'home started', 'home stopped'])
     expect(started).toEqual([])
   })
 
