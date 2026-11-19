@@ -16,6 +16,7 @@ describe('settings', () => {
       silenceSeconds: 10,
       pageRefreshSeconds: 1,
       historyReadBatch: 2048,
+      horizonFile: '/mnt/storage/vela/horizon.json',
       devices: { mount: 'mount', primary: 'primary' },
       capture: { commandAnswerSeconds: 10, settleSeconds: 10, exposureSilenceSeconds: 10, failuresInRow: 3 },
       frames: { host: 'errai', keepDir: '/mnt/storage/rig/frames', nightChangesAtHour: 12, copyAttempts: 3, preview: { bin: 2, blackSigmas: 2.8, targetMedian: 0.25 } },
