@@ -1,13 +1,14 @@
 import { useParams } from 'react-router'
 
 import { framesOf } from '../../../../state/first-frames.ts'
+import { cropAddress, frameShapeAddress, previewAddress } from '../../../../state/frames.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { Statement } from '../../components/Statement.tsx'
 import { clockSeconds } from '../../rig/clock.ts'
 import { useRig } from '../../rig/store.ts'
-import { FrameInspector } from './FrameInspector.tsx'
+import { Inspector } from './Inspector.tsx'
 
 export function FramePage() {
   const asked = Number.parseInt(useParams().number ?? '', 10)
@@ -37,7 +38,7 @@ export function FramePage() {
         <ActionLink to="/">Close</ActionLink>
       </PageHeader>
 
-      {frame === undefined ? <Statement size="instruction">{ours.length === 0 ? 'No frames kept in this run yet' : `This run has frames 1 to ${ours.length}`}</Statement> : <FrameInspector key={frame.file} frame={frame} />}
+      {frame === undefined ? <Statement size="instruction">{ours.length === 0 ? 'No frames kept in this run yet' : `This run has frames 1 to ${ours.length}`}</Statement> : <Inspector key={frame.file} whole="frame" shapeAddress={frameShapeAddress(frame)} wholeAddress={previewAddress(frame)} cropAt={box => cropAddress(frame, box)} />}
     </Page>
   )
 }

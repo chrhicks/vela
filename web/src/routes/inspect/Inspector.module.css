@@ -34,12 +34,6 @@
   cursor: crosshair;
 }
 
-.sky > svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
 .sky > img {
   display: block;
   width: 100%;

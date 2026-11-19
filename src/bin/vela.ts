@@ -382,7 +382,7 @@ const feedApp = FeedServer.pipe(
       Layer.succeed(DetailSurveyKept, { survey: detailSurveyKept, tilesDir: settings.skyDetail.tilesDir }),
       Layer.succeed(DevelopedFrames, { get: (night, file) => Effect.tryPromise({ try: () => developedFrames.get(night, file), catch: cause => new FrameUndeveloped({ night, file, cause }) }) }),
       Layer.succeed(Previews, { get: (night, file) => Effect.tryPromise({ try: () => previews.get(night, file), catch: cause => new PreviewFailed({ night, file, cause }) }) }),
-      Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)) }),
+      Layer.succeed(StackPictures, { picture: (night, sequence) => Effect.sync(() => stacks.picture(night, sequence)), shape: (night, sequence) => Effect.sync(() => stacks.shape(night, sequence)), crop: (night, sequence, box) => Effect.sync(() => stacks.crop(night, sequence, box)) }),
       Layer.succeed(CommandLog, {
         newId: Effect.sync(() => randomUUID()),
         pressed: (id, request) => Effect.sync(() => publishEntry(stream.vela('command'), 'vela.command.pressed', id, { id, command: request.command, key: pressKey(request) })),

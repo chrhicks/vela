@@ -1,75 +1,133 @@
-import { type MouseEvent, useState } from 'react'
+import { type PointerEvent, useLayoutEffect, useRef, useState } from 'react'
 
+import { boxAround, type Extent, type PixelBox, type Share } from '../../../../state/crop-box.ts'
 import { Caption } from '../../components/Caption.tsx'
 import { Picture } from '../../components/Picture.tsx'
-import { StubSky } from '../../stub/StubSky.tsx'
+import { Statement } from '../../components/Statement.tsx'
+import { shapeAt } from '../../rig/shape.ts'
+import { useAsked } from '../../rig/use-asked.ts'
 import styles from './Inspector.module.css'
-import { cropNames } from './stub.ts'
 
 interface InspectorProps {
-  readonly seed: number
-  readonly glow: 'faint' | 'bright'
+  readonly whole: 'frame' | 'stack'
+  readonly shapeAddress: string
+  readonly wholeAddress: string
+  readonly cropAt: (box: PixelBox) => string
 }
 
-interface Spot {
-  readonly x: number
-  readonly y: number
+const cropNames: ReadonlyArray<string> = ['Top left', 'Top', 'Top right', 'Left', 'Centre', 'Right', 'Bottom left', 'Bottom', 'Bottom right']
+
+const middle: Share = { x: 0.5, y: 0.5 }
+
+const places: ReadonlyArray<Share> = [0, 0.5, 1].flatMap(y => [0, 0.5, 1].map(x => ({ x, y })))
+
+function useExtent<Measured extends HTMLElement>(): readonly [(element: Measured | null) => void, Extent | undefined] {
+  const [element, setElement] = useState<Measured | null>(null)
+  const [extent, setExtent] = useState<Extent | undefined>(undefined)
+
+  useLayoutEffect(() => {
+    if (element === null) return
+
+    const measure = () => {
+      const { width, height } = element.getBoundingClientRect()
+
+      setExtent({ width, height })
+    }
+    const watcher = new ResizeObserver(measure)
+
+    watcher.observe(element)
+
+    return () => watcher.disconnect()
+  }, [element])
+
+  return [setElement, extent]
 }
 
-const boxShare = 0.15
+export function Inspector({ whole, shapeAddress, wholeAddress, cropAt }: InspectorProps) {
+  const [spot, setSpot] = useState<Share>(middle)
+  const [shown, setShown] = useState<Share>(middle)
+  const [close, closeExtent] = useExtent<HTMLDivElement>()
+  const [crop, cropExtent] = useExtent<HTMLLIElement>()
+  const answer = useAsked(() => shapeAt(shapeAddress), shapeAddress, 0)
+  const pressed = useRef(false)
 
-const within = (share: number) => Math.min(1 - boxShare / 2, Math.max(boxShare / 2, share))
+  if (answer === undefined) return null
 
-export function Inspector({ seed, glow }: InspectorProps) {
-  const [spot, setSpot] = useState<Spot>({ x: 0.72, y: 0.34 })
+  if (answer === null) return <Statement size="instruction">{`Vela could not read this ${whole}`}</Statement>
 
-  function moveBox(event: MouseEvent<HTMLDivElement>) {
-    const frame = event.currentTarget.getBoundingClientRect()
+  const shape = answer
+  const boxed = closeExtent === undefined ? undefined : boxAround(shape, closeExtent, spot)
+  const closeUp = closeExtent === undefined ? undefined : boxAround(shape, closeExtent, shown)
 
-    setSpot({
-      x: within((event.clientX - frame.left) / frame.width),
-      y: within((event.clientY - frame.top) / frame.height),
-    })
+  const spotAt = (event: PointerEvent<HTMLDivElement>): Share => {
+    const whole = event.currentTarget.getBoundingClientRect()
+
+    return { x: (event.clientX - whole.left) / whole.width, y: (event.clientY - whole.top) / whole.height }
+  }
+
+  const press = (event: PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    pressed.current = true
+    setSpot(spotAt(event))
+  }
+
+  const move = (event: PointerEvent<HTMLDivElement>) => {
+    if (pressed.current) setSpot(spotAt(event))
+  }
+
+  const release = (event: PointerEvent<HTMLDivElement>) => {
+    if (!pressed.current) return
+
+    pressed.current = false
+    setShown(spotAt(event))
   }
 
   return (
     <div className={styles.inspector}>
       <div className={styles.whole}>
-        <Picture label="Whole frame" detail="">
-          <div className={styles.sky} onClick={moveBox}>
-            <StubSky seed={seed} glow={glow} />
+        <Picture label={`Whole ${whole}`} detail={`${shape.width} × ${shape.height}`}>
+          <div className={styles.sky} onPointerDown={press} onPointerMove={move} onPointerUp={release} onPointerCancel={release}>
+            <img src={wholeAddress} alt={`The whole ${whole}`} draggable={false} />
 
-            <span
-              className={styles.box}
-              style={{
-                left: `${(spot.x - boxShare / 2) * 100}%`,
-                top: `${(spot.y - boxShare / 2) * 100}%`,
-                width: `${boxShare * 100}%`,
-                height: `${boxShare * 100}%`,
-              }}
-            />
+            {boxed === undefined ? null : (
+              <span
+                className={styles.box}
+                style={{
+                  left: `${(boxed.x / shape.width) * 100}%`,
+                  top: `${(boxed.y / shape.height) * 100}%`,
+                  width: `${(boxed.width / shape.width) * 100}%`,
+                  height: `${(boxed.height / shape.height) * 100}%`,
+                }}
+              />
+            )}
           </div>
         </Picture>
       </div>
 
       <div className={styles.close}>
-        <Picture label="At 100 %" detail="">
-          <StubSky seed={seed + Math.round(spot.x * 100) + Math.round(spot.y * 1000)} glow={glow} view="close" />
+        <Picture label="At 100 %" detail="The box on the left">
+          <div ref={close} className={styles.full}>
+            {closeUp === undefined ? null : <img src={cropAt(closeUp)} alt="The box at full size" width={closeUp.width} height={closeUp.height} />}
+          </div>
         </Picture>
       </div>
 
       <div className={styles.field}>
         <div className={styles.fieldCaption}>
           <Caption>Corners, edges and centre</Caption>
-          <Caption>100 %</Caption>
+          <Caption>At 100 %</Caption>
         </div>
 
         <ul className={styles.crops}>
-          {cropNames.map((name, index) => (
-            <li key={name} className={styles.crop} aria-label={name}>
-              <StubSky seed={seed * 31 + index} glow={glow} view="close" />
-            </li>
-          ))}
+          {places.map((place, index) => {
+            const box = cropExtent === undefined ? undefined : boxAround(shape, cropExtent, place)
+
+            return (
+              <li key={cropNames[index]} ref={index === 0 ? crop : undefined} className={`${styles.crop} ${styles.full}`} aria-label={cropNames[index]}>
+                {box === undefined ? null : <img src={cropAt(box)} alt="" width={box.width} height={box.height} />}
+              </li>
+            )
+          })}
         </ul>
       </div>
     </div>
