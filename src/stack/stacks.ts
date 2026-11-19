@@ -1,6 +1,7 @@
-import { Schema } from 'effect'
+import { Result, Schema } from 'effect'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { CropOutside, isInside, type CropBox } from '../frames/crop.ts'
 import { readFits } from '../frames/fits.ts'
 import { listNight } from '../frames/library.ts'
 import { stretch, superpixels, text, type PreviewSettings } from '../frames/preview.ts'
@@ -29,10 +30,26 @@ export interface StacksOptions {
   readonly failed: (file: string, error: unknown) => void
 }
 
+interface Developed {
+  readonly planes: ReadonlyArray<Uint16Array>
+  readonly tables: ReadonlyArray<Uint8Array>
+}
+
 interface Kept {
   readonly stack: Stack
   readonly topDown: boolean
+  developed: Developed | undefined
   picture: Buffer | undefined
+}
+
+export interface StackPicture {
+  readonly png: Buffer
+  readonly frames: number
+}
+
+export interface StackShape {
+  readonly width: number
+  readonly height: number
 }
 
 const stacked = (sequence: string | undefined): sequence is string => sequence !== undefined && !sequence.startsWith('test-frame')
@@ -98,38 +115,74 @@ export function makeStacks({ keepDir, preview, solve, failed }: StacksOptions) {
       return countOf(frame.night, sequence)
     }
 
-    const entry = kept.get(sequence) ?? { stack: makeStack(solution, binned), topDown: text(fits.header, 'ROWORDER')?.toUpperCase() === 'TOP-DOWN', picture: undefined }
+    const entry = kept.get(sequence) ?? { stack: makeStack(solution, binned), topDown: text(fits.header, 'ROWORDER')?.toUpperCase() === 'TOP-DOWN', developed: undefined, picture: undefined }
 
     if (!entry.stack.add(binned, solution)) leaveOut(sequence)
 
+    entry.developed = undefined
     entry.picture = undefined
     kept.set(sequence, entry)
 
     return countOf(frame.night, sequence)
   }
 
-  function picture(asked: string, sequence: string): { readonly png: Buffer; readonly frames: number } | undefined {
+  const keptFor = (asked: string, sequence: string) => {
     const entry = asked === night ? kept.get(sequence) : undefined
 
-    if (entry === undefined || entry.stack.frames === 0) return undefined
-    if (entry.picture !== undefined) return { png: entry.picture, frames: entry.stack.frames }
+    return entry === undefined || entry.stack.frames === 0 ? undefined : entry
+  }
 
-    const { width, height } = entry.stack
+  function developedOf(entry: Kept): Developed {
+    if (entry.developed !== undefined) return entry.developed
+
     const planes = entry.stack.mean()
-    const tables = planes.map(plane => stretch(plane, preview))
-    const rgb = new Uint8Array(width * height * 3)
 
-    for (let row = 0; row < height; row += 1) {
-      const source = entry.topDown ? row : height - 1 - row
+    entry.developed = { planes, tables: planes.map(plane => stretch(plane, preview)) }
 
-      for (let column = 0; column < width; column += 1) {
-        for (let channel = 0; channel < 3; channel += 1) rgb[(row * width + column) * 3 + channel] = tables[channel]?.[planes[channel]?.[source * width + column] ?? 0] ?? 0
+    return entry.developed
+  }
+
+  function render(entry: Kept, box: CropBox): Buffer {
+    const { width, height } = entry.stack
+    const { planes, tables } = developedOf(entry)
+    const rgb = new Uint8Array(box.width * box.height * 3)
+
+    for (let row = 0; row < box.height; row += 1) {
+      const shownRow = box.y + row
+      const source = entry.topDown ? shownRow : height - 1 - shownRow
+
+      for (let column = 0; column < box.width; column += 1) {
+        for (let channel = 0; channel < 3; channel += 1) rgb[(row * box.width + column) * 3 + channel] = tables[channel]?.[planes[channel]?.[source * width + box.x + column] ?? 0] ?? 0
       }
     }
 
-    entry.picture = encodePng(width, height, rgb)
+    return encodePng(box.width, box.height, rgb)
+  }
+
+  function picture(asked: string, sequence: string): StackPicture | undefined {
+    const entry = keptFor(asked, sequence)
+
+    if (entry === undefined) return undefined
+
+    entry.picture ??= render(entry, { x: 0, y: 0, width: entry.stack.width, height: entry.stack.height })
 
     return { png: entry.picture, frames: entry.stack.frames }
+  }
+
+  function shape(asked: string, sequence: string): StackShape | undefined {
+    const entry = keptFor(asked, sequence)
+
+    return entry === undefined ? undefined : { width: entry.stack.width, height: entry.stack.height }
+  }
+
+  function crop(asked: string, sequence: string, box: CropBox): Result.Result<StackPicture, CropOutside> | undefined {
+    const entry = keptFor(asked, sequence)
+
+    if (entry === undefined) return undefined
+
+    const { width, height } = entry.stack
+
+    return isInside(box, entry.stack) ? Result.succeed({ png: render(entry, box), frames: entry.stack.frames }) : Result.fail(new CropOutside({ box, width, height }))
   }
 
   async function rebuild(tonight: string, each: (count: StackCount) => void) {
@@ -142,5 +195,5 @@ export function makeStacks({ keepDir, preview, solve, failed }: StacksOptions) {
     }
   }
 
-  return { add, picture, rebuild }
+  return { add, picture, shape, crop, rebuild }
 }
