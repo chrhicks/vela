@@ -225,6 +225,62 @@ describe('legs', () => {
   })
 })
 
+describe('keeping every step at or above the floor', () => {
+  const floor = settings.floorDegrees
+  const limit = settings.legDegrees
+
+  const expectAbove = (start: Pose, moves: ReadonlyArray<{ readonly pose: Pose }>, lowest: number) => {
+    let previous = start
+
+    for (const move of moves) {
+      const turn = axisTurn(previous, move.pose)
+
+      expect(move.pose.altitudeDegrees).toBeGreaterThanOrEqual(lowest - 1e-6)
+      expect(turn.hourAngle).toBeLessThanOrEqual(limit + 1e-6)
+      expect(turn.declination).toBeLessThanOrEqual(limit + 1e-6)
+      previous = move.pose
+    }
+  }
+
+  it('returns from the last east column to the first west column at the floor without dipping below it', () => {
+    const from = poseAt(2, 7.5, phoenix)
+    const to = poseAt(2, 187.5, phoenix)
+    const steps = legs(from, to, phoenix, settings)
+
+    expect(steps[steps.length - 1]).toBe(to)
+    expect(steps.length).toBeGreaterThan(30)
+    expectAbove(from, steps.map(pose => ({ pose })), floor)
+  })
+
+  it('keeps the whole rehearsal path and the route from several starting poses at or above the floor', () => {
+    const path = rehearsalPath(phoenix, settings)
+
+    expectAbove(path[0]!.pose, path.slice(1), floor)
+
+    for (const start of [
+      poseOfAxes({ hourAngleDegrees: 120, declinationDegrees: 80 }, phoenix),
+      poseAt(2, 5, phoenix),
+      poseAt(15, 350, phoenix),
+      poseAt(60, 100, phoenix),
+    ]) {
+      const route = rehearsalRoute(start, phoenix, settings)
+
+      expectAbove(start, route, Math.min(floor, start.altitudeDegrees))
+      expect(route[route.length - 1]).toEqual(path[path.length - 1])
+    }
+  })
+
+  it('is the same on every call, and only rises to the floor when it starts below it', () => {
+    const from = poseAt(-8, 100, phoenix)
+    const to = poseAt(30, 250, phoenix)
+    const steps = legs(from, to, phoenix, settings)
+
+    expect(legs(from, to, phoenix, settings)).toEqual(steps)
+    expect(steps[steps.length - 1]).toBe(to)
+    expectAbove(from, steps.map(pose => ({ pose })), -8)
+  })
+})
+
 describe('the rehearsal path', () => {
   const path = rehearsalPath(phoenix, settings)
 
@@ -301,8 +357,8 @@ describe('the rehearsal path', () => {
   })
 
   it('has the number of moves for the default settings', () => {
-    expect(path).toHaveLength(601)
-    expect(path.length * 2.5 / 60).toBeCloseTo(25.0416667, 6)
+    expect(path).toHaveLength(612)
+    expect(path.length * 2.5 / 60).toBeCloseTo(25.5, 6)
   })
 
   it('has more moves for closer columns and fewer for a lower ceiling', () => {
