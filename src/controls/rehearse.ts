@@ -37,13 +37,13 @@ const wrapHourAngle = (degrees: number) => ((((degrees + 180) % 360) + 360) % 36
 
 export const hourAngleOfRa = (raHours: number, site: Site, at: number) => wrapHourAngle(SiderealTime(new Date(at)) * 15 + site.longitudeDegrees - raHours * 15)
 
-const siteReported = (rig: RigState): Site | undefined => {
+export const siteReported = (rig: RigState): Site | undefined => {
   const values = rig.devices.mount.GEOGRAPHIC_COORD?.values
 
   return values === undefined ? undefined : { latitudeDegrees: values.LAT, longitudeDegrees: values.LONG > 180 ? values.LONG - 360 : values.LONG, elevationMeters: values.ELEV }
 }
 
-const pierSideOf = (rig: RigState): PierSide | undefined => {
+export const pierSideOf = (rig: RigState): PierSide | undefined => {
   const side = rig.devices.mount.TELESCOPE_PIER_SIDE?.values
 
   return side?.PIER_EAST === true ? 'PIER_EAST' : side?.PIER_WEST === true ? 'PIER_WEST' : undefined
@@ -104,13 +104,13 @@ export const rehearsalControls = Effect.gen(function* () {
       if (rig.devices.mount.CONNECTION?.values.CONNECT !== true) return yield* refusedWith({ code: 'not-connected', device: 'mount' })
       if (site === undefined) return yield* refusedWith({ code: 'not-reported', device: 'mount', property: 'GEOGRAPHIC_COORD' })
       if (coordinates === undefined) return yield* refusedWith({ code: 'not-reported', device: 'mount', property: 'EQUATORIAL_EOD_COORD' })
-      if (yield* rehearsing.busy) return yield* refusedWith({ code: 'rehearsal-active' })
+      if (yield* rehearsing.busy) return yield* refusedWith({ code: (yield* rehearsing.which) === 'sweep' ? 'sweep-active' : 'rehearsal-active' })
       if ((yield* capturing.busy) || (yield* starting.busy)) return yield* refusedWith({ code: 'run-active' })
 
       const from = poseOfAxes({ hourAngleDegrees: hourAngleOfRa(coordinates.RA, site, now), declinationDegrees: coordinates.DEC }, site)
       const route = rehearsalRoute(from, site, sweep)
 
-      yield* rehearsing.began(yield* Effect.forkDetach(routine(yield* newId, site, route)))
+      yield* rehearsing.began(yield* Effect.forkDetach(routine(yield* newId, site, route)), 'rehearsal')
 
       return { code: 'rehearsing-sweep', moves: route.length } satisfies Done
     }),

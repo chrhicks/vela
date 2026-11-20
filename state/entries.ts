@@ -23,11 +23,11 @@ export const FrameFile = Schema.NonEmptyString.pipe(Schema.brand('FrameFile'))
 
 export type FrameFile = typeof FrameFile.Type
 
-export const Operation = Schema.Literals(['align', 'focus', 'centre', 'test', 'flatExposure'])
+export const Operation = Schema.Literals(['align', 'focus', 'centre', 'test', 'flatExposure', 'sweep'])
 
 export type Operation = typeof Operation.Type
 
-export const operationObjects: Readonly<Record<Operation, string>> = { align: 'polar-align', focus: 'autofocus', centre: 'centre', test: 'test-frame', flatExposure: 'flat-exposure' }
+export const operationObjects: Readonly<Record<Operation, string>> = { align: 'polar-align', focus: 'autofocus', centre: 'centre', test: 'test-frame', flatExposure: 'flat-exposure', sweep: 'horizon-sweep' }
 
 export const RunObject = Schema.Union([Schema.TaggedStruct('Operation', { operation: Operation }), Schema.TaggedStruct('Target', { name: Schema.String })])
 
@@ -252,9 +252,64 @@ export type SweepMoveBody = typeof SweepMoved.Type['body']
 
 export const SweepEnded = entryOf('vela.sweep.ended', { rehearsal: RehearsalId, total: Count, ending: RehearsalEnding })
 
+export const SweepId = Schema.String.pipe(Schema.brand('SweepId'))
+
+export type SweepId = typeof SweepId.Type
+
+export const FrameClass = Schema.Literals(['sky', 'edge', 'blocked'])
+
+export type FrameClass = typeof FrameClass.Type
+
+export const PointingSource = Schema.Literals(['solve', 'commanded+offset', 'commanded'])
+
+export type PointingSource = typeof PointingSource.Type
+
+export const EdgeHow = Schema.Literals(['edge-in-frame', 'between-frames', 'open-to-floor', 'blocked-to-ceiling'])
+
+export type EdgeHow = typeof EdgeHow.Type
+
+export const SweepRunStarted = entryOf('vela.sweep.run.started', { sweep: SweepId, exposureSeconds: Schema.Number, columns: Count })
+
+export const SweepSolve = Schema.Union([
+  Schema.Struct({ solved: Schema.Literal(true), raDegrees: Schema.Number, decDegrees: Schema.Number, rotationDegrees: Schema.optionalKey(Schema.Number), scaleArcsecPerPixel: Schema.optionalKey(Schema.Number) }),
+  Schema.Struct({ solved: Schema.Literal(false), reason: Schema.String }),
+])
+
+export const SweepFrameFields = {
+  sweep: SweepId,
+  column: Count,
+  azimuthDegrees: Schema.Number,
+  file: Schema.String,
+  at: Schema.Number,
+  commanded: Schema.Struct({ altitudeDegrees: Schema.Number, azimuthDegrees: Schema.Number, hourAngleDegrees: Schema.Number, declinationDegrees: Schema.Number }),
+  EQUATORIAL_EOD_COORD: Schema.optionalKey(Schema.Struct({ RA: Schema.Number, DEC: Schema.Number })),
+  TELESCOPE_PIER_SIDE: Schema.optionalKey(PierSide),
+  moveProblem: Schema.optionalKey(Schema.String),
+  solve: SweepSolve,
+  stars: Count,
+  starsReason: Schema.optionalKey(Schema.String),
+  baseline: Schema.optionalKey(Schema.Number),
+  class: FrameClass,
+  pointing: Schema.Struct({ source: PointingSource, altitudeDegrees: Schema.Number, azimuthDegrees: Schema.Number }),
+}
+
+export const SweepFramed = entryOf('vela.sweep.frame', SweepFrameFields)
+
+export type SweepFrameBody = typeof SweepFramed.Type['body']
+
+export const SweepColumnFields = { sweep: SweepId, column: Count, azimuthDegrees: Schema.Number, edgeAltitudeDegrees: Schema.Number, how: EdgeHow, frames: Count }
+
+export const SweepColumned = entryOf('vela.sweep.column', SweepColumnFields)
+
+export type SweepColumnBody = typeof SweepColumned.Type['body']
+
+export const SweepAlerted = entryOf('vela.sweep.alert', { sweep: SweepId, column: Count, text: Schema.String })
+
+export const SweepRunEnded = entryOf('vela.sweep.run.ended', { sweep: SweepId, columns: Count, ending: RehearsalEnding })
+
 export const VelaStarted = entryOf('vela.started', { token: StartToken })
 
-export const RigEntry = Schema.Union([VelaStarted, SweepStarted, SweepMoved, SweepEnded, ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
+export const RigEntry = Schema.Union([VelaStarted, SweepStarted, SweepMoved, SweepEnded, SweepRunStarted, SweepFramed, SweepColumned, SweepAlerted, SweepRunEnded, ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 

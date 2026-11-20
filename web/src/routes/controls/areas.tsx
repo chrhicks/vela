@@ -6,8 +6,9 @@ import { CommandButton } from '../../components/CommandButton.tsx'
 import { latestSaid, PressLine, saidOf, type Pressed, type Said } from '../../components/PressLine.tsx'
 import type { Answer } from '../../rig/commands.ts'
 import { useLink, useRig } from '../../rig/store.ts'
-import { autofocusEndWords, flatExposureWords, rehearsalWords } from '../../rig/words.ts'
+import { autofocusEndWords, flatExposureWords, rehearsalWords, sweepWords } from '../../rig/words.ts'
 import type { Rehearsal } from '../../../../state/rehearsal.ts'
+import type { Sweep } from '../../../../state/sweep.ts'
 import type { Frame } from '../../../../state/frames.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import styles from './areas.module.css'
@@ -42,6 +43,14 @@ function rehearsalSaid(state: Rehearsal | undefined): Said | undefined {
   return { words, troubled, at: state.updatedAt }
 }
 
+function sweepSaid(state: Sweep | undefined): Said | undefined {
+  if (state === undefined) return undefined
+
+  const { troubled, ...words } = sweepWords(state)
+
+  return { words, troubled, at: state.updatedAt }
+}
+
 export function MountArea() {
   const runTarget = useRig(rig => rig.run?.object)
   const [typed, setTyped] = useState<string | undefined>(undefined)
@@ -50,12 +59,16 @@ export function MountArea() {
   const [pressed, setPressed] = useState<Pressed | undefined>(undefined)
   const answered = (answer: Answer) => setPressed({ answer, at: Date.now() })
   const rehearsal = useRig(rig => rig.rehearsal)
+  const sweep = useRig(rig => rig.sweep)
+  const offeredExposure = useLink().controls?.testFrameSeconds
+  const [typedExposure, setTypedExposure] = useState<string | undefined>(undefined)
+  const exposure = typedExposure ?? (offeredExposure === undefined ? '' : String(offeredExposure))
   const blocked = useRig(rehearsalBlock)
   const block = blocked === undefined ? undefined : rehearsalBlockWords[blocked]
 
   return (
     <Area id="mount">
-      <PressLine said={latestSaid(pressed === undefined ? undefined : saidOf(pressed), rehearsalSaid(rehearsal))} />
+      <PressLine said={latestSaid(pressed === undefined ? undefined : saidOf(pressed), rehearsalSaid(rehearsal), sweepSaid(sweep))} />
 
       <ActionRow>
         <CommandButton request={{ command: 'home' }} onAnswer={answered}>
@@ -81,6 +94,10 @@ export function MountArea() {
         <CommandButton request={{ command: 'rehearseSweep' }} disabled={block !== undefined} onAnswer={answered}>
           Rehearse sweep
         </CommandButton>
+        <CommandButton request={{ command: 'startSweep', exposureSeconds: Number(exposure) }} disabled={block !== undefined} onAnswer={answered}>
+          Sweep
+        </CommandButton>
+        <Field name="Sweep exposure, seconds" kind="number" value={exposure} onChange={setTypedExposure} />
         {block === undefined ? null : (
           <>
             <span className={styles.note}>{block.note}</span>

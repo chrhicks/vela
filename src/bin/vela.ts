@@ -29,7 +29,7 @@ import { makeAutofocus } from '../focus/autofocus.ts'
 import { makeAlign } from '../align/run.ts'
 import { makeCentre } from '../pointing/centre.ts'
 import { makeGoto } from '../pointing/goto.ts'
-import { makeMeasureRequests, measuredOf } from '../measure/rig.ts'
+import { makeMeasureRequests, measuredOf, notKeptOf } from '../measure/rig.ts'
 import { makeNight } from '../rig/night.ts'
 import { makePicture } from '../rig/picture.ts'
 import { makePage } from '../page/server.ts'
@@ -55,13 +55,16 @@ import { flatControls, FlatSettings, FlatsLog } from '../controls/flats.ts'
 import { guidingControls, GuidingSettings, mountGuiding } from '../controls/guiding.ts'
 import { FilterAnswers, StartLog, StartRunning, StartSettings, startControls, TargetCatalog, TargetCentring } from '../controls/start.ts'
 import { rehearsalControls, RehearsalGoto, RehearsalLog, RehearsalSettings, rehearsalGoto } from '../controls/rehearse.ts'
-import { RehearsalRunning, type Cancelled } from '../controls/rehearsing.ts'
+import { RehearsalRunning, type Cancelled, type Routine } from '../controls/rehearsing.ts'
+import { sweepControls, SweepFrames, SweepLog, SweepRecord, SweepRunSettings } from '../controls/sweep.ts'
+import { makeSweepFrames } from '../sweep/frames.ts'
+import { appendFile, mkdir } from 'node:fs/promises'
 import { Centring, mountControls, MountGuiding, MountRuns, MountSettings } from '../controls/mount.ts'
 import { catalogOf, readCatalog } from '../catalog/catalog.ts'
 import { CatalogSettings } from '../catalog/database.ts'
 import { makePlacedTargets } from '../catalog/placed.ts'
 import { operationObjects } from '../../state/entries.ts'
-import { NightName, RehearsalId, StartId } from '../../state/entries.ts'
+import { NightName, RehearsalId, StartId, SweepId } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
 import { ServiceStart, ServiceStartNow } from '../feed/start.ts'
 import { makeReader, type Entry, type Message } from '../../state/entry.ts'
@@ -288,7 +291,7 @@ function frameSaved(entry: Entry) {
   const path = readWireBody(entry)?.elements['FILE_PATH']
   const label = typeof path === 'string' ? capture.labelOf(basename(path)) : undefined
 
-  if (label?.measure !== undefined) requestMeasure(basename(String(path)), label.measure)
+  if (label?.measure !== undefined) requestMeasure(basename(String(path)), label.measure, label.keep)
   else void keeper.requestScan()
 }
 
@@ -320,6 +323,7 @@ const cancelStart = Effect.suspend(() => (startRoutine === undefined ? Effect.vo
 
 let rehearsalRoutine: Fiber.Fiber<void> | undefined
 let rehearsalEnding: Cancelled = 'pressed'
+let rehearsalKind: Routine | undefined
 
 const cancelRehearsal = (ending: Cancelled) =>
   Effect.suspend(() => {
@@ -341,9 +345,11 @@ const rehearsalServices = Layer.mergeAll(
   }),
   Layer.succeed(RehearsalRunning, {
     busy: Effect.sync(() => rehearsalRoutine !== undefined),
-    began: routine =>
+    which: Effect.sync(() => (rehearsalRoutine === undefined ? undefined : rehearsalKind)),
+    began: (routine, which) =>
       Effect.sync(() => {
         rehearsalRoutine = routine
+        rehearsalKind = which
       }).pipe(
         Effect.andThen(
           Effect.forkDetach(
@@ -361,6 +367,41 @@ const rehearsalServices = Layer.mergeAll(
     cancelled: Effect.sync(() => rehearsalEnding),
   }),
   Layer.succeed(RehearsalSettings, { sweep: settings.sweep, rigSilentAfterSeconds: settings.silenceSeconds, newId: Effect.sync(() => RehearsalId.make(`rehearsal-${randomUUID()}`)) }),
+)
+
+const sweepFrames = makeSweepFrames({
+  picture,
+  capture: { start: (request, between, measure, keep) => capture.start(request, between, measure, keep), labelOf: capture.labelOf, stop: () => capture.stop() },
+  camera: devices.primary,
+  measure: ['solve', 'stars'],
+  onKept: () => void keeper.requestScan(),
+})
+
+const sweepServices = Layer.mergeAll(
+  Layer.succeed(SweepFrames, {
+    begin: exposureSeconds => Effect.suspend(() => started(sweepFrames.begin(exposureSeconds))),
+    take: Effect.promise(() => sweepFrames.take()),
+    problems: Effect.sync(() => sweepFrames.problems()),
+    end: Effect.promise(() => sweepFrames.end()),
+  }),
+  Layer.succeed(SweepLog, {
+    started: body => Effect.sync(() => publishEntry(stream.vela('sweep'), 'vela.sweep.run.started', body.sweep, body)),
+    framed: body => Effect.sync(() => publishEntry(stream.vela('sweep'), 'vela.sweep.frame', `${body.sweep}:${body.file}`, body)),
+    columned: body => Effect.sync(() => publishEntry(stream.vela('sweep'), 'vela.sweep.column', `${body.sweep}:${body.column}`, body)),
+    alerted: body => Effect.sync(() => publishEntry(stream.vela('sweep'), 'vela.sweep.alert', `${body.sweep}:${body.column}`, body)),
+    ended: body => Effect.sync(() => publishEntry(stream.vela('sweep'), 'vela.sweep.run.ended', body.sweep, body)),
+  }),
+  Layer.succeed(SweepRecord, {
+    append: (record, at, line) => {
+      const folder = join(settings.sweep.recordDir, nightOf(at, naming))
+
+      return Effect.tryPromise({
+        try: () => mkdir(folder, { recursive: true }).then(() => appendFile(join(folder, `${record}.jsonl`), `${JSON.stringify(line)}\n`)),
+        catch: error => (error instanceof Error ? error.message : String(error)),
+      })
+    },
+  }),
+  Layer.succeed(SweepRunSettings, { sweep: settings.sweep, rigSilentAfterSeconds: settings.silenceSeconds, newId: Effect.sync(() => SweepId.make(`sweep-${randomUUID()}`)) }),
 )
 
 const startServices = Layer.mergeAll(
@@ -434,7 +475,7 @@ const capturing = Layer.succeed(Capturing, {
 
 const flatsLog = Layer.succeed(FlatsLog, { tried: flatTry => Effect.sync(() => publishEntry(stream.vela('flats'), 'vela.flats.exposure', String(flatTry.exposureSeconds), { ...flatTry })) })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls, flatControls, guidingControls, startControls, rehearsalControls]), ([mount, focus, camera, dew, flats, guiding, start, rehearsal]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew, ...flats, ...guiding, ...start, ...rehearsal }))).pipe(Layer.provide(Layer.effect(MountGuiding, mountGuiding)), Layer.provide(startServices), Layer.provide(rehearsalServices), Layer.provide(Layer.succeed(GuidingSettings, { settle: { pixels: settings.controls.guideSettlePixels, time: settings.controls.guideSettleSeconds, timeout: settings.controls.guideSettleTimeoutSeconds }, replySeconds: settings.controls.guiderReplySeconds, connectSeconds: settings.controls.guiderConnectSeconds, newId: Effect.sync(() => `vela-guider-${randomUUID()}`) })), Layer.provide(flatsLog), Layer.provide(Layer.succeed(FlatSettings, { startSeconds: settings.controls.flatStartSeconds, lowAdu: settings.controls.flatLowAdu, highAdu: settings.controls.flatHighAdu, minSeconds: settings.controls.biasExposureSeconds, maxSeconds: settings.controls.flatMaxSeconds, tries: settings.controls.flatTries, measureSeconds: settings.controls.flatMeasureSeconds })), Layer.provide(Layer.succeed(CalibrationSettings, { biasExposureSeconds: settings.controls.biasExposureSeconds })), Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds, guidingSettleSeconds: settings.controls.guideSettleTimeoutSeconds + settings.controls.guiderReplySeconds })))
+const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls, flatControls, guidingControls, startControls, rehearsalControls, sweepControls]), ([mount, focus, camera, dew, flats, guiding, start, rehearsal, sweeping]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew, ...flats, ...guiding, ...start, ...rehearsal, ...sweeping }))).pipe(Layer.provide(Layer.effect(MountGuiding, mountGuiding)), Layer.provide(startServices), Layer.provide(rehearsalServices), Layer.provide(sweepServices), Layer.provide(Layer.succeed(GuidingSettings, { settle: { pixels: settings.controls.guideSettlePixels, time: settings.controls.guideSettleSeconds, timeout: settings.controls.guideSettleTimeoutSeconds }, replySeconds: settings.controls.guiderReplySeconds, connectSeconds: settings.controls.guiderConnectSeconds, newId: Effect.sync(() => `vela-guider-${randomUUID()}`) })), Layer.provide(flatsLog), Layer.provide(Layer.succeed(FlatSettings, { startSeconds: settings.controls.flatStartSeconds, lowAdu: settings.controls.flatLowAdu, highAdu: settings.controls.flatHighAdu, minSeconds: settings.controls.biasExposureSeconds, maxSeconds: settings.controls.flatMaxSeconds, tries: settings.controls.flatTries, measureSeconds: settings.controls.flatMeasureSeconds })), Layer.provide(Layer.succeed(CalibrationSettings, { biasExposureSeconds: settings.controls.biasExposureSeconds })), Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds, guidingSettleSeconds: settings.controls.guideSettleTimeoutSeconds + settings.controls.guiderReplySeconds })))
 
 const startAnnounced = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -517,8 +558,11 @@ function observe(entry: Entry) {
 
   if (item !== undefined) page.activityAdded(item)
   const measured = measuredOf(entry, 'vela')
+  const notKept = notKeptOf(entry, 'vela')
 
+  if (notKept !== undefined) sweepFrames.notKept(notKept.file, notKept.reason)
   if (measured !== undefined) {
+    sweepFrames.measured(measured)
     align.measured(measured)
     centre.measured(measured)
     autofocus.measured(measured)

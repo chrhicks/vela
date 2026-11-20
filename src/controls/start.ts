@@ -168,7 +168,7 @@ export const startControls = Effect.gen(function* () {
         if (rig.devices.mount.CONNECTION?.values.CONNECT !== true) return yield* refusedWith({ code: 'not-connected', device: 'mount' })
         if (gain === undefined || offset === undefined) return yield* refusedWith({ code: 'not-connected', device: 'primary' })
         if (cooler.state === 'on' && limits !== undefined && (cooler.celsius < limits.min || cooler.celsius > limits.max)) return yield* refusedWith({ code: 'out-of-range', value: cooler.celsius, ...limits })
-        if (yield* rehearsing.busy) return yield* refusedWith({ code: 'rehearsal-active' })
+        if (yield* rehearsing.busy) return yield* refusedWith({ code: (yield* rehearsing.which) === 'sweep' ? 'sweep-active' : 'rehearsal-active' })
         if ((yield* capturing.busy) || (yield* running.busy)) return yield* refusedWith({ code: 'run-active' })
 
         const name = asciiName(found.name)

@@ -19,6 +19,7 @@ export class Operations extends Context.Service<
     readonly slewAndCentre: (target: string) => Effect.Effect<Done, CommandRefused>
     readonly flipNow: Effect.Effect<Done, CommandRefused>
     readonly rehearseSweep: Effect.Effect<Done, CommandRefused>
+    readonly startSweep: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
     readonly startGuiding: Effect.Effect<Done, CommandRefused>
     readonly stopGuiding: Effect.Effect<Done, CommandRefused>
     readonly pickGuideStar: Effect.Effect<Done, CommandRefused>
@@ -76,6 +77,7 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         slewAndCentre: ({ target }) => operations.slewAndCentre(target),
         flipNow: () => operations.flipNow,
         rehearseSweep: () => operations.rehearseSweep,
+        startSweep: ({ exposureSeconds }) => operations.startSweep(exposureSeconds),
         startGuiding: () => operations.startGuiding,
         stopGuiding: () => operations.stopGuiding,
         pickGuideStar: () => operations.pickGuideStar,

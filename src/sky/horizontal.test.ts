@@ -2,7 +2,7 @@ import { Horizon, Observer, SiderealTime } from 'astronomy-engine'
 import { describe, expect, it } from 'vitest'
 import { horizonOf } from '../align/polar.ts'
 import { fromMount } from './coordinates.ts'
-import { equatorialOfDate } from './horizontal.ts'
+import { equatorialOfDate, horizontalOfDate, horizontalOfJ2000 } from './horizontal.ts'
 
 const phoenix = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
 const observer = new Observer(phoenix.latitudeDegrees, phoenix.longitudeDegrees, phoenix.elevationMeters)
@@ -90,5 +90,39 @@ describe('equatorial coordinates of date from altitude and azimuth', () => {
 
     expect(Horizon(new Date(at), observer, raHours, decDegrees, undefined).altitude).toBeCloseTo(2, 6)
     expect(Horizon(new Date(at), observer, raHours, decDegrees, 'normal').altitude).toBeGreaterThan(2.2)
+  })
+})
+
+describe('altitude and azimuth from equatorial coordinates', () => {
+  it('goes back to the altitude and azimuth that gave the coordinates of date, round the compass', () => {
+    for (const at of times)
+      for (const azimuth of azimuths.slice(1, -1))
+        for (const altitude of altitudes) {
+          const back = horizontalOfDate(equatorialOfDate(altitude, azimuth, at, phoenix), at, phoenix)
+
+          expect(back.altitudeDegrees).toBeCloseTo(altitude, 6)
+          expect(Math.abs((((back.azimuthDegrees - azimuth) % 360) + 540) % 360 - 180)).toBeLessThan(1e-6)
+        }
+  })
+
+  it('treats the coordinates of a solve as J2000, not of date: they go back to the same place through the precession', () => {
+    for (const at of times)
+      for (const azimuth of [10, 100, 200, 300])
+        for (const altitude of [8, 25, 60]) {
+          const ofDate = equatorialOfDate(altitude, azimuth, at, phoenix)
+          const j2000 = fromMount({ raDegrees: ofDate.raHours * 15, decDegrees: ofDate.decDegrees }, new Date(at))
+          const back = horizontalOfJ2000(j2000, at, phoenix)
+
+          expect(back.altitudeDegrees).toBeCloseTo(altitude, 6)
+          expect(Math.abs((((back.azimuthDegrees - azimuth) % 360) + 540) % 360 - 180)).toBeLessThan(1e-6)
+        }
+  })
+
+  it('is no more than the arcminutes of precession away from reading the J2000 position as of date, and not zero', () => {
+    const at = times[0]!
+    const wrong = horizontalOfDate({ raHours: 6, decDegrees: 20 }, at, phoenix)
+    const right = horizontalOfJ2000({ raDegrees: 90, decDegrees: 20 }, at, phoenix)
+
+    expect(Math.abs(wrong.altitudeDegrees - right.altitudeDegrees)).toBeGreaterThan(0.05)
   })
 })
