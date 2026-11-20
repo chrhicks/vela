@@ -22,7 +22,7 @@ const phoenix = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMe
 
 const fieldHalfHeightDegrees = 1.1
 const pointingError = { altitudeDegrees: 0.3, azimuthDegrees: -0.2 }
-const skyStars = 800
+const defaultSkyStars = 800
 
 const horizonAt = (azimuthDegrees: number) => 15 + 10 * Math.sin((azimuthDegrees * Math.PI) / 180)
 
@@ -39,6 +39,14 @@ function readyRig(): RigState {
 
 const settings = decodeConfig(SweepSettings, { columnDegrees: 90, settleSeconds: 0, alertAfterFrames: 6 })
 
+const firstOf = (frames: ReadonlyArray<SweepFrameBody>, column: number) => frames.find(frame => frame.column === column)!
+
+const commandedEdgeOf = (frames: ReadonlyArray<SweepFrameBody>, column: number) => {
+  const last = frames.filter(frame => frame.column === column).slice(-2)
+
+  return last.reduce((sum, frame) => sum + frame.commanded.altitudeDegrees, 0) / last.length
+}
+
 interface Options {
   readonly rig?: RigState
   readonly busy?: boolean
@@ -48,6 +56,9 @@ interface Options {
   readonly alertGotoAt?: ReadonlyArray<number>
   readonly recordFails?: boolean
   readonly guiding?: boolean
+  readonly skyStars?: number
+  readonly horizon?: (azimuthDegrees: number) => number
+  readonly settings?: typeof settings
 }
 
 type Logged =
@@ -57,7 +68,7 @@ type Logged =
   | { readonly kind: 'alerted'; readonly body: { readonly column: number; readonly text: string } }
   | { readonly kind: 'ended'; readonly body: { readonly ending: string; readonly columns: number } }
 
-function setup({ rig = readyRig(), busy = false, skyAnswer, hangOnTake, problemsAt = [], alertGotoAt = [], recordFails = false, guiding = false }: Options = {}) {
+function setup({ rig = readyRig(), busy = false, skyAnswer, hangOnTake, problemsAt = [], alertGotoAt = [], recordFails = false, guiding = false, skyStars = defaultSkyStars, horizon = horizonAt, settings: used = settings }: Options = {}) {
   const logged: Array<Logged> = []
   const records: Array<{ readonly record: string; readonly line: unknown }> = []
   const targets: Array<{ readonly raHours: number; readonly decDegrees: number }> = []
@@ -81,7 +92,7 @@ function setup({ rig = readyRig(), busy = false, skyAnswer, hangOnTake, problems
 
   const frameOf = (take: number): Taken => {
     const truth = trueSkyOf()
-    const fraction = Math.max(0, Math.min(1, (truth.altitudeDegrees + fieldHalfHeightDegrees - horizonAt(truth.azimuthDegrees)) / (2 * fieldHalfHeightDegrees)))
+    const fraction = Math.max(0, Math.min(1, (truth.altitudeDegrees + fieldHalfHeightDegrees - horizon(truth.azimuthDegrees)) / (2 * fieldHalfHeightDegrees)))
 
     truths.push({ ...truth, fraction })
 
@@ -153,7 +164,7 @@ function setup({ rig = readyRig(), busy = false, skyAnswer, hangOnTake, problems
     Layer.succeed(SweepRecord, {
       append: (record, _at, line) => (recordFails ? Effect.fail('the disk is full') : Effect.sync(() => void records.push({ record, line }))),
     }),
-    Layer.succeed(SweepRunSettings, { sweep: settings, rigSilentAfterSeconds: 10, newId: Effect.succeed(SweepId.make('sweep-1')) }),
+    Layer.succeed(SweepRunSettings, { sweep: used, rigSilentAfterSeconds: 10, newId: Effect.succeed(SweepId.make('sweep-1')) }),
   )
 
   const press = (exposureSeconds = 2) => Effect.runPromise(Effect.flatMap(sweepControls, controls => controls.startSweep(exposureSeconds)).pipe(Effect.result, Effect.provide(services)))
@@ -245,26 +256,40 @@ describe('Sweep', () => {
     expect(truths).toHaveLength(frames().length)
   })
 
-  it('classifies each frame from its star count against a baseline taken from the solved frames, and says why a frame did not solve', async () => {
+  it('calls a frame that solved sky and one that did not blocked, whatever its star count, and records the stars and the baseline beside the class', async () => {
     const { press, finished, frames } = setup()
 
     await press()
     await finished()
 
     const all = frames()
-    const first = all[0]!
 
-    expect(first.baseline).toBeUndefined()
-    expect(first.class).toBe(first.solve.solved ? 'sky' : 'blocked')
+    expect(all[0]!.baseline).toBeUndefined()
 
-    for (const frame of all.slice(1)) {
-      expect(frame.baseline).toBeGreaterThan(0)
-      expect(frame.class).toBe(frame.stars < 0.15 * frame.baseline! ? 'blocked' : frame.solve.solved && frame.stars >= 0.65 * frame.baseline! ? 'sky' : 'edge')
-    }
+    for (const frame of all) expect(frame.class).toBe(frame.solve.solved ? 'sky' : 'blocked')
+
+    for (const frame of all.slice(1)) expect(frame.baseline).toBeGreaterThan(0)
 
     expect(all.some(frame => frame.class === 'blocked')).toBe(true)
+    expect(all.some(frame => frame.class === 'blocked' && frame.stars > 0)).toBe(true)
     expect(all.filter(frame => !frame.solve.solved).every(frame => frame.solve.solved === false && frame.solve.reason.length > 0)).toBe(true)
     expect(all.filter(frame => frame.solve.solved).every(frame => frame.solve.solved && frame.solve.rotationDegrees === 12 && frame.solve.scaleArcsecPerPixel === 1.2)).toBe(true)
+  })
+
+  it('finds the edge in every column when clear frames have few stars, as near the Moon or low in the lights', async () => {
+    const { press, finished, frames, columns } = setup({ skyStars: 30 })
+
+    await press()
+    await finished()
+
+    expect(Math.max(...frames().filter(frame => frame.solve.solved).map(frame => frame.stars))).toBeLessThanOrEqual(30)
+    expect(frames().every(frame => frame.class === 'sky' || frame.class === 'blocked')).toBe(true)
+    expect(columns().map(column => column.how)).toEqual(['between-frames', 'between-frames', 'between-frames', 'between-frames'])
+
+    for (const column of columns()) {
+      expect(column.frames).toBeGreaterThan(1)
+      expect(Math.abs(column.edgeAltitudeDegrees - horizonAt(column.azimuthDegrees))).toBeLessThanOrEqual(settings.stepDegrees)
+    }
   })
 
   it('takes the pointing from the solve when it solved, and from the commanded position plus the offset of the last solve on the same pier side when it did not', async () => {
@@ -308,17 +333,51 @@ describe('Sweep', () => {
     }
   })
 
-  it('starts each column at the edge of the one before it, and the first at the first guess', async () => {
+  it('starts each column of a half at the edge of the one before it as it was commanded, and the first at the first guess', async () => {
     const { press, finished, frames, columns } = setup()
 
     await press()
     await finished()
 
-    const firstOf = (column: number) => frames().find(frame => frame.column === column)!
+    expect(firstOf(frames(), 0).commanded.altitudeDegrees).toBeCloseTo(settings.firstGuessDegrees, 6)
+    expect(commandedEdgeOf(frames(), 0)).toBeGreaterThan(0)
+    expect(firstOf(frames(), 1).commanded.altitudeDegrees).toBeCloseTo(commandedEdgeOf(frames(), 0), 6)
+    expect(firstOf(frames(), 3).commanded.altitudeDegrees).toBeCloseTo(commandedEdgeOf(frames(), 2), 6)
+    expect(columns()).toHaveLength(4)
+  })
 
-    expect(firstOf(0).commanded.altitudeDegrees).toBeCloseTo(settings.firstGuessDegrees, 6)
+  it('starts the first column of the west half at the edge of the first column of the east half, not of the last one in the north', async () => {
+    const { press, finished, frames, columns } = setup({ horizon: azimuth => (azimuth > 90 && azimuth < 270 ? 12 : 30) })
 
-    for (const [index, column] of columns().slice(0, -1).entries()) expect(firstOf(index + 1).commanded.altitudeDegrees).toBeCloseTo(column.edgeAltitudeDegrees, 6)
+    await press()
+    await finished()
+
+    const south = commandedEdgeOf(frames(), 0)
+    const north = commandedEdgeOf(frames(), 1)
+
+    expect(Math.abs(south - north)).toBeGreaterThan(10)
+    expect(columns().map(column => column.azimuthDegrees)).toEqual([135, 45, 225, 315])
+    expect(firstOf(frames(), 2).commanded.altitudeDegrees).toBeCloseTo(south, 6)
+    expect(firstOf(frames(), 3).commanded.altitudeDegrees).toBeCloseTo(commandedEdgeOf(frames(), 2), 6)
+  })
+
+  it('does not let a pointing error creep the start altitude from column to column of a flat horizon', async () => {
+    const many = decodeConfig(SweepSettings, { columnDegrees: 9, settleSeconds: 0, alertAfterFrames: 30 })
+    const { press, finished, frames, columns } = setup({ horizon: () => 15, settings: many, skyStars: 30 })
+
+    await press()
+    await finished()
+
+    expect(columns()).toHaveLength(40)
+
+    const commandedHorizon = 15 - pointingError.altitudeDegrees
+
+    for (const column of [...columns().keys()].slice(1)) {
+      expect(Math.abs(firstOf(frames(), column).commanded.altitudeDegrees - commandedHorizon)).toBeLessThanOrEqual(many.stepDegrees)
+      expect(Math.abs(columns()[column]!.edgeAltitudeDegrees - 15)).toBeLessThanOrEqual(many.stepDegrees)
+    }
+
+    expect(columns().slice(1).every(column => column.frames <= 3)).toBe(true)
   })
 
   it('appends each frame and each column as a line of the record, and goes on when the record cannot be written, with an alert', async () => {

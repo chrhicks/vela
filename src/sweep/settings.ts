@@ -26,8 +26,6 @@ export const SweepSettings = Schema.Struct({
   baselineAltitudeDegrees: described('How close in altitude, in degrees, a solved frame must be to count in the baseline star count of a frame', Positive, 10),
   baselineTopFraction: described('The share of the nearby solved frames, highest star counts first, whose median is the baseline star count', Fraction.check(Schema.isGreaterThan(0)), 0.25),
   baselineMinFrames: described('The fewest nearby solved frames the baseline is taken from; with fewer it is the highest star count of any solved frame so far', PositiveCount, 3),
-  blockedFraction: described('A frame with fewer stars than this fraction of the baseline is blocked', Fraction, 0.15),
-  skyFraction: described('A solved frame with at least this fraction of the baseline star count is sky; between blocked and sky it is the edge', Fraction, 0.65),
   recordDir: described('The folder the sweep keeps one folder per night in, each with frames.jsonl and columns.jsonl', Schema.String, '/mnt/storage/rig/horizon'),
   rehearsal: described('The rehearsal: the sweep drives the mount through every pose it could reach, with no frames', RehearsalSettings, {}),
 })

@@ -1,12 +1,12 @@
 import { Clock, Context, Duration, Effect } from 'effect'
 import type { Done, Refusal } from '../../state/commands.ts'
-import type { SweepColumnBody, SweepFrameBody, SweepId, RehearsalEnding } from '../../state/entries.ts'
+import type { FrameClass, SweepColumnBody, SweepFrameBody, SweepId, RehearsalEnding } from '../../state/entries.ts'
 import { exposureMiddle, raForHourAngle } from '../align/run.ts'
 import { CommandRefused } from '../feed/commands.ts'
 import { Feed } from '../feed/feed.ts'
 import type { Site } from '../pointing/target.ts'
 import { horizontalOfDate, horizontalOfJ2000 } from '../sky/horizontal.ts'
-import { baselineOf, classify, type SolvedStars } from '../sweep/classify.ts'
+import { baselineOf, type SolvedStars } from '../sweep/baseline.ts'
 import { nextInColumn, startAltitude, type ColumnFrame } from '../sweep/column.ts'
 import type { Taken } from '../sweep/frames.ts'
 import { columns as columnsOf, legs, poseAt, poseOfAxes, type Column, type Pose } from '../sweep/path.ts'
@@ -90,14 +90,19 @@ export const sweepControls = Effect.gen(function* () {
       const solvedStars: Array<SolvedStars> = []
       const offsets: Array<KnownOffset> = []
       let at = from
-      let edge: number | undefined
+      let start: number | undefined
+      let southStart: number | undefined
       let finished = 0
 
       yield* log.started({ sweep: id, exposureSeconds, columns: route.length })
 
-      for (const [column, { azimuthDegrees }] of route.entries()) {
+      for (const [column, { azimuthDegrees, half }] of route.entries()) {
         const inColumn: Array<ColumnFrame> = []
-        let altitude = startAltitude(edge, sweep)
+        const previousHalf = route[column - 1]?.half
+
+        if (previousHalf === 'east' && half === 'west') start = southStart
+
+        let altitude = startAltitude(start, sweep)
         let alerted = false
 
         while (true) {
@@ -139,7 +144,7 @@ export const sweepControls = Effect.gen(function* () {
           const stars = taken.taken === 'measured' && taken.answer.stars?.measured === true ? taken.answer.stars.count : 0
           const starsReason = taken.taken === 'refused' ? `the rig program did not measure it: ${taken.reason}` : taken.answer.stars?.measured === false ? taken.answer.stars.reason : undefined
           const baseline = baselineOf(solvedStars, pointing.altitudeDegrees, sweep)
-          const frameClass = classify({ solved: solved !== undefined, stars }, baseline, sweep)
+          const frameClass: FrameClass = solved !== undefined ? 'sky' : 'blocked'
 
           if (solved !== undefined) solvedStars.push({ altitudeDegrees: pointing.altitudeDegrees, stars })
 
@@ -188,7 +193,10 @@ export const sweepControls = Effect.gen(function* () {
           yield* log.columned(done)
           yield* keepRecord(id, column, 'columns', when, done)
 
-          edge = step.edgeAltitudeDegrees
+          start = step.startAltitudeDegrees
+
+          if (southStart === undefined && half === 'east') southStart = start
+
           finished = column + 1
 
           break

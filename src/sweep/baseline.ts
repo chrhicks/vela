@@ -1,4 +1,3 @@
-import type { FrameClass } from '../../state/entries.ts'
 import type { SweepSettings } from './settings.ts'
 
 export interface SolvedStars {
@@ -7,8 +6,6 @@ export interface SolvedStars {
 }
 
 type BaselineSettings = Pick<SweepSettings, 'baselineAltitudeDegrees' | 'baselineTopFraction' | 'baselineMinFrames'>
-
-type ClassSettings = Pick<SweepSettings, 'blockedFraction' | 'skyFraction'>
 
 const median = (values: ReadonlyArray<number>) => {
   const sorted = [...values].sort((a, b) => a - b)
@@ -27,12 +24,4 @@ export function baselineOf(solved: ReadonlyArray<SolvedStars>, altitudeDegrees: 
   const best = [...near].sort((a, b) => b.stars - a.stars).slice(0, Math.max(1, Math.ceil(near.length * settings.baselineTopFraction)))
 
   return median(best.map(frame => frame.stars))
-}
-
-export function classify(frame: { readonly solved: boolean; readonly stars: number }, baseline: number | undefined, settings: ClassSettings): FrameClass {
-  if (baseline === undefined) return frame.solved ? 'sky' : 'blocked'
-  if (frame.stars < settings.blockedFraction * baseline) return 'blocked'
-  if (frame.solved && frame.stars >= settings.skyFraction * baseline) return 'sky'
-
-  return 'edge'
 }

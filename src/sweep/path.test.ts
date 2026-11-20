@@ -32,8 +32,6 @@ describe('the sweep settings', () => {
       baselineAltitudeDegrees: 10,
       baselineTopFraction: 0.25,
       baselineMinFrames: 3,
-      blockedFraction: 0.15,
-      skyFraction: 0.65,
       recordDir: '/mnt/storage/rig/horizon',
       rehearsal: { columnDegrees: 15, rowDegrees: 5 },
     })
