@@ -107,7 +107,7 @@ export const rehearsalControls = Effect.gen(function* () {
       if (yield* rehearsing.busy) return yield* refusedWith({ code: 'rehearsal-active' })
       if ((yield* capturing.busy) || (yield* starting.busy)) return yield* refusedWith({ code: 'run-active' })
 
-      const from = poseOfAxes({ hourAngleDegrees: hourAngleOfRa(coordinates.RA, site, now), declinationDegrees: coordinates.DEC }, site, sweep)
+      const from = poseOfAxes({ hourAngleDegrees: hourAngleOfRa(coordinates.RA, site, now), declinationDegrees: coordinates.DEC }, site)
       const route = rehearsalRoute(from, site, sweep)
 
       yield* rehearsing.began(yield* Effect.forkDetach(routine(yield* newId, site, route)))

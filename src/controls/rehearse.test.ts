@@ -34,7 +34,7 @@ function readyRig(hourAngle = 0, dec = 60): RigState {
     wire('mount', 'GEOGRAPHIC_COORD', { LAT: 33.45, LONG: 360 - 112.07, ELEV: 331 }),
   ])
 
-  return mountReports(base, hourAngleRa(hourAngle), dec, hourAngle > 15 ? 'PIER_EAST' : 'PIER_WEST')
+  return mountReports(base, hourAngleRa(hourAngle), dec, hourAngle > 0 ? 'PIER_EAST' : 'PIER_WEST')
 }
 
 interface Options {
@@ -68,7 +68,7 @@ function setup({ rig = readyRig(), capturing = false, startGoing = false, rehear
 
         const hourAngle = hourAngleOfRa(target.raHours, phoenix, Date.now())
 
-        current = mountReports(current, target.raHours, target.decDegrees, hourAngle > 15 ? 'PIER_EAST' : 'PIER_WEST')
+        current = mountReports(current, target.raHours, target.decDegrees, hourAngle > 0 ? 'PIER_EAST' : 'PIER_WEST')
 
         if (alertAt.includes(move)) return Effect.succeed({ ok: false, refusal: 'alert', reason: 'the mount answered with an alert' })
         if (refuseAt.includes(move)) return Effect.succeed({ ok: false, refusal: 'coordinates', reason: 'EQUATORIAL_EOD_COORD refused' })
@@ -137,7 +137,7 @@ describe('Rehearse sweep', () => {
 
   it('chains legs from a far-off pose to the first pose, none turning an axis more than the leg limit', async () => {
     const { press, finished, moves, targets } = setup({ rig: readyRig(120, 80) })
-    const from = poseOfAxes({ hourAngleDegrees: 120, declinationDegrees: 80 }, phoenix, sweep)
+    const from = poseOfAxes({ hourAngleDegrees: 120, declinationDegrees: 80 }, phoenix)
     const route = rehearsalRoute(from, phoenix, sweep)
 
     expect(await press()).toMatchObject({ success: { code: 'rehearsing-sweep', moves: route.length } })
@@ -161,7 +161,7 @@ describe('Rehearse sweep', () => {
 
   it('visits every pose of the route in order with the right ascension worked out from its hour angle, and records each move', async () => {
     const { press, finished, moves, targets, logged } = setup({ rig: readyRig(-60, 20) })
-    const from = poseOfAxes({ hourAngleDegrees: -60, declinationDegrees: 20 }, phoenix, sweep)
+    const from = poseOfAxes({ hourAngleDegrees: -60, declinationDegrees: 20 }, phoenix)
     const route = rehearsalRoute(from, phoenix, sweep)
 
     await press()
@@ -317,6 +317,6 @@ describe('the hour angle of a right ascension', () => {
 
     for (const hourAngle of [-170, -90, 0, 15, 90, 179]) expect(hourAngleOfRa(raForHourAngle(hourAngle, phoenix, at), phoenix, at)).toBeCloseTo(hourAngle, 6)
     expect(hourAngleOfRa(raForHourAngle(-179.9, phoenix, at), phoenix, at)).toBeCloseTo(-179.9, 6)
-    expect(poseAt(10, 180, phoenix, sweep).hourAngleDegrees).toBeCloseTo(0, 6)
+    expect(poseAt(10, 180, phoenix).hourAngleDegrees).toBeCloseTo(0, 6)
   })
 })
