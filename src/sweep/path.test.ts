@@ -80,28 +80,28 @@ describe('a pose from altitude and azimuth', () => {
 })
 
 describe('the sweep columns', () => {
-  it('start at the south meridian, go east round to the north, then the west side round to the north', () => {
+  it('start half a column east of the south meridian, go east round to the north, then the west side from the south round to the north', () => {
     const all = columns({ columnDegrees: 30 })
 
-    expect(all.map(column => column.azimuthDegrees)).toEqual([180, 150, 120, 90, 60, 30, 0, 210, 240, 270, 300, 330, 360])
-    expect(all.map(column => column.half)).toEqual([...Array(7).fill('east'), ...Array(6).fill('west')])
+    expect(all.map(column => column.azimuthDegrees)).toEqual([165, 135, 105, 75, 45, 15, 195, 225, 255, 285, 315, 345])
+    expect(all.map(column => column.half)).toEqual([...Array(6).fill('east'), ...Array(6).fill('west')])
   })
 
-  it('are spaced by the setting, and stop short of the north when the spacing does not divide', () => {
+  it('are spaced by the setting, and keep half a column clear of the south and north when the spacing does not divide', () => {
     const all = columns({ columnDegrees: 2.5 })
     const east = all.filter(column => column.half === 'east')
     const west = all.filter(column => column.half === 'west')
 
-    expect(east).toHaveLength(73)
+    expect(east).toHaveLength(72)
     expect(west).toHaveLength(72)
-    expect(east[0]!.azimuthDegrees).toBe(180)
-    expect(east[72]!.azimuthDegrees).toBe(0)
-    expect(west[0]!.azimuthDegrees).toBe(182.5)
-    expect(west[71]!.azimuthDegrees).toBe(360)
+    expect(east[0]!.azimuthDegrees).toBe(178.75)
+    expect(east[71]!.azimuthDegrees).toBe(1.25)
+    expect(west[0]!.azimuthDegrees).toBe(181.25)
+    expect(west[71]!.azimuthDegrees).toBe(358.75)
 
     const uneven = columns({ columnDegrees: 70 })
 
-    expect(uneven.map(column => column.azimuthDegrees)).toEqual([180, 110, 40, 250, 320])
+    expect(uneven.map(column => column.azimuthDegrees)).toEqual([145, 75, 5, 215, 285, 355])
   })
 
   it('every azimuth is inside 0 to 360 and each step is the setting', () => {
@@ -115,6 +115,17 @@ describe('the sweep columns', () => {
     for (let index = 1; index < all.length; index += 1) {
       if (all[index]!.half === all[index - 1]!.half) expect(Math.abs(all[index]!.azimuthDegrees - all[index - 1]!.azimuthDegrees)).toBeCloseTo(2.6, 9)
     }
+  })
+})
+
+describe('the sweep columns and the pier side boundaries', () => {
+  it('never put a column on the south meridian or on the north at 0 or 360', () => {
+    for (const columnDegrees of [15, 2.5, 2.6, 70])
+      for (const column of columns({ columnDegrees })) {
+        expect(column.azimuthDegrees).toBeGreaterThan(0)
+        expect(column.azimuthDegrees).toBeLessThan(360)
+        expect(column.azimuthDegrees).not.toBe(180)
+      }
   })
 })
 
@@ -217,28 +228,28 @@ describe('legs', () => {
 describe('the rehearsal path', () => {
   const path = rehearsalPath(phoenix, settings)
 
-  it('visits 25 columns of 15 degrees, each from the floor to the ceiling and back, the next going the other way', () => {
+  it('visits 24 columns of 15 degrees, each from the floor to the ceiling and back, the next going the other way', () => {
     const atColumn = (index: number) => path.filter(move => move.column === index)
     const heights = (index: number) => atColumn(index).map(move => move.pose.altitudeDegrees)
     const reached = [...new Set(path.map(move => move.column))]
 
-    expect(reached).toEqual(Array.from({ length: 25 }, (_, index) => index))
+    expect(reached).toEqual(Array.from({ length: 24 }, (_, index) => index))
     expect(heights(0)[0]).toBeCloseTo(2, 6)
     expect(heights(0)[heights(0).length - 1]).toBeCloseTo(70, 6)
     expect(heights(1)[heights(1).length - 1]).toBeCloseTo(2, 6)
     expect(heights(2)[heights(2).length - 1]).toBeCloseTo(70, 6)
     expect(heights(13)[heights(13).length - 1]).toBeCloseTo(2, 6)
-    expect(heights(24)[heights(24).length - 1]).toBeCloseTo(70, 6)
+    expect(heights(23)[heights(23).length - 1]).toBeCloseTo(2, 6)
   })
 
   it('ends each column at its own azimuth, in the order south, east round to the north, then west round to the north', () => {
-    const ends = [0, 1, 6, 12, 13, 14, 24].map(index => {
+    const ends = [0, 1, 6, 11, 12, 13, 23].map(index => {
       const moves = path.filter(move => move.column === index)
 
       return Math.round(moves[moves.length - 1]!.pose.azimuthDegrees * 1000) / 1000
     })
 
-    expect(ends).toEqual([180, 165, 90, 0, 195, 210, 360])
+    expect(ends).toEqual([172.5, 157.5, 82.5, 7.5, 187.5, 202.5, 352.5])
   })
 
   it('keeps every step within the axis limit', () => {
@@ -250,24 +261,24 @@ describe('the rehearsal path', () => {
     }
   })
 
-  it('begins at the south meridian at the floor and ends at the north on the west side, above the pole', () => {
+  it('begins just east of the south meridian at the floor and ends at the north on the west side, at the floor', () => {
     const first = path[0]!
     const last = path[path.length - 1]!
 
-    expect(first.pose.azimuthDegrees).toBe(180)
+    expect(first.pose.azimuthDegrees).toBe(172.5)
     expect(first.pose.altitudeDegrees).toBe(2)
     expect(first.flipExpected).toBe(false)
-    expect(last.column).toBe(24)
-    expect(last.pose.azimuthDegrees).toBeCloseTo(360, 6)
-    expect(last.pose.altitudeDegrees).toBeCloseTo(70, 6)
-    expect(last.pose.hourAngleDegrees).toBeCloseTo(0, 6)
+    expect(last.column).toBe(23)
+    expect(last.pose.azimuthDegrees).toBeCloseTo(352.5, 6)
+    expect(last.pose.altitudeDegrees).toBeCloseTo(2, 6)
+    expect(last.pose.hourAngleDegrees).toBeCloseTo(165.8400965, 6)
   })
 
   it('goes east first on the normal side, and marks the return to the south and the change to the west', () => {
-    const east = path.filter(move => move.column <= 12)
+    const east = path.filter(move => move.column <= 11)
 
     expect(east.every(move => move.kind !== 'return')).toBe(true)
-    expect(path.filter(move => move.kind === 'return').every(move => move.column === 13)).toBe(true)
+    expect(path.filter(move => move.kind === 'return').every(move => move.column === 12)).toBe(true)
     expect(path.filter(move => move.kind === 'return').length).toBeGreaterThan(0)
     expect(path.filter(move => move.kind === 'join').length).toBeGreaterThan(0)
     expect(east.every(move => move.pose.hourAngleDegrees <= 15 + 1e-6)).toBe(true)
@@ -288,8 +299,8 @@ describe('the rehearsal path', () => {
   })
 
   it('has the number of moves for the default settings', () => {
-    expect(path).toHaveLength(633)
-    expect(path.length * 2.5 / 60).toBeCloseTo(26.375, 6)
+    expect(path).toHaveLength(601)
+    expect(path.length * 2.5 / 60).toBeCloseTo(25.0416667, 6)
   })
 
   it('has more moves for closer columns and fewer for a lower ceiling', () => {
@@ -336,7 +347,7 @@ describe('the rehearsal route from where the mount is', () => {
   })
 
   it('is one move to the first pose when the mount is already one leg away, and the whole path when it stands on it', () => {
-    const near = poseAt(7, 180, phoenix, settings)
+    const near = poseAt(7, 172.5, phoenix, settings)
 
     expect(rehearsalRoute(near, phoenix, settings)).toHaveLength(path.length)
     expect(rehearsalRoute(path[0]!.pose, phoenix, settings)).toHaveLength(path.length)

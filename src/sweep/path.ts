@@ -83,12 +83,12 @@ export function poseAt(altitudeDegrees: number, azimuthDegrees: number, { latitu
 }
 
 export function columns({ columnDegrees }: Pick<SweepSettings, 'columnDegrees'>): ReadonlyArray<Column> {
-  const stepsInHalf = Math.floor(180 / columnDegrees + roundingSlack)
-  const steps = Array.from({ length: stepsInHalf + 1 }, (_, step) => step * columnDegrees)
+  const count = Math.max(0, Math.ceil(180 / columnDegrees - 0.5 - roundingSlack))
+  const offsets = Array.from({ length: count }, (_, step) => (step + 0.5) * columnDegrees)
 
   return [
-    ...steps.map((step): Column => ({ azimuthDegrees: 180 - step, half: 'east' })),
-    ...steps.slice(1).map((step): Column => ({ azimuthDegrees: 180 + step, half: 'west' })),
+    ...offsets.map((offset): Column => ({ azimuthDegrees: 180 - offset, half: 'east' })),
+    ...offsets.map((offset): Column => ({ azimuthDegrees: 180 + offset, half: 'west' })),
   ]
 }
 
