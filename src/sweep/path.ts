@@ -34,7 +34,7 @@ export interface Latitude {
 
 type Axes = Pick<Pose, 'hourAngleDegrees' | 'declinationDegrees'>
 
-type PathSettings = Pick<SweepSettings, 'legDegrees'>
+type PathSettings = Pick<SweepSettings, 'legDegrees' | 'floorDegrees'>
 
 const radians = Math.PI / 180
 const degrees = 180 / Math.PI
@@ -100,24 +100,38 @@ function hourAngleTurn(from: number, to: number) {
   return Math.abs(around) < Math.abs(direct) ? around : direct
 }
 
+const axisTurnWithin = (from: Pose, to: Pose, limitDegrees: number) =>
+  Math.abs(wrapHourAngle(to.hourAngleDegrees - from.hourAngleDegrees)) <= limitDegrees + roundingSlack && Math.abs(to.declinationDegrees - from.declinationDegrees) <= limitDegrees + roundingSlack
+
 export function legs(from: Pose, to: Pose, latitude: Latitude, settings: PathSettings): ReadonlyArray<Pose> {
   const hourAngleTurnDegrees = hourAngleTurn(from.hourAngleDegrees, to.hourAngleDegrees)
   const declinationTurnDegrees = to.declinationDegrees - from.declinationDegrees
-  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(hourAngleTurnDegrees), Math.abs(declinationTurnDegrees)) / settings.legDegrees - roundingSlack))
+  const floorDegrees = Math.min(settings.floorDegrees, from.altitudeDegrees, to.altitudeDegrees)
+  const base = Math.max(1, Math.ceil(Math.max(Math.abs(hourAngleTurnDegrees), Math.abs(declinationTurnDegrees)) / settings.legDegrees - roundingSlack))
 
-  return Array.from({ length: steps }, (_, index) => {
-    if (index === steps - 1) return to
+  const stepsOf = (steps: number): ReadonlyArray<Pose> =>
+    Array.from({ length: steps }, (_, index) => {
+      if (index === steps - 1) return to
 
-    const fraction = (index + 1) / steps
+      const fraction = (index + 1) / steps
+      const pose = poseOfAxes(
+        {
+          hourAngleDegrees: wrapHourAngle(from.hourAngleDegrees + hourAngleTurnDegrees * fraction),
+          declinationDegrees: from.declinationDegrees + declinationTurnDegrees * fraction,
+        },
+        latitude,
+      )
 
-    return poseOfAxes(
-      {
-        hourAngleDegrees: wrapHourAngle(from.hourAngleDegrees + hourAngleTurnDegrees * fraction),
-        declinationDegrees: from.declinationDegrees + declinationTurnDegrees * fraction,
-      },
-      latitude,
-    )
-  })
+      return pose.altitudeDegrees < floorDegrees ? poseAt(floorDegrees, pose.azimuthDegrees, latitude) : pose
+    })
+
+  const smooth = (poses: ReadonlyArray<Pose>) => poses.every((pose, index) => axisTurnWithin(poses[index - 1] ?? from, pose, settings.legDegrees))
+
+  for (let steps = base; ; steps += 1) {
+    const poses = stepsOf(steps)
+
+    if (smooth(poses)) return poses
+  }
 }
 
 function altitudes(floorDegrees: number, ceilingDegrees: number, rowDegrees: number) {
