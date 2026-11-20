@@ -34,14 +34,13 @@ export interface Latitude {
 
 type Axes = Pick<Pose, 'hourAngleDegrees' | 'declinationDegrees'>
 
-type PathSettings = Pick<SweepSettings, 'legDegrees' | 'meridianLimitDegrees'>
+type PathSettings = Pick<SweepSettings, 'legDegrees'>
 
 const radians = Math.PI / 180
 const degrees = 180 / Math.PI
 const roundingSlack = 1e-9
 
-export const predictedPierSide = (hourAngleDegrees: number, { meridianLimitDegrees }: Pick<SweepSettings, 'meridianLimitDegrees'>): PierSide =>
-  hourAngleDegrees > meridianLimitDegrees ? 'PIER_EAST' : 'PIER_WEST'
+export const predictedPierSide = (hourAngleDegrees: number): PierSide => (hourAngleDegrees > 0 ? 'PIER_EAST' : 'PIER_WEST')
 
 const clamp = (value: number) => Math.max(-1, Math.min(1, value))
 
@@ -49,7 +48,7 @@ const wrapAzimuth = (azimuthDegrees: number) => ((azimuthDegrees % 360) + 360) %
 
 const wrapHourAngle = (hourAngleDegrees: number) => (hourAngleDegrees > 180 ? hourAngleDegrees - 360 : hourAngleDegrees < -180 ? hourAngleDegrees + 360 : hourAngleDegrees)
 
-export function poseOfAxes(axes: Axes, { latitudeDegrees }: Latitude, settings: Pick<SweepSettings, 'meridianLimitDegrees'>): Pose {
+export function poseOfAxes(axes: Axes, { latitudeDegrees }: Latitude): Pose {
   const latitude = latitudeDegrees * radians
   const hourAngle = axes.hourAngleDegrees * radians
   const declination = axes.declinationDegrees * radians
@@ -61,11 +60,11 @@ export function poseOfAxes(axes: Axes, { latitudeDegrees }: Latitude, settings: 
     declinationDegrees: axes.declinationDegrees,
     altitudeDegrees: altitude * degrees,
     azimuthDegrees: wrapAzimuth(azimuth * degrees),
-    predictedPierSide: predictedPierSide(axes.hourAngleDegrees, settings),
+    predictedPierSide: predictedPierSide(axes.hourAngleDegrees),
   }
 }
 
-export function poseAt(altitudeDegrees: number, azimuthDegrees: number, { latitudeDegrees }: Latitude, settings: Pick<SweepSettings, 'meridianLimitDegrees'>): Pose {
+export function poseAt(altitudeDegrees: number, azimuthDegrees: number, { latitudeDegrees }: Latitude): Pose {
   const latitude = latitudeDegrees * radians
   const altitude = altitudeDegrees * radians
   const azimuth = azimuthDegrees * radians
@@ -78,7 +77,7 @@ export function poseAt(altitudeDegrees: number, azimuthDegrees: number, { latitu
     declinationDegrees: declination * degrees,
     altitudeDegrees,
     azimuthDegrees,
-    predictedPierSide: predictedPierSide(hourAngleDegrees, settings),
+    predictedPierSide: predictedPierSide(hourAngleDegrees),
   }
 }
 
@@ -92,17 +91,17 @@ export function columns({ columnDegrees }: Pick<SweepSettings, 'columnDegrees'>)
   ]
 }
 
-function hourAngleTurn(from: number, to: number, settings: Pick<SweepSettings, 'meridianLimitDegrees'>) {
+function hourAngleTurn(from: number, to: number) {
   const direct = to - from
   const around = direct > 0 ? direct - 360 : direct + 360
 
-  if (predictedPierSide(from, settings) === predictedPierSide(to, settings)) return direct
+  if (predictedPierSide(from) === predictedPierSide(to)) return direct
 
   return Math.abs(around) < Math.abs(direct) ? around : direct
 }
 
 export function legs(from: Pose, to: Pose, latitude: Latitude, settings: PathSettings): ReadonlyArray<Pose> {
-  const hourAngleTurnDegrees = hourAngleTurn(from.hourAngleDegrees, to.hourAngleDegrees, settings)
+  const hourAngleTurnDegrees = hourAngleTurn(from.hourAngleDegrees, to.hourAngleDegrees)
   const declinationTurnDegrees = to.declinationDegrees - from.declinationDegrees
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(hourAngleTurnDegrees), Math.abs(declinationTurnDegrees)) / settings.legDegrees - roundingSlack))
 
@@ -117,7 +116,6 @@ export function legs(from: Pose, to: Pose, latitude: Latitude, settings: PathSet
         declinationDegrees: from.declinationDegrees + declinationTurnDegrees * fraction,
       },
       latitude,
-      settings,
     )
   })
 }
@@ -135,7 +133,7 @@ export function rehearsalPath(latitude: Latitude, settings: SweepSettings): Read
   const poses = rehearsed.flatMap((column, index) => {
     const ordered = index % 2 === 0 ? rows : [...rows].reverse()
 
-    return ordered.map(altitude => ({ column: index, half: column.half, pose: poseAt(altitude, column.azimuthDegrees, latitude, settings) }))
+    return ordered.map(altitude => ({ column: index, half: column.half, pose: poseAt(altitude, column.azimuthDegrees, latitude) }))
   })
   const moves: Move[] = []
 

@@ -13,7 +13,6 @@ export const SweepSettings = Schema.Struct({
   legDegrees: described('The most, in degrees, either mount axis (hour angle or declination) turns in one step of a move', Positive, 5),
   floorDegrees: described('The lowest altitude, in degrees, a column reaches', Schema.Number, 2),
   ceilingDegrees: described('The highest altitude, in degrees, a column reaches', Schema.Number, 70),
-  meridianLimitDegrees: described('The hour angle, in degrees west of the meridian, past which the mount is expected to be on the flipped pier side', Schema.Number, 15),
   rehearsal: described('The rehearsal: the sweep drives the mount through every pose it could reach, with no frames', RehearsalSettings, {}),
 })
 

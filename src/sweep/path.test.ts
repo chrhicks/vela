@@ -25,7 +25,6 @@ describe('the sweep settings', () => {
       legDegrees: 5,
       floorDegrees: 2,
       ceilingDegrees: 70,
-      meridianLimitDegrees: 15,
       rehearsal: { columnDegrees: 15, rowDegrees: 5 },
     })
   })
@@ -40,7 +39,7 @@ describe('a pose from altitude and azimuth', () => {
   it('has the hour angle and declination the site gives, the same as the astronomy-engine route at that site', () => {
     for (const azimuth of [0.5, 45, 90, 135, 179.9, 190, 225, 270, 315, 359.5])
       for (const altitude of [2, 15, 33, 45, 70]) {
-        const pose = poseAt(altitude, azimuth, phoenix, settings)
+        const pose = poseAt(altitude, azimuth, phoenix)
         const ofDate = equatorialOfDate(altitude, azimuth, at, phoenix)
 
         expect(pose.declinationDegrees).toBeCloseTo(ofDate.decDegrees, 6)
@@ -51,8 +50,8 @@ describe('a pose from altitude and azimuth', () => {
   it('goes back to the same altitude and azimuth from its hour angle and declination', () => {
     for (const azimuth of [0.5, 90, 179.9, 190, 270, 359.5])
       for (const altitude of [2, 33, 70]) {
-        const pose = poseAt(altitude, azimuth, phoenix, settings)
-        const back = poseOfAxes(pose, phoenix, settings)
+        const pose = poseAt(altitude, azimuth, phoenix)
+        const back = poseOfAxes(pose, phoenix)
 
         expect(back.altitudeDegrees).toBeCloseTo(altitude, 6)
         expect(Math.abs(wrapped(back.azimuthDegrees - azimuth))).toBeLessThan(1e-6)
@@ -60,22 +59,23 @@ describe('a pose from altitude and azimuth', () => {
   })
 
   it('puts due south on the meridian and due north under the pole at hour angle 180', () => {
-    expect(poseAt(40, 180, phoenix, settings).hourAngleDegrees).toBeCloseTo(0, 6)
-    expect(Math.abs(poseAt(10, 0, phoenix, settings).hourAngleDegrees)).toBeCloseTo(180, 6)
-    expect(poseAt(10, 0, phoenix, settings).declinationDegrees).toBeCloseTo(90 - (phoenix.latitudeDegrees - 10), 6)
+    expect(poseAt(40, 180, phoenix).hourAngleDegrees).toBeCloseTo(0, 6)
+    expect(Math.abs(poseAt(10, 0, phoenix).hourAngleDegrees)).toBeCloseTo(180, 6)
+    expect(poseAt(10, 0, phoenix).declinationDegrees).toBeCloseTo(90 - (phoenix.latitudeDegrees - 10), 6)
   })
 
   it('puts the north under the pole at hour angle -180 from the east and +180 from the west, so it is on opposite pier sides', () => {
-    expect(poseAt(10, 0, phoenix, settings)).toMatchObject({ hourAngleDegrees: -180, predictedPierSide: 'PIER_WEST' })
-    expect(poseAt(10, 360, phoenix, settings)).toMatchObject({ predictedPierSide: 'PIER_EAST' })
-    expect(poseAt(10, 360, phoenix, settings).hourAngleDegrees).toBeCloseTo(180, 6)
+    expect(poseAt(10, 0, phoenix)).toMatchObject({ hourAngleDegrees: -180, predictedPierSide: 'PIER_WEST' })
+    expect(poseAt(10, 360, phoenix)).toMatchObject({ predictedPierSide: 'PIER_EAST' })
+    expect(poseAt(10, 360, phoenix).hourAngleDegrees).toBeCloseTo(180, 6)
   })
 
-  it('predicts the pier side from the meridian limit: the normal side up to it, the flipped side past it', () => {
-    expect(poseOfAxes({ hourAngleDegrees: 15, declinationDegrees: 20 }, phoenix, settings).predictedPierSide).toBe('PIER_WEST')
-    expect(poseOfAxes({ hourAngleDegrees: 15.1, declinationDegrees: 20 }, phoenix, settings).predictedPierSide).toBe('PIER_EAST')
-    expect(poseOfAxes({ hourAngleDegrees: -120, declinationDegrees: 20 }, phoenix, settings).predictedPierSide).toBe('PIER_WEST')
-    expect(poseOfAxes({ hourAngleDegrees: 15.1, declinationDegrees: 20 }, phoenix, { ...settings, meridianLimitDegrees: 30 }).predictedPierSide).toBe('PIER_WEST')
+  it('predicts the pier side from the sign of the hour angle: west of the meridian is PIER_EAST, the meridian and east of it PIER_WEST', () => {
+    expect(poseOfAxes({ hourAngleDegrees: 0.1, declinationDegrees: 20 }, phoenix).predictedPierSide).toBe('PIER_EAST')
+    expect(poseOfAxes({ hourAngleDegrees: 15.1, declinationDegrees: 20 }, phoenix).predictedPierSide).toBe('PIER_EAST')
+    expect(poseOfAxes({ hourAngleDegrees: 0, declinationDegrees: 20 }, phoenix).predictedPierSide).toBe('PIER_WEST')
+    expect(poseOfAxes({ hourAngleDegrees: -0.1, declinationDegrees: 20 }, phoenix).predictedPierSide).toBe('PIER_WEST')
+    expect(poseOfAxes({ hourAngleDegrees: -120, declinationDegrees: 20 }, phoenix).predictedPierSide).toBe('PIER_WEST')
   })
 })
 
@@ -138,8 +138,8 @@ describe('legs', () => {
       for (const toAzimuth of grid)
         for (const fromAltitude of altitudes)
           for (const toAltitude of altitudes) {
-            const from = poseAt(fromAltitude, fromAzimuth, phoenix, settings)
-            const to = poseAt(toAltitude, toAzimuth, phoenix, settings)
+            const from = poseAt(fromAltitude, fromAzimuth, phoenix)
+            const to = poseAt(toAltitude, toAzimuth, phoenix)
             const steps = legs(from, to, phoenix, settings)
 
             expect(steps[steps.length - 1]).toBe(to)
@@ -157,16 +157,16 @@ describe('legs', () => {
   })
 
   it('is one step when the axes turn the limit or less, and none is added for a move that stays put', () => {
-    const from = poseOfAxes({ hourAngleDegrees: -40, declinationDegrees: 10 }, phoenix, settings)
+    const from = poseOfAxes({ hourAngleDegrees: -40, declinationDegrees: 10 }, phoenix)
 
-    expect(legs(from, poseOfAxes({ hourAngleDegrees: -35, declinationDegrees: 15 }, phoenix, settings), phoenix, settings)).toHaveLength(1)
-    expect(legs(from, poseOfAxes({ hourAngleDegrees: -34.9, declinationDegrees: 10 }, phoenix, settings), phoenix, settings)).toHaveLength(2)
+    expect(legs(from, poseOfAxes({ hourAngleDegrees: -35, declinationDegrees: 15 }, phoenix), phoenix, settings)).toHaveLength(1)
+    expect(legs(from, poseOfAxes({ hourAngleDegrees: -34.9, declinationDegrees: 10 }, phoenix), phoenix, settings)).toHaveLength(2)
     expect(legs(from, from, phoenix, settings)).toHaveLength(1)
   })
 
   it('limits the axes and not the sky angle: a one degree move near the pole is many steps', () => {
-    const below = poseAt(33, 0, phoenix, settings)
-    const above = poseAt(34, 0, phoenix, settings)
+    const below = poseAt(33, 0, phoenix)
+    const above = poseAt(34, 0, phoenix)
     const steps = legs(below, above, phoenix, settings)
 
     expect(Math.abs(above.hourAngleDegrees - below.hourAngleDegrees)).toBeCloseTo(180, 6)
@@ -174,19 +174,19 @@ describe('legs', () => {
   })
 
   it('wraps at azimuth 0 and 360: from 359 to 1 degrees azimuth is a short move across hour angle 180, not a trip round the compass', () => {
-    const from = poseAt(20, 359, phoenix, settings)
-    const to = poseAt(20, 1, phoenix, settings)
+    const from = poseAt(20, 359, phoenix)
+    const to = poseAt(20, 1, phoenix)
     const steps = legs(from, to, phoenix, settings)
 
     expect(from.hourAngleDegrees).toBeGreaterThan(170)
     expect(to.hourAngleDegrees).toBeLessThan(-170)
     expect(steps.length).toBeLessThanOrEqual(2)
-    expect(steps.map(step => step.predictedPierSide)).toEqual(steps.map(step => (step.hourAngleDegrees > 15 ? 'PIER_EAST' : 'PIER_WEST')))
+    expect(steps.map(step => step.predictedPierSide)).toEqual(steps.map(step => (step.hourAngleDegrees > 0 ? 'PIER_EAST' : 'PIER_WEST')))
   })
 
   it('wraps at hour angle 180 and keeps a flipped side move on the flipped side', () => {
-    const from = poseOfAxes({ hourAngleDegrees: 170, declinationDegrees: 60 }, phoenix, settings)
-    const to = poseOfAxes({ hourAngleDegrees: 178, declinationDegrees: 60 }, phoenix, settings)
+    const from = poseOfAxes({ hourAngleDegrees: 170, declinationDegrees: 60 }, phoenix)
+    const to = poseOfAxes({ hourAngleDegrees: 178, declinationDegrees: 60 }, phoenix)
     const steps = legs(from, to, phoenix, settings)
 
     expect(steps.map(step => step.hourAngleDegrees)).toEqual([174, 178])
@@ -194,8 +194,8 @@ describe('legs', () => {
   })
 
   it('crosses hour angle 180 between the two sides when that is the shorter way, with hour angle kept from -180 to 180', () => {
-    const from = poseOfAxes({ hourAngleDegrees: 176, declinationDegrees: 60 }, phoenix, settings)
-    const to = poseOfAxes({ hourAngleDegrees: -170, declinationDegrees: 60 }, phoenix, settings)
+    const from = poseOfAxes({ hourAngleDegrees: 176, declinationDegrees: 60 }, phoenix)
+    const to = poseOfAxes({ hourAngleDegrees: -170, declinationDegrees: 60 }, phoenix)
     const steps = legs(from, to, phoenix, settings)
 
     expect(steps).toHaveLength(3)
@@ -205,23 +205,23 @@ describe('legs', () => {
     expect(steps.map(step => step.predictedPierSide)).toEqual(['PIER_WEST', 'PIER_WEST', 'PIER_WEST'])
   })
 
-  it('goes the side that avoids the meridian limit when the move stays on the normal side', () => {
-    const from = poseOfAxes({ hourAngleDegrees: -170, declinationDegrees: 60 }, phoenix, settings)
-    const to = poseOfAxes({ hourAngleDegrees: 10, declinationDegrees: 60 }, phoenix, settings)
+  it('goes the long way round when the move stays on one side of the meridian', () => {
+    const from = poseOfAxes({ hourAngleDegrees: -170, declinationDegrees: 60 }, phoenix)
+    const to = poseOfAxes({ hourAngleDegrees: -10, declinationDegrees: 60 }, phoenix)
     const steps = legs(from, to, phoenix, settings)
 
-    expect(steps).toHaveLength(36)
+    expect(steps).toHaveLength(32)
     expect(steps.every(step => step.predictedPierSide === 'PIER_WEST')).toBe(true)
-    expect(steps.every(step => step.hourAngleDegrees <= 15)).toBe(true)
+    expect(steps.every(step => step.hourAngleDegrees <= 0)).toBe(true)
   })
 
-  it('crosses the meridian limit when the destination is on the other side', () => {
-    const from = poseOfAxes({ hourAngleDegrees: 10, declinationDegrees: 40 }, phoenix, settings)
-    const to = poseOfAxes({ hourAngleDegrees: 30, declinationDegrees: 40 }, phoenix, settings)
+  it('crosses the meridian when the destination is on the other side', () => {
+    const from = poseOfAxes({ hourAngleDegrees: -10, declinationDegrees: 40 }, phoenix)
+    const to = poseOfAxes({ hourAngleDegrees: 10, declinationDegrees: 40 }, phoenix)
     const steps = legs(from, to, phoenix, settings)
 
-    expect(steps.map(step => step.hourAngleDegrees)).toEqual([15, 20, 25, 30])
-    expect(steps.map(step => step.predictedPierSide)).toEqual(['PIER_WEST', 'PIER_EAST', 'PIER_EAST', 'PIER_EAST'])
+    expect(steps.map(step => step.hourAngleDegrees)).toEqual([-5, 0, 5, 10])
+    expect(steps.map(step => step.predictedPierSide)).toEqual(['PIER_WEST', 'PIER_WEST', 'PIER_EAST', 'PIER_EAST'])
   })
 })
 
@@ -281,7 +281,9 @@ describe('the rehearsal path', () => {
     expect(path.filter(move => move.kind === 'return').every(move => move.column === 12)).toBe(true)
     expect(path.filter(move => move.kind === 'return').length).toBeGreaterThan(0)
     expect(path.filter(move => move.kind === 'join').length).toBeGreaterThan(0)
-    expect(east.every(move => move.pose.hourAngleDegrees <= 15 + 1e-6)).toBe(true)
+    expect(east.every(move => move.pose.hourAngleDegrees <= 1e-6)).toBe(true)
+    expect(east.every(move => move.pose.predictedPierSide === 'PIER_WEST')).toBe(true)
+    expect(path.filter(move => move.column >= 12 && move.kind === 'column').every(move => move.pose.predictedPierSide === 'PIER_EAST')).toBe(true)
   })
 
   it('marks a flip exactly where the predicted pier side changes from the move before', () => {
@@ -289,7 +291,7 @@ describe('the rehearsal path', () => {
       expect(move.flipExpected).toBe(index > 0 && path[index - 1]!.pose.predictedPierSide !== move.pose.predictedPierSide)
     })
 
-    expect(path.filter(move => move.flipExpected).length).toBeGreaterThan(0)
+    expect(path.filter(move => move.flipExpected).length).toBe(1)
   })
 
   it('is the same on every call and depends on the latitude only', () => {
@@ -311,7 +313,7 @@ describe('the rehearsal path', () => {
 
 describe('the rehearsal route from where the mount is', () => {
   const path = rehearsalPath(phoenix, settings)
-  const far = poseOfAxes({ hourAngleDegrees: 120, declinationDegrees: 80 }, phoenix, settings)
+  const far = poseOfAxes({ hourAngleDegrees: 120, declinationDegrees: 80 }, phoenix)
   const route = rehearsalRoute(far, phoenix, settings)
 
   it('chains legs from the mount to the first pose, then visits the rest of the rehearsal path in order', () => {
@@ -347,7 +349,7 @@ describe('the rehearsal route from where the mount is', () => {
   })
 
   it('is one move to the first pose when the mount is already one leg away, and the whole path when it stands on it', () => {
-    const near = poseAt(7, 172.5, phoenix, settings)
+    const near = poseAt(7, 172.5, phoenix)
 
     expect(rehearsalRoute(near, phoenix, settings)).toHaveLength(path.length)
     expect(rehearsalRoute(path[0]!.pose, phoenix, settings)).toHaveLength(path.length)
