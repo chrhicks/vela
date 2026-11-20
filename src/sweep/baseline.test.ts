@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decodeConfig } from '../config.ts'
-import { baselineOf, classify } from './classify.ts'
+import { baselineOf } from './baseline.ts'
 import { SweepSettings } from './settings.ts'
 
 const settings = decodeConfig(SweepSettings, {})
@@ -31,28 +31,5 @@ describe('the baseline star count', () => {
     const solved = [frame(20, 400), frame(21, 420), frame(22, 380), frame(33, 9000)]
 
     expect(baselineOf(solved, 21, settings)).toBe(420)
-  })
-})
-
-describe('the class of a frame', () => {
-  it('is sky when it solved and blocked when it did not, with no baseline', () => {
-    expect(classify({ solved: true, stars: 300 }, undefined, settings)).toBe('sky')
-    expect(classify({ solved: false, stars: 300 }, undefined, settings)).toBe('blocked')
-  })
-
-  it('is blocked under the blocked fraction of the baseline, solved or not', () => {
-    expect(classify({ solved: false, stars: 149 }, 1000, settings)).toBe('blocked')
-    expect(classify({ solved: true, stars: 149 }, 1000, settings)).toBe('blocked')
-  })
-
-  it('is sky when it solved with at least the sky fraction of the baseline', () => {
-    expect(classify({ solved: true, stars: 650 }, 1000, settings)).toBe('sky')
-    expect(classify({ solved: true, stars: 2000 }, 1000, settings)).toBe('sky')
-  })
-
-  it('is the edge between the two, and when it has the stars but did not solve', () => {
-    expect(classify({ solved: true, stars: 400 }, 1000, settings)).toBe('edge')
-    expect(classify({ solved: false, stars: 150 }, 1000, settings)).toBe('edge')
-    expect(classify({ solved: false, stars: 900 }, 1000, settings)).toBe('edge')
   })
 })
