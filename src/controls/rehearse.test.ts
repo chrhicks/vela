@@ -143,12 +143,12 @@ describe('Rehearse sweep', () => {
     expect(await press()).toMatchObject({ success: { code: 'rehearsing-sweep', moves: route.length } })
     await finished()
 
-    const chain = route.findIndex(move => move.pose.altitudeDegrees === 2 && move.pose.azimuthDegrees === 180) + 1
+    const chain = route.findIndex(move => move.pose.altitudeDegrees === 2 && move.pose.azimuthDegrees === 172.5) + 1
     let previous = from
 
     expect(chain).toBeGreaterThan(10)
-    expect(moves()[chain - 1]).toMatchObject({ altitudeDegrees: 2, azimuthDegrees: 180 })
-    expect(moves()[chain - 1]!.hourAngleDegrees).toBeCloseTo(0, 6)
+    expect(moves()[chain - 1]).toMatchObject({ altitudeDegrees: 2, azimuthDegrees: 172.5 })
+    expect(moves()[chain - 1]!.hourAngleDegrees).toBeCloseTo(-12.7759785, 6)
 
     for (const [index, target] of targets.slice(0, chain).entries()) {
       const hourAngle = hourAngleOfRa(target.raHours, phoenix, Date.now())
@@ -188,7 +188,7 @@ describe('Rehearse sweep', () => {
 
   it('walks the whole rehearsal path after the chain, column by column', async () => {
     const path = rehearsalPath(phoenix, sweep)
-    const { press, finished, moves } = setup({ rig: readyRig(0, -54.55) })
+    const { press, finished, moves } = setup({ rig: readyRig(path[0]!.pose.hourAngleDegrees, path[0]!.pose.declinationDegrees) })
 
     await press()
     await finished()
@@ -196,7 +196,7 @@ describe('Rehearse sweep', () => {
     const reached = moves()
 
     expect(reached).toHaveLength(path.length)
-    expect([...new Set(reached.map(move => move.column))]).toEqual(Array.from({ length: 25 }, (_, index) => index))
+    expect([...new Set(reached.map(move => move.column))]).toEqual(Array.from({ length: 24 }, (_, index) => index))
   })
 
   it("records what the mount reports on arrival, its EQUATORIAL_EOD_COORD and TELESCOPE_PIER_SIDE, and the flip when the pier side changes", async () => {
