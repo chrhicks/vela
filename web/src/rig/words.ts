@@ -4,6 +4,7 @@ import type { DeviceName } from '../../../state/devices.ts'
 import type { RunEnding } from '../../../state/entries.ts'
 import type { PierSide } from '../../../state/entries.ts'
 import type { Rehearsal } from '../../../state/rehearsal.ts'
+import type { Sweep } from '../../../state/sweep.ts'
 import type { FlatExposure } from '../../../state/flats.ts'
 import type { Flip } from '../../../state/flip.ts'
 import type { GuiderActivity, Guiding } from '../../../state/guiding.ts'
@@ -60,6 +61,7 @@ export const doneWords = (done: Done): RefusalWords =>
       autofocusing: ({ exposureSeconds, endedRun }) => ({ happened: `Autofocus at ${exposureSeconds} s`, ...(endedRun ? { toDo: 'Run stopped' } : {}) }),
       refocused: ({ exposureSeconds, ending }) => ({ happened: ending === 'done' ? `Refocused at ${exposureSeconds} s` : `Refocus ${ending}`, toDo: 'Run carried on' }),
       'rehearsing-sweep': ({ moves }) => ({ happened: 'Rehearsing the sweep', toDo: `${moves} moves, Stop ends it` }),
+      sweeping: ({ columns, exposureSeconds, stoppedGuiding }) => ({ happened: 'Sweeping the horizon', toDo: `${columns} columns, ${exposureSeconds} s frames${stoppedGuiding ? ', guiding stopped' : ''}, Stop ends it` }),
       reguided: () => ({ happened: 'Guiding settled on a new star', toDo: 'Run carried on' }),
       home: ({ endedRun, stoppedGuiding }) => ({ happened: 'Going home', ...afterwards(endedRun, stoppedGuiding) }),
       stop: ({ endedRun, stoppedGuiding }) => ({ happened: 'Stopped', ...afterwards(endedRun, stoppedGuiding) }),
@@ -118,6 +120,33 @@ export const rehearsalWords = (state: Rehearsal): RefusalWords & { readonly trou
   )
 }
 
+const sweepFacts = ({ last, edges, alerts, alert, columns }: Sweep): ReadonlyArray<string> => [
+  ...(last === undefined
+    ? []
+    : [
+        `column ${last.column + 1} of ${columns}`,
+        `az ${last.azimuthDegrees.toFixed(1)}° alt ${last.pointing.altitudeDegrees.toFixed(1)}°`,
+        `last ${last.class}, ${counted(last.stars, 'star')}`,
+      ]),
+  `${counted(edges.length, 'edge')} found`,
+  ...(edges.length === 0 ? [] : [`latest ${edges[edges.length - 1]!.azimuthDegrees.toFixed(1)}° at ${edges[edges.length - 1]!.edgeAltitudeDegrees.toFixed(1)}°`]),
+  ...(alerts > 0 ? [`${counted(alerts, 'alert')}${alert === undefined ? '' : `: ${alert}`}`] : []),
+]
+
+export const sweepWords = (state: Sweep): RefusalWords & { readonly troubled: boolean } => {
+  const facts = sweepFacts(state).join(' · ')
+  const troubled = state.alerts > 0
+
+  return Match.value(state.ending).pipe(
+    Match.when(undefined, () => ({ happened: 'Sweeping the horizon', toDo: facts, troubled })),
+    Match.when('finished', () => ({ happened: 'Horizon sweep done', toDo: facts, troubled })),
+    Match.when('stopped', () => ({ happened: 'Horizon sweep stopped', toDo: facts, troubled })),
+    Match.when('pressed', () => ({ happened: 'Horizon sweep ended by another press', toDo: facts, troubled })),
+    Match.when('restarted', () => ({ happened: 'Horizon sweep ended: Vela restarted', toDo: facts, troubled: true })),
+    Match.exhaustive,
+  )
+}
+
 export const refusalWords = (refusal: Refusal): RefusalWords =>
   Match.value(refusal).pipe(
     Match.discriminatorsExhaustive('code')({
@@ -131,6 +160,7 @@ export const refusalWords = (refusal: Refusal): RefusalWords =>
       'unknown-target': ({ text }) => ({ happened: `${text} not found`, toDo: 'Check the name' }),
       'run-active': () => ({ happened: 'Run active', toDo: 'See latest frame' }),
       'rehearsal-active': () => ({ happened: 'Sweep rehearsal going', toDo: 'Stop it first' }),
+      'sweep-active': () => ({ happened: 'Horizon sweep going', toDo: 'Stop it first' }),
       'no-run': () => ({ happened: 'No run to pause' }),
       'rig-silent': ({ seconds }) => ({ happened: 'Rig silent', toDo: `nothing heard for ${seconds} s` }),
       'move-failed': ({ device }) => ({ happened: `${deviceWords[device]} did not move`, toDo: 'Driver refused the move' }),

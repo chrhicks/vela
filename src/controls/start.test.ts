@@ -15,7 +15,7 @@ import { deviceCommandsFrom } from './device-commands.ts'
 import { Autofocusing } from './focus.ts'
 import { GuidingSettings } from './guiding.ts'
 import { MountRuns } from './mount.ts'
-import { RehearsalRunning } from './rehearsing.ts'
+import { RehearsalRunning, type Routine } from './rehearsing.ts'
 import { FilterAnswers, startControls, StartLog, StartRunning, StartSettings, TargetCatalog, TargetCentring } from './start.ts'
 
 const deviceIds = { mount: 'mount', primary: 'asi', focuser: 'focuser', box: 'box', guide: 'guide' }
@@ -77,7 +77,7 @@ function setup({ rig = ready(), busy = false, centreRefused = false, mountAnswer
     Layer.succeed(FilterAnswers, { answer: filter => Effect.sync(() => void did.push(`filter ${filter}`)) }),
     Layer.succeed(StartRunning, { busy: Effect.sync(() => routine !== undefined), began: begun => Effect.sync(() => void (routine = begun)) }),
     Layer.succeed(MountRuns, { stopRehearsal: Effect.succeed(false), endRun: Effect.sync(() => (did.push('end run'), running)), idle: Effect.void, pause: Effect.sync(() => (did.push('pause'), true)), parked: Effect.sync(() => (did.push('parked'), parks)), resume: Effect.sync(() => void did.push('resume')) }),
-    Layer.succeed(RehearsalRunning, { busy: Effect.succeed(rehearsing), began: () => Effect.void, cancelled: Effect.succeed<'pressed'>('pressed') }),
+    Layer.succeed(RehearsalRunning, { busy: Effect.succeed(rehearsing), which: Effect.succeed<Routine | undefined>(rehearsing ? 'rehearsal' : undefined), began: () => Effect.void, cancelled: Effect.succeed<'pressed'>('pressed') }),
     Layer.succeed(StartSettings, { homeSeconds, guidingSeconds: 5, rigSilentAfterSeconds: 10, autofocusExposureSeconds: { in: 10, out: 2 }, newId: Effect.succeed(StartId.make('start-1')) }),
   )
 

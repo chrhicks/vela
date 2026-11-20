@@ -81,7 +81,7 @@ function setup({ rig = readyRig(), capturing = false, startGoing = false, rehear
     Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.never, current: Effect.sync(() => current) }),
     Layer.succeed(Capturing, { busy: Effect.succeed(capturing), start: () => Effect.void, finished: Effect.succeed(undefined) }),
     Layer.succeed(StartRunning, { busy: Effect.succeed(startGoing), began: () => Effect.void }),
-    Layer.succeed(RehearsalRunning, { busy: Effect.sync(() => rehearsalGoing || routine !== undefined), began: began => Effect.sync(() => void (routine = began)), cancelled: Effect.sync(() => cancelling) }),
+    Layer.succeed(RehearsalRunning, { busy: Effect.sync(() => rehearsalGoing || routine !== undefined), which: Effect.sync(() => (rehearsalGoing || routine !== undefined ? 'rehearsal' : undefined)), began: began => Effect.sync(() => void (routine = began)), cancelled: Effect.sync(() => cancelling) }),
     goto,
     Layer.succeed(RehearsalLog, {
       started: body => Effect.sync(() => void logged.push({ kind: 'started', body })),
@@ -287,7 +287,7 @@ describe('Rehearse sweep with the shared goto', () => {
       Layer.succeed(Feed, { receive: () => Effect.void, subscribe: Effect.never, current: Effect.sync(() => rig) }),
       Layer.succeed(Capturing, { busy: Effect.succeed(false), start: () => Effect.void, finished: Effect.succeed(undefined) }),
       Layer.succeed(StartRunning, { busy: Effect.succeed(false), began: () => Effect.void }),
-      Layer.succeed(RehearsalRunning, { busy: Effect.sync(() => routine !== undefined), began: began => Effect.sync(() => void (routine = began)), cancelled: Effect.succeed<'stopped'>('stopped') }),
+      Layer.succeed(RehearsalRunning, { busy: Effect.sync(() => routine !== undefined), which: Effect.sync(() => (routine !== undefined ? 'rehearsal' : undefined)), began: began => Effect.sync(() => void (routine = began)), cancelled: Effect.succeed<'stopped'>('stopped') }),
       Layer.succeed(RehearsalGoto, rehearsalGoto(gotoOf.holder)),
       Layer.succeed(RehearsalLog, {
         started: () => Effect.void,

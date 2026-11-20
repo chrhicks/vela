@@ -6,7 +6,7 @@ import { readFits } from '../frames/fits.ts'
 import { listNight } from '../frames/library.ts'
 import { stretch, superpixels, text, type PreviewSettings } from '../frames/preview.ts'
 import { encodePng } from '../frames/png.ts'
-import type { SkyPosition } from '../../state/entries.ts'
+import { operationObjects, type SkyPosition } from '../../state/entries.ts'
 import { fieldHeightDegrees, isLight, PlateSolution, pointingOf, readSolution, statsName } from '../frames/stats.ts'
 import { makeStack, type Stack } from './stack.ts'
 
@@ -52,7 +52,7 @@ export interface StackShape {
   readonly height: number
 }
 
-const stacked = (sequence: string | undefined): sequence is string => sequence !== undefined && !sequence.startsWith('test-frame')
+const stacked = (sequence: string | undefined): sequence is string => sequence !== undefined && !sequence.startsWith(operationObjects.test) && !sequence.startsWith(operationObjects.sweep)
 
 const decodeKept = Schema.decodeUnknownPromise(Schema.fromJsonString(Schema.Struct({ solution: Schema.optionalKey(Schema.NullOr(PlateSolution)) })))
 

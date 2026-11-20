@@ -25,6 +25,16 @@ describe('the sweep settings', () => {
       legDegrees: 5,
       floorDegrees: 2,
       ceilingDegrees: 70,
+      settleSeconds: 1,
+      stepDegrees: 2,
+      firstGuessDegrees: 25,
+      alertAfterFrames: 8,
+      baselineAltitudeDegrees: 10,
+      baselineTopFraction: 0.25,
+      baselineMinFrames: 3,
+      blockedFraction: 0.15,
+      skyFraction: 0.65,
+      recordDir: '/mnt/storage/rig/horizon',
       rehearsal: { columnDegrees: 15, rowDegrees: 5 },
     })
   })

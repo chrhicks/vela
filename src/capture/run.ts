@@ -56,6 +56,7 @@ export interface FrameLabel {
   readonly sequence: string
   readonly frame: number
   readonly measure: ReadonlyArray<Measurement> | undefined
+  readonly keep?: true
 }
 
 export interface CaptureView {
@@ -92,6 +93,7 @@ interface Active {
   readonly abort: AbortController
   readonly between: Between | undefined
   readonly measure: ReadonlyArray<Measurement> | undefined
+  readonly keep: boolean
   readonly startedAt: number
   counted: number
   failed: number
@@ -356,7 +358,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
   }
 
   return {
-    start(json: unknown, between?: Between, measure?: ReadonlyArray<Measurement>): StartResult {
+    start(json: unknown, between?: Between, measure?: ReadonlyArray<Measurement>, keep = false): StartResult {
       const parsed = parseRequest(json, settings.filterInSuffix)
 
       if (!parsed.ok) return parsed
@@ -375,6 +377,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
         abort: new AbortController(),
         between,
         measure,
+        keep,
         startedAt: now(),
         counted: 0,
         failed: 0,
@@ -431,7 +434,7 @@ export function makeCapture({ picture, sender, settings, runFile, nextName, now,
 
           if (watch.file === undefined && announcesFrame(entry, settings.device) && typeof path === 'string' && path !== watch.previous) {
             watch.file = path
-            labels.set(basename(path), { run: run.id, sequence: run.sequence, frame: run.counted + 1, measure: run.measure })
+            labels.set(basename(path), { run: run.id, sequence: run.sequence, frame: run.counted + 1, measure: run.measure, ...(run.keep ? { keep: true as const } : {}) })
           }
         }
       }
