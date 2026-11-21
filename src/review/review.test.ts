@@ -1,12 +1,17 @@
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { behindTheTrees } from '../../state/review.ts'
 import { foldRig } from '../../state/testing.ts'
 import { entry } from '../../state/testing.ts'
 import type { Entry } from '../../state/entry.ts'
 import { decodeConfig } from '../config.ts'
 import { makeReview, PictureUnavailable, type ReviewPorts, type Shot } from './review.ts'
 import { ReviewFailed, type Reply } from './reviewer.ts'
-import type { ReviewRequest } from './request.ts'
+import { questionOf, type ReviewRequest } from './request.ts'
+import { noHorizon, type Horizon } from '../horizon/horizon.ts'
+import { fromMount } from '../sky/coordinates.ts'
+import { equatorialOfDate } from '../sky/horizontal.ts'
+import type { FrameView } from './line.ts'
 import { ReviewSettings } from './settings.ts'
 
 const settings = decodeConfig(ReviewSettings, {})
@@ -24,7 +29,17 @@ const kept = (n: number, sequence = 'IC-1396_light_dual'): Entry => entry('vela.
 
 const shot = (exposureSeconds: number | undefined): Shot => ({ width: 8, height: 6, rgb: new Uint8Array(8 * 6 * 3).fill(90), exposureSeconds })
 
-function rig(options: { readonly settings?: typeof settings; readonly reviewer?: (model: string, request: ReviewRequest) => Effect.Effect<Reply, ReviewFailed>; readonly pictureFails?: boolean; readonly exposure?: number | undefined; readonly live?: () => boolean } = {}) {
+const phoenix = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
+
+const flat20: Horizon = { ...noHorizon, altitudesDegrees: Array.from({ length: 360 }, () => 20) }
+
+const viewAt = (altitude: number, azimuth = 100): FrameView => {
+  const ofDate = equatorialOfDate(altitude, azimuth, t0, phoenix)
+
+  return { at: t0, site: phoenix, columns: 6248, rows: 4176, heightDegrees: 2.25, mount: fromMount({ raDegrees: ofDate.raHours * 15, decDegrees: ofDate.decDegrees }, new Date(t0)), solution: null }
+}
+
+function rig(options: { readonly placed?: FrameView | undefined; readonly horizon?: Horizon; readonly settings?: typeof settings; readonly reviewer?: (model: string, request: ReviewRequest) => Effect.Effect<Reply, ReviewFailed>; readonly pictureFails?: boolean; readonly exposure?: number | undefined; readonly live?: () => boolean } = {}) {
   const published: Array<{ readonly kind: string; readonly id: string; readonly body: Readonly<Record<string, unknown>> }> = []
   const lines: string[] = []
   const reports: string[] = []
@@ -41,6 +56,8 @@ function rig(options: { readonly settings?: typeof settings; readonly reviewer?:
         return (options.reviewer ?? (() => Effect.succeed(answer)))(model, request)
       },
     },
+    placed: () => Effect.succeed(options.placed),
+    horizon: options.horizon ?? flat20,
     picture: (night, name) => (options.pictureFails === true ? Effect.fail(new PictureUnavailable({ night, file: name, cause: 'no such file' })) : Effect.succeed(shot('exposure' in options ? options.exposure : 120))),
     publish: (kind, id, body) => void published.push({ kind, id, body }),
     keep: line => Effect.sync(() => void lines.push(line)),
@@ -57,6 +74,49 @@ async function play(subject: ReturnType<typeof rig>, entries: ReadonlyArray<Entr
   for (const each of entries) subject.review.observe(each)
   await subject.review.whenIdle()
 }
+
+const textOf = (request: ReviewRequest | undefined) => (request === undefined ? '' : questionOf(request.exposureSeconds, settings.hazards, request.line))
+
+describe('reviewing a frame against the mapped line', () => {
+  it('sends the same sentence to every model and records the frame\'s line with each answer', async () => {
+    const subject = rig({ placed: viewAt(23) })
+
+    await play(subject, [started(), kept(1)])
+
+    for (const each of subject.requests) expect(each.request.line).toEqual({ centreDegrees: 3, lowestDegrees: 1, heightDegrees: 2.3, source: 'mount' })
+    expect(textOf(subject.requests[0]?.request)).toContain('The frame\'s centre is 3 degrees above the mapped tree line in its direction')
+    expect(subject.published.filter(each => each.kind === 'answer').map(each => each.body['line'])).toHaveLength(2)
+    expect(subject.published[0]?.body).toEqual({ review: 'rv1', run: 'r1', night: '2026-11-18', file: file(1), models: ['claude-opus-5-5', 'claude-haiku-5-5'] })
+    expect(JSON.parse(subject.lines[1] ?? '{}')).toMatchObject({ kind: 'vela.review.answer', line: { centreDegrees: 3, source: 'mount' } })
+  })
+
+  it('adds no sentence and records no line when the frame is not placed, or the horizon has no value there', async () => {
+    const unplaced = rig({ placed: undefined })
+    const unmapped = rig({ placed: viewAt(23), horizon: noHorizon })
+
+    await play(unplaced, [started(), kept(1)])
+    await play(unmapped, [started(), kept(1)])
+
+    for (const subject of [unplaced, unmapped]) {
+      expect(Object.keys(subject.requests[0]?.request ?? {}).sort()).toEqual(['exposureSeconds', 'picture'])
+      expect(subject.published.every(each => !('line' in each.body))).toBe(true)
+    }
+  })
+
+  it('labels an obstructed answer behind the trees only when some of the frame is below the line', async () => {
+    const entriesFor = async (altitude: number, horizon = flat20) => {
+      const subject = rig({ placed: viewAt(altitude), horizon })
+
+      await play(subject, [started(), kept(1)])
+
+      return foldRig(subject.published.map((each, index) => entry(`vela.review.${each.kind}`, 9000 + index, each.body))).reviews[0]?.replies.map(behindTheTrees)
+    }
+
+    expect(await entriesFor(21)).toEqual([true, true])
+    expect(await entriesFor(30)).toEqual([false, false])
+    expect(await entriesFor(21, noHorizon)).toEqual([false, false])
+  })
+})
 
 describe('reviewing a frame', () => {
   it('asks every model about each light frame once it is kept, with the same request, and records the ask and each answer', async () => {

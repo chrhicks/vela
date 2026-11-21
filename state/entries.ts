@@ -2,7 +2,7 @@ import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effe
 import { FilterAnswer, Refusal } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
 import { Check, CheckedFrames, FirstFramesVerdict } from './first-frames-check.ts'
-import { ReviewId, ReviewOutcome, ReviewUsage } from './review-answer.ts'
+import { ReviewId, ReviewLine, ReviewOutcome, ReviewUsage } from './review-answer.ts'
 import { RunTarget } from './targets.ts'
 
 export const StartToken = Schema.String.pipe(Schema.brand('StartToken'))
@@ -211,6 +211,7 @@ export const ReviewAnswered = entryOf('vela.review.answer', {
   seconds: Schema.Number,
   outcome: ReviewOutcome,
   usage: Schema.optionalKey(ReviewUsage),
+  line: Schema.optionalKey(ReviewLine),
 })
 
 export const PierSide = Schema.Literals(['PIER_WEST', 'PIER_EAST'])

@@ -21,6 +21,14 @@ const picture = pictureFor(makePreviewRgb(frameWithHeaders(1), { bin: 1, blackSi
 
 const request: ReviewRequest = { picture, exposureSeconds: 120 }
 
+const line = { centreDegrees: 3, lowestDegrees: 1.9, heightDegrees: 2.2, source: 'solve' } as const
+
+const lineRequest: ReviewRequest = { ...request, line }
+
+const base = 'Here is an image of a 120 s astrophotography exposure. Please say, with a confidence float from 0 to 1, whether it is obstructed. Known hazards to appear during an observation session: trees, high-tension power poles/lines, houses, clouds obstructing stars.'
+
+const sentence = 'The frame\'s centre is 3 degrees above the mapped tree line in its direction, and the frame is about 2.2 degrees tall.'
+
 const settings = decodeConfig(ReviewSettings, {})
 
 const chunkTypes = (png: Buffer) => {
@@ -33,8 +41,8 @@ const chunkTypes = (png: Buffer) => {
 
 const bodyOf = (model: string) => messageParams(settings, model, request)
 
-const contentOf = (model: string) => {
-  const content = bodyOf(model).messages[0]?.content
+const contentOf = (model: string, asked: ReviewRequest = request) => {
+  const content = messageParams(settings, model, asked).messages[0]?.content
 
   return Array.isArray(content) ? content : []
 }
@@ -64,10 +72,7 @@ describe('what an ask sends', () => {
   it('asks in Chris\'s words, with the exposure and the configured hazards', () => {
     const text = contentOf('claude-opus-5-5')[1]
 
-    expect(text).toEqual({
-      type: 'text',
-      text: 'Here is an image of a 120 s astrophotography exposure. Please say, with a confidence float from 0 to 1, whether it is obstructed. Known hazards to appear during an observation session: trees, high-tension power poles/lines, houses, clouds obstructing stars.',
-    })
+    expect(text).toEqual({ type: 'text', text: base })
     expect(questionOf(60, ['trees', 'the neighbour\'s roof'])).toContain('a 60 s astrophotography exposure')
     expect(questionOf(60, ['trees', 'the neighbour\'s roof'])).toContain('hazards to appear during an observation session: trees, the neighbour\'s roof.')
   })
@@ -89,6 +94,35 @@ describe('what an ask sends', () => {
       const text = JSON.stringify(contentOf(model).filter(block => block.type === 'text'))
 
       for (const forbidden of ['33.45', '112.07', '331', '2026', '2025', 'DATE-OBS', 'SITELAT', 'SITELONG', 'SITEELEV', 'OBJCTRA', 'OBJCTDEC', 'SIMPLE', 'BITPIX', 'Test scope', 'IC 1396', '21 39', '+57', '.fits', 'night', 'T05:', 'latitude', 'longitude', 'elevation', 'altitude', 'azimuth']) {
+        expect(text.toLowerCase().includes(forbidden.toLowerCase()) ? forbidden : undefined).toBeUndefined()
+      }
+    }
+  })
+
+  it('adds exactly one sentence, the frame against the mapped line, when the line is known, and nothing else changes', () => {
+    const plain = contentOf('claude-opus-5-5')
+    const placed = contentOf('claude-opus-5-5', lineRequest)
+
+    expect(placed[1]).toEqual({ type: 'text', text: `${base} ${sentence}` })
+    expect(placed[0]).toEqual(plain[0])
+    expect(placed).toHaveLength(2)
+    expect(questionOf(120, ['trees'], line).split('. ').length).toBe(questionOf(120, ['trees']).split('. ').length + 1)
+    expect(messageParams(settings, 'claude-opus-5-5', lineRequest)).toEqual({ ...messageParams(settings, 'claude-opus-5-5', request), messages: [{ role: 'user', content: placed }] })
+  })
+
+  it('asks as it always did when the line is not known', () => {
+    expect(contentOf('claude-opus-5-5', { ...request })[1]).toEqual({ type: 'text', text: base })
+    expect(Object.keys(request).sort()).toEqual(['exposureSeconds', 'picture'])
+  })
+
+  it('still sends no latitude, longitude, elevation, date, time, FITS header, file name, night, target, sky position, altitude, azimuth or the line\'s own height with the sentence in', () => {
+    for (const asked of [lineRequest, { ...lineRequest, line: { ...line, centreDegrees: -4.5, heightDegrees: 3.4 } }]) {
+      const text = JSON.stringify(contentOf('claude-opus-5-5', asked).filter(block => block.type === 'text'))
+      const numbers = text.match(/\d+(\.\d+)?/g) ?? []
+
+      expect(numbers).toEqual(['120', '0', '1', String(Math.abs(asked.line?.centreDegrees ?? NaN)), String(asked.line?.heightDegrees)])
+
+      for (const forbidden of ['33.45', '112.07', '331', '2026', '2025', 'DATE-OBS', 'SITELAT', 'OBJCTRA', 'IC 1396', '.fits', 'night', 'latitude', 'longitude', 'elevation', 'altitude', 'azimuth', 'solve', 'mount', '1.9']) {
         expect(text.toLowerCase().includes(forbidden.toLowerCase()) ? forbidden : undefined).toBeUndefined()
       }
     }

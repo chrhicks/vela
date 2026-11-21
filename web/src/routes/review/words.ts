@@ -1,4 +1,4 @@
-import type { Review, ReviewReply } from '../../../../state/review.ts'
+import { behindTheTrees, type Review, type ReviewReply } from '../../../../state/review.ts'
 import type { ReviewFailureKind } from '../../../../state/review-answer.ts'
 import type { Reading } from '../../components/Readings.tsx'
 
@@ -42,6 +42,7 @@ export function replyReadings(reply: ReviewReply | undefined): ReadonlyArray<Rea
     { label: 'Verdict', value: verdictWords[obstructed ? 'obstructed' : 'clear'], attention: obstructed },
     { label: 'Confidence', value: percent(confidence) },
     { label: 'Hazard', value: hazard },
+    ...(behindTheTrees(reply) ? [{ label: 'Mapped line', value: 'Behind the trees', attention: true }] : []),
   ]
 }
 
@@ -58,5 +59,5 @@ export function summaryOf(reply: ReviewReply | undefined): string {
 
   const { obstructed, confidence, hazard } = reply.outcome.answer
 
-  return `${verdictWords[obstructed ? 'obstructed' : 'clear']} ${percent(confidence)}, ${hazard}`
+  return `${verdictWords[obstructed ? 'obstructed' : 'clear']} ${percent(confidence)}, ${hazard}${behindTheTrees(reply) ? ', behind the trees' : ''}`
 }

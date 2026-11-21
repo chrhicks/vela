@@ -77,6 +77,7 @@ import { keep, readKept } from '../remembered/kept.ts'
 import { coolerFor, lastCentreNear, nothingRemembered, remember } from '../remembered/remembered.ts'
 import { Recalled } from '../feed/remembered.ts'
 import { keepLine } from '../review/keep.ts'
+import { placeFrame } from '../review/place.ts'
 import { makeReview, PictureUnavailable } from '../review/review.ts'
 import { anthropicMessages, makeReviewer } from '../review/reviewer.ts'
 
@@ -241,6 +242,8 @@ const review = makeReview({
   reviewer: makeReviewer(settings.review, anthropicMessages()),
   picture: (night, file) =>
     Effect.tryPromise({ try: () => readFile(join(frames.keepDir, night, file)).then(bytes => makePreviewRgb(bytes, frames.preview)), catch: cause => new PictureUnavailable({ night, file, cause }) }),
+  placed: (night, file) => Effect.promise(() => statsQueue.then(() => placeFrame(frames.keepDir, night, file)).catch(() => undefined)),
+  horizon,
   publish: (kind, id, body) => publishEntry(stream.vela('review'), `vela.review.${kind}`, id, body),
   keep: keepLine(settings.review.answersFile),
   report: line => console.error(`vela: ${line}`),
