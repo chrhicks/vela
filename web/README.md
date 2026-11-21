@@ -13,6 +13,7 @@ Each route serves one moment of the night.
 | `/controls` | Something needs correcting | Either |
 | `/frame/<number>`, `/stack` | Judging a picture by eye | Either |
 | `/review` | Seeing whether Claude calls each frame obstructed | Either |
+| `/horizon?target=ID` | Seeing when a target clears the trees tonight | A desktop, scrolling sideways on a phone |
 
 ## Where things are
 
@@ -45,6 +46,10 @@ One address whose content follows the run: no run, the target picker (`READY`), 
 The picker (`routes/run/picker/`) lists what is best placed now, all of it or only what is hinted for dual band, the most cited or the largest first, with how much of the frame's width each target spans; it filters as you type on any of a target's names, and shows the chosen target with the camera's frame drawn over it. Two things are set there, the exposure and when the run stops; the end time is worked out from them (`ends-by.ts`). A Horizon row above it says when the chosen target drops behind the horizon at its azimuth tonight ("behind the trees from 01:20") or, when it is below now and rises over it before the dark ends, when it clears ("behind the trees now, clears at 22:40"); where the line it crosses is the flat up line it says "below 30°" instead, and for a target that has not yet risen above the true horizon, "below the horizon now". Nothing is shown for a target that is up, or not up, all night. It reads the target's placement (`state/behind-trees.ts`), so it agrees with the list, and Start refuses nothing because of it. The chosen target is in the address (`&target=`), so on a phone the list and the chosen target are two screens.
 
 Amber appears only in the alert and on the readings it concerns, so a page with no amber is a night that needs nothing.
+
+## /horizon
+
+One target's night from `GET /horizon-night` (`routes/horizon/`, the arithmetic in `state/horizon-view.ts`): a header with the target, the night, the dark hours and the nights of the sweeps the trees came from; a facts row (clears, clear for, highest, flip with what it was predicted from, ends); and a chart of azimuth against altitude with the mapped tree line filled, the target's path solid while it is dark and above the line and dashed otherwise, an hour tick for each whole hour of the answer's zone, the meridian, and a NOW dot from the service's clock while now is inside the night. Where there is no horizon file, or a bin has no edge, the up line is drawn dotted and labelled with the flat altitude assumed. The refusals (`no-site`, `no-night`, `unknown-target`, `malformed`) are one plain line. Start opens the picker's panel for the target (`/?target=ID`), where the exposure, framing, filter and cooler are chosen; Other target opens the picker, whose panel links back here.
 
 ## /frame/<number> and /stack
 

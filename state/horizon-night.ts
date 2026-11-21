@@ -47,6 +47,7 @@ export const HorizonBins = Schema.Struct({
   fileLoaded: Schema.Boolean,
   altitudesDegrees: Schema.Array(Schema.NullOr(Schema.Number)),
   sources: Schema.Array(Schema.NullOr(HorizonSource)),
+  sweepNights: Schema.Array(NightName),
   upLineDegrees: Schema.Number,
 })
 

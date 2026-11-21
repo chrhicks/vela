@@ -1,0 +1,99 @@
+import { useSearchParams } from 'react-router'
+
+import type { HorizonNight, HorizonRefusal } from '../../../../state/horizon-night.ts'
+import { clockIn, lastNightsWords, nightFacts } from '../../../../state/horizon-view.ts'
+import { ActionLink } from '../../components/ActionLink.tsx'
+import { Page } from '../../components/Page.tsx'
+import { PageHeader } from '../../components/PageHeader.tsx'
+import { PillLink } from '../../components/PillLink.tsx'
+import { Statement } from '../../components/Statement.tsx'
+import { useLocalNow } from '../../rig/clock.ts'
+import { horizonNight } from '../../rig/horizon-night.ts'
+import { serviceNow } from '../../rig/service-clock.ts'
+import { useLink } from '../../rig/store.ts'
+import { useAsked } from '../../rig/use-asked.ts'
+import { HorizonChart } from './HorizonChart.tsx'
+import { HorizonFacts } from './HorizonFacts.tsx'
+import styles from './HorizonPage.module.css'
+
+const tickMilliseconds = 30_000
+
+const refreshMilliseconds = 60_000
+
+const pickerAddress = '/?pick'
+
+const refusalWords = (refusal: HorizonRefusal): string => {
+  switch (refusal.code) {
+    case 'no-site':
+      return 'The mount has not reported its site, so the night cannot be worked out yet'
+    case 'no-night':
+      return 'The Sun does not set or rise here at this time of year, so there is no night to draw'
+    case 'unknown-target':
+      return 'That target is not in the catalog'
+    case 'malformed':
+      return 'Vela could not read that request'
+  }
+}
+
+const darkWords = (night: HorizonNight, clock: (at: number) => string) =>
+  night.times.darkAt === null || night.times.darkEndsAt === null ? 'No full dark' : `Dark ${clock(night.times.darkAt)} to ${clock(night.times.darkEndsAt)}`
+
+function NightView({ target }: { readonly target: string }) {
+  const tick = useLocalNow(tickMilliseconds)
+  const now = serviceNow(useLink(), tick)
+  const reading = useAsked(() => horizonNight(target), target, Math.floor(tick / refreshMilliseconds))
+
+  if (reading === undefined) return null
+
+  if (reading.status !== 'night') {
+    return (
+      <Page width="wide">
+        <PageHeader title="Horizon" facts={[]}>
+          <ActionLink to={pickerAddress}>Other target</ActionLink>
+        </PageHeader>
+
+        <Statement size="instruction">{reading.status === 'refused' ? refusalWords(reading.refusal) : 'Vela did not answer'}</Statement>
+      </Page>
+    )
+  }
+
+  const night = reading.night
+  const clock = clockIn(night.zone)
+  const sweeps = lastNightsWords(night.horizon.sweepNights)
+
+  return (
+    <Page width="wide">
+      <PageHeader title={night.target.name} facts={[...(night.target.commonName === null ? [] : [night.target.commonName]), `Night of ${night.night.slice('0000-'.length)}`, darkWords(night, clock), ...(sweeps === undefined ? [] : [sweeps])]}>
+        <ActionLink to={pickerAddress}>Other target</ActionLink>
+        <PillLink to={`/?target=${encodeURIComponent(night.target.id)}`}>Start</PillLink>
+      </PageHeader>
+
+      <div className={styles.night}>
+        <HorizonFacts cells={nightFacts(night, clock)} />
+
+        {night.facts.clear === null ? <Statement size="instruction">{`${night.target.name} never clears the horizon in the dark tonight`}</Statement> : null}
+
+        <HorizonChart night={night} now={now} />
+      </div>
+    </Page>
+  )
+}
+
+export function HorizonPage() {
+  const [search] = useSearchParams()
+  const target = search.get('target')
+
+  if (target === null) {
+    return (
+      <Page width="wide">
+        <PageHeader title="Horizon" facts={[]}>
+          <ActionLink to={pickerAddress}>Pick a target</ActionLink>
+        </PageHeader>
+
+        <Statement size="instruction">No target chosen</Statement>
+      </Page>
+    )
+  }
+
+  return <NightView key={target} target={target} />
+}

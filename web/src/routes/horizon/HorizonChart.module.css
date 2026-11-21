@@ -1,0 +1,118 @@
+.scroll {
+  overflow-x: auto;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  min-width: 48rem;
+  height: auto;
+  font-family: var(--font-code);
+}
+
+.grid {
+  stroke: var(--rule);
+}
+
+.axis {
+  stroke: var(--ember-quiet);
+}
+
+.altitude {
+  fill: var(--ember-quiet);
+  font-size: 11px;
+  text-anchor: end;
+}
+
+.compass {
+  fill: var(--ember-quiet);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-anchor: middle;
+}
+
+.meridian {
+  stroke: var(--ember-quiet);
+  stroke-dasharray: 2 5;
+  opacity: 0.6;
+}
+
+.meridianLabel {
+  fill: var(--ember-quiet);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.treesFill {
+  fill: var(--ember);
+  opacity: 0.14;
+}
+
+.treesEdge {
+  fill: none;
+  stroke: var(--ember);
+  stroke-width: 1.5;
+  opacity: 0.8;
+}
+
+.assumed {
+  fill: none;
+  stroke: var(--ember-quiet);
+  stroke-width: 2;
+  stroke-dasharray: 1 6;
+  stroke-linecap: round;
+}
+
+.assumedLabel {
+  fill: var(--ember-quiet);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+
+.pathClear {
+  fill: none;
+  stroke: var(--ember);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pathOther {
+  fill: none;
+  stroke: var(--ember-quiet);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.tick {
+  fill: var(--ground);
+  stroke: var(--ember);
+  stroke-width: 1.5;
+}
+
+.tickLabel {
+  fill: var(--ember);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+.name {
+  fill: var(--ember);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-anchor: middle;
+}
+
+.nowDot {
+  fill: var(--ember);
+}
+
+.nowLabel {
+  fill: var(--ember);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}

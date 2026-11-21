@@ -63,6 +63,11 @@
   margin-top: var(--gap-row);
 }
 
+.horizon {
+  display: flex;
+  justify-content: center;
+}
+
 .back {
   display: none;
 }
