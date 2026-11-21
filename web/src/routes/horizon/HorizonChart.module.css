@@ -87,6 +87,28 @@
   stroke-dasharray: 4 4;
 }
 
+.pathCloudyClear {
+  fill: none;
+  stroke: var(--cloud);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pathCloudyOther {
+  fill: none;
+  stroke: var(--cloud-quiet);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.cloudLabel {
+  fill: var(--cloud);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .tick {
   fill: var(--ground);
   stroke: var(--ember);

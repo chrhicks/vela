@@ -6,6 +6,7 @@ import { CatalogConfig } from './catalog/database.ts'
 import { SurveyConfig } from './sky/survey.ts'
 import { ReviewSettings } from './review/settings.ts'
 import { SweepSettings } from './sweep/settings.ts'
+import { ForecastSettings } from './forecast/settings.ts'
 
 export const FrameSettings = Schema.Struct({
   rig: described("The rig's id on the entries Vela publishes, the same id the rig program's entries carry", Schema.String, 'fra-cria'),
@@ -172,6 +173,7 @@ export const HorizonNightSettings = Schema.Struct({
   decimals: described("How many decimal places, in degrees, the horizon page's path altitudes, azimuths and line altitudes are rounded to", Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), 2),
   frameAngleDecimals: described("How many decimal places, in degrees, the horizon page's camera footprint angles (the direction of celestial north from straight up at the target) are rounded to", Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), 1),
   frameEdgeSamples: described("How many points along each edge of the camera's footprint the server checks against the horizon when it looks for the first clean frame of a night", Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)), 16),
+  cloudyPercent: described("The forecast cloud cover, in percent, from which the horizon page greys the target's path and counts an hour as cloudy. A display choice, not a limit on anything Vela does", Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 100 })), 50),
 })
 
 export const StarSettings = Schema.Struct({
@@ -342,6 +344,7 @@ export const VelaSettings = Schema.Struct({
   rememberedFile: described('The file Vela keeps what it remembers in: the last light run, the camera angle, the centres that centring reached and the cooler each target was last started with', Schema.String, '/mnt/storage/vela/remembered.json'),
   horizonFile: described('The file the horizon is read from: the lowest altitude above which the sky is open, in each 1 degree of azimuth (version 2). Without the file, every direction is unknown', Schema.String, '/mnt/storage/vela/horizon.json'),
   horizonNight: described("A target's night on the horizon page: the path's points and their rounding", HorizonNightSettings, {}),
+  forecast: described('The cloud forecast for the site the mount reports, from the National Weather Service and Open-Meteo', ForecastSettings, {}),
   sweep: described('The horizon sweep: the columns, steps and limits of its path', SweepSettings, {}),
   start: described('Starting a target from the picker: home, stop guiding, slew and centre, autofocus, guiding, then the run', StartRoutineSettings, {}),
   streamViewer: Schema.optionalKey(

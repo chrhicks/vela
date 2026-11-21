@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 
 import type { HorizonNight } from '../../../../state/horizon-night.ts'
+import { cloudWords, type CloudHour } from '../../../../state/horizon-clouds.ts'
 import type { Layer } from '../../../../state/horizon-layers.ts'
 import { sliderSettings } from '../../../../state/horizon-slider.ts'
 import { backTo, clockIn, fractionOf, inSpan, laneRuns, nightSpan, readoutAt, readoutSentence, steppedBy, timeAtFraction, trackHours, zoneName, type TimeRun } from '../../../../state/horizon-view.ts'
@@ -12,14 +13,17 @@ interface HorizonSliderProps {
   readonly now: number | undefined
   readonly selected: number
   readonly layers: ReadonlySet<Layer>
+  readonly clouds: ReadonlyArray<CloudHour>
   readonly onSelect: (at: number) => void
 }
 
 const percent = (fraction: number) => `${(fraction * 100).toFixed(3)}%`
 
+const cloudOpacity = (coverPercent: number) => 0.15 + (Math.min(Math.max(coverPercent, 0), 100) / 100) * 0.75
+
 const barStyle = (span: TimeRun, run: TimeRun) => ({ left: percent(fractionOf(span, run.from)), width: percent(fractionOf(span, run.until) - fractionOf(span, run.from)) })
 
-export function HorizonSlider({ night, now, selected, layers, onSelect }: HorizonSliderProps) {
+export function HorizonSlider({ night, now, selected, layers, clouds, onSelect }: HorizonSliderProps) {
   const [playing, setPlaying] = useState(false)
   const field = useRef<HTMLDivElement>(null)
   const latest = useRef(selected)
@@ -32,6 +36,7 @@ export function HorizonSlider({ night, now, selected, layers, onSelect }: Horizo
   const hours = trackHours(span, night.zone)
   const back = backTo(night, now)
   const moonLane = layers.has('moon')
+  const cloudLane = layers.has('clouds')
   const nowHere = now !== undefined && inSpan(span, now)
   const { stepMinutes, bigStepMinutes, playMinutesPerSecond, playFrameMilliseconds } = sliderSettings
 
@@ -107,7 +112,7 @@ export function HorizonSlider({ night, now, selected, layers, onSelect }: Horizo
 
         <output className={styles.readout}>{`${clock(selected)} ${zoneName(night.zone, selected)}`}</output>
 
-        <span className={`${styles.words} ${readout.clear ? styles.clear : ''}`}>{`${readout.altitude} · ${readout.verdict}`}</span>
+        <span className={`${styles.words} ${readout.clear ? styles.clear : ''}`}>{`${readout.altitude} · ${readout.verdict}${cloudLane ? ` · ${cloudWords(clouds, selected)}` : ''}`}</span>
 
         <span className={styles.hint}>{`Drag, or ← → for ${stepMinutes} min, shift for ${bigStepMinutes / 60} h`}</span>
 
@@ -123,6 +128,7 @@ export function HorizonSlider({ night, now, selected, layers, onSelect }: Horizo
           <span className={styles.trackLabel} />
           <span className={styles.laneLabel}>Dark</span>
           <span className={styles.laneLabel}>{`${night.target.name} clear`}</span>
+          {cloudLane ? <span className={styles.laneLabel}>Clouds</span> : null}
           {moonLane ? <span className={styles.laneLabel}>Moon up</span> : null}
         </div>
 
@@ -136,7 +142,7 @@ export function HorizonSlider({ night, now, selected, layers, onSelect }: Horizo
           aria-valuemin={span.from}
           aria-valuemax={span.until}
           aria-valuenow={Math.round(selected)}
-          aria-valuetext={readoutSentence(night, selected, clock)}
+          aria-valuetext={`${readoutSentence(night, selected, clock)}${cloudLane ? `, ${cloudWords(clouds, selected).toLowerCase()}` : ''}`}
           onKeyDown={key}
           onPointerDown={event => {
             event.currentTarget.setPointerCapture(event.pointerId)
@@ -175,6 +181,18 @@ export function HorizonSlider({ night, now, selected, layers, onSelect }: Horizo
               <span key={run.from} className={`${styles.bar} ${styles.clearBar}`} style={barStyle(span, run)} />
             ))}
           </div>
+
+          {cloudLane ? (
+            <div className={styles.lane}>
+              {clouds.map(hour => (
+                <span
+                  key={hour.from}
+                  className={`${styles.bar} ${hour.coverPercent === null ? styles.unknownBar : styles.cloudBar}`}
+                  style={{ ...barStyle(span, hour), ...(hour.coverPercent === null ? {} : { opacity: cloudOpacity(hour.coverPercent) }) }}
+                />
+              ))}
+            </div>
+          ) : null}
 
           {moonLane ? (
             <div className={styles.lane}>

@@ -1,6 +1,7 @@
 import type { HorizonNight } from '../../../../state/horizon-night.ts'
+import { cloudLabels } from '../../../../state/horizon-clouds.ts'
 import type { Layer } from '../../../../state/horizon-layers.ts'
-import { clearAt, clockIn, footprintAtTime, frameLabel, hourTicks, lineNote, lineRuns, meridianAzimuths, moonMarkAt, moonPieces, nowPoint, pathPieces, skyPointAt, turnsOfChart, type SkyPoint } from '../../../../state/horizon-view.ts'
+import { clearAt, clockIn, footprintAtTime, frameLabel, hourTicks, lineNote, lineRuns, meridianAzimuths, moonMarkAt, moonPieces, nowPoint, pathPieces, skyPointAt, turnsOfChart, type SkyPoint, type TimeRun } from '../../../../state/horizon-view.ts'
 import styles from './HorizonChart.module.css'
 
 interface HorizonChartProps {
@@ -8,6 +9,7 @@ interface HorizonChartProps {
   readonly now: number | undefined
   readonly selected: number
   readonly layers: ReadonlySet<Layer>
+  readonly cloudy: ReadonlyArray<TimeRun>
 }
 
 const width = 1344
@@ -35,6 +37,7 @@ const moonLabelGap = 16
 const moonLabelWidth = 250
 const frameLabelGap = 16
 const frameLabelWidth = 520
+const cloudLabelDrop = 24
 
 const xOf = (azimuthDegrees: number) => left + (azimuthDegrees / 360) * (right - left)
 
@@ -49,7 +52,7 @@ const filled = (points: ReadonlyArray<SkyPoint>) => {
   return first === undefined || last === undefined ? '' : `${xOf(first.azimuthDegrees).toFixed(1)},${bottom} ${pointsOf(points)} ${xOf(last.azimuthDegrees).toFixed(1)},${bottom}`
 }
 
-export function HorizonChart({ night, now, selected, layers }: HorizonChartProps) {
+export function HorizonChart({ night, now, selected, layers, cloudy }: HorizonChartProps) {
   const runs = lineRuns(night.horizon)
   const note = lineNote(night.horizon)
   const assumed = runs.filter(run => !run.known)
@@ -57,7 +60,10 @@ export function HorizonChart({ night, now, selected, layers }: HorizonChartProps
   const widestFirst = widest?.points[0]
   const widestLast = widest?.points.at(-1)
   const noteX = widestFirst === undefined || widestLast === undefined ? undefined : Math.min(Math.max((xOf(widestFirst.azimuthDegrees) + xOf(widestLast.azimuthDegrees)) / 2, left + labelMargin), right - labelMargin)
-  const pieces = pathPieces(night.path, night.clear)
+  const cloudsOn = layers.has('clouds')
+  const shownClouds = cloudsOn ? cloudy : []
+  const pieces = pathPieces(night.path, night.clear, shownClouds)
+  const cloudWords = cloudLabels(night, shownClouds, clockIn(night.zone))
   const ticks = hourTicks(night.path, night.zone)
   const here = nowPoint(night.path, now)
   const chosen = nowPoint(night.path, selected)
@@ -131,7 +137,13 @@ export function HorizonChart({ night, now, selected, layers }: HorizonChartProps
         ))}
 
         {pieces.map((piece, index) => (
-          <polyline key={index} className={piece.clear ? styles.pathClear : styles.pathOther} points={pointsOf(piece.points)} />
+          <polyline key={index} className={piece.cloudy ? (piece.clear ? styles.pathCloudyClear : styles.pathCloudyOther) : piece.clear ? styles.pathClear : styles.pathOther} points={pointsOf(piece.points)} />
+        ))}
+
+        {cloudWords.map(label => (
+          <text key={label.words + label.point.azimuthDegrees} className={styles.cloudLabel} x={xOf(label.point.azimuthDegrees)} y={yOf(label.point.altitudeDegrees) + cloudLabelDrop} textAnchor="middle">
+            {label.words}
+          </text>
         ))}
 
         {ticks.map(tick => (

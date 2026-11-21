@@ -3,10 +3,11 @@ import styles from './HorizonChips.module.css'
 
 interface HorizonChipsProps {
   readonly layers: ReadonlySet<Layer>
+  readonly cloudNote: string | undefined
   readonly onToggle: (layer: Layer) => void
 }
 
-export function HorizonChips({ layers, onToggle }: HorizonChipsProps) {
+export function HorizonChips({ layers, cloudNote, onToggle }: HorizonChipsProps) {
   return (
     <div className={styles.row} role="group" aria-label="Layers on the chart">
       {layerChips.map(chip => (
@@ -16,7 +17,7 @@ export function HorizonChips({ layers, onToggle }: HorizonChipsProps) {
         </button>
       ))}
 
-      <span className={styles.always}>Trees and path always on</span>
+      <span className={styles.always}>{layers.has('clouds') && cloudNote !== undefined ? `${cloudNote} · trees and path always on` : 'Trees and path always on'}</span>
     </div>
   )
 }
