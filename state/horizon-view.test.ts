@@ -6,7 +6,9 @@ import {
   clampedTo,
   clearAt,
   clockIn,
+  footprintAtTime,
   fractionOf,
+  frameLabel,
   hourTicks,
   lastNightsWords,
   laneRuns,
@@ -17,6 +19,7 @@ import {
   moonPercent,
   moonPieces,
   moonPointAt,
+  northAngleAt,
   nightFacts,
   nightSpan,
   nowPoint,
@@ -30,6 +33,7 @@ import {
   steppedBy,
   timeAtFraction,
   trackHours,
+  turnsOfChart,
   zoneName,
 } from './horizon-view.ts'
 
@@ -58,6 +62,7 @@ const night = (facts: HorizonNight['facts']): HorizonNight => ({
   horizon: flat(10),
   path: path([10, 20, 30], [100, 110, 120]),
   moon: { litFraction: 0.9, altitudes: [-5, 5, 15], azimuths: [250, 255, 260], upSpans: [{ from: start + minuteMs, until: start + 2 * minuteMs }] },
+  frame: { angleDegrees: 20, northAngles: [10, 20, 30], firstCleanAt: start + minuteMs },
   clear: [],
   facts,
 })
@@ -204,6 +209,7 @@ describe('the facts row', () => {
   it('says when it clears and by which gap, how long, the highest, the flip and what ends it', () => {
     expect(nightFacts(withClear(base, { at: at(8, 26), basis: 'mount-limit', limitDegrees: 5 }), clock)).toEqual([
       { label: 'Clears', value: '21:06 · SE gap', note: null },
+      { label: 'First clean frame', value: '17:31', note: null },
       { label: 'Clear for', value: '8 h 10', note: null },
       { label: 'Highest', value: '45° at 01:26', note: null },
       { label: 'Flip', value: '01:26', note: "Predicted from the mount's 5° limit" },
@@ -475,5 +481,59 @@ describe('the Moon on the chart', () => {
       expect(moonFact(moonOn({ upSpans: [{ from: at(0), until: at(4) }] }))?.value).toBe('90% · up all night')
       expect(moonFact(moonOn({ upSpans: [] }))?.value).toBe('90% · down all night')
     })
+  })
+})
+
+describe('the camera frame on the chart', () => {
+  const clock = clockIn(zone)
+  const withFrame = (frame: Partial<HorizonNight['frame']>, clear: HorizonNight['clear'] = []): HorizonNight => ({
+    ...night({ clear: null, highest: { altitudeDegrees: 30, at: start }, transitAt: null, flip: null }),
+    frame: { angleDegrees: 20, northAngles: [10, 20, 30], firstCleanAt: null, ...frame },
+    clear,
+  })
+  const spell = (from: number): HorizonNight['clear'] => [{ from, until: from + 2 * minuteMs, startedBy: { cause: 'dark' }, endedBy: { cause: 'dark' } }]
+
+  it('takes the direction of north between two samples the short way round', () => {
+    expect(northAngleAt(withFrame({ northAngles: [170, -170, -150] }), start + minuteMs / 2)).toBeCloseTo(180)
+    expect(northAngleAt(withFrame({ northAngles: [10, 20, 30] }), start + minuteMs * 1.5)).toBeCloseTo(25)
+    expect(northAngleAt(withFrame({}), start + 5 * minuteMs)).toBeUndefined()
+  })
+
+  it('draws the footprint round the target at the time asked, and none off the path', () => {
+    const drawn = footprintAtTime(withFrame({}), start + minuteMs, 4)!
+
+    expect(drawn).toHaveLength(16)
+    expect(Math.min(...drawn.map(point => point.altitudeDegrees))).toBeLessThan(20)
+    expect(Math.max(...drawn.map(point => point.altitudeDegrees))).toBeGreaterThan(20)
+    expect(footprintAtTime(withFrame({}), start + 9 * minuteMs, 4)).toBeUndefined()
+  })
+
+  it('draws a footprint that crosses north in both halves of the chart, and one inside it once', () => {
+    const across = [
+      { azimuthDegrees: -3, altitudeDegrees: 40 },
+      { azimuthDegrees: 3, altitudeDegrees: 40 },
+    ]
+
+    expect(turnsOfChart(across).map(copy => copy.map(point => point.azimuthDegrees))).toEqual([
+      [-3, 3],
+      [357, 363],
+    ])
+    expect(turnsOfChart([{ azimuthDegrees: 100, altitudeDegrees: 40 }])).toHaveLength(1)
+    expect(turnsOfChart([{ azimuthDegrees: 358, altitudeDegrees: 40 }, { azimuthDegrees: 364, altitudeDegrees: 40 }]).map(copy => copy[0]?.azimuthDegrees)).toEqual([358, -2])
+  })
+
+  it('labels the first clean frame beside when the centre clears, and says when the camera angle is not known', () => {
+    expect(frameLabel(withFrame({ firstCleanAt: start + minuteMs }, spell(start)), clock)?.words).toBe('First clean frame 17:31 · Centre clears 17:30')
+    expect(frameLabel(withFrame({ firstCleanAt: start + minuteMs, angleDegrees: null }, spell(start)), clock)?.words).toBe('First clean frame 17:31 · Centre clears 17:30 · Camera angle unknown')
+    expect(frameLabel(withFrame({ firstCleanAt: null }, spell(start)), clock)?.words).toBe('No clean frame tonight · Centre clears 17:30')
+    expect(frameLabel(withFrame({ firstCleanAt: start + minuteMs }, spell(start)), clock)?.point).toEqual({ azimuthDegrees: 110, altitudeDegrees: 20 })
+    expect(frameLabel(withFrame({ firstCleanAt: null }), clock)).toBeUndefined()
+  })
+
+  it('puts the first clean frame in the facts, with the note when the angle is not known', () => {
+    const facts = (frame: Partial<HorizonNight['frame']>) => nightFacts({ ...withFrame(frame), facts: { clear: { which: 'next', clearsAt: start, startedBy: { cause: 'dark' }, clearForSeconds: 600, endsAt: start + 600_000, endedBy: { cause: 'dark' } }, highest: { altitudeDegrees: 30, at: start }, transitAt: null, flip: null } }, clock).find(fact => fact.label === 'First clean frame')
+
+    expect(facts({ firstCleanAt: start + minuteMs })).toEqual({ label: 'First clean frame', value: '17:31', note: null })
+    expect(facts({ firstCleanAt: null, angleDegrees: null })).toEqual({ label: 'First clean frame', value: 'Not tonight', note: 'Camera angle unknown, box square to north' })
   })
 })

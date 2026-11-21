@@ -169,3 +169,18 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+.frameBox {
+  fill: var(--ember);
+  fill-opacity: 0.12;
+  stroke: var(--ember);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.frameLabel {
+  fill: var(--ember);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
