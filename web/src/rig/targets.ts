@@ -14,9 +14,9 @@ export type Recalled = { readonly status: 'recalled'; readonly remembered: Remem
 
 const unknownStatus = 404
 
-const asked = (address: string) => Effect.tryPromise(() => fetch(address))
+export const asked = (address: string) => Effect.tryPromise(() => fetch(address))
 
-const bodyOf = (response: Response) => Effect.tryPromise(() => response.json())
+export const bodyOf = (response: Response) => Effect.tryPromise(() => response.json())
 
 const listing = (address: string): Effect.Effect<Listing> =>
   asked(address).pipe(

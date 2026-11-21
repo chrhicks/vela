@@ -289,6 +289,10 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
         </CommandPill>
       </div>
 
+      <div className={styles.horizon}>
+        <ActionLink to={`/horizon?target=${encodeURIComponent(target.id)}`}>Tonight's horizon</ActionLink>
+      </div>
+
       <div className={styles.back}>
         <ActionLink to="/?pick">Targets</ActionLink>
       </div>

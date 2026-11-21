@@ -27,6 +27,9 @@ export interface HorizonNightOptions {
   readonly settings: HorizonNightSettings
 }
 
+const sweepNightsOf = (horizon: Horizon): ReadonlyArray<NightName> =>
+  [...new Set(horizon.origins.flatMap(origin => (origin === null ? [] : [origin.night])))].sort()
+
 export function makeHorizonNights({ catalog, site, horizon, horizonFileLoaded, meridianLimitDegrees, naming, settings }: HorizonNightOptions) {
   const line = { horizon, upLineDegrees: settings.upLineDegrees }
 
@@ -53,7 +56,7 @@ export function makeHorizonNights({ catalog, site, horizon, horizonFileLoaded, m
           night: NightName.make(nightOf(night.duskAt, naming)),
           zone: naming.zone,
           times: { duskAt: night.duskAt, darkAt: night.darkAt ?? null, darkEndsAt: night.darkEndsAt ?? null, dawnAt: night.dawnAt },
-          horizon: { fileLoaded: horizonFileLoaded, altitudesDegrees: horizon.altitudesDegrees, sources: horizon.sources, upLineDegrees: settings.upLineDegrees },
+          horizon: { fileLoaded: horizonFileLoaded, altitudesDegrees: horizon.altitudesDegrees, sources: horizon.sources, sweepNights: sweepNightsOf(horizon), upLineDegrees: settings.upLineDegrees },
           path,
           clear,
           facts,

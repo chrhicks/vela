@@ -1,5 +1,6 @@
 import { Effect, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { NightName, SweepId } from '../../state/entries.ts'
 import { HorizonNight } from '../../state/horizon-night.ts'
 import { nightTimes } from '../sky/darkness.ts'
 import { noHorizon, type Horizon } from '../horizon/horizon.ts'
@@ -62,6 +63,18 @@ describe('the night of a catalog target', () => {
     expect(answer.horizon.altitudesDegrees.every(altitude => altitude === 10)).toBe(true)
     expect(answer.horizon.sources.every(source => source === 'sweep')).toBe(true)
     expect(answer.path.lines.every(line => line === 10)).toBe(true)
+  })
+
+  it('names the nights of the sweeps the bins came from, once each, oldest first', () => {
+    const origin = (sweep: string, night: string) => ({ sweep: SweepId.make(sweep), night: NightName.make(night) })
+    const built: Horizon = {
+      ...mapped,
+      origins: mapped.origins.map((_, bin) => (bin < 100 ? origin('sweep-b', '2026-11-20') : bin < 200 ? origin('sweep-a', '2026-11-18') : bin < 300 ? origin('sweep-c', '2026-11-20') : null)),
+    }
+
+    expect((answered('orion', afternoon, phoenix, built) as HorizonNight).horizon.sweepNights).toEqual(['2026-11-18', '2026-11-20'])
+    expect((answered('orion', afternoon, phoenix, mapped) as HorizonNight).horizon.sweepNights).toEqual([])
+    expect((answered('orion', afternoon) as HorizonNight).horizon.sweepNights).toEqual([])
   })
 
   it('answers in a shape that decodes, whole, from its JSON', () => {
