@@ -48,11 +48,17 @@ export function targetOf(found: CatalogTarget, at: number): Target {
   }
 }
 
-export function meridianLimitAt(picture: Pick<Picture, 'property'>, mount: string, raHours: number, at: number) {
-  const site = siteOf(picture, mount)
+export function meridianLimitDegreesOf(picture: Pick<Picture, 'property'>, mount: string) {
   const limit = picture.property(mount, 'MERIDIAN_LIMIT')?.values['LIMIT']
 
-  if (site === undefined || typeof limit !== 'number') return undefined
+  return typeof limit === 'number' ? limit : undefined
+}
+
+export function meridianLimitAt(picture: Pick<Picture, 'property'>, mount: string, raHours: number, at: number) {
+  const site = siteOf(picture, mount)
+  const limit = meridianLimitDegreesOf(picture, mount)
+
+  if (site === undefined || limit === undefined) return undefined
 
   return at + secondsToMeridianLimit({ raHours, longitudeDegrees: site.longitudeDegrees, limitDegrees: limit, at }) * 1000
 }

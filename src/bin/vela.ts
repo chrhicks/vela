@@ -22,7 +22,7 @@ import { makeSsh } from '../frames/ssh.ts'
 import { makeFrameStats, saveStats, solveFrame } from '../frames/stats.ts'
 import { makeStacks, type StackCount } from '../stack/stacks.ts'
 import { makePointing } from '../pointing/pointing.ts'
-import { siteOf } from '../pointing/target.ts'
+import { meridianLimitDegreesOf, siteOf } from '../pointing/target.ts'
 import { makePrepare } from '../prepare/prepare.ts'
 import { makeFocusDrift } from '../rig/focus.ts'
 import { makeAutofocus } from '../focus/autofocus.ts'
@@ -62,8 +62,11 @@ import { appendFile, mkdir } from 'node:fs/promises'
 import { Centring, mountControls, MountGuiding, MountRuns, MountSettings } from '../controls/mount.ts'
 import { catalogOf, readCatalog } from '../catalog/catalog.ts'
 import { CatalogSettings } from '../catalog/database.ts'
+import { makeHorizonNights } from '../catalog/horizon-night.ts'
 import { makePlacedTargets } from '../catalog/placed.ts'
 import { loadHorizon } from '../horizon/file.ts'
+import { noHorizon } from '../horizon/horizon.ts'
+import { HorizonNights } from '../feed/horizon-night.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName, RehearsalId, StartId, SweepId } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -150,6 +153,15 @@ const placedTargets = makePlacedTargets({
   lastCoolerFor: id => coolerFor(remembered, id),
   horizon,
   settings: settings.pointing,
+})
+const horizonNights = makeHorizonNights({
+  catalog,
+  site: () => siteOf(picture, settings.devices.mount),
+  horizon,
+  horizonFileLoaded: horizon !== noHorizon,
+  meridianLimitDegrees: () => meridianLimitDegreesOf(picture, settings.devices.mount),
+  naming,
+  settings: { ...settings.horizonNight, upLineDegrees: settings.pointing.upLineDegrees },
 })
 const pointing = makePointing({ picture, catalog, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
 const capture = makeCapture({
@@ -527,6 +539,7 @@ const feedApp = FeedServer.pipe(
           return site === undefined ? null : skyTonight(site, at)
         }),
       }),
+      Layer.succeed(HorizonNights, { night: (id, at) => horizonNights.night(id, at) }),
       Layer.succeed(Targets, {
         search: text => Effect.map(Clock.currentTimeMillis, at => placedTargets.search(text, at)),
         bestPlaced: asked => Effect.map(Clock.currentTimeMillis, at => placedTargets.bestPlaced(at, asked)),

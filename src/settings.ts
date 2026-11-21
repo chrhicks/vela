@@ -167,6 +167,11 @@ export const PointingSettings = Schema.Struct({
   ),
 })
 
+export const HorizonNightSettings = Schema.Struct({
+  stepSeconds: described("The time between the points, in seconds, of a target's path from dusk to dawn on the horizon page", Schema.Number.check(Schema.isGreaterThan(0)), 60),
+  decimals: described("How many decimal places, in degrees, the horizon page's path altitudes, azimuths and line altitudes are rounded to", Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), 2),
+})
+
 export const StarSettings = Schema.Struct({
   program: Schema.String.annotate({ description: 'The ASTAP command-line program (astap_cli) on this machine, which counts and sizes the stars of each kept imaging frame' }),
   catalog: Schema.optionalKey(Schema.String.annotate({ description: "The folder of ASTAP's star database on this machine. With it, each kept imaging frame is also plate solved to find where it points" })),
@@ -334,6 +339,7 @@ export const VelaSettings = Schema.Struct({
   review: described('Asking models whether each light frame is obstructed. Report only: it never acts on the rig', ReviewSettings, {}),
   rememberedFile: described('The file Vela keeps what it remembers in: the last light run, the camera angle, the centres that centring reached and the cooler each target was last started with', Schema.String, '/mnt/storage/vela/remembered.json'),
   horizonFile: described('The file the horizon is read from: the lowest altitude above which the sky is open, in each 1 degree of azimuth (version 2). Without the file, every direction is unknown', Schema.String, '/mnt/storage/vela/horizon.json'),
+  horizonNight: described("A target's night on the horizon page: the path's points and their rounding", HorizonNightSettings, {}),
   sweep: described('The horizon sweep: the columns, steps and limits of its path', SweepSettings, {}),
   start: described('Starting a target from the picker: home, stop guiding, slew and centre, autofocus, guiding, then the run', StartRoutineSettings, {}),
   streamViewer: Schema.optionalKey(

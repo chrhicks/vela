@@ -1,12 +1,11 @@
 import { Schema } from 'effect'
+import { HorizonSource } from '../../state/horizon-source.ts'
 
 const binsAround = 360
 
 const Bins = <S extends Schema.Top>(item: S) => Schema.Array(item).check(Schema.isBetweenLength(binsAround, binsAround))
 
 const IsoTime = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/))
-
-export const HorizonSource = Schema.Literals(['sweep', 'frames', 'old-profile'])
 
 export const Horizon = Schema.Struct({
   version: Schema.Literal(2),
