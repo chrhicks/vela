@@ -18,6 +18,7 @@ import { FrameCropRoute, FrameShapeRoute } from './crops.ts'
 import { DetailSurveyRoute, DetailSurveyTiles, SurveyRoute, SurveyTiles } from './survey.ts'
 import { ForecastRoute } from './forecast.ts'
 import { HorizonNightRoute, HorizonPathsRoute } from './horizon-night.ts'
+import { HorizonSweepRoute } from './horizon-sweep.ts'
 import { BestPlacedRoute, CatalogRoute, TargetRoute, TargetsRoute } from './targets.ts'
 
 export class Tonight extends Context.Service<Tonight, { readonly nightOf: (at: number) => NightName }>()('vela/Tonight') {}
@@ -56,7 +57,7 @@ export const FeedRoute = HttpRouter.add(
 
 export const WebApp = Layer.unwrap(Effect.map(FeedSettings, ({ webRoot }) => HttpStaticServer.layer({ root: webRoot, spa: true, cacheControl: 'no-cache' })))
 
-export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, CommandsRoute, RememberedRoute, SkyRoute, PreviewRoute, StackPictureRoute, StackShapeRoute, StackCropRoute, BestPlacedRoute, HorizonNightRoute, HorizonPathsRoute, ForecastRoute, TargetRoute, TargetsRoute, CatalogRoute, SurveyRoute, SurveyTiles, DetailSurveyRoute, DetailSurveyTiles, FrameShapeRoute, FrameCropRoute, WebApp), { disableLogger: true }).pipe(
+export const FeedServer = HttpRouter.serve(Layer.mergeAll(FeedRoute, CommandsRoute, RememberedRoute, SkyRoute, PreviewRoute, StackPictureRoute, StackShapeRoute, StackCropRoute, BestPlacedRoute, HorizonNightRoute, HorizonPathsRoute, HorizonSweepRoute, ForecastRoute, TargetRoute, TargetsRoute, CatalogRoute, SurveyRoute, SurveyTiles, DetailSurveyRoute, DetailSurveyTiles, FrameShapeRoute, FrameCropRoute, WebApp), { disableLogger: true }).pipe(
   Layer.provideMerge(
     Layer.unwrap(
       Effect.map(FeedSettings, ({ host, port }) => NodeHttpServer.layer(createServer, { port, host })),

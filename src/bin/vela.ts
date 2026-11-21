@@ -68,6 +68,8 @@ import { positionTarget } from '../catalog/position.ts'
 import { loadHorizon } from '../horizon/file.ts'
 import { noHorizon } from '../horizon/horizon.ts'
 import { HorizonNights } from '../feed/horizon-night.ts'
+import { HorizonSweepKept } from '../feed/horizon-sweep.ts'
+import { readHorizonSweep } from '../sweep/horizon-map.ts'
 import { ForecastNights } from '../feed/forecast.ts'
 import { makeForecasts } from '../forecast/forecasts.ts'
 import { makeForecastNights } from '../forecast/night.ts'
@@ -149,6 +151,10 @@ const surveyKept = await surveyOf(settings.sky, 'no sky survey, the picker shows
 const detailSurveyKept = await surveyOf(settings.skyDetail, 'no detail survey, the picker has no full-size view. Run src/bin/sky-setup.ts with detail')
 
 const horizon = await runHandledPromise(loadHorizon(settings.horizonFile))
+const horizonSweepReadAt = Date.now()
+const horizonSweep = await runHandledPromise(readHorizonSweep(settings.sweep.recordDir, horizon))
+
+console.error(`vela: the horizon sweep's records were read in ${Date.now() - horizonSweepReadAt} ms: ${horizonSweep.status === 'available' ? `${horizonSweep.frames.length} frames from ${horizonSweep.nights.join(', ')}` : `unavailable, ${horizonSweep.reason}`}, ${Buffer.byteLength(JSON.stringify(horizonSweep))} bytes`)
 
 let remembered = nothingRemembered
 
@@ -573,6 +579,7 @@ const feedApp = FeedServer.pipe(
         }),
       }),
       Layer.succeed(HorizonNights, { night: (id, at) => horizonNights.night(id, at), paths: (ids, at) => horizonNights.paths(ids, at) }),
+      Layer.succeed(HorizonSweepKept, { answer: horizonSweep }),
       Layer.succeed(ForecastNights, { night: at => forecastNights.night(at) }),
       Layer.succeed(Targets, {
         search: text => Effect.map(Clock.currentTimeMillis, at => placedTargets.search(text, at)),
