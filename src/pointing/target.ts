@@ -20,6 +20,8 @@ export interface Site {
   elevationMeters: number
 }
 
+export const siteAt = (latitude: number, longitude: number, elevation: number | undefined): Site => ({ latitudeDegrees: latitude, longitudeDegrees: longitude > 180 ? longitude - 360 : longitude, elevationMeters: elevation ?? 0 })
+
 export function siteOf(picture: Pick<Picture, 'property'>, mount: string): Site | undefined {
   const values = picture.property(mount, 'GEOGRAPHIC_COORD')?.values
   const latitude = values?.['LAT']
@@ -28,7 +30,7 @@ export function siteOf(picture: Pick<Picture, 'property'>, mount: string): Site 
 
   if (typeof latitude !== 'number' || typeof longitude !== 'number') return undefined
 
-  return { latitudeDegrees: latitude, longitudeDegrees: longitude > 180 ? longitude - 360 : longitude, elevationMeters: typeof elevation === 'number' ? elevation : 0 }
+  return siteAt(latitude, longitude, typeof elevation === 'number' ? elevation : undefined)
 }
 
 export function targetOf(found: CatalogTarget, at: number): Target {

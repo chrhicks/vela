@@ -52,7 +52,7 @@ Clicking the latest frame or the stack on the run page opens it for judging the 
 
 ## /review
 
-Tonight's frames as the models judged them, newest first (`routes/review/`, on real data from `state/review.ts`). A strip across the top marks every frame per model, oldest first: a tall amber mark for obstructed, a short one for clear, an outline for a failed answer; hovering gives the time, the verdict, the confidence and the hazard, and a mark links to its frame below. Each frame shows its preview and, for each model, the verdict (obstructed or clear) and confidence first, then the hazard and the one sentence, with the time it took and its tokens, or the typed reason it failed. The capturing page shows the newest frame's verdicts under the stats (`LatestReview`) with a link here. Report only; nothing here acts on the rig.
+Tonight's frames as the models judged them, newest first (`routes/review/`, on real data from `state/review.ts`). A strip across the top marks every frame per model, oldest first: a tall amber mark for obstructed, a short one for clear, an outline for a failed answer; hovering gives the time, the verdict, the confidence and the hazard, and a mark links to its frame below. Each frame shows its preview and, for each model, the verdict (obstructed or clear) and confidence first, then the hazard, a "Mapped line: Behind the trees" row when the model said obstructed and some of the frame sat below the mapped horizon line (an answer with no line stays the open question), and the one sentence, with the time it took and its tokens, or the typed reason it failed. The capturing page shows the newest frame's verdicts under the stats (`LatestReview`) with a link here. Report only; nothing here acts on the rig.
 
 ## /controls
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { latestReview, noReviews, reviews, tonightsReviews, type Reviews } from './review.ts'
+import { Schema } from 'effect'
+import { ReviewAnswered } from './entries.ts'
+import { behindTheTrees, latestReview, noReviews, reviews, tonightsReviews, type Reviews } from './review.ts'
 import { clear, failed, fold, obstructed, reviewAnswered, reviewAsked, velaStarted } from './testing.ts'
 
 const reduce = (entries: Parameters<typeof fold>[2]) => fold<Reviews>(reviews, noReviews, entries)
@@ -77,5 +79,44 @@ describe('reviews', () => {
 
     expect(state[0]?.replies.filter(reply => reply.model === 'claude-haiku-5-5')).toHaveLength(1)
     expect(state[0]?.replies.find(reply => reply.model === 'claude-haiku-5-5')?.outcome._tag).toBe('Answered')
+  })
+})
+
+const withLine = (lowestDegrees: number) => ({ centreDegrees: 3, lowestDegrees, heightDegrees: 2.2, source: 'solve' })
+
+describe('the frame against the mapped line', () => {
+  const replyOf = (outcome: unknown, line?: unknown) => {
+    const answered = reviewAnswered('rv1', 1010, 'a.fits', 'claude-opus-5-5', outcome)
+
+    return reduce([reviewAsked('rv1', 1000, 'a.fits'), { ...answered, body: { ...(answered.body as object), ...(line === undefined ? {} : { line }) } }])[0]?.replies[0]
+  }
+
+  it('keeps the line a model\'s answer was recorded with', () => {
+    expect(replyOf(obstructed, withLine(-0.4))?.line).toEqual(withLine(-0.4))
+  })
+
+  it('is behind the trees when a model says obstructed and some of the frame is below the line', () => {
+    expect(behindTheTrees(replyOf(obstructed, withLine(-0.4))!)).toBe(true)
+    expect(behindTheTrees(replyOf(obstructed, withLine(0.4))!)).toBe(false)
+    expect(behindTheTrees(replyOf(clear, withLine(-5))!)).toBe(false)
+    expect(behindTheTrees(replyOf(failed, withLine(-5))!)).toBe(false)
+  })
+
+  it('leaves an answer with no line, as the old ones were, an open question', () => {
+    expect(replyOf(obstructed)?.line).toBeUndefined()
+    expect(behindTheTrees(replyOf(obstructed)!)).toBe(false)
+  })
+
+  it('still reads an answer line recorded before the line existed', () => {
+    const old = JSON.parse(
+      '{"kind":"vela.review.answer","at":1763443000000,"review":"rv1","night":"2026-11-18","file":"M-31_light_0009.fits","model":"claude-opus-5-5","seconds":12.5,"outcome":{"_tag":"Answered","answer":{"obstructed":true,"confidence":0.8,"hazard":"trees","what":"Dark shapes."}},"usage":{"inputTokens":1800,"outputTokens":90}}',
+    ) as { kind: string; at: number }
+    const { kind, at, ...body } = old
+
+    expect(Schema.is(ReviewAnswered.fields.body)(body)).toBe(true)
+    expect(Schema.is(ReviewAnswered.fields.body)({ ...body, line: withLine(-1) })).toBe(true)
+    expect(Schema.is(ReviewAnswered.fields.body)({ ...body, line: { centreDegrees: 3 } })).toBe(false)
+    expect(kind).toBe('vela.review.answer')
+    expect(at).toBe(1763443000000)
   })
 })

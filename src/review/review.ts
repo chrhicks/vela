@@ -1,9 +1,11 @@
 import { Data, Effect, Result, Schema } from 'effect'
 import { FrameKept, RunEnded, RunStarted } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
-import type { ReviewFailureKind, ReviewOutcome, ReviewUsage } from '../../state/review-answer.ts'
+import type { ReviewFailureKind, ReviewLine, ReviewOutcome, ReviewUsage } from '../../state/review-answer.ts'
 import { runHandledPromise } from '../edge.ts'
+import type { Horizon } from '../horizon/horizon.ts'
 import { pictureFor, type Rgb } from './image.ts'
+import { lineOf, type FrameView } from './line.ts'
 import type { ReviewRequest } from './request.ts'
 import { ReviewFailed, type Reply, type Reviewer } from './reviewer.ts'
 import type { ReviewSettings } from './settings.ts'
@@ -20,6 +22,8 @@ export interface ReviewPorts {
   readonly settings: ReviewSettings
   readonly reviewer: Reviewer['Service']
   readonly picture: (night: string, file: string) => Effect.Effect<Shot, PictureUnavailable>
+  readonly placed: (night: string, file: string) => Effect.Effect<FrameView | undefined>
+  readonly horizon: Horizon
   readonly publish: (kind: 'asked' | 'answer', id: string, body: Readonly<Record<string, unknown>>) => void
   readonly keep: (line: string) => Effect.Effect<void, NotKept>
   readonly report: (line: string) => void
@@ -74,7 +78,7 @@ export function makeReview(ports: ReviewPorts) {
       ),
     )
 
-  const askModel = (review: string, night: string, file: string, model: string, request: Effect.Effect<ReviewRequest, PictureUnavailable>) =>
+  const askModel = (review: string, night: string, file: string, model: string, line: ReviewLine | undefined, request: Effect.Effect<ReviewRequest, PictureUnavailable>) =>
     Effect.gen(function* () {
       const started = ports.now()
       const result = yield* request.pipe(
@@ -89,7 +93,7 @@ export function makeReview(ports: ReviewPorts) {
         ports.report(`frame review: ${model}: ${outcome.failure.kind}: ${outcome.failure.message}`)
       }
 
-      yield* record('answer', `${review}:${model}`, { review, night, file, model, seconds: tenths((ports.now() - started) / 1000), outcome, ...(usage === undefined ? {} : { usage }) })
+      yield* record('answer', `${review}:${model}`, { review, night, file, model, seconds: tenths((ports.now() - started) / 1000), outcome, ...(usage === undefined ? {} : { usage }), ...(line === undefined ? {} : { line }) })
     })
 
   const ask = (night: string, file: string, run: Running) =>
@@ -98,12 +102,17 @@ export function makeReview(ports: ReviewPorts) {
 
       yield* record('asked', review, { review, run: run.id, night, file, models: settings.models })
 
+      const line = yield* ports.placed(night, file).pipe(Effect.map(view => (view === undefined ? undefined : lineOf(view, ports.horizon))))
       const request = ports.picture(night, file).pipe(
-        Effect.map(shot => ({ picture: pictureFor(shot, settings.imageLongSide, settings.imageMaxBytes), exposureSeconds: tenths(shot.exposureSeconds ?? run.exposureSeconds) })),
+        Effect.map(shot => ({
+          picture: pictureFor(shot, settings.imageLongSide, settings.imageMaxBytes),
+          exposureSeconds: tenths(shot.exposureSeconds ?? run.exposureSeconds),
+          ...(line === undefined ? {} : { line }),
+        })),
       )
       const built = yield* Effect.cached(request)
 
-      yield* Effect.forEach(settings.models, model => askModel(review, night, file, model, built), { concurrency: 'unbounded', discard: true })
+      yield* Effect.forEach(settings.models, model => askModel(review, night, file, model, line, built), { concurrency: 'unbounded', discard: true })
     })
 
   function observe(entry: Entry) {

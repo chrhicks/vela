@@ -1,12 +1,13 @@
 import { Schema } from 'effect'
 import { FrameFile, NightName, RunId, restartDetail, type RigEntry } from './entries.ts'
-import { ReviewId, ReviewOutcome, ReviewUsage } from './review-answer.ts'
+import { ReviewId, ReviewLine, ReviewOutcome, ReviewUsage } from './review-answer.ts'
 
 export const ReviewReply = Schema.Struct({
   model: Schema.NonEmptyString,
   seconds: Schema.Number,
   outcome: ReviewOutcome,
   usage: Schema.optional(ReviewUsage),
+  line: Schema.optional(ReviewLine),
 })
 
 export type ReviewReply = typeof ReviewReply.Type
@@ -39,9 +40,9 @@ export function reviews(state: Reviews, entry: RigEntry): Reviews {
       return [...state.filter(known => known.night === night), { id: review, at: entry.at, run, night, file, models, replies: [] }]
     }
     case 'vela.review.answer': {
-      const { review, model, seconds, outcome, usage } = entry.body
+      const { review, model, seconds, outcome, usage, line } = entry.body
 
-      return state.map(known => (known.id === review ? { ...known, replies: [...known.replies.filter(reply => reply.model !== model), { model, seconds, outcome, usage }] } : known))
+      return state.map(known => (known.id === review ? { ...known, replies: [...known.replies.filter(reply => reply.model !== model), { model, seconds, outcome, usage, line }] } : known))
     }
     case 'vela.started':
       return state.map(known => ({
@@ -50,7 +51,7 @@ export function reviews(state: Reviews, entry: RigEntry): Reviews {
           ...known.replies,
           ...known.models
             .filter(model => !known.replies.some(reply => reply.model === model))
-            .map((model): ReviewReply => ({ model, seconds: (entry.at - known.at) / 1000, outcome: { _tag: 'Failed', failure: { kind: 'restarted', message: restartDetail } }, usage: undefined })),
+            .map((model): ReviewReply => ({ model, seconds: (entry.at - known.at) / 1000, outcome: { _tag: 'Failed', failure: { kind: 'restarted', message: restartDetail } }, usage: undefined, line: undefined })),
         ],
       }))
     default:
@@ -61,3 +62,5 @@ export function reviews(state: Reviews, entry: RigEntry): Reviews {
 export const latestReview = (state: Reviews): Review | undefined => state.at(-1)
 
 export const tonightsReviews = (state: Reviews, night: NightName): Reviews => state.filter(review => review.night === night).reverse()
+
+export const behindTheTrees = (reply: ReviewReply): boolean => reply.outcome._tag === 'Answered' && reply.outcome.answer.obstructed && reply.line !== undefined && reply.line.lowestDegrees < 0
