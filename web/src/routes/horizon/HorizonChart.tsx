@@ -37,7 +37,7 @@ const moonLabelGap = 16
 const moonLabelWidth = 250
 const frameLabelGap = 16
 const frameLabelWidth = 520
-const cloudLabelDrop = 24
+const cloudLabelDrop = 40
 
 const xOf = (azimuthDegrees: number) => left + (azimuthDegrees / 360) * (right - left)
 
