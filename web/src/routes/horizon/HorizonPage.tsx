@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 
 import type { HorizonNight, HorizonRefusal } from '../../../../state/horizon-night.ts'
-import { clockIn, lastNightsWords, nightFacts } from '../../../../state/horizon-view.ts'
+import { clampedTo, clockIn, lastNightsWords, nightFacts, nightSpan, startingTime } from '../../../../state/horizon-view.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
@@ -14,6 +15,7 @@ import { useLink } from '../../rig/store.ts'
 import { useAsked } from '../../rig/use-asked.ts'
 import { HorizonChart } from './HorizonChart.tsx'
 import { HorizonFacts } from './HorizonFacts.tsx'
+import { HorizonSlider } from './HorizonSlider.tsx'
 import styles from './HorizonPage.module.css'
 
 const tickMilliseconds = 30_000
@@ -38,6 +40,32 @@ const refusalWords = (refusal: HorizonRefusal): string => {
 const darkWords = (night: HorizonNight, clock: (at: number) => string) =>
   night.times.darkAt === null || night.times.darkEndsAt === null ? 'No full dark' : `Dark ${clock(night.times.darkAt)} to ${clock(night.times.darkEndsAt)}`
 
+function NightBody({ night, now }: { readonly night: HorizonNight; readonly now: number | undefined }) {
+  const [chosen, setChosen] = useState(() => startingTime(night, now))
+  const selected = clampedTo(nightSpan(night), chosen)
+  const clock = clockIn(night.zone)
+  const sweeps = lastNightsWords(night.horizon.sweepNights)
+
+  return (
+    <Page width="wide">
+      <PageHeader title={night.target.name} facts={[...(night.target.commonName === null ? [] : [night.target.commonName]), `Night of ${night.night.slice('0000-'.length)}`, darkWords(night, clock), ...(sweeps === undefined ? [] : [sweeps])]}>
+        <ActionLink to={pickerAddress}>Other target</ActionLink>
+        <PillLink to={`/?target=${encodeURIComponent(night.target.id)}`}>Start</PillLink>
+      </PageHeader>
+
+      <div className={styles.night}>
+        <HorizonFacts cells={nightFacts(night, clock)} />
+
+        {night.facts.clear === null ? <Statement size="instruction">{`${night.target.name} never clears the horizon in the dark tonight`}</Statement> : null}
+
+        <HorizonChart night={night} now={now} selected={selected} />
+
+        <HorizonSlider night={night} now={now} selected={selected} onSelect={setChosen} />
+      </div>
+    </Page>
+  )
+}
+
 function NightView({ target }: { readonly target: string }) {
   const tick = useLocalNow(tickMilliseconds)
   const now = serviceNow(useLink(), tick)
@@ -57,26 +85,7 @@ function NightView({ target }: { readonly target: string }) {
     )
   }
 
-  const night = reading.night
-  const clock = clockIn(night.zone)
-  const sweeps = lastNightsWords(night.horizon.sweepNights)
-
-  return (
-    <Page width="wide">
-      <PageHeader title={night.target.name} facts={[...(night.target.commonName === null ? [] : [night.target.commonName]), `Night of ${night.night.slice('0000-'.length)}`, darkWords(night, clock), ...(sweeps === undefined ? [] : [sweeps])]}>
-        <ActionLink to={pickerAddress}>Other target</ActionLink>
-        <PillLink to={`/?target=${encodeURIComponent(night.target.id)}`}>Start</PillLink>
-      </PageHeader>
-
-      <div className={styles.night}>
-        <HorizonFacts cells={nightFacts(night, clock)} />
-
-        {night.facts.clear === null ? <Statement size="instruction">{`${night.target.name} never clears the horizon in the dark tonight`}</Statement> : null}
-
-        <HorizonChart night={night} now={now} />
-      </div>
-    </Page>
-  )
+  return <NightBody night={reading.night} now={now} />
 }
 
 export function HorizonPage() {

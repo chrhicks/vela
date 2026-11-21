@@ -21,6 +21,22 @@ export interface HourTick {
   readonly point: SkyPoint
 }
 
+export interface TimeRun {
+  readonly from: number
+  readonly until: number
+}
+
+export interface Readout {
+  readonly altitude: string
+  readonly clear: boolean
+  readonly verdict: string
+}
+
+export interface TrackHour {
+  readonly at: number
+  readonly label: string
+}
+
 export interface FactCell {
   readonly label: string
   readonly value: string
@@ -34,6 +50,7 @@ interface Sample extends SkyPoint {
 const secondMs = 1000
 const hourSeconds = 3600
 const minuteSeconds = 60
+const minuteMs = minuteSeconds * secondMs
 const halfTurn = 180
 const fullTurn = 360
 const quarterTurn = 90
@@ -116,21 +133,27 @@ export const clockIn = (zone: string) => {
   return (at: number) => format.format(at)
 }
 
-export function hourTicks(path: TargetPath, zone: string): ReadonlyArray<HourTick> {
-  const { minute, second } = zonedParts(zone, path.startAt)
+const wholeHours = (from: number, until: number, zone: string): ReadonlyArray<TrackHour> => {
+  const { minute, second } = zonedParts(zone, from)
   const wait = (hourSeconds - ((minute * minuteSeconds + second) % hourSeconds)) % hourSeconds
-  const end = nightEnd(path)
-  const label = (at: number) => String(zonedParts(zone, at).hour).padStart(2, '0')
-  const ticks: Array<HourTick> = []
+  const hours: Array<TrackHour> = []
 
-  for (let at = path.startAt + wait * secondMs; at <= end; at += hourSeconds * secondMs) {
-    const point = skyPointAt(path, at)
-
-    if (point !== undefined && point.altitudeDegrees >= 0) ticks.push({ at, label: label(at), point })
+  for (let at = from + wait * secondMs; at <= until; at += hourSeconds * secondMs) {
+    hours.push({ at, label: String(zonedParts(zone, at).hour).padStart(2, '0') })
   }
 
-  return ticks
+  return hours
 }
+
+export function hourTicks(path: TargetPath, zone: string): ReadonlyArray<HourTick> {
+  return wholeHours(path.startAt, nightEnd(path), zone).flatMap(hour => {
+    const point = skyPointAt(path, hour.at)
+
+    return point !== undefined && point.altitudeDegrees >= 0 ? [{ ...hour, point }] : []
+  })
+}
+
+export const trackHours = (span: TimeRun, zone: string): ReadonlyArray<TrackHour> => wholeHours(span.from, span.until, zone)
 
 export function nowPoint(path: TargetPath, now: number | undefined): SkyPoint | undefined {
   if (now === undefined) return undefined
@@ -238,4 +261,101 @@ export function nightFacts(night: HorizonNight, clock: (at: number) => string): 
       : { label: 'Flip', value: clock(flip.at), note: flip.basis === 'meridian' ? 'Predicted at the meridian' : `Predicted from the mount's ${flip.limitDegrees === null ? '' : `${flip.limitDegrees}° `}limit` }
 
   return [clears, ...clearFor, { label: 'Highest', value: `${Math.round(highest.altitudeDegrees)}° at ${clock(highest.at)}`, note: null }, flipCell, ...ends]
+}
+
+export const nightSpan = (night: HorizonNight): TimeRun => ({ from: night.times.duskAt, until: night.times.dawnAt })
+
+export const inSpan = (span: TimeRun, at: number): boolean => at >= span.from && at <= span.until
+
+export const clampedTo = (span: TimeRun, at: number): number => Math.min(Math.max(at, span.from), span.until)
+
+export const fractionOf = (span: TimeRun, at: number): number => (span.until === span.from ? 0 : (clampedTo(span, at) - span.from) / (span.until - span.from))
+
+export const timeAtFraction = (span: TimeRun, fraction: number): number => span.from + Math.min(Math.max(fraction, 0), 1) * (span.until - span.from)
+
+export const steppedBy = (span: TimeRun, at: number, minutes: number): number => clampedTo(span, at + minutes * minuteMs)
+
+const clippedTo = (span: TimeRun, runs: ReadonlyArray<TimeRun>): ReadonlyArray<TimeRun> =>
+  runs.flatMap(run => (run.until < span.from || run.from > span.until ? [] : [{ from: Math.max(run.from, span.from), until: Math.min(run.until, span.until) }]))
+
+export function laneRuns(night: HorizonNight): { readonly dark: ReadonlyArray<TimeRun>; readonly clear: ReadonlyArray<TimeRun> } {
+  const span = nightSpan(night)
+  const { darkAt, darkEndsAt } = night.times
+
+  return {
+    dark: darkAt === null || darkEndsAt === null ? [] : clippedTo(span, [{ from: darkAt, until: darkEndsAt }]),
+    clear: clippedTo(span, night.clear.map(spell => ({ from: spell.from, until: spell.until }))),
+  }
+}
+
+export function startingTime(night: HorizonNight, now: number | undefined): number {
+  const span = nightSpan(night)
+
+  if (now !== undefined && inSpan(span, now)) return now
+
+  const first = night.clear[0]
+
+  if (first !== undefined) return clampedTo(span, first.from)
+
+  return clampedTo(span, night.times.darkAt ?? span.from)
+}
+
+export function backTo(night: HorizonNight, now: number | undefined): { readonly at: number; readonly toNow: boolean } {
+  const span = nightSpan(night)
+
+  if (now !== undefined && inSpan(span, now)) return { at: now, toNow: true }
+
+  return { at: clampedTo(span, night.times.darkAt ?? span.from), toNow: false }
+}
+
+export const clearAt = (night: HorizonNight, at: number): boolean => night.clear.some(spell => at >= spell.from && at <= spell.until)
+
+const lineAt = (path: TargetPath, at: number): number | undefined => {
+  const position = (at - path.startAt) / (path.stepSeconds * secondMs)
+  const before = path.lines[Math.floor(position)]
+  const after = path.lines[Math.ceil(position)]
+
+  if (before === undefined || after === undefined) return undefined
+
+  return before + (after - before) * (position - Math.floor(position))
+}
+
+const mappedAt = (horizon: HorizonNight['horizon'], azimuthDegrees: number): boolean => {
+  const bin = Math.floor(azimuthDegrees)
+
+  return horizon.altitudesDegrees[bin % fullTurn] !== null && horizon.altitudesDegrees[(bin + 1) % fullTurn] !== null
+}
+
+export function readoutAt(night: HorizonNight, at: number): Readout {
+  const point = skyPointAt(night.path, at)
+
+  if (point === undefined) return { altitude: 'Off the path', clear: false, verdict: 'Not clear' }
+
+  const altitude = point.altitudeDegrees < 0 ? 'Below the horizon' : `${Math.round(point.altitudeDegrees)}° up`
+
+  if (clearAt(night, at)) return { altitude, clear: true, verdict: 'Clear' }
+
+  const { dark } = laneRuns(night)
+  const line = lineAt(night.path, at)
+
+  const why =
+    point.altitudeDegrees < 0
+      ? 'below the horizon'
+      : !dark.some(run => at >= run.from && at <= run.until)
+        ? 'twilight'
+        : line !== undefined && point.altitudeDegrees < line
+          ? mappedAt(night.horizon, point.azimuthDegrees)
+            ? 'behind the trees'
+            : `under the ${night.horizon.upLineDegrees}° line`
+          : undefined
+
+  return { altitude, clear: false, verdict: why === undefined ? 'Not clear' : `Not clear: ${why}` }
+}
+
+export const zoneName = (zone: string, at: number): string => new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortGeneric' }).formatToParts(at).find(part => part.type === 'timeZoneName')?.value ?? zone
+
+export const readoutSentence = (night: HorizonNight, at: number, clock: (at: number) => string): string => {
+  const readout = readoutAt(night, at)
+
+  return `${clock(at)} ${zoneName(night.zone, at)}, ${readout.altitude}, ${readout.verdict.toLowerCase()}`
 }

@@ -1,10 +1,11 @@
 import type { HorizonNight } from '../../../../state/horizon-night.ts'
-import { hourTicks, lineNote, lineRuns, meridianAzimuths, nowPoint, pathPieces, skyPointAt, type SkyPoint } from '../../../../state/horizon-view.ts'
+import { clearAt, hourTicks, lineNote, lineRuns, meridianAzimuths, nowPoint, pathPieces, skyPointAt, type SkyPoint } from '../../../../state/horizon-view.ts'
 import styles from './HorizonChart.module.css'
 
 interface HorizonChartProps {
   readonly night: HorizonNight
   readonly now: number | undefined
+  readonly selected: number
 }
 
 const width = 1344
@@ -20,6 +21,8 @@ const compassStep = 45
 const compassNames = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N']
 const labelMargin = 170
 const nowDotRadius = 5
+const selectedDotRadius = 7
+const selectedRingRadius = 12
 const tickRadius = 3
 const nameLift = 26
 const tickLift = 10
@@ -38,7 +41,7 @@ const filled = (points: ReadonlyArray<SkyPoint>) => {
   return first === undefined || last === undefined ? '' : `${xOf(first.azimuthDegrees).toFixed(1)},${bottom} ${pointsOf(points)} ${xOf(last.azimuthDegrees).toFixed(1)},${bottom}`
 }
 
-export function HorizonChart({ night, now }: HorizonChartProps) {
+export function HorizonChart({ night, now, selected }: HorizonChartProps) {
   const runs = lineRuns(night.horizon)
   const note = lineNote(night.horizon)
   const assumed = runs.filter(run => !run.known)
@@ -49,6 +52,8 @@ export function HorizonChart({ night, now }: HorizonChartProps) {
   const pieces = pathPieces(night.path, night.clear)
   const ticks = hourTicks(night.path, night.zone)
   const here = nowPoint(night.path, now)
+  const chosen = nowPoint(night.path, selected)
+  const chosenClear = clearAt(night, selected)
   const meridians = meridianAzimuths(night)
   const peak = skyPointAt(night.path, night.facts.highest.at)
   const altitudes = Array.from({ length: maxAltitude / altitudeStep }, (_, index) => (index + 1) * altitudeStep)
@@ -115,6 +120,13 @@ export function HorizonChart({ night, now }: HorizonChartProps) {
             >
               NOW
             </text>
+          </g>
+        )}
+
+        {chosen === undefined ? null : (
+          <g aria-hidden="true">
+            <circle className={styles.selectedRing} cx={xOf(chosen.azimuthDegrees)} cy={yOf(chosen.altitudeDegrees)} r={selectedRingRadius} />
+            <circle className={chosenClear ? styles.selectedClear : styles.selectedOther} cx={xOf(chosen.azimuthDegrees)} cy={yOf(chosen.altitudeDegrees)} r={selectedDotRadius} />
           </g>
         )}
       </svg>

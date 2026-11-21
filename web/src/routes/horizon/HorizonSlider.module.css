@@ -1,0 +1,202 @@
+.slider {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+
+.play {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ember);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ember);
+  cursor: pointer;
+}
+
+.play svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: currentColor;
+}
+
+.play:focus-visible,
+.field:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+}
+
+.readout {
+  font-family: var(--font-code);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: var(--track-code);
+}
+
+.words {
+  color: var(--ember-quiet);
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.clear {
+  color: var(--ember);
+}
+
+.hint {
+  color: var(--ember-dim);
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.back {
+  margin-left: auto;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  min-width: 0;
+}
+
+.labels {
+  display: flex;
+  flex-direction: column;
+}
+
+.trackLabel {
+  height: 3rem;
+}
+
+.laneLabel {
+  height: 0.875rem;
+  overflow: hidden;
+  color: var(--ember-quiet);
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+  line-height: 0.875rem;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.field {
+  position: relative;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.track {
+  position: relative;
+  height: 3rem;
+}
+
+.line {
+  position: absolute;
+  top: 2rem;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--ember-dim);
+}
+
+.hour {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+
+.hourLabel {
+  position: absolute;
+  top: 0.5rem;
+  transform: translateX(-50%);
+  color: var(--ember-quiet);
+  font-family: var(--font-code);
+  font-size: var(--size-small);
+}
+
+.hourTick {
+  position: absolute;
+  top: 1.75rem;
+  width: 1px;
+  height: 0.6875rem;
+  background: var(--ember-dim);
+}
+
+.now {
+  position: absolute;
+  top: 2rem;
+}
+
+.nowDot {
+  position: absolute;
+  width: 0.5rem;
+  height: 0.5rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--ember);
+}
+
+.nowLabel {
+  position: absolute;
+  top: 0.5rem;
+  transform: translateX(-50%);
+  color: var(--ember);
+  font-family: var(--font-code);
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.lane {
+  position: relative;
+  height: 0.875rem;
+}
+
+.bar {
+  position: absolute;
+  top: 0.3125rem;
+  height: 0.25rem;
+  background: var(--ember);
+}
+
+.darkBar {
+  opacity: 0.45;
+}
+
+.clearBar {
+  opacity: 0.9;
+}
+
+.cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--ember);
+  pointer-events: none;
+}
+
+.thumb {
+  position: absolute;
+  top: 2rem;
+  width: 1rem;
+  height: 1rem;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--ember);
+}
