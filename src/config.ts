@@ -1,9 +1,7 @@
 import { readFileSync } from 'node:fs'
-import { Effect, Schema } from 'effect'
+import { Schema } from 'effect'
 
-export function described<S extends Schema.Top>(description: string, schema: S, value: S['Rebuild']['Encoded']) {
-  return Schema.withDecodingDefaultKey<S['Rebuild']>(Effect.succeed(value))(schema.annotate({ description }))
-}
+export { described } from '../state/described.ts'
 
 export function decodeConfig<S extends Schema.ConstraintDecoder<unknown>>(schema: S, json: unknown): S['Type'] {
   return Schema.decodeUnknownSync(schema, { onExcessProperty: 'error' })(json)

@@ -1,6 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import type { HorizonNight } from './horizon-night.ts'
-import { clockIn, hourTicks, lastNightsWords, lineNote, lineRuns, meridianAzimuths, nightFacts, nowPoint, pathPieces, skyPointAt, spanWords } from './horizon-view.ts'
+import { sliderSettings } from './horizon-slider.ts'
+import {
+  backTo,
+  clampedTo,
+  clearAt,
+  clockIn,
+  fractionOf,
+  hourTicks,
+  lastNightsWords,
+  laneRuns,
+  lineNote,
+  lineRuns,
+  meridianAzimuths,
+  nightFacts,
+  nightSpan,
+  nowPoint,
+  pathPieces,
+  readoutAt,
+  readoutSentence,
+  skyPointAt,
+  spanWords,
+  startingTime,
+  steppedBy,
+  timeAtFraction,
+  trackHours,
+  zoneName,
+} from './horizon-view.ts'
 
 const zone = 'America/Phoenix'
 const minuteMs = 60_000
@@ -206,5 +232,150 @@ describe('the facts row', () => {
     expect(lastNightsWords([])).toBeUndefined()
     expect(lastNightsWords(['2026-11-20'])).toBe('Trees from the 11-20 sweep')
     expect(lastNightsWords(['2026-11-18', '2026-11-20'])).toBe('Trees from the 11-18, 11-20 sweeps')
+  })
+})
+
+describe('the time slider', () => {
+  const at = (hour: number, minute: number) => Date.UTC(2026, 10, 15, hour, minute, 0)
+  const times = { duskAt: at(0, 0), darkAt: at(1, 0), darkEndsAt: at(5, 0), dawnAt: at(6, 0) }
+  const stepMinutes = 5
+  const samples = 6 * 60 / stepMinutes + 1
+  const high = Array.from({ length: samples }, () => 50)
+  const spell = (from: number, until: number) => ({ from, until, startedBy: { cause: 'dark' as const }, endedBy: { cause: 'dark' as const } })
+
+  const sliding = (overrides: Partial<HorizonNight> = {}): HorizonNight => ({
+    ...night({ clear: null, highest: { altitudeDegrees: 50, at: at(3, 0) }, transitAt: null, flip: null }),
+    times,
+    path: { startAt: at(0, 0), stepSeconds: stepMinutes * 60, altitudes: high, azimuths: high.map(() => 100.5), lines: high.map(() => 20) },
+    clear: [spell(at(2, 0), at(4, 0))],
+    ...overrides,
+  })
+
+  const span = nightSpan(sliding())
+
+  describe('the span and its arithmetic', () => {
+    it('runs from dusk to dawn', () => {
+      expect(span).toEqual({ from: at(0, 0), until: at(6, 0) })
+    })
+
+    it('holds a time inside the span', () => {
+      expect(clampedTo(span, at(-1, 0))).toBe(at(0, 0))
+      expect(clampedTo(span, at(7, 0))).toBe(at(6, 0))
+      expect(clampedTo(span, at(2, 0))).toBe(at(2, 0))
+    })
+
+    it('turns a time into a fraction of the span and back', () => {
+      expect(fractionOf(span, at(3, 0))).toBe(0.5)
+      expect(fractionOf(span, at(9, 0))).toBe(1)
+      expect(timeAtFraction(span, 0.25)).toBe(at(1, 30))
+      expect(timeAtFraction(span, 2)).toBe(at(6, 0))
+      expect(timeAtFraction(span, -1)).toBe(at(0, 0))
+    })
+
+    it('steps by the minutes asked and stops at either end', () => {
+      expect(steppedBy(span, at(2, 0), sliderSettings.stepMinutes)).toBe(at(2, 10))
+      expect(steppedBy(span, at(2, 0), -sliderSettings.bigStepMinutes)).toBe(at(1, 0))
+      expect(steppedBy(span, at(5, 55), sliderSettings.bigStepMinutes)).toBe(at(6, 0))
+      expect(steppedBy(span, at(0, 5), -sliderSettings.bigStepMinutes)).toBe(at(0, 0))
+    })
+  })
+
+  describe('the lanes', () => {
+    it('are the dark hours and the clear spells, cut to the span', () => {
+      expect(laneRuns(sliding())).toEqual({ dark: [{ from: at(1, 0), until: at(5, 0) }], clear: [{ from: at(2, 0), until: at(4, 0) }] })
+      expect(laneRuns(sliding({ clear: [spell(at(-1, 0), at(1, 30)), spell(at(5, 30), at(8, 0)), spell(at(9, 0), at(10, 0))] })).clear).toEqual([
+        { from: at(0, 0), until: at(1, 30) },
+        { from: at(5, 30), until: at(6, 0) },
+      ])
+    })
+
+    it('have no dark run when the night never gets fully dark', () => {
+      expect(laneRuns(sliding({ times: { ...times, darkAt: null, darkEndsAt: null } })).dark).toEqual([])
+    })
+  })
+
+  describe('where the selected time starts', () => {
+    it('is now when now is inside the night', () => {
+      expect(startingTime(sliding(), at(3, 17))).toBe(at(3, 17))
+      expect(startingTime(sliding(), at(0, 0))).toBe(at(0, 0))
+      expect(startingTime(sliding(), at(6, 0))).toBe(at(6, 0))
+    })
+
+    it('is the start of the first clear spell when now is outside the night or unknown', () => {
+      expect(startingTime(sliding(), at(-2, 0))).toBe(at(2, 0))
+      expect(startingTime(sliding(), at(7, 0))).toBe(at(2, 0))
+      expect(startingTime(sliding(), undefined)).toBe(at(2, 0))
+    })
+
+    it('is the start of darkness when nothing clears, and dusk when it never gets dark', () => {
+      expect(startingTime(sliding({ clear: [] }), at(7, 0))).toBe(at(1, 0))
+      expect(startingTime(sliding({ clear: [], times: { ...times, darkAt: null, darkEndsAt: null } }), undefined)).toBe(at(0, 0))
+    })
+  })
+
+  describe('back to now', () => {
+    it('goes to now while now is inside the night', () => {
+      expect(backTo(sliding(), at(3, 0))).toEqual({ at: at(3, 0), toNow: true })
+    })
+
+    it('goes to the start of darkness otherwise', () => {
+      expect(backTo(sliding(), at(8, 0))).toEqual({ at: at(1, 0), toNow: false })
+      expect(backTo(sliding(), undefined)).toEqual({ at: at(1, 0), toNow: false })
+      expect(backTo(sliding({ times: { ...times, darkAt: null, darkEndsAt: null } }), undefined)).toEqual({ at: at(0, 0), toNow: false })
+    })
+  })
+
+  describe('the readout', () => {
+    it('says clear with the altitude inside a clear spell', () => {
+      expect(readoutAt(sliding(), at(3, 0))).toEqual({ altitude: '50° up', clear: true, verdict: 'Clear' })
+      expect(clearAt(sliding(), at(3, 0))).toBe(true)
+      expect(clearAt(sliding(), at(4, 30))).toBe(false)
+    })
+
+    it('says twilight outside the dark hours', () => {
+      expect(readoutAt(sliding({ clear: [] }), at(0, 30))).toEqual({ altitude: '50° up', clear: false, verdict: 'Not clear: twilight' })
+      expect(readoutAt(sliding({ clear: [], times: { ...times, darkAt: null, darkEndsAt: null } }), at(3, 0)).verdict).toBe('Not clear: twilight')
+    })
+
+    it('says behind the trees in the dark when the target is under the mapped line', () => {
+      const low = sliding({ clear: [], path: { ...sliding().path, altitudes: high.map(() => 12), lines: high.map(() => 20) } })
+
+      expect(readoutAt(low, at(3, 0))).toEqual({ altitude: '12° up', clear: false, verdict: 'Not clear: behind the trees' })
+    })
+
+    it('names the flat line instead of the trees where the horizon has no bins', () => {
+      const unmapped = sliding({ clear: [], horizon: flat(null), path: { ...sliding().path, altitudes: high.map(() => 12) } })
+
+      expect(readoutAt(unmapped, at(3, 0)).verdict).toBe('Not clear: under the 30° line')
+    })
+
+    it('says below the horizon before twilight or trees', () => {
+      const under = sliding({ clear: [], path: { ...sliding().path, altitudes: high.map(() => -5) } })
+
+      expect(readoutAt(under, at(0, 30))).toEqual({ altitude: 'Below the horizon', clear: false, verdict: 'Not clear: below the horizon' })
+    })
+
+    it('gives no reason it cannot back with the line, and nothing off the path', () => {
+      expect(readoutAt(sliding({ clear: [] }), at(3, 0)).verdict).toBe('Not clear')
+      expect(readoutAt(sliding(), at(9, 0)).altitude).toBe('Off the path')
+    })
+
+    it('reads as one sentence in the answer zone for a screen reader', () => {
+      expect(readoutSentence(sliding(), at(3, 0), clockIn(zone))).toBe(`20:00 ${zoneName(zone, at(3, 0))}, 50° up, clear`)
+    })
+  })
+
+  describe('the hour track', () => {
+    it('has a label for each whole hour of the answer zone inside the span', () => {
+      const hours = trackHours({ from: Date.UTC(2026, 10, 15, 0, 30, 0), until: Date.UTC(2026, 10, 15, 3, 10, 0) }, zone)
+
+      expect(hours.map(hour => hour.label)).toEqual(['18', '19', '20'])
+    })
+  })
+
+  describe('the zone', () => {
+    it('is named the way the page names it, in the answer zone', () => {
+      expect(zoneName('America/New_York', Date.UTC(2026, 10, 15, 12, 0, 0))).toBe('ET')
+    })
   })
 })
