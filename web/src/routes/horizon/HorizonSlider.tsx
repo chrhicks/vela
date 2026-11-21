@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 
 import type { HorizonNight } from '../../../../state/horizon-night.ts'
+import type { Layer } from '../../../../state/horizon-layers.ts'
 import { sliderSettings } from '../../../../state/horizon-slider.ts'
 import { backTo, clockIn, fractionOf, inSpan, laneRuns, nightSpan, readoutAt, readoutSentence, steppedBy, timeAtFraction, trackHours, zoneName, type TimeRun } from '../../../../state/horizon-view.ts'
 import { ActionButton } from '../../components/ActionButton.tsx'
@@ -10,6 +11,7 @@ interface HorizonSliderProps {
   readonly night: HorizonNight
   readonly now: number | undefined
   readonly selected: number
+  readonly layers: ReadonlySet<Layer>
   readonly onSelect: (at: number) => void
 }
 
@@ -17,7 +19,7 @@ const percent = (fraction: number) => `${(fraction * 100).toFixed(3)}%`
 
 const barStyle = (span: TimeRun, run: TimeRun) => ({ left: percent(fractionOf(span, run.from)), width: percent(fractionOf(span, run.until) - fractionOf(span, run.from)) })
 
-export function HorizonSlider({ night, now, selected, onSelect }: HorizonSliderProps) {
+export function HorizonSlider({ night, now, selected, layers, onSelect }: HorizonSliderProps) {
   const [playing, setPlaying] = useState(false)
   const field = useRef<HTMLDivElement>(null)
   const latest = useRef(selected)
@@ -29,6 +31,7 @@ export function HorizonSlider({ night, now, selected, onSelect }: HorizonSliderP
   const lanes = laneRuns(night)
   const hours = trackHours(span, night.zone)
   const back = backTo(night, now)
+  const moonLane = layers.has('moon')
   const nowHere = now !== undefined && inSpan(span, now)
   const { stepMinutes, bigStepMinutes, playMinutesPerSecond, playFrameMilliseconds } = sliderSettings
 
@@ -120,6 +123,7 @@ export function HorizonSlider({ night, now, selected, onSelect }: HorizonSliderP
           <span className={styles.trackLabel} />
           <span className={styles.laneLabel}>Dark</span>
           <span className={styles.laneLabel}>{`${night.target.name} clear`}</span>
+          {moonLane ? <span className={styles.laneLabel}>Moon up</span> : null}
         </div>
 
         <div
@@ -171,6 +175,14 @@ export function HorizonSlider({ night, now, selected, onSelect }: HorizonSliderP
               <span key={run.from} className={`${styles.bar} ${styles.clearBar}`} style={barStyle(span, run)} />
             ))}
           </div>
+
+          {moonLane ? (
+            <div className={styles.lane}>
+              {lanes.moon.map(run => (
+                <span key={run.from} className={`${styles.bar} ${styles.moonBar}`} style={barStyle(span, run)} />
+              ))}
+            </div>
+          ) : null}
 
           <span className={styles.cursor} style={{ left: percent(fractionOf(span, selected)) }}>
             <span className={styles.thumb} />

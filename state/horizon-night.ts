@@ -43,6 +43,19 @@ export const TargetPath = Schema.Struct({
 
 export type TargetPath = typeof TargetPath.Type
 
+export const TimeSpan = Schema.Struct({ from: Schema.Number, until: Schema.Number })
+
+export type TimeSpan = typeof TimeSpan.Type
+
+export const MoonNight = Schema.Struct({
+  litFraction: Schema.Number,
+  altitudes: Schema.Array(Schema.Number),
+  azimuths: Schema.Array(Schema.Number),
+  upSpans: Schema.Array(TimeSpan),
+})
+
+export type MoonNight = typeof MoonNight.Type
+
 export const HorizonBins = Schema.Struct({
   fileLoaded: Schema.Boolean,
   altitudesDegrees: Schema.Array(Schema.NullOr(Schema.Number)),
@@ -81,6 +94,7 @@ export const HorizonNight = Schema.Struct({
   times: NightTimesAnswer,
   horizon: HorizonBins,
   path: TargetPath,
+  moon: MoonNight,
   clear: Schema.Array(ClearSpell),
   facts: NightFacts,
 })

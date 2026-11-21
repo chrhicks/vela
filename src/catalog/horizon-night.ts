@@ -6,6 +6,7 @@ import { nightOf, type NightNaming } from '../frames/night.ts'
 import type { Horizon } from '../horizon/horizon.ts'
 import type { Site } from '../pointing/target.ts'
 import { nightTimes } from '../sky/darkness.ts'
+import { moonNight } from '../sky/moon-night.ts'
 import { targetNight } from '../sky/target-night.ts'
 import type { Catalog } from './catalog.ts'
 
@@ -58,6 +59,7 @@ export function makeHorizonNights({ catalog, site, horizon, horizonFileLoaded, m
           times: { duskAt: night.duskAt, darkAt: night.darkAt ?? null, darkEndsAt: night.darkEndsAt ?? null, dawnAt: night.dawnAt },
           horizon: { fileLoaded: horizonFileLoaded, altitudesDegrees: horizon.altitudesDegrees, sources: horizon.sources, sweepNights: sweepNightsOf(horizon), upLineDegrees: settings.upLineDegrees },
           path,
+          moon: moonNight({ site: here, night, stepSeconds: settings.stepSeconds, decimals: settings.decimals }),
           clear,
           facts,
         }

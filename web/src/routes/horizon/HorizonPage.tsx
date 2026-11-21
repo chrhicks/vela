@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 
 import type { HorizonNight, HorizonRefusal } from '../../../../state/horizon-night.ts'
+import { layersAtStart, toggled, type Layer } from '../../../../state/horizon-layers.ts'
 import { clampedTo, clockIn, lastNightsWords, nightFacts, nightSpan, startingTime } from '../../../../state/horizon-view.ts'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import { Page } from '../../components/Page.tsx'
@@ -13,6 +14,7 @@ import { horizonNight } from '../../rig/horizon-night.ts'
 import { serviceNow } from '../../rig/service-clock.ts'
 import { useLink } from '../../rig/store.ts'
 import { useAsked } from '../../rig/use-asked.ts'
+import { HorizonChips } from './HorizonChips.tsx'
 import { HorizonChart } from './HorizonChart.tsx'
 import { HorizonFacts } from './HorizonFacts.tsx'
 import { HorizonSlider } from './HorizonSlider.tsx'
@@ -42,6 +44,7 @@ const darkWords = (night: HorizonNight, clock: (at: number) => string) =>
 
 function NightBody({ night, now }: { readonly night: HorizonNight; readonly now: number | undefined }) {
   const [chosen, setChosen] = useState(() => startingTime(night, now))
+  const [layers, setLayers] = useState(layersAtStart)
   const selected = clampedTo(nightSpan(night), chosen)
   const clock = clockIn(night.zone)
   const sweeps = lastNightsWords(night.horizon.sweepNights)
@@ -58,9 +61,11 @@ function NightBody({ night, now }: { readonly night: HorizonNight; readonly now:
 
         {night.facts.clear === null ? <Statement size="instruction">{`${night.target.name} never clears the horizon in the dark tonight`}</Statement> : null}
 
-        <HorizonChart night={night} now={now} selected={selected} />
+        <HorizonChips layers={layers} onToggle={(layer: Layer) => setLayers(current => toggled(current, layer))} />
 
-        <HorizonSlider night={night} now={now} selected={selected} onSelect={setChosen} />
+        <HorizonChart night={night} now={now} selected={selected} layers={layers} />
+
+        <HorizonSlider night={night} now={now} selected={selected} layers={layers} onSelect={setChosen} />
       </div>
     </Page>
   )

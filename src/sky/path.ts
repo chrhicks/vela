@@ -3,10 +3,23 @@ import type { Site } from '../pointing/target.ts'
 import type { LineSource } from '../../state/targets.ts'
 import { altitudeAt, type Horizon } from '../horizon/horizon.ts'
 import { toMount, type EquatorialPosition } from './coordinates.ts'
+import type { NightTimes } from './darkness.ts'
 
 const radians = Math.PI / 180
 
 export const siderealHoursPerHour = 1.0027379093
+
+const secondMs = 1000
+
+export const wrapped = (degrees: number) => ((degrees % 360) + 360) % 360
+
+export const rounder = (decimals: number) => {
+  const scale = 10 ** decimals
+
+  return (value: number) => Math.round(value * scale) / scale
+}
+
+export const stepCountOf = (night: NightTimes, stepSeconds: number) => Math.floor((night.dawnAt - night.duskAt) / (stepSeconds * secondMs)) + 1
 
 const signedHours = (hours: number) => ((((hours % 24) + 36) % 24) - 12)
 

@@ -1,11 +1,13 @@
 import type { HorizonNight } from '../../../../state/horizon-night.ts'
-import { clearAt, hourTicks, lineNote, lineRuns, meridianAzimuths, nowPoint, pathPieces, skyPointAt, type SkyPoint } from '../../../../state/horizon-view.ts'
+import type { Layer } from '../../../../state/horizon-layers.ts'
+import { clearAt, hourTicks, lineNote, lineRuns, meridianAzimuths, moonMarkAt, moonPieces, nowPoint, pathPieces, skyPointAt, type SkyPoint } from '../../../../state/horizon-view.ts'
 import styles from './HorizonChart.module.css'
 
 interface HorizonChartProps {
   readonly night: HorizonNight
   readonly now: number | undefined
   readonly selected: number
+  readonly layers: ReadonlySet<Layer>
 }
 
 const width = 1344
@@ -27,6 +29,10 @@ const tickRadius = 3
 const nameLift = 26
 const tickLift = 10
 const edgeMargin = 100
+const moonDiscRadius = 8
+const moonGlowRadius = 150
+const moonLabelGap = 16
+const moonLabelWidth = 250
 
 const xOf = (azimuthDegrees: number) => left + (azimuthDegrees / 360) * (right - left)
 
@@ -41,7 +47,7 @@ const filled = (points: ReadonlyArray<SkyPoint>) => {
   return first === undefined || last === undefined ? '' : `${xOf(first.azimuthDegrees).toFixed(1)},${bottom} ${pointsOf(points)} ${xOf(last.azimuthDegrees).toFixed(1)},${bottom}`
 }
 
-export function HorizonChart({ night, now, selected }: HorizonChartProps) {
+export function HorizonChart({ night, now, selected, layers }: HorizonChartProps) {
   const runs = lineRuns(night.horizon)
   const note = lineNote(night.horizon)
   const assumed = runs.filter(run => !run.known)
@@ -56,11 +62,23 @@ export function HorizonChart({ night, now, selected }: HorizonChartProps) {
   const chosenClear = clearAt(night, selected)
   const meridians = meridianAzimuths(night)
   const peak = skyPointAt(night.path, night.facts.highest.at)
+  const moonOn = layers.has('moon')
+  const moonPaths = moonOn ? moonPieces(night) : []
+  const moon = moonOn ? moonMarkAt(night, selected) : undefined
+  const moonX = moon === undefined ? 0 : xOf(moon.point.azimuthDegrees)
+  const moonLabelLeft = moonX + moonDiscRadius + moonLabelGap + moonLabelWidth > right
   const altitudes = Array.from({ length: maxAltitude / altitudeStep }, (_, index) => (index + 1) * altitudeStep)
 
   return (
     <div className={styles.scroll}>
       <svg className={styles.chart} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${night.target.name} against the horizon, night of ${night.night}`}>
+        <defs>
+          <radialGradient id="moon-glow">
+            <stop offset="0%" className={styles.glowCentre} />
+            <stop offset="100%" className={styles.glowEdge} />
+          </radialGradient>
+        </defs>
+
         {altitudes.map(altitude => (
           <g key={altitude}>
             <line className={styles.grid} x1={left} x2={right} y1={yOf(altitude)} y2={yOf(altitude)} />
@@ -96,6 +114,14 @@ export function HorizonChart({ night, now, selected }: HorizonChartProps) {
 
         <line className={styles.axis} x1={left} x2={right} y1={bottom} y2={bottom} />
 
+        {moon === undefined ? null : (
+          <circle className={styles.moonGlow} cx={moonX} cy={yOf(moon.point.altitudeDegrees)} r={moonGlowRadius * night.moon.litFraction} fill="url(#moon-glow)" />
+        )}
+
+        {moonPaths.map((piece, index) => (
+          <polyline key={`moon${index}`} className={styles.moonPath} points={pointsOf(piece.points)} />
+        ))}
+
         {pieces.map((piece, index) => (
           <polyline key={index} className={piece.clear ? styles.pathClear : styles.pathOther} points={pointsOf(piece.points)} />
         ))}
@@ -127,6 +153,20 @@ export function HorizonChart({ night, now, selected }: HorizonChartProps) {
           <g aria-hidden="true">
             <circle className={styles.selectedRing} cx={xOf(chosen.azimuthDegrees)} cy={yOf(chosen.altitudeDegrees)} r={selectedRingRadius} />
             <circle className={chosenClear ? styles.selectedClear : styles.selectedOther} cx={xOf(chosen.azimuthDegrees)} cy={yOf(chosen.altitudeDegrees)} r={selectedDotRadius} />
+          </g>
+        )}
+
+        {moon === undefined ? null : (
+          <g>
+            <circle className={styles.moonDisc} cx={moonX} cy={yOf(moon.point.altitudeDegrees)} r={moonDiscRadius} />
+            <text
+              className={styles.moonLabel}
+              x={moonX + (moonLabelLeft ? -(moonDiscRadius + moonLabelGap) : moonDiscRadius + moonLabelGap)}
+              y={yOf(moon.point.altitudeDegrees) + 4}
+              textAnchor={moonLabelLeft ? 'end' : 'start'}
+            >
+              {moon.words}
+            </text>
           </g>
         )}
       </svg>
