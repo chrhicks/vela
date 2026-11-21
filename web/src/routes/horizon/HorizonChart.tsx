@@ -1,6 +1,8 @@
 import type { HorizonNight } from '../../../../state/horizon-night.ts'
 import { cloudLabels } from '../../../../state/horizon-clouds.ts'
 import type { Layer } from '../../../../state/horizon-layers.ts'
+import type { HorizonSweep } from '../../../../state/horizon-sweep.ts'
+import { frameGroups, framesWords, treeLinePieces } from '../../../../state/horizon-sweep-view.ts'
 import { clearAt, clockIn, footprintAtTime, frameLabel, hourTicks, lineNote, lineRuns, meridianAzimuths, moonMarkAt, moonPieces, nowPoint, pathPieces, skyPointAt, turnsOfChart, type ShortlistMark, type SkyPoint, type TimeRun } from '../../../../state/horizon-view.ts'
 import styles from './HorizonChart.module.css'
 
@@ -11,6 +13,7 @@ interface HorizonChartProps {
   readonly layers: ReadonlySet<Layer>
   readonly cloudy: ReadonlyArray<TimeRun>
   readonly shortlist: ReadonlyArray<ShortlistMark>
+  readonly sweepMap: Extract<HorizonSweep, { readonly status: 'available' }> | undefined
 }
 
 const width = 1344
@@ -41,6 +44,16 @@ const moonLabelWidth = 250
 const frameLabelGap = 16
 const frameLabelWidth = 520
 const cloudLabelDrop = 40
+const mapLabelDrop = 27
+const mapLabelInset = 8
+const plusArm = 3.5
+const blockedHalf = 2.5
+
+const sourceClass = { solve: 'pointedBySolve', 'commanded+offset': 'pointedByOffset', commanded: 'pointedByCommand' } as const
+
+const plusAt = (x: number, y: number) => `M${(x - plusArm).toFixed(1)} ${y.toFixed(1)}h${plusArm * 2}M${x.toFixed(1)} ${(y - plusArm).toFixed(1)}v${plusArm * 2}`
+
+const squareAt = (x: number, y: number) => `M${(x - blockedHalf).toFixed(1)} ${(y - blockedHalf).toFixed(1)}h${blockedHalf * 2}v${blockedHalf * 2}h${-blockedHalf * 2}z`
 
 const xOf = (azimuthDegrees: number) => left + (azimuthDegrees / 360) * (right - left)
 
@@ -55,7 +68,7 @@ const filled = (points: ReadonlyArray<SkyPoint>) => {
   return first === undefined || last === undefined ? '' : `${xOf(first.azimuthDegrees).toFixed(1)},${bottom} ${pointsOf(points)} ${xOf(last.azimuthDegrees).toFixed(1)},${bottom}`
 }
 
-export function HorizonChart({ night, now, selected, layers, cloudy, shortlist }: HorizonChartProps) {
+export function HorizonChart({ night, now, selected, layers, cloudy, shortlist, sweepMap }: HorizonChartProps) {
   const runs = lineRuns(night.horizon)
   const note = lineNote(night.horizon)
   const assumed = runs.filter(run => !run.known)
@@ -84,6 +97,10 @@ export function HorizonChart({ night, now, selected, layers, cloudy, shortlist }
   const frameWords = frameOn ? frameLabel(night, clockIn(night.zone)) : undefined
   const frameX = frameWords === undefined ? 0 : xOf(frameWords.point.azimuthDegrees)
   const frameLabelLeft = frameX + frameLabelGap + frameLabelWidth > right
+  const treePieces = sweepMap === undefined ? [] : treeLinePieces(night.horizon, sweepMap.edges)
+  const solidPieces = treePieces.filter(piece => !piece.dotted)
+  const dottedPieces = treePieces.filter(piece => piece.dotted)
+  const marks = sweepMap === undefined ? [] : frameGroups(sweepMap.frames)
   const altitudes = Array.from({ length: maxAltitude / altitudeStep }, (_, index) => (index + 1) * altitudeStep)
 
   return (
@@ -118,18 +135,40 @@ export function HorizonChart({ night, now, selected, layers, cloudy, shortlist }
           run.known ? (
             <g key={index}>
               <polygon className={styles.treesFill} points={filled(run.points)} />
-              <polyline className={styles.treesEdge} points={pointsOf(run.points)} />
+              {sweepMap === undefined ? <polyline className={styles.treesEdge} points={pointsOf(run.points)} /> : null}
             </g>
           ) : (
             <polyline key={index} className={styles.assumed} points={pointsOf(run.points)} />
           ),
         )}
 
+        {solidPieces.map((piece, index) => (
+          <polyline key={`solid${index}`} className={styles.treesEdge} points={pointsOf(piece.points)} />
+        ))}
+
+        {dottedPieces.map((piece, index) => (
+          <polyline key={`dotted${index}`} className={styles.treesDotted} points={pointsOf(piece.points)} />
+        ))}
+
         {note === undefined || noteX === undefined ? null : (
           <text className={styles.assumedLabel} x={noteX} y={yOf(night.horizon.upLineDegrees) - 8}>{note}</text>
         )}
 
         <line className={styles.axis} x1={left} x2={right} y1={bottom} y2={bottom} />
+
+        {marks.map(group => (
+          <path
+            key={`${group.blocked}${group.source}`}
+            className={`${group.blocked ? styles.frameBlocked : styles.frameClean} ${styles[sourceClass[group.source]]}`}
+            d={group.points.map(point => (group.blocked ? squareAt(xOf(point.azimuthDegrees), yOf(point.altitudeDegrees)) : plusAt(xOf(point.azimuthDegrees), yOf(point.altitudeDegrees)))).join('')}
+          />
+        ))}
+
+        {sweepMap === undefined ? null : (
+          <text className={styles.mapLabel} x={right - mapLabelInset} y={top + mapLabelDrop} textAnchor="end">
+            {framesWords(sweepMap.nights)}
+          </text>
+        )}
 
         {moon === undefined ? null : (
           <circle className={styles.moonGlow} cx={moonX} cy={yOf(moon.point.altitudeDegrees)} r={moonGlowRadius * night.moon.litFraction} fill="url(#moon-glow)" />

@@ -56,6 +56,45 @@
   opacity: 0.8;
 }
 
+.treesDotted {
+  fill: none;
+  stroke: var(--ember);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.frameClean {
+  fill: none;
+  stroke: var(--ember);
+  stroke-width: 1.2;
+}
+
+.frameBlocked {
+  fill: var(--ember);
+  stroke: none;
+}
+
+.pointedBySolve {
+  opacity: 0.9;
+}
+
+.pointedByOffset {
+  opacity: 0.55;
+}
+
+.pointedByCommand {
+  opacity: 0.3;
+}
+
+.mapLabel {
+  fill: var(--ember-quiet);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .assumed {
   fill: none;
   stroke: var(--ember-quiet);

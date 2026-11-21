@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router'
 import type { HorizonNight, HorizonRefusal } from '../../../../state/horizon-night.ts'
 import { layersAtStart, toggled, type Layer } from '../../../../state/horizon-layers.ts'
 import { cloudHours, cloudyRuns, forecastClearCell, forecastNote, withForecastClear } from '../../../../state/horizon-clouds.ts'
+import { mapUnavailableWords } from '../../../../state/horizon-sweep-view.ts'
 import { clampedTo, clockIn, lastNightsWords, nightFacts, nightSpan, shortlistMarks, startingTime } from '../../../../state/horizon-view.ts'
 import { ActionButton } from '../../components/ActionButton.tsx'
 import { ActionLink } from '../../components/ActionLink.tsx'
@@ -15,6 +16,7 @@ import { useLocalNow } from '../../rig/clock.ts'
 import { forecastReading } from '../../rig/forecast.ts'
 import { horizonNight } from '../../rig/horizon-night.ts'
 import { horizonPaths } from '../../rig/horizon-paths.ts'
+import { horizonSweep } from '../../rig/horizon-sweep.ts'
 import { serviceNow } from '../../rig/service-clock.ts'
 import { useShortlist } from '../../rig/shortlist.ts'
 import { useLink } from '../../rig/store.ts'
@@ -64,6 +66,10 @@ function NightBody({ night, now, tick }: { readonly night: HorizonNight; readonl
   const paths = useAsked(() => (shortlistOn ? horizonPaths(beside, night.at) : Promise.resolve(undefined)), `${night.night}:${shortlistOn}:${beside.join(',')}`, Math.floor(tick / refreshMilliseconds))
   const marks = shortlistOn && paths !== undefined ? shortlistMarks(night, paths.targets, selected) : []
   const listed = shortlist.has(night.target.id)
+  const treemapOn = layers.has('treemap')
+  const map = useAsked(() => (treemapOn ? horizonSweep() : Promise.resolve(undefined)), `${night.night}:${treemapOn}`, 0)
+  const mapNote = map === undefined ? undefined : mapUnavailableWords(map)
+  const sweepMap = map?.status === 'read' && map.sweep.status === 'available' ? map.sweep : undefined
 
   return (
     <Page width="wide">
@@ -80,9 +86,9 @@ function NightBody({ night, now, tick }: { readonly night: HorizonNight; readonl
 
         {night.facts.clear === null ? <Statement size="instruction">{`${night.target.name} never clears the horizon in the dark tonight`}</Statement> : null}
 
-        <HorizonChips layers={layers} cloudNote={answer === undefined ? undefined : forecastNote(forecast, clouds)} onToggle={(layer: Layer) => setLayers(current => toggled(current, layer))} />
+        <HorizonChips layers={layers} cloudNote={answer === undefined ? undefined : forecastNote(forecast, clouds)} mapNote={mapNote} onToggle={(layer: Layer) => setLayers(current => toggled(current, layer))} />
 
-        <HorizonChart night={night} now={now} selected={selected} layers={layers} cloudy={cloudy} shortlist={marks} />
+        <HorizonChart night={night} now={now} selected={selected} layers={layers} cloudy={cloudy} shortlist={marks} sweepMap={treemapOn ? sweepMap : undefined} />
 
         <HorizonSlider night={night} now={now} selected={selected} layers={layers} clouds={clouds} onSelect={setChosen} />
       </div>
