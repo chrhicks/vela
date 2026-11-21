@@ -205,3 +205,29 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+.shortlistPath {
+  fill: none;
+  stroke: var(--ember-quiet);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.55;
+}
+
+.shortlistName {
+  fill: var(--ember-quiet);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-anchor: middle;
+}
+
+.shortlistDot {
+  fill: var(--ember-quiet);
+}
+
+.shortlistDotHidden {
+  fill: none;
+  stroke: var(--ember-quiet);
+  stroke-width: 1.5;
+}

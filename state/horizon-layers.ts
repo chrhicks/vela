@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { described } from './described.ts'
 
-export const Layer = Schema.Literals(['frame', 'clouds', 'moon'])
+export const Layer = Schema.Literals(['frame', 'clouds', 'shortlist', 'moon'])
 
 export type Layer = typeof Layer.Type
 
@@ -22,6 +22,7 @@ export interface LayerChip {
 export const layerChips: ReadonlyArray<LayerChip> = [
   { layer: 'frame', letter: 'A', label: 'Frame' },
   { layer: 'clouds', letter: 'B', label: 'Clouds' },
+  { layer: 'shortlist', letter: 'C', label: 'Shortlist' },
   { layer: 'moon', letter: 'E', label: 'Moon' },
 ]
 

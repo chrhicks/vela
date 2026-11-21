@@ -1,7 +1,7 @@
 import type { HorizonNight } from '../../../../state/horizon-night.ts'
 import { cloudLabels } from '../../../../state/horizon-clouds.ts'
 import type { Layer } from '../../../../state/horizon-layers.ts'
-import { clearAt, clockIn, footprintAtTime, frameLabel, hourTicks, lineNote, lineRuns, meridianAzimuths, moonMarkAt, moonPieces, nowPoint, pathPieces, skyPointAt, turnsOfChart, type SkyPoint, type TimeRun } from '../../../../state/horizon-view.ts'
+import { clearAt, clockIn, footprintAtTime, frameLabel, hourTicks, lineNote, lineRuns, meridianAzimuths, moonMarkAt, moonPieces, nowPoint, pathPieces, skyPointAt, turnsOfChart, type ShortlistMark, type SkyPoint, type TimeRun } from '../../../../state/horizon-view.ts'
 import styles from './HorizonChart.module.css'
 
 interface HorizonChartProps {
@@ -10,6 +10,7 @@ interface HorizonChartProps {
   readonly selected: number
   readonly layers: ReadonlySet<Layer>
   readonly cloudy: ReadonlyArray<TimeRun>
+  readonly shortlist: ReadonlyArray<ShortlistMark>
 }
 
 const width = 1344
@@ -27,6 +28,8 @@ const labelMargin = 170
 const nowDotRadius = 5
 const selectedDotRadius = 7
 const selectedRingRadius = 12
+const shortlistDotRadius = 4
+const shortlistNameLift = 12
 const tickRadius = 3
 const nameLift = 26
 const tickLift = 10
@@ -52,7 +55,7 @@ const filled = (points: ReadonlyArray<SkyPoint>) => {
   return first === undefined || last === undefined ? '' : `${xOf(first.azimuthDegrees).toFixed(1)},${bottom} ${pointsOf(points)} ${xOf(last.azimuthDegrees).toFixed(1)},${bottom}`
 }
 
-export function HorizonChart({ night, now, selected, layers, cloudy }: HorizonChartProps) {
+export function HorizonChart({ night, now, selected, layers, cloudy, shortlist }: HorizonChartProps) {
   const runs = lineRuns(night.horizon)
   const note = lineNote(night.horizon)
   const assumed = runs.filter(run => !run.known)
@@ -140,6 +143,20 @@ export function HorizonChart({ night, now, selected, layers, cloudy }: HorizonCh
           <polyline key={index} className={piece.cloudy ? (piece.clear ? styles.pathCloudyClear : styles.pathCloudyOther) : piece.clear ? styles.pathClear : styles.pathOther} points={pointsOf(piece.points)} />
         ))}
 
+        {shortlist.map(mark => (
+          <g key={mark.id}>
+            {mark.pieces.map((piece, index) => (
+              <polyline key={index} className={styles.shortlistPath} points={pointsOf(piece.points)} />
+            ))}
+
+            {mark.peak === undefined ? null : (
+              <text className={styles.shortlistName} x={xOf(mark.peak.azimuthDegrees)} y={yOf(mark.peak.altitudeDegrees) - shortlistNameLift}>
+                {mark.name}
+              </text>
+            )}
+          </g>
+        ))}
+
         {cloudWords.map(label => (
           <text key={label.words + label.point.azimuthDegrees} className={styles.cloudLabel} x={xOf(label.point.azimuthDegrees)} y={yOf(label.point.altitudeDegrees) + cloudLabelDrop} textAnchor="middle">
             {label.words}
@@ -167,6 +184,12 @@ export function HorizonChart({ night, now, selected, layers, cloudy }: HorizonCh
               NOW
             </text>
           </g>
+        )}
+
+        {shortlist.map(mark =>
+          mark.dot === undefined ? null : (
+            <circle key={`dot${mark.id}`} className={mark.dot.hidden ? styles.shortlistDotHidden : styles.shortlistDot} cx={xOf(mark.dot.point.azimuthDegrees)} cy={yOf(mark.dot.point.altitudeDegrees)} r={shortlistDotRadius} />
+          ),
         )}
 
         {frameWords === undefined ? null : (

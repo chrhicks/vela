@@ -1,9 +1,9 @@
 import { Data, Effect, Option, Result, Schema, SchemaTransformation } from 'effect'
-import { FilterAnswer, Refusal } from './commands.ts'
+import { FilterAnswer, Refusal, ShortlistAction } from './commands.ts'
 import { StreamPosition, WireBody, type Entry } from './entry.ts'
 import { Check, CheckedFrames, FirstFramesVerdict } from './first-frames-check.ts'
 import { ReviewId, ReviewLine, ReviewOutcome, ReviewUsage } from './review-answer.ts'
-import { RunTarget } from './targets.ts'
+import { RunTarget, TargetId } from './targets.ts'
 
 export const StartToken = Schema.String.pipe(Schema.brand('StartToken'))
 
@@ -169,6 +169,8 @@ export const FlatExposureTried = entryOf('vela.flats.exposure', { exposureSecond
 
 export const FilterAnswered = entryOf('vela.filter', { filter: FilterAnswer })
 
+export const ShortlistEdited = entryOf('vela.shortlist', { target: TargetId, action: ShortlistAction, from: Schema.optionalKey(Schema.Array(TargetId)) })
+
 export const StartId = Schema.String.pipe(Schema.brand('StartId'))
 
 export type StartId = typeof StartId.Type
@@ -310,7 +312,7 @@ export const SweepRunEnded = entryOf('vela.sweep.run.ended', { sweep: SweepId, c
 
 export const VelaStarted = entryOf('vela.started', { token: StartToken })
 
-export const RigEntry = Schema.Union([VelaStarted, SweepStarted, SweepMoved, SweepEnded, SweepRunStarted, SweepFramed, SweepColumned, SweepAlerted, SweepRunEnded, ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, FlatExposureTried, GuiderReplied])
+export const RigEntry = Schema.Union([VelaStarted, SweepStarted, SweepMoved, SweepEnded, SweepRunStarted, SweepFramed, SweepColumned, SweepAlerted, SweepRunEnded, ReviewAsked, ReviewAnswered, TargetStep, FirstFramesAnnounced, StackGrew, CommandPressed, CommandAnswered, RunStarted, RunExposed, RunFailed, RunEnded, FrameKept, FrameMeasured, DeviceReported, RigConnected, RigLink, GuiderReported, AlignStarted, AlignSolved, FocusStarted, FocusSampled, FocusBest, FilterAnswered, ShortlistEdited, FlatExposureTried, GuiderReplied])
 
 export type RigEntry = typeof RigEntry.Type
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { layerChips, layersAtStart, toggled } from './horizon-layers.ts'
 
 describe('the layers of the horizon chart', () => {
-  it('start with the frame, the clouds and the Moon on', () => {
+  it('start with the frame, the clouds and the Moon on, and the shortlist off', () => {
     expect([...layersAtStart()]).toEqual(['frame', 'clouds', 'moon'])
   })
 
@@ -10,6 +10,7 @@ describe('the layers of the horizon chart', () => {
     expect(layerChips).toEqual([
       { layer: 'frame', letter: 'A', label: 'Frame' },
       { layer: 'clouds', letter: 'B', label: 'Clouds' },
+      { layer: 'shortlist', letter: 'C', label: 'Shortlist' },
       { layer: 'moon', letter: 'E', label: 'Moon' },
     ])
   })

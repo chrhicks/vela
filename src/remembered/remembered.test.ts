@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { entry } from '../../state/testing.ts'
-import { coolerFor, lastCentreNear, nothingRemembered, remember } from './remembered.ts'
+import { coolerFor, lastCentreNear, nothingRemembered, recentLightTargets, remember, shortlistOf } from './remembered.ts'
 
 const fold = (entries: ReadonlyArray<ReturnType<typeof entry>>) => entries.reduce(remember, nothingRemembered)
 
@@ -124,5 +124,86 @@ describe('what Vela remembers from the stream', () => {
 
     expect(state.targetCoolers).toEqual([{ target: 'orion', setting: { state: 'on', celsius: -10 }, at: 200 }])
     expect(state.camera).toMatchObject({ on: false, setpoint: -10, wrote: 300 })
+  })
+
+  describe('the shortlist', () => {
+    const exposed = (at: number, run: string) => entry('vela.run.exposed', at, { run, frame: 1 })
+    const imaged = (at: number, run: string, id: string) => [lightOn(at, run, id), exposed(at + 10, run)]
+    const edit = (at: number, target: string, action: 'add' | 'remove', from?: ReadonlyArray<string>) => entry('vela.shortlist', at, { target, action, ...(from === undefined ? {} : { from }) })
+
+    it('is the most recently imaged targets, newest first, one entry each, until the first edit', () => {
+      const state = fold([...imaged(100, 'a', 'orion'), ...imaged(200, 'b', 'triangulum'), ...imaged(300, 'c', 'orion'), ...imaged(400, 'd', 'pinwheel')])
+
+      expect(state.shortlist).toBeUndefined()
+      expect(shortlistOf(state, 5)).toEqual(['pinwheel', 'orion', 'triangulum'])
+      expect(shortlistOf(state, 2)).toEqual(['pinwheel', 'orion'])
+      expect(shortlistOf(state, 0)).toEqual([])
+    })
+
+    it('leaves out a light run that kept no frame, and what is not a light run on a catalogued target', () => {
+      const state = fold([
+        ...imaged(100, 'a', 'orion'),
+        lightOn(200, 'b', 'triangulum'),
+        entry('vela.run.started', 300, { run: 'c', object: 'dark', frameType: 'dark', exposureSeconds: 120, count: 30 }),
+        entry('vela.run.started', 400, { run: 'd', object: 'centre', frameType: 'light', exposureSeconds: 2 }),
+        exposed(410, 'd'),
+        exposed(420, 'b'),
+      ])
+
+      expect(shortlistOf(state, 5)).toEqual(['orion'])
+      expect(fold([lightOn(200, 'b', 'triangulum')]).lightTargets).toEqual([])
+    })
+
+    it('is seeded from the targets that earlier history only knows by their cooler, after the ones it knows as imaged', () => {
+      const state = fold([
+        setpoint(50, -10),
+        coolerSwitched(51, true),
+        lightOn(100, 'old', 'soul'),
+        lightOn(150, 'older', 'pinwheel'),
+        ...imaged(200, 'new', 'orion'),
+      ])
+
+      expect(state.targetCoolers.map(known => known.target).sort()).toEqual(['orion', 'pinwheel', 'soul'])
+      expect(recentLightTargets(state, 5)).toEqual(['orion', 'pinwheel', 'soul'])
+      expect(recentLightTargets({ ...nothingRemembered, targetCoolers: [{ target: 'soul', setting: { state: 'on', celsius: -10 }, at: 100 }] }, 5)).toEqual(['soul'])
+    })
+
+    it('starts the first edit from the list that was shown, and keeps it after that', () => {
+      const shown = ['pinwheel', 'orion']
+      const state = fold([...imaged(100, 'a', 'orion'), edit(500, 'triangulum', 'add', shown), ...imaged(600, 'b', 'soul')])
+
+      expect(state.shortlist).toEqual(['pinwheel', 'orion', 'triangulum'])
+      expect(shortlistOf(state, 5)).toEqual(['pinwheel', 'orion', 'triangulum'])
+    })
+
+    it('is empty, and stays empty, once its last target is removed, which is not the same as never edited', () => {
+      const emptied = fold([...imaged(100, 'a', 'orion'), edit(500, 'orion', 'remove', ['orion']), ...imaged(600, 'b', 'soul')])
+      const never = fold([...imaged(100, 'a', 'orion'), ...imaged(600, 'b', 'soul')])
+
+      expect(emptied.shortlist).toEqual([])
+      expect(shortlistOf(emptied, 5)).toEqual([])
+      expect(never.shortlist).toBeUndefined()
+      expect(shortlistOf(never, 5)).toEqual(['soul', 'orion'])
+    })
+
+    it('does not add a target twice or remove one that is not there, and keeps the order it was added in', () => {
+      const state = fold([edit(100, 'orion', 'add', []), edit(110, 'triangulum', 'add'), edit(120, 'orion', 'add'), edit(130, 'soul', 'remove'), edit(140, 'pinwheel', 'add'), edit(150, 'triangulum', 'remove')])
+
+      expect(state.shortlist).toEqual(['orion', 'pinwheel'])
+    })
+
+    it('comes out the same when the stream is replayed over what is already kept', () => {
+      const night = [edit(100, 'orion', 'add', ['soul']), edit(110, 'triangulum', 'add'), edit(120, 'soul', 'remove'), edit(130, 'pinwheel', 'add')]
+      const once = fold(night)
+
+      expect(once.shortlist).toEqual(['orion', 'triangulum', 'pinwheel'])
+      expect(night.reduce(remember, once).shortlist).toEqual(once.shortlist)
+    })
+
+    it('does not start from the list shown when it is already edited', () => {
+      const state = fold([edit(100, 'orion', 'add', []), edit(200, 'soul', 'add', ['pinwheel'])])
+
+      expect(state.shortlist).toEqual(['orion', 'soul'])
+    })
   })
 })

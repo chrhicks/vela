@@ -1,5 +1,5 @@
 import { footprintOf, frameDrawing } from './horizon-frame.ts'
-import type { HorizonNight, SpellEdge, TargetPath } from './horizon-night.ts'
+import type { HorizonNight, HorizonPaths, SpellEdge, TargetPath } from './horizon-night.ts'
 
 export type SkyTrack = Pick<TargetPath, 'startAt' | 'stepSeconds' | 'altitudes' | 'azimuths'>
 
@@ -472,4 +472,46 @@ export const readoutSentence = (night: HorizonNight, at: number, clock: (at: num
   const readout = readoutAt(night, at)
 
   return `${clock(at)} ${zoneName(night.zone, at)}, ${readout.altitude}, ${readout.verdict.toLowerCase()}`
+}
+
+export interface ShortlistMark {
+  readonly id: string
+  readonly name: string
+  readonly pieces: ReadonlyArray<PathPiece>
+  readonly peak: SkyPoint | undefined
+  readonly dot: { readonly point: SkyPoint; readonly hidden: boolean } | undefined
+}
+
+const darkRun = (night: HorizonNight): TimeRun | undefined => (night.times.darkAt === null || night.times.darkEndsAt === null ? undefined : { from: night.times.darkAt, until: night.times.darkEndsAt })
+
+const trackWithin = (path: SkyTrack, run: TimeRun): SkyTrack => {
+  const stepMs = path.stepSeconds * secondMs
+  const first = Math.max(Math.ceil((run.from - path.startAt) / stepMs), 0)
+  const last = Math.floor((run.until - path.startAt) / stepMs)
+
+  return { startAt: path.startAt + first * stepMs, stepSeconds: path.stepSeconds, altitudes: path.altitudes.slice(first, last + 1), azimuths: path.azimuths.slice(first, last + 1) }
+}
+
+export function shortlistMarks(night: HorizonNight, targets: HorizonPaths['targets'], at: number): ReadonlyArray<ShortlistMark> {
+  const dark = darkRun(night)
+
+  return targets
+    .filter(({ target }) => target.id !== night.target.id)
+    .map(({ target, path }) => {
+      const inDark = dark === undefined ? undefined : trackWithin(path, dark)
+      const pieces = inDark === undefined ? [] : pathPieces(inDark, [{ from: inDark.startAt, until: nightEnd(inDark) }])
+      const highest = (inDark === undefined ? [] : samplesOf(inDark))
+        .filter(sample => sample.altitudeDegrees >= 0)
+        .reduce<Sample | undefined>((best, sample) => (best === undefined || sample.altitudeDegrees > best.altitudeDegrees ? sample : best), undefined)
+      const point = skyPointAt(path, at)
+      const line = skyPointAt({ ...path, altitudes: path.lines }, at)
+
+      return {
+        id: target.id,
+        name: target.name,
+        pieces,
+        peak: highest === undefined ? undefined : { azimuthDegrees: highest.azimuthDegrees, altitudeDegrees: highest.altitudeDegrees },
+        dot: point === undefined || point.altitudeDegrees < 0 ? undefined : { point, hidden: line !== undefined && point.altitudeDegrees < line.altitudeDegrees },
+      }
+    })
 }

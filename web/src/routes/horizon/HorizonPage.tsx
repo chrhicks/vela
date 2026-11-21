@@ -4,7 +4,8 @@ import { useSearchParams } from 'react-router'
 import type { HorizonNight, HorizonRefusal } from '../../../../state/horizon-night.ts'
 import { layersAtStart, toggled, type Layer } from '../../../../state/horizon-layers.ts'
 import { cloudHours, cloudyRuns, forecastClearCell, forecastNote, withForecastClear } from '../../../../state/horizon-clouds.ts'
-import { clampedTo, clockIn, lastNightsWords, nightFacts, nightSpan, startingTime } from '../../../../state/horizon-view.ts'
+import { clampedTo, clockIn, lastNightsWords, nightFacts, nightSpan, shortlistMarks, startingTime } from '../../../../state/horizon-view.ts'
+import { ActionButton } from '../../components/ActionButton.tsx'
 import { ActionLink } from '../../components/ActionLink.tsx'
 import { Page } from '../../components/Page.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
@@ -13,7 +14,9 @@ import { Statement } from '../../components/Statement.tsx'
 import { useLocalNow } from '../../rig/clock.ts'
 import { forecastReading } from '../../rig/forecast.ts'
 import { horizonNight } from '../../rig/horizon-night.ts'
+import { horizonPaths } from '../../rig/horizon-paths.ts'
 import { serviceNow } from '../../rig/service-clock.ts'
+import { useShortlist } from '../../rig/shortlist.ts'
 import { useLink } from '../../rig/store.ts'
 import { useAsked } from '../../rig/use-asked.ts'
 import { HorizonChips } from './HorizonChips.tsx'
@@ -55,10 +58,19 @@ function NightBody({ night, now, tick }: { readonly night: HorizonNight; readonl
   const cloudyPercent = forecast?.cloudyPercent
   const cloudy = cloudyPercent === undefined ? [] : cloudyRuns(clouds, cloudyPercent)
   const sweeps = lastNightsWords(night.horizon.sweepNights)
+  const shortlist = useShortlist()
+  const beside = (shortlist.ids ?? []).filter(id => id !== night.target.id)
+  const shortlistOn = layers.has('shortlist')
+  const paths = useAsked(() => (shortlistOn ? horizonPaths(beside, night.at) : Promise.resolve(undefined)), `${night.night}:${shortlistOn}:${beside.join(',')}`, Math.floor(tick / refreshMilliseconds))
+  const marks = shortlistOn && paths !== undefined ? shortlistMarks(night, paths.targets, selected) : []
+  const listed = shortlist.has(night.target.id)
 
   return (
     <Page width="wide">
       <PageHeader title={night.target.name} facts={[...(night.target.commonName === null ? [] : [night.target.commonName]), `Night of ${night.night.slice('0000-'.length)}`, darkWords(night, clock), ...(sweeps === undefined ? [] : [sweeps])]}>
+        <ActionButton onPress={() => shortlist.toggle(night.target.id)}>
+          {listed ? 'On shortlist' : 'Add to shortlist'}
+        </ActionButton>
         <ActionLink to={pickerAddress}>Other target</ActionLink>
         <PillLink to={`/?target=${encodeURIComponent(night.target.id)}`}>Start</PillLink>
       </PageHeader>
@@ -70,7 +82,7 @@ function NightBody({ night, now, tick }: { readonly night: HorizonNight; readonl
 
         <HorizonChips layers={layers} cloudNote={answer === undefined ? undefined : forecastNote(forecast, clouds)} onToggle={(layer: Layer) => setLayers(current => toggled(current, layer))} />
 
-        <HorizonChart night={night} now={now} selected={selected} layers={layers} cloudy={cloudy} />
+        <HorizonChart night={night} now={now} selected={selected} layers={layers} cloudy={cloudy} shortlist={marks} />
 
         <HorizonSlider night={night} now={now} selected={selected} layers={layers} clouds={clouds} onSelect={setChosen} />
       </div>

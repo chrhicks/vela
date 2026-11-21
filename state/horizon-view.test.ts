@@ -27,6 +27,7 @@ import {
   readoutAt,
   readoutSentence,
   separationDegrees,
+  shortlistMarks,
   skyPointAt,
   spanWords,
   startingTime,
@@ -543,5 +544,45 @@ describe('the camera frame on the chart', () => {
 
     expect(facts({ firstCleanAt: start + minuteMs })).toEqual({ label: 'First clean frame', value: '17:31', note: null })
     expect(facts({ firstCleanAt: null, angleDegrees: null })).toEqual({ label: 'First clean frame', value: 'Not tonight', note: 'Camera angle unknown, box square to north' })
+  })
+})
+
+describe('the shortlist on the chart', () => {
+  const dark = { ...night({ clear: null, highest: { altitudeDegrees: 30, at: start }, transitAt: null, flip: null }), times: { duskAt: start, darkAt: start + minuteMs, darkEndsAt: start + 3 * minuteMs, dawnAt: start + 4 * minuteMs } }
+  const listed = (id: string, name: string, altitudes: ReadonlyArray<number>, azimuths: ReadonlyArray<number>, lines?: ReadonlyArray<number>) => ({
+    target: { id: id as HorizonNight['target']['id'], name },
+    path: { ...path(altitudes, azimuths), ...(lines === undefined ? {} : { lines }) },
+  })
+
+  it('draws only the dark part of each path and names it at its highest point in the dark', () => {
+    const [mark] = shortlistMarks(dark, [listed('triangulum', 'M 33', [5, 20, 60, 40, 10], [60, 70, 80, 90, 100])], start)
+
+    expect(mark!.pieces).toHaveLength(1)
+    expect(mark!.pieces[0]!.points.map(({ azimuthDegrees, altitudeDegrees }) => ({ azimuthDegrees, altitudeDegrees }))).toEqual([
+      { azimuthDegrees: 70, altitudeDegrees: 20 },
+      { azimuthDegrees: 80, altitudeDegrees: 60 },
+      { azimuthDegrees: 90, altitudeDegrees: 40 },
+    ])
+    expect(mark!.peak).toEqual({ azimuthDegrees: 80, altitudeDegrees: 60 })
+    expect(mark).toMatchObject({ id: 'triangulum', name: 'M 33' })
+  })
+
+  it('does not draw the target the page is already about', () => {
+    expect(shortlistMarks(dark, [listed('orion', 'M 42', [10, 20, 30], [100, 110, 120]), listed('soul', 'IC 1848', [10, 20, 30], [100, 110, 120])], start).map(mark => mark.id)).toEqual(['soul'])
+  })
+
+  it('puts a dot at the slider time, hollow behind the trees or below the line and solid above it', () => {
+    const marks = shortlistMarks(dark, [listed('triangulum', 'M 33', [40, 40, 40], [60, 70, 80], [30, 30, 50]), listed('soul', 'IC 1848', [-5, -5, 20], [10, 20, 30], [30, 30, 30])], start + minuteMs)
+
+    expect(marks[0]!.dot).toEqual({ point: { azimuthDegrees: 70, altitudeDegrees: 40 }, hidden: false })
+    expect(marks[1]!.dot).toBeUndefined()
+    expect(shortlistMarks(dark, [listed('triangulum', 'M 33', [40, 40, 40], [60, 70, 80], [30, 30, 50])], start + 2 * minuteMs)[0]!.dot).toEqual({ point: { azimuthDegrees: 80, altitudeDegrees: 40 }, hidden: true })
+  })
+
+  it('draws no path and no name when there is no full dark, and no dot outside the night', () => {
+    const noDark = { ...dark, times: { ...dark.times, darkAt: null, darkEndsAt: null } }
+
+    expect(shortlistMarks(noDark, [listed('triangulum', 'M 33', [40, 40, 40], [60, 70, 80])], start)[0]).toMatchObject({ pieces: [], peak: undefined })
+    expect(shortlistMarks(dark, [listed('triangulum', 'M 33', [40, 40, 40], [60, 70, 80])], start - 1)[0]!.dot).toBeUndefined()
   })
 })

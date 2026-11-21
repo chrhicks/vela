@@ -1,6 +1,6 @@
 import { Context, Data, Effect, Match } from 'effect'
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
-import { commandsPath, CommandRequest, type CoolerSetting, type Done, type FilterAnswer, type NudgeDirection, type NudgeId, type NudgeRate, type Refusal } from '../../state/commands.ts'
+import { commandsPath, CommandRequest, type CoolerSetting, type Done, type FilterAnswer, type NudgeDirection, type NudgeId, type NudgeRate, type Refusal, type ShortlistAction } from '../../state/commands.ts'
 
 export class CommandRefused extends Data.TaggedError('CommandRefused')<{ readonly refusal: Refusal }> {}
 
@@ -36,6 +36,7 @@ export class Operations extends Context.Service<
     readonly dewFixed: (percent: number) => Effect.Effect<Done, CommandRefused>
     readonly dewOff: Effect.Effect<Done, CommandRefused>
     readonly testFrame: (exposureSeconds: number) => Effect.Effect<Done, CommandRefused>
+    readonly shortlist: (target: string, action: ShortlistAction) => Effect.Effect<void, CommandRefused>
     readonly startTarget: (target: string, exposureSeconds: number, frames: number | undefined, filter: FilterAnswer, centre: { readonly raDegrees: number; readonly decDegrees: number } | undefined, cooler: CoolerSetting) => Effect.Effect<Done, CommandRefused>
     readonly takeDarks: (frames: number, exposureSeconds: number, celsius: number) => Effect.Effect<Done, CommandRefused>
     readonly takeDarkFlats: (frames: number, exposureSeconds: number, celsius: number) => Effect.Effect<Done, CommandRefused>
@@ -91,6 +92,7 @@ const carryOut = (request: CommandRequest): Effect.Effect<Done, CommandRefused, 
         dewFixed: ({ percent }) => operations.dewFixed(percent),
         dewOff: () => operations.dewOff,
         testFrame: ({ exposureSeconds }) => operations.testFrame(exposureSeconds),
+        shortlist: ({ target, action }) => operations.shortlist(target, action).pipe(carriedOut),
         startTarget: ({ target, exposureSeconds, frames, filter, centre, cooler }) => operations.startTarget(target, exposureSeconds, frames, filter, centre, cooler),
         stopForTheNight: () => operations.stopForTheNight,
         refocus: () => operations.refocus,

@@ -2,7 +2,7 @@ import type { Site } from '../pointing/target.ts'
 import { Compass, type ClearSpell, type HorizonNight, type SpellEdge, type TargetPath } from '../../state/horizon-night.ts'
 import type { EquatorialPosition } from './coordinates.ts'
 import type { NightTimes } from './darkness.ts'
-import { clearanceOf, lineAt, rounder, siderealHoursPerHour, skyAlong, stepCountOf, wrapped, type HorizonLine } from './path.ts'
+import { clearanceOf, lineAt, rounder, siderealHoursPerHour, skyAlong, stepCountOf, wrapped, type HorizonLine, type SkyPoint } from './path.ts'
 
 export interface TargetNightInput {
   readonly target: EquatorialPosition
@@ -29,6 +29,26 @@ const secondsPerHour = 3600
 
 export const compassOf = (azimuthDegrees: number) => Compass.literals[Math.round(wrapped(azimuthDegrees) / degreesPerCompassPoint) % Compass.literals.length]!
 
+export type TargetPathInput = Pick<TargetNightInput, 'target' | 'site' | 'night' | 'line' | 'stepSeconds' | 'decimals'>
+
+const pathOf = (points: ReadonlyArray<SkyPoint>, { night, line, stepSeconds, decimals }: Pick<TargetPathInput, 'night' | 'line' | 'stepSeconds' | 'decimals'>): TargetPath => {
+  const round = rounder(decimals)
+
+  return {
+    startAt: night.duskAt,
+    stepSeconds,
+    altitudes: points.map(point => round(point.altitudeDegrees)),
+    azimuths: points.map(point => round(wrapped(point.azimuthDegrees)) % 360),
+    lines: points.map(point => round(lineAt(line, point.azimuthDegrees).degrees)),
+  }
+}
+
+export function targetPath({ target, site, night, line, stepSeconds, decimals }: TargetPathInput): TargetPath {
+  const sky = skyAlong(target, site, night.duskAt, stepSeconds)
+
+  return pathOf(Array.from({ length: stepCountOf(night, stepSeconds) }, (_, index) => sky(index)), { night, line, stepSeconds, decimals })
+}
+
 export function targetNight({ target, site, night, at, line, stepSeconds, decimals, meridianLimitDegrees }: TargetNightInput): TargetNight {
   const round = rounder(decimals)
   const stepMs = stepSeconds * secondMs
@@ -37,14 +57,7 @@ export function targetNight({ target, site, night, at, line, stepSeconds, decima
   const count = stepCountOf(night, stepSeconds)
   const points = Array.from({ length: count }, (_, index) => sky(index))
   const timeOf = (index: number) => Math.round(night.duskAt + index * stepMs)
-
-  const path: TargetPath = {
-    startAt: night.duskAt,
-    stepSeconds,
-    altitudes: points.map(point => round(point.altitudeDegrees)),
-    azimuths: points.map(point => round(wrapped(point.azimuthDegrees)) % 360),
-    lines: points.map(point => round(lineAt(line, point.azimuthDegrees).degrees)),
-  }
+  const path = pathOf(points, { night, line, stepSeconds, decimals })
 
   const edgeAt = (time: number): SpellEdge => {
     const { azimuthDegrees } = sky(stepsAt(time))
