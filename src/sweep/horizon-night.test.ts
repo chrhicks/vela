@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Effect } from 'effect'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { SweepFrameBody, SweepId } from '../../state/entries.ts'
+import type { NightName, SweepFrameBody, SweepId } from '../../state/entries.ts'
 import { readHorizon } from '../horizon/file.ts'
 import { altitudeAt } from '../horizon/horizon.ts'
 import { buildHorizon } from './horizon-night.ts'
@@ -45,7 +45,7 @@ beforeEach(async () => {
 
 afterEach(() => rm(folder, { recursive: true, force: true }))
 
-const options = (sweepPrefix: string, now = at + 3600000) => ({ recordsFolder: records, out, sweepPrefix, settings, now: () => now })
+const options = (sweepPrefix: string, now = at + 3600000, night = '2026-11-08') => ({ recordsFolder: records, night: night as NightName, out, sweepPrefix, settings, now: () => now })
 
 const writeRecords = async (edges: ReadonlyArray<unknown> | undefined) => {
   await writeFile(join(records, 'columns.jsonl'), jsonl([columnLine(sweepA, 0, 101.25, 12), columnLine(sweepA, 1, 103.75, 14), columnLine(sweepB, 0, 201.25, 30)]))
@@ -63,6 +63,9 @@ describe('building the horizon file of a sweep', () => {
     expect(result).toEqual({ sweep: sweepA, fromCells: 2, fromColumns: 3, unknown: 355, kept: 0, backup: undefined })
     expect(altitudeAt(horizon, 100.5)).toBeCloseTo(11.25, 10)
     expect(horizon.altitudesDegrees.slice(100, 106)).toEqual([10.5, 12, 14.5, 14, 14, null])
+    expect(horizon.origins[100]).toEqual({ sweep: sweepA, night: '2026-11-08' })
+    expect(horizon.origins[104]).toEqual({ sweep: sweepA, night: '2026-11-08' })
+    expect(horizon.origins[105]).toBeNull()
     expect(horizon.observedAt[100]).toBe(new Date(at + 10000).toISOString())
     expect(horizon.observedAt[104]).toBe(new Date(at + 20000).toISOString())
     expect(horizon.sources[100]).toBe('sweep')
@@ -89,6 +92,44 @@ describe('building the horizon file of a sweep', () => {
     expect(await readFile(`${out}.bak-2026-11-09T06-00-00-000Z`, 'utf8')).toBe(before)
     expect(horizon.altitudesDegrees[101]).toBe(12)
     expect(horizon.altitudesDegrees[200]).toBe(30)
+  })
+
+  it('keeps the origin of the bins from the file before, and gives the new bins the sweep and night of the new build', async () => {
+    await writeRecords([])
+    await Effect.runPromise(buildHorizon(options('sweep-aaaa')))
+    await writeFile(join(records, 'columns.jsonl'), jsonl([columnLine(sweepB, 0, 201.25, 30)]))
+
+    await Effect.runPromise(buildHorizon(options('sweep-bbbb', at + 7200000, '2026-11-09')))
+
+    const horizon = await Effect.runPromise(readHorizon(out))
+
+    expect(horizon.origins[101]).toEqual({ sweep: sweepA, night: '2026-11-08' })
+    expect(horizon.origins[200]).toEqual({ sweep: sweepB, night: '2026-11-09' })
+    expect(horizon.origins[250]).toBeNull()
+  })
+
+  it('writes origins into a file that had none, for the bins the sweep gives, and keeps its other bins as they were', async () => {
+    await writeRecords([])
+    await mkdir(join(folder, 'vela'))
+    const bins = Array.from({ length: 360 }, (_, bin) => bin)
+    await writeFile(
+      out,
+      JSON.stringify({
+        version: 2,
+        stepDegrees: 1,
+        altitudesDegrees: bins.map(bin => (bin === 300 ? 7 : null)),
+        sources: bins.map(bin => (bin === 300 ? 'sweep' : null)),
+        observedAt: bins.map(bin => (bin === 300 ? '2026-01-01T00:00:00.000Z' : null)),
+      }),
+    )
+
+    await Effect.runPromise(buildHorizon(options('sweep-aaaa')))
+
+    const horizon = await Effect.runPromise(readHorizon(out))
+
+    expect(horizon.origins[101]).toEqual({ sweep: sweepA, night: '2026-11-08' })
+    expect(horizon.altitudesDegrees[300]).toBe(7)
+    expect(horizon.origins[300]).toBeNull()
   })
 
   it('says which sweeps match when the prefix is not one sweep, and writes nothing', async () => {
