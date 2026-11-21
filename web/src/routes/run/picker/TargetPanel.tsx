@@ -6,6 +6,7 @@ import { behindTrees, behindTreesWords } from '../../../../../state/behind-trees
 import { endsBy } from '../../../../../state/ends-by.ts'
 import type { RememberedAnswer } from '../../../../../state/remembered.ts'
 import type { Survey } from '../../../../../state/survey.ts'
+import { ActionButton } from '../../../components/ActionButton.tsx'
 import { ActionLink } from '../../../components/ActionLink.tsx'
 import { Caption } from '../../../components/Caption.tsx'
 import { Choices } from '../../../components/Choices.tsx'
@@ -16,6 +17,7 @@ import { Readings } from '../../../components/Readings.tsx'
 import { Statement } from '../../../components/Statement.tsx'
 import { clockTime, useLocalNow } from '../../../rig/clock.ts'
 import { serviceNow } from '../../../rig/service-clock.ts'
+import { useShortlist } from '../../../rig/shortlist.ts'
 import { useLink, useRig } from '../../../rig/store.ts'
 import { targetFacts } from '../../../rig/targets.ts'
 import { useAsked } from '../../../rig/use-asked.ts'
@@ -97,6 +99,7 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
   const offeredCelsius = useLink().controls?.coolerCelsius
   const answer = useAsked(() => targetFacts(id), id, refreshed)
   const now = serviceNow(useLink(), useLocalNow(tickMilliseconds))
+  const shortlist = useShortlist()
   const navigate = useNavigate()
   const [search] = useSearchParams()
 
@@ -125,6 +128,7 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
       ? unknown
       : endsByWords(endsBy({ now, exposureSeconds, frames: stop === 'frames' ? frameCount : undefined, line: target.placement?.line, darkUntil }), now)
 
+  const listed = shortlist.has(target.id)
   const behind = behindTrees({ placement: target.placement, darkUntil })
 
   return (
@@ -291,6 +295,8 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
 
       <div className={styles.horizon}>
         <ActionLink to={`/horizon?target=${encodeURIComponent(target.id)}`}>Tonight's horizon</ActionLink>
+
+        <ActionButton onPress={() => shortlist.toggle(target.id)}>{listed ? 'Remove from shortlist' : 'Add to shortlist'}</ActionButton>
       </div>
 
       <div className={styles.back}>

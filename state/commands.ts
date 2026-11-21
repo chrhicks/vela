@@ -23,6 +23,10 @@ export const NudgeId = Schema.String.check(Schema.isPattern(/^[0-9a-f]{8}-[0-9a-
 
 export type NudgeId = typeof NudgeId.Type
 
+export const ShortlistAction = Schema.Literals(['add', 'remove'])
+
+export type ShortlistAction = typeof ShortlistAction.Type
+
 export const NightStep = Schema.Literals(['guiding', 'home', 'tracking', 'cooler'])
 
 export type NightStep = typeof NightStep.Type
@@ -61,6 +65,7 @@ export const CommandRequest = Schema.Union([
   Schema.Struct({ command: Schema.Literal('stopForTheNight') }),
   Schema.Struct({ command: Schema.Literal('refocus') }),
   Schema.Struct({ command: Schema.Literal('reguide') }),
+  Schema.Struct({ command: Schema.Literal('shortlist'), target: Schema.NonEmptyString, action: ShortlistAction }),
   Schema.Struct({ command: Schema.Literal('startTarget'), target: Schema.NonEmptyString, exposureSeconds: Schema.Number.check(Schema.isGreaterThan(0)), frames: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))), filter: FilterAnswer, centre: Schema.optionalKey(Schema.Struct({ raDegrees: Schema.Finite, decDegrees: Schema.Finite })), cooler: CoolerSetting }),
 ])
 

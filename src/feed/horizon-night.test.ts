@@ -1,11 +1,11 @@
 import { Context, Effect, Layer, Schema } from 'effect'
 import { HttpRouter } from 'effect/http'
 import { describe, expect, it } from 'vitest'
-import { HorizonNight } from '../../state/horizon-night.ts'
+import { HorizonNight, HorizonPaths } from '../../state/horizon-night.ts'
 import { HorizonNightRefused, makeHorizonNights } from '../catalog/horizon-night.ts'
 import { testCatalog } from '../catalog/testing.ts'
 import { noHorizon } from '../horizon/horizon.ts'
-import { HorizonNightRoute, HorizonNights } from './horizon-night.ts'
+import { HorizonNightRoute, HorizonNights, HorizonPathsRoute } from './horizon-night.ts'
 
 const phoenix = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
 
@@ -15,8 +15,8 @@ const nightsFor = (site: typeof phoenix | null) =>
 async function get(address: string, site: typeof phoenix | null = phoenix) {
   const asked: Array<{ readonly id: string; readonly at: number }> = []
   const nights = nightsFor(site)
-  const service = { night: (id: string, at: number) => (asked.push({ id, at }), nights.night(id, at)) }
-  const { handler, dispose } = HttpRouter.toWebHandler(Layer.mergeAll(HorizonNightRoute), { disableLogger: true })
+  const service = { night: (id: string, at: number) => (asked.push({ id, at }), nights.night(id, at)), paths: (ids: ReadonlyArray<string>, at: number) => nights.paths(ids, at) }
+  const { handler, dispose } = HttpRouter.toWebHandler(Layer.mergeAll(HorizonNightRoute, HorizonPathsRoute), { disableLogger: true })
   const response = await handler(new Request(`http://localhost${address}`), Context.make(HorizonNights, service))
   const body = await response.json()
 
@@ -71,12 +71,52 @@ describe('GET /horizon-night', () => {
   })
 
   it('refuses where there is no night to sample', async () => {
-    const { handler, dispose } = HttpRouter.toWebHandler(Layer.mergeAll(HorizonNightRoute), { disableLogger: true })
-    const service = { night: () => Effect.fail(new HorizonNightRefused({ refusal: { code: 'no-night' } })) }
+    const { handler, dispose } = HttpRouter.toWebHandler(Layer.mergeAll(HorizonNightRoute, HorizonPathsRoute), { disableLogger: true })
+    const refusal = Effect.fail(new HorizonNightRefused({ refusal: { code: 'no-night' } }))
+    const service = { night: () => refusal, paths: () => refusal }
     const response = await handler(new Request('http://localhost/horizon-night?target=orion'), Context.make(HorizonNights, service))
 
     await dispose()
 
     expect({ status: response.status, body: await response.json() }).toEqual({ status: 422, body: { code: 'no-night' } })
+  })
+})
+
+describe('GET /horizon-paths', () => {
+  const afternoon = '2026-11-15T22:00:00Z'
+
+  it('answers with every asked target path in one body, leaving out the Moon, horizon and frame', async () => {
+    const answer = await get(`/horizon-paths?targets=orion,triangulum,nowhere,orion&at=${afternoon}`)
+    const paths = Schema.decodeUnknownSync(HorizonPaths)(answer.body)
+
+    expect(answer.status).toBe(200)
+    expect(answer.cache).toBe('no-store')
+    expect(paths.at).toBe(Date.parse(afternoon))
+    expect(paths.targets.map(({ target }) => target.id)).toEqual(['orion', 'triangulum'])
+    expect(paths.unknown).toEqual(['nowhere'])
+    expect(Object.keys(answer.body as object)).toEqual(['at', 'targets', 'unknown'])
+    expect(Object.keys(paths.targets[0]!.path)).toEqual(['startAt', 'stepSeconds', 'altitudes', 'azimuths', 'lines'])
+  })
+
+  it('draws the same path for a target as the full night does', async () => {
+    const one = Schema.decodeUnknownSync(HorizonPaths)((await get(`/horizon-paths?targets=orion&at=${afternoon}`)).body)
+    const night = Schema.decodeUnknownSync(HorizonNight)((await get(`/horizon-night?target=orion&at=${afternoon}`)).body)
+
+    expect(one.targets[0]!.path).toEqual(night.path)
+  })
+
+  it('answers with an empty list when every target is unknown', async () => {
+    expect(await get(`/horizon-paths?targets=nowhere&at=${afternoon}`)).toMatchObject({ status: 200, body: { targets: [], unknown: ['nowhere'] } })
+  })
+
+  it('refuses a request with no targets, an empty one, or a time that is not one', async () => {
+    expect(await get('/horizon-paths')).toMatchObject({ status: 400, body: { code: 'malformed' } })
+    expect(await get('/horizon-paths?targets=')).toMatchObject({ status: 400, body: { code: 'malformed' } })
+    expect(await get('/horizon-paths?targets=orion,,m3')).toMatchObject({ status: 400, body: { code: 'malformed' } })
+    expect(await get('/horizon-paths?targets=orion&at=tonight')).toMatchObject({ status: 400, body: { code: 'malformed' } })
+  })
+
+  it('refuses when the mount has not reported its site', async () => {
+    expect(await get(`/horizon-paths?targets=orion&at=${afternoon}`, null)).toMatchObject({ status: 503, body: { code: 'no-site' } })
   })
 })

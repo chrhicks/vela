@@ -15,28 +15,35 @@ const Kept = Schema.Struct({
   camera: Schema.optionalKey(Schema.NullOr(Schema.Struct({ on: Schema.NullOr(Schema.Boolean), setpoint: Schema.NullOr(Schema.Finite), sensorCelsius: Schema.NullOr(Schema.Finite), wrote: Schema.Finite }))),
   targetCoolers: Schema.optionalKey(Schema.Array(Schema.Struct({ target: Schema.String, ...CoolerAtStart.fields }))),
   lastCooler: Schema.optionalKey(Schema.NullOr(CoolerAtStart)),
+  lightTargets: Schema.optionalKey(Schema.Array(Schema.Struct({ target: Schema.String, at: Schema.Finite }))),
+  shortlist: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 
 const decodeKept = Schema.decodeUnknownEffect(Schema.fromJsonString(Kept))
 
 const reasonOf = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause))
 
-const keptOf = ({ lastLight, cameraAngle, centres, camera, targetCoolers, lastCooler }: Remembered): typeof Kept.Type => ({
+const keptOf = ({ lastLight, cameraAngle, centres, camera, targetCoolers, lastCooler, lightTargets, shortlist }: Remembered): typeof Kept.Type => ({
   lastLight: lastLight === undefined ? null : { exposureSeconds: lastLight.exposureSeconds, frames: lastLight.frames ?? null, at: lastLight.at },
   cameraAngle: cameraAngle ?? null,
   centres,
   camera: camera === undefined ? null : { on: camera.on ?? null, setpoint: camera.setpoint ?? null, sensorCelsius: camera.sensorCelsius ?? null, wrote: camera.wrote },
   targetCoolers,
   lastCooler: lastCooler ?? null,
+  lightTargets,
+  ...(shortlist === undefined ? {} : { shortlist }),
 })
 
-const rememberedOf = ({ lastLight, cameraAngle, centres, camera, targetCoolers, lastCooler }: typeof Kept.Type): Remembered => ({
+const rememberedOf = ({ lastLight, cameraAngle, centres, camera, targetCoolers, lastCooler, lightTargets, shortlist }: typeof Kept.Type): Remembered => ({
   lastLight: lastLight === null ? undefined : { exposureSeconds: lastLight.exposureSeconds, frames: lastLight.frames ?? undefined, at: lastLight.at },
   cameraAngle: cameraAngle ?? undefined,
   centres,
   camera: camera === undefined || camera === null ? undefined : { on: camera.on ?? undefined, setpoint: camera.setpoint ?? undefined, sensorCelsius: camera.sensorCelsius ?? undefined, wrote: camera.wrote },
   targetCoolers: targetCoolers ?? [],
   lastCooler: lastCooler ?? undefined,
+  lightRun: undefined,
+  lightTargets: lightTargets ?? [],
+  shortlist,
 })
 
 const written = (path: string) => Effect.promise(() => stat(path).then(() => true, () => false))

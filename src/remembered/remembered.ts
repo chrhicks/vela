@@ -1,5 +1,5 @@
 import { Option, Result, Schema } from 'effect'
-import type { CoolerSetting } from '../../state/commands.ts'
+import type { CoolerSetting, ShortlistAction } from '../../state/commands.ts'
 import { operationObjects, readRigEntry } from '../../state/entries.ts'
 import type { Entry } from '../../state/entry.ts'
 import { angularDistance } from '../../state/angles.ts'
@@ -33,6 +33,21 @@ export interface TargetCooler extends CoolerAtStart {
   readonly target: string
 }
 
+export interface LightTarget {
+  readonly target: string
+  readonly at: number
+}
+
+export interface LightRun extends LightTarget {
+  readonly run: string
+}
+
+export interface ShortlistEdit {
+  readonly target: string
+  readonly action: ShortlistAction
+  readonly from?: ReadonlyArray<string>
+}
+
 export interface Remembered {
   readonly lastLight: LastLight | undefined
   readonly cameraAngle: { readonly degrees: number; readonly at: number } | undefined
@@ -40,9 +55,12 @@ export interface Remembered {
   readonly camera: CoolerCamera | undefined
   readonly targetCoolers: ReadonlyArray<TargetCooler>
   readonly lastCooler: CoolerAtStart | undefined
+  readonly lightRun: LightRun | undefined
+  readonly lightTargets: ReadonlyArray<LightTarget>
+  readonly shortlist: ReadonlyArray<string> | undefined
 }
 
-export const nothingRemembered: Remembered = { lastLight: undefined, cameraAngle: undefined, centres: [], camera: undefined, targetCoolers: [], lastCooler: undefined }
+export const nothingRemembered: Remembered = { lastLight: undefined, cameraAngle: undefined, centres: [], camera: undefined, targetCoolers: [], lastCooler: undefined, lightRun: undefined, lightTargets: [], shortlist: undefined }
 
 const SolvedPass = Schema.Struct({
   run: Schema.String,
@@ -137,6 +155,36 @@ function lightStarted(state: Remembered, start: { readonly at: number; readonly 
   }
 }
 
+function lightExposed(state: Remembered, run: string): Remembered {
+  const { lightRun } = state
+
+  if (lightRun === undefined || lightRun.run !== run) return state
+
+  const before = state.lightTargets.find(known => known.target === lightRun.target)
+
+  return { ...state, lightTargets: [...state.lightTargets.filter(known => known !== before), later(before, { target: lightRun.target, at: lightRun.at })] }
+}
+
+export function withShortlistEdit(state: Remembered, { target, action, from }: ShortlistEdit): Remembered {
+  const base = state.shortlist ?? from ?? []
+
+  if (action === 'add') return base.includes(target) && state.shortlist !== undefined ? state : { ...state, shortlist: base.includes(target) ? base : [...base, target] }
+
+  return base.includes(target) || state.shortlist === undefined ? { ...state, shortlist: base.filter(known => known !== target) } : state
+}
+
+export function recentLightTargets(state: Remembered, count: number): ReadonlyArray<string> {
+  const imaged = new Set(state.lightTargets.map(known => known.target))
+  const seeded = state.targetCoolers.filter(cooler => !imaged.has(cooler.target)).map(cooler => ({ target: cooler.target, at: cooler.at }))
+
+  return [...state.lightTargets, ...seeded]
+    .sort((a, b) => b.at - a.at)
+    .slice(0, count)
+    .map(known => known.target)
+}
+
+export const shortlistOf = (state: Remembered, count: number): ReadonlyArray<string> => state.shortlist ?? recentLightTargets(state, count)
+
 export function remember(state: Remembered, entry: Entry): Remembered {
   if (entry.kind === 'vela.centre.pass') return passed(state, entry)
   if (entry.kind === 'client.measure') return solvedForCentring(state, entry)
@@ -144,11 +192,21 @@ export function remember(state: Remembered, entry: Entry): Remembered {
 
   const read = Result.match(readRigEntry(entry), { onFailure: () => undefined, onSuccess: Option.getOrUndefined })
 
-  if (read?.kind === 'vela.run.started' && read.body.frameType === 'light' && read.body.object._tag === 'Target') {
-    const lit = { ...state, lastLight: later(state.lastLight, { exposureSeconds: read.body.exposureSeconds, frames: read.body.count, at: read.at }) }
+  if (read?.kind === 'vela.run.started') {
+    if (read.body.frameType !== 'light' || read.body.object._tag !== 'Target') return state.lightRun === undefined ? state : { ...state, lightRun: undefined }
+
+    const lit: Remembered = {
+      ...state,
+      lastLight: later(state.lastLight, { exposureSeconds: read.body.exposureSeconds, frames: read.body.count, at: read.at }),
+      lightRun: read.body.target === undefined ? undefined : { run: read.body.run, target: read.body.target.id, at: read.at },
+    }
 
     return lightStarted(lit, { at: read.at, target: read.body.target?.id })
   }
+
+  if (read?.kind === 'vela.run.exposed') return lightExposed(state, read.body.run)
+
+  if (read?.kind === 'vela.shortlist') return withShortlistEdit(state, read.body)
 
   if (read?.kind === 'vela.run.ended' && read.body.reason === 'done') {
     return { ...state, centres: state.centres.map(centre => (centre.run === read.body.run ? { ...centre, reached: true } : centre)) }

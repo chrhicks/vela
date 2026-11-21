@@ -176,6 +176,10 @@ export const HorizonNightSettings = Schema.Struct({
   cloudyPercent: described("The forecast cloud cover, in percent, from which the horizon page greys the target's path and counts an hour as cloudy. A display choice, not a limit on anything Vela does", Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 100 })), 50),
 })
 
+export const ShortlistSettings = Schema.Struct({
+  recentCount: described('How many of the most recently imaged targets the shortlist shows until the first time a target is added to it or removed from it', Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), 5),
+})
+
 export const StarSettings = Schema.Struct({
   program: Schema.String.annotate({ description: 'The ASTAP command-line program (astap_cli) on this machine, which counts and sizes the stars of each kept imaging frame' }),
   catalog: Schema.optionalKey(Schema.String.annotate({ description: "The folder of ASTAP's star database on this machine. With it, each kept imaging frame is also plate solved to find where it points" })),
@@ -343,6 +347,7 @@ export const VelaSettings = Schema.Struct({
   review: described('Asking models whether each light frame is obstructed. Report only: it never acts on the rig', ReviewSettings, {}),
   rememberedFile: described('The file Vela keeps what it remembers in: the last light run, the camera angle, the centres that centring reached and the cooler each target was last started with', Schema.String, '/mnt/storage/vela/remembered.json'),
   horizonFile: described('The file the horizon is read from: the lowest altitude above which the sky is open, in each 1 degree of azimuth (version 2). Without the file, every direction is unknown', Schema.String, '/mnt/storage/vela/horizon.json'),
+  shortlist: described('The shortlist of targets the horizon page draws beside the chosen one', ShortlistSettings, {}),
   horizonNight: described("A target's night on the horizon page: the path's points and their rounding", HorizonNightSettings, {}),
   forecast: described('The cloud forecast for the site the mount reports, from the National Weather Service and Open-Meteo', ForecastSettings, {}),
   sweep: described('The horizon sweep: the columns, steps and limits of its path', SweepSettings, {}),

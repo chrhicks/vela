@@ -1,4 +1,4 @@
-import { Schema } from 'effect'
+import { Schema, SchemaTransformation } from 'effect'
 import { NightName } from './entries.ts'
 import { HorizonSource } from './horizon-source.ts'
 import { TargetId } from './targets.ts'
@@ -8,6 +8,16 @@ export const horizonNightPath = '/horizon-night'
 export const HorizonNightAsked = Schema.Struct({ target: Schema.NonEmptyString, at: Schema.optionalKey(Schema.DateTimeUtcFromString) })
 
 export type HorizonNightAsked = typeof HorizonNightAsked.Type
+
+export const horizonPathsPath = '/horizon-paths'
+
+export const targetSeparator = ','
+
+const TargetList = Schema.String.pipe(Schema.decodeTo(Schema.Array(Schema.NonEmptyString), SchemaTransformation.transform<ReadonlyArray<string>, string>({ decode: text => text.split(targetSeparator), encode: ids => ids.join(targetSeparator) })))
+
+export const HorizonPathsAsked = Schema.Struct({ targets: TargetList, at: Schema.optionalKey(Schema.DateTimeUtcFromString) })
+
+export type HorizonPathsAsked = typeof HorizonPathsAsked.Type
 
 export const Compass = Schema.Literals(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
 
@@ -109,6 +119,14 @@ export const HorizonNight = Schema.Struct({
 })
 
 export type HorizonNight = typeof HorizonNight.Type
+
+export const HorizonPaths = Schema.Struct({
+  at: Schema.Number,
+  targets: Schema.Array(Schema.Struct({ target: Schema.Struct({ id: TargetId, name: Schema.String }), path: TargetPath })),
+  unknown: Schema.Array(Schema.String),
+})
+
+export type HorizonPaths = typeof HorizonPaths.Type
 
 export const HorizonRefusal = Schema.Union([
   Schema.Struct({ code: Schema.Literal('malformed') }),

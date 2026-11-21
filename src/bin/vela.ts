@@ -46,7 +46,7 @@ import { StackPictures } from '../feed/stack.ts'
 import { DetailSurveyKept, SurveyKept } from '../feed/survey.ts'
 import { CommandLog, CommandRefused, Operations } from '../feed/commands.ts'
 import { pressKey } from '../../state/pressing.ts'
-import type { FilterAnswer } from '../../state/commands.ts'
+import type { FilterAnswer, ShortlistAction } from '../../state/commands.ts'
 import { deviceCommandsFrom } from '../controls/device-commands.ts'
 import { Autofocusing, focusControls, FocusSettings } from '../controls/focus.ts'
 import { CalibrationSettings, cameraControls, Capturing } from '../controls/camera.ts'
@@ -81,7 +81,7 @@ import { readWireBody } from '../stream/json.ts'
 import { Broker, brokerOf, followRig, type Followed } from '../stream/follow.ts'
 import { readHistory } from '../stream/history.ts'
 import { keep, readKept } from '../remembered/kept.ts'
-import { coolerFor, lastCentreNear, nothingRemembered, remember } from '../remembered/remembered.ts'
+import { coolerFor, lastCentreNear, nothingRemembered, remember, shortlistOf, withShortlistEdit } from '../remembered/remembered.ts'
 import { Recalled } from '../feed/remembered.ts'
 import { keepLine } from '../review/keep.ts'
 import { placeFrame } from '../review/place.ts'
@@ -504,7 +504,27 @@ const capturing = Layer.succeed(Capturing, {
 
 const flatsLog = Layer.succeed(FlatsLog, { tried: flatTry => Effect.sync(() => publishEntry(stream.vela('flats'), 'vela.flats.exposure', String(flatTry.exposureSeconds), { ...flatTry })) })
 
-const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls, flatControls, guidingControls, startControls, rehearsalControls, sweepControls]), ([mount, focus, camera, dew, flats, guiding, start, rehearsal, sweeping]) => ({ ...launchOperations, ...mount, ...focus, ...camera, ...dew, ...flats, ...guiding, ...start, ...rehearsal, ...sweeping }))).pipe(Layer.provide(Layer.effect(MountGuiding, mountGuiding)), Layer.provide(startServices), Layer.provide(rehearsalServices), Layer.provide(sweepServices), Layer.provide(Layer.succeed(GuidingSettings, { settle: { pixels: settings.controls.guideSettlePixels, time: settings.controls.guideSettleSeconds, timeout: settings.controls.guideSettleTimeoutSeconds }, replySeconds: settings.controls.guiderReplySeconds, connectSeconds: settings.controls.guiderConnectSeconds, newId: Effect.sync(() => `vela-guider-${randomUUID()}`) })), Layer.provide(flatsLog), Layer.provide(Layer.succeed(FlatSettings, { startSeconds: settings.controls.flatStartSeconds, lowAdu: settings.controls.flatLowAdu, highAdu: settings.controls.flatHighAdu, minSeconds: settings.controls.biasExposureSeconds, maxSeconds: settings.controls.flatMaxSeconds, tries: settings.controls.flatTries, measureSeconds: settings.controls.flatMeasureSeconds })), Layer.provide(Layer.succeed(CalibrationSettings, { biasExposureSeconds: settings.controls.biasExposureSeconds })), Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds, guidingSettleSeconds: settings.controls.guideSettleTimeoutSeconds + settings.controls.guiderReplySeconds })))
+const shortlistOperations = {
+  shortlist: (target: string, action: ShortlistAction): Effect.Effect<void, CommandRefused> =>
+    Effect.gen(function* () {
+      if (action === 'add' && catalog.find(target) === undefined) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'unknown-target', text: target } }))
+
+      const from = remembered.shortlist === undefined ? shortlistOf(remembered, settings.shortlist.recentCount) : undefined
+      const edit = { target, action, ...(from === undefined ? {} : { from }) }
+      const at = Date.now()
+
+      yield* Effect.tryPromise({
+        try: () => jetstream(broker.connection).publish(stream.vela('shortlist'), JSON.stringify({ v: 2, id: `vela.shortlist:${target}:${at}`, rig: frames.rig, kind: 'vela.shortlist', at, source: 'vela', body: edit })),
+        catch: cause => new CommandRefused({ refusal: { code: 'refused', text: `the shortlist could not be recorded on the stream: ${String(cause)}` } }),
+      })
+
+      remembered = withShortlistEdit(remembered, edit)
+
+      yield* keepRemembered
+    }),
+}
+
+const OperationsLive = Layer.effect(Operations, Effect.map(Effect.all([mountControls, focusControls, cameraControls, dewControls, flatControls, guidingControls, startControls, rehearsalControls, sweepControls]), ([mount, focus, camera, dew, flats, guiding, start, rehearsal, sweeping]) => ({ ...launchOperations, ...shortlistOperations, ...mount, ...focus, ...camera, ...dew, ...flats, ...guiding, ...start, ...rehearsal, ...sweeping }))).pipe(Layer.provide(Layer.effect(MountGuiding, mountGuiding)), Layer.provide(startServices), Layer.provide(rehearsalServices), Layer.provide(sweepServices), Layer.provide(Layer.succeed(GuidingSettings, { settle: { pixels: settings.controls.guideSettlePixels, time: settings.controls.guideSettleSeconds, timeout: settings.controls.guideSettleTimeoutSeconds }, replySeconds: settings.controls.guiderReplySeconds, connectSeconds: settings.controls.guiderConnectSeconds, newId: Effect.sync(() => `vela-guider-${randomUUID()}`) })), Layer.provide(flatsLog), Layer.provide(Layer.succeed(FlatSettings, { startSeconds: settings.controls.flatStartSeconds, lowAdu: settings.controls.flatLowAdu, highAdu: settings.controls.flatHighAdu, minSeconds: settings.controls.biasExposureSeconds, maxSeconds: settings.controls.flatMaxSeconds, tries: settings.controls.flatTries, measureSeconds: settings.controls.flatMeasureSeconds })), Layer.provide(Layer.succeed(CalibrationSettings, { biasExposureSeconds: settings.controls.biasExposureSeconds })), Layer.provide(Layer.succeed(DewSettings, { channel: settings.controls.dewChannel })), Layer.provide(mountRuns), Layer.provide(centring), Layer.provide(autofocusing), Layer.provide(capturing), Layer.provide(Layer.succeed(FocusSettings, { moveSeconds: settings.controls.focusMoveSeconds })), Layer.provide(Layer.succeed(MountSettings, { nudgeRates: { slow: settings.controls.nudgeSlowRate, fast: settings.controls.nudgeFastRate }, flipSettleSeconds: settings.controls.flipSettleSeconds, guidingSettleSeconds: settings.controls.guideSettleTimeoutSeconds + settings.controls.guiderReplySeconds })))
 
 const startAnnounced = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -530,6 +550,7 @@ const feedApp = FeedServer.pipe(
         now: Effect.sync(() => ({
           lastLight: remembered.lastLight === undefined ? null : { exposureSeconds: remembered.lastLight.exposureSeconds, frames: remembered.lastLight.frames ?? null },
           cameraAngleDegrees: remembered.cameraAngle?.degrees ?? null,
+          shortlist: shortlistOf(remembered, settings.shortlist.recentCount),
         })),
       }),
       Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
@@ -549,7 +570,7 @@ const feedApp = FeedServer.pipe(
           return site === undefined ? null : skyTonight(site, at)
         }),
       }),
-      Layer.succeed(HorizonNights, { night: (id, at) => horizonNights.night(id, at) }),
+      Layer.succeed(HorizonNights, { night: (id, at) => horizonNights.night(id, at), paths: (ids, at) => horizonNights.paths(ids, at) }),
       Layer.succeed(ForecastNights, { night: at => forecastNights.night(at) }),
       Layer.succeed(Targets, {
         search: text => Effect.map(Clock.currentTimeMillis, at => placedTargets.search(text, at)),
@@ -668,7 +689,7 @@ remembered = await runHandledPromise(
 )
 
 remembered = await runHandledPromise(
-  readHistory({ stream, subjects: [stream.vela('run'), stream.vela('centre'), stream.client, stream.sent(settings.devices.primary)], readBatch: settings.historyReadBatch, read: readMessage }).pipe(
+  readHistory({ stream, subjects: [stream.vela('run'), stream.vela('centre'), stream.vela('shortlist'), stream.client, stream.sent(settings.devices.primary)], readBatch: settings.historyReadBatch, read: readMessage }).pipe(
     Effect.map(entries => entries.reduce(remember, remembered)),
     Effect.provideService(Broker, broker),
     Effect.catchTag('StreamUnreadable', error => logProblem(`what was used last could not be read from ${error.stream}: ${error.issue}`).pipe(Effect.as(remembered))),
