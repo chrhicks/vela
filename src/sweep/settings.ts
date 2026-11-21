@@ -14,16 +14,6 @@ export const RehearsalSettings = Schema.Struct({
   rowDegrees: described('The altitude, in degrees, between two stops down a column of the rehearsal, before each stop is split into steps by the axis limit', Positive, 5),
 })
 
-const Latitude = Schema.Number.check(Schema.isBetween({ minimum: -90, maximum: 90 }))
-
-const Longitude = Schema.Number.check(Schema.isBetween({ minimum: -180, maximum: 180 }))
-
-export const CellSite = Schema.Struct({
-  latitudeDegrees: Latitude.annotate({ description: 'The latitude of the site, in degrees north' }),
-  longitudeDegrees: Longitude.annotate({ description: 'The longitude of the site, in degrees east' }),
-  elevationMeters: Schema.Number.annotate({ description: 'The height of the site above sea level, in metres' }),
-})
-
 export const CellSettings = Schema.Struct({
   columns: described('How many cells a frame is split into across its width', PositiveCount, 4),
   rows: described('How many cells a frame is split into down its height', PositiveCount, 3),
@@ -31,7 +21,6 @@ export const CellSettings = Schema.Struct({
   partlyBlockedBelow: described('A cell with fewer stars than this share of the clear-sky star count of a cell, and not blocked, is partly blocked; the rest are sky', Fraction, 0.65),
   clearTopFraction: described("The share of a frame's cells, most stars first, whose median star count is the frame's own clear-sky star count of a cell", Fraction.check(Schema.isGreaterThan(0)), 0.1),
   edgeBinDegrees: described('The width, in degrees of azimuth, of one bin of the edge', Positive, 1),
-  site: Schema.optionalKey(CellSite.annotate({ description: 'The site the cells are placed in the sky for; the sweep itself takes it from the mount, so replaying a night needs it here' })),
 })
 
 export type CellSettings = typeof CellSettings.Type

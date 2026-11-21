@@ -17,12 +17,6 @@ describe('the cell settings', () => {
     expect(() => decodeConfig(CellSettings, { blockedBelow: 1.5 })).toThrow()
     expect(() => decodeConfig(CellSettings, { clearTopFraction: 0 })).toThrow()
   })
-
-  it('take a site only with all of latitude, longitude and elevation', () => {
-    expect(decodeConfig(CellSettings, { site: { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 } }).site?.latitudeDegrees).toBe(33.45)
-    expect(() => decodeConfig(CellSettings, { site: { latitudeDegrees: 33.45 } })).toThrow()
-    expect(() => decodeConfig(CellSettings, { site: { latitudeDegrees: 133, longitudeDegrees: 0, elevationMeters: 0 } })).toThrow()
-  })
 })
 
 describe('which cell a star is in', () => {

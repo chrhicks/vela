@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { Data, Effect, Schema } from 'effect'
 import { SweepFrameFields, type SweepFrameBody, type SweepId } from '../../state/entries.ts'
-import { readFits } from '../frames/fits.ts'
+import { readFits, type HeaderValue } from '../frames/fits.ts'
 import { arcsecPerPixel, readStarList, type StarSettings } from '../frames/stats.ts'
 import type { Site } from '../pointing/target.ts'
 import { cellLevels, countStars, type FrameSize } from './cells.ts'
@@ -23,6 +23,7 @@ export interface FileMeasure {
   readonly counts: ReadonlyArray<number>
   readonly levels: ReadonlyArray<number>
   readonly headerScale: number | undefined
+  readonly site: Site | undefined
 }
 
 export type MeasureFile = (path: string) => Promise<FileMeasure>
@@ -37,6 +38,18 @@ export interface NightResult {
   readonly edges: number
   readonly failures: ReadonlyArray<FrameFailure>
   readonly seconds: number
+}
+
+const numberIn = (header: ReadonlyMap<string, HeaderValue>, key: string) => {
+  const value = header.get(key)
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+export function siteOf(header: ReadonlyMap<string, HeaderValue>): Site | undefined {
+  const latitudeDegrees = numberIn(header, 'SITELAT')
+  const longitudeDegrees = numberIn(header, 'SITELONG')
+
+  return latitudeDegrees === undefined || longitudeDegrees === undefined ? undefined : { latitudeDegrees, longitudeDegrees, elevationMeters: numberIn(header, 'SITEELEV') ?? 0 }
 }
 
 const reasonOf = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause))
@@ -72,7 +85,7 @@ export const measureWithAstap =
     const [listed, fits] = await Promise.all([extractStars(stars.program, path, stars.analyseSnr, stars.listLimit), readFile(path).then(readFits)])
     const size = { width: fits.width, height: fits.height }
 
-    return { size, counts: countStars(listed, size, grid), levels: cellLevels(fits.pixels, size, grid), headerScale: arcsecPerPixel(fits.header) ?? undefined }
+    return { size, counts: countStars(listed, size, grid), levels: cellLevels(fits.pixels, size, grid), headerScale: arcsecPerPixel(fits.header) ?? undefined, site: siteOf(fits.header) }
   }
 
 export interface NightOptions {
@@ -81,18 +94,17 @@ export interface NightOptions {
   readonly outFolder: string
   readonly sweepPrefix: string
   readonly settings: SweepSettings
-  readonly site: Site
   readonly measure: MeasureFile
   readonly now: () => number
 }
 
 export const labelNight = (options: NightOptions): Effect.Effect<NightResult, CellRecordsUnreadable | CellOutputUnwritable> =>
   Effect.gen(function* () {
-    const { recordsFolder, framesFolder, outFolder, sweepPrefix, settings, site, measure, now } = options
+    const { recordsFolder, framesFolder, outFolder, sweepPrefix, settings, measure, now } = options
     const started = now()
     const records = (yield* readFrameRecords(join(recordsFolder, 'frames.jsonl'))).filter(record => record.sweep.startsWith(sweepPrefix))
     const failures: Array<FrameFailure> = []
-    const measured = new Map<SweepId, Array<MeasuredFrame>>()
+    const measured = new Map<SweepId, Array<MeasuredFrame & Pick<FileMeasure, 'site'>>>()
 
     for (const record of records) {
       const found = yield* Effect.tryPromise({ try: () => measure(join(framesFolder, record.file)), catch: reasonOf }).pipe(Effect.result)
@@ -105,9 +117,14 @@ export const labelNight = (options: NightOptions): Effect.Effect<NightResult, Ce
       measured.set(record.sweep, [...(measured.get(record.sweep) ?? []), { record, ...found.success }])
     }
 
-    const labelled = [...measured.values()].map(frames => labelSweep(frames, settings, site))
-    const frameLines = labelled.flatMap(({ frames }) => frames.map(frame => JSON.stringify(frame)))
-    const edgeLines = [...measured.keys()].flatMap((sweep, index) => labelled[index]!.edges.map(edge => JSON.stringify({ sweep, ...edge })))
+    const placed = [...measured].flatMap(([sweep, frames]) => {
+      const site = frames.find(frame => frame.site !== undefined)?.site
+      if (site !== undefined) return [{ sweep, labelled: labelSweep(frames, settings, site) }]
+      failures.push(...frames.map(frame => ({ file: frame.record.file, reason: 'no frame of its sweep has SITELAT and SITELONG in its header' })))
+      return []
+    })
+    const frameLines = placed.flatMap(({ labelled }) => labelled.frames.map(frame => JSON.stringify(frame)))
+    const edgeLines = placed.flatMap(({ sweep, labelled }) => labelled.edges.map(edge => JSON.stringify({ sweep, ...edge })))
     const write = (name: string, lines: ReadonlyArray<string>) =>
       Effect.tryPromise({ try: () => writeFile(join(outFolder, name), lines.map(line => `${line}\n`).join('')), catch: cause => new CellOutputUnwritable({ path: join(outFolder, name), reason: reasonOf(cause) }) })
 

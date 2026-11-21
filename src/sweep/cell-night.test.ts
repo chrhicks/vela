@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { SweepFrameBody, SweepId } from '../../state/entries.ts'
 import { decodeConfig } from '../config.ts'
 import { syntheticFits } from '../testing/fits.ts'
-import { extractStars, labelNight, measureWithAstap, readFrameRecords, type MeasureFile } from './cell-night.ts'
+import { extractStars, labelNight, measureWithAstap, readFrameRecords, siteOf, type MeasureFile } from './cell-night.ts'
 import { SweepSettings } from './settings.ts'
 
 const phoenix = { latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 331 }
@@ -28,7 +28,7 @@ const record = (sweep: string, file: string, index: number): SweepFrameBody => (
   pointing: { source: 'solve', altitudeDegrees: 20, azimuthDegrees: 180 },
 })
 
-const stub: MeasureFile = async () => ({ size, counts: Array.from({ length: 48 }, () => 10), levels: Array.from({ length: 48 }, () => 500), headerScale: 2 })
+const stub: MeasureFile = async () => ({ size, counts: Array.from({ length: 48 }, () => 10), levels: Array.from({ length: 48 }, () => 500), headerScale: 2, site: phoenix })
 
 let folder = ''
 
@@ -42,7 +42,7 @@ afterEach(() => rm(folder, { recursive: true, force: true }))
 
 const writeRecords = (records: ReadonlyArray<SweepFrameBody>) => writeFile(join(folder, 'records', 'frames.jsonl'), records.map(line => `${JSON.stringify(line)}\n`).join(''))
 
-const options = (measure: MeasureFile, sweepPrefix = '') => ({ recordsFolder: join(folder, 'records'), framesFolder: join(folder, 'frames'), outFolder: join(folder, 'out'), sweepPrefix, settings, site: phoenix, measure, now: () => 0 })
+const options = (measure: MeasureFile, sweepPrefix = '') => ({ recordsFolder: join(folder, 'records'), framesFolder: join(folder, 'frames'), outFolder: join(folder, 'out'), sweepPrefix, settings, measure, now: () => 0 })
 
 const lines = async (name: string) =>
   (await readFile(join(folder, 'out', name), 'utf8'))
@@ -103,6 +103,22 @@ describe('labelling a night', () => {
 
     expect(result.failures).toEqual([{ file: 'a_2.fits', reason: 'ASTAP did not run' }])
     expect((await lines('cells.jsonl')).map(line => line['file'])).toEqual(['a_1.fits'])
+  })
+
+  it('leaves out and names the frames of a sweep none of whose frames carries the site', async () => {
+    await writeRecords([record('sweep-a', 'a_1.fits', 0), record('sweep-b', 'b_1.fits', 0)])
+    const siteless: MeasureFile = async path => ({ ...(await stub(path)), site: path.endsWith('a_1.fits') ? undefined : phoenix })
+
+    const result = await Effect.runPromise(labelNight(options(siteless)))
+
+    expect(result).toMatchObject({ frames: 1, failures: [{ file: 'a_1.fits', reason: 'no frame of its sweep has SITELAT and SITELONG in its header' }] })
+  })
+
+  it('takes the site from the header, elevation 0 when it is not there', () => {
+    expect(siteOf(new Map<string, number | string>([['SITELAT', 33.45], ['SITELONG', -112.07]]))).toEqual({ latitudeDegrees: 33.45, longitudeDegrees: -112.07, elevationMeters: 0 })
+    expect(siteOf(new Map<string, number | string>([['SITELAT', 33.45], ['SITELONG', -112.07], ['SITEELEV', 331]]))).toEqual(phoenix)
+    expect(siteOf(new Map<string, number | string>([['SITELAT', 33.45]]))).toBeUndefined()
+    expect(siteOf(new Map<string, number | string>([['SITELAT', '33.45'], ['SITELONG', -112.07]]))).toBeUndefined()
   })
 
   it('fails with the folder it could not write to', async () => {

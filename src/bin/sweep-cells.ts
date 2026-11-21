@@ -17,22 +17,17 @@ const failed = (reason: string) =>
     process.exitCode = 1
   })
 
-const { site } = settings.sweep.cells
-
 await runHandledPromise(
   night === undefined || !nightPattern.test(night)
     ? failed('usage: sweep-cells.ts <config.json> <night YYYY-MM-DD> [--sweep ID-PREFIX] [--out FOLDER]')
     : settings.stars === undefined
       ? failed('the config has no stars setting, so there is no ASTAP program to run')
-      : site === undefined
-        ? failed('the config has no sweep.cells.site: the cells are placed in the sky for that site')
-        : labelNight({
+      : labelNight({
             recordsFolder: join(settings.sweep.recordDir, night),
             framesFolder: join(settings.frames.keepDir, night),
             outFolder: values.out ?? join(settings.sweep.recordDir, night),
             sweepPrefix: values.sweep,
             settings: settings.sweep,
-            site,
             measure: measureWithAstap(settings.stars, settings.sweep.cells),
             now: Date.now,
           }).pipe(
