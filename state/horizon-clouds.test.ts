@@ -80,7 +80,10 @@ describe('the clouds label and the forecast note', () => {
   it('labels each cloudy stretch with its hours, where the target is up', () => {
     const runs = cloudyRuns(cloudHours(span, forecast), 50)
 
-    expect(cloudLabels(night(spell), runs, clock).map(label => label.words)).toEqual(['Clouds 03 to 05 · forecast'])
+    const labels = cloudLabels(night(spell), runs, clock)
+
+    expect(labels.map(label => label.words)).toEqual(['Clouds 03 to 05 · forecast'])
+    expect(labels[0]?.point).toEqual({ azimuthDegrees: 120, altitudeDegrees: 40 })
   })
 
   it('names each source in use with its age, and says when a refresh is failing', () => {

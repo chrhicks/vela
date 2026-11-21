@@ -56,8 +56,12 @@ export function cloudWords(hours: ReadonlyArray<CloudHour>, at: number): string 
 const hourWords = (clock: (at: number) => string, at: number) => clock(at).replace(/:00$/, '')
 
 export function cloudLabels(night: HorizonNight, runs: ReadonlyArray<TimeRun>, clock: (at: number) => string): ReadonlyArray<CloudLabel> {
+  const { path } = night
+
   return runs.flatMap(run => {
-    const point = skyPointAt(night.path, (run.from + run.until) / 2)
+    const samples = path.altitudes.map((altitude, index) => ({ at: path.startAt + index * path.stepSeconds * secondMs, altitude })).filter(sample => sample.at >= run.from && sample.at < run.until)
+    const highest = samples.reduce<(typeof samples)[number] | undefined>((best, sample) => (best === undefined || sample.altitude > best.altitude ? sample : best), undefined)
+    const point = highest === undefined ? undefined : skyPointAt(path, highest.at)
 
     return point === undefined || point.altitudeDegrees < 0 ? [] : [{ words: `Clouds ${hourWords(clock, run.from)} to ${hourWords(clock, run.until)} · forecast`, point }]
   })
