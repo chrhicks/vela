@@ -5,7 +5,7 @@ import { type BestPlacedAsked, type Placement, type TargetFacts } from '../../st
 import { testCatalog } from '../catalog/testing.ts'
 import { BestPlacedRoute, CatalogRoute, TargetRoute, Targets, TargetsRoute } from './targets.ts'
 
-const placement: Placement = { altitudeDegrees: 71.2, lineDegrees: 30, moonDegrees: 112, line: { above: 'until', until: 1794380000000 } }
+const placement: Placement = { altitudeDegrees: 71.2, lineDegrees: 30, lineSource: 'up-line', moonDegrees: 112, line: { above: 'until', until: 1794380000000 } }
 
 async function get(address: string) {
   const asked: Array<string | BestPlacedAsked> = []

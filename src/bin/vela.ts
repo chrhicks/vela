@@ -63,6 +63,7 @@ import { Centring, mountControls, MountGuiding, MountRuns, MountSettings } from 
 import { catalogOf, readCatalog } from '../catalog/catalog.ts'
 import { CatalogSettings } from '../catalog/database.ts'
 import { makePlacedTargets } from '../catalog/placed.ts'
+import { loadHorizon } from '../horizon/file.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName, RehearsalId, StartId, SweepId } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -137,6 +138,8 @@ const surveyOf = (config: typeof settings.sky, missing: string) =>
 const surveyKept = await surveyOf(settings.sky, 'no sky survey, the picker shows no sky picture. Run src/bin/sky-setup.ts')
 const detailSurveyKept = await surveyOf(settings.skyDetail, 'no detail survey, the picker has no full-size view. Run src/bin/sky-setup.ts with detail')
 
+const horizon = await runHandledPromise(loadHorizon(settings.horizonFile))
+
 let remembered = nothingRemembered
 
 const placedTargets = makePlacedTargets({
@@ -144,6 +147,7 @@ const placedTargets = makePlacedTargets({
   site: () => siteOf(picture, settings.devices.mount),
   lastCentreNear: position => lastCentreNear(remembered, position, settings.pointing.sameFramingDegrees),
   lastCoolerFor: id => coolerFor(remembered, id),
+  horizon,
   settings: settings.pointing,
 })
 const pointing = makePointing({ picture, catalog, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })

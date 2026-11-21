@@ -40,6 +40,17 @@ describe('the horizon file', () => {
     expect(await Effect.runPromise(loadHorizon(path))).toEqual(noHorizon)
   })
 
+  it('says once that there is no file', async () => {
+    const path = join(await folder(), 'horizon.json')
+    const lines: Array<string> = []
+    const collect = Logger.make<unknown, void>(({ message }) => void lines.push(String(Array.isArray(message) ? message.join(' ') : message)))
+    const horizon = await Effect.runPromise(loadHorizon(path).pipe(Effect.provide(Logger.layer([collect]))))
+
+    expect(horizon).toEqual(noHorizon)
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain(path)
+  })
+
   it.each([
     ['not json', 'horizon'],
     ['an old version', file({ version: 1 })],

@@ -131,6 +131,9 @@ export function aboveLineOf(placement: Placement | null) {
   }
 }
 
+export const lineWordsOf = (placement: Placement | null) =>
+  placement === null ? undefined : placement.lineSource === 'horizon' ? `Above the mapped horizon at its azimuth, ${degrees(placement.lineDegrees)} now` : `Above ${degrees(placement.lineDegrees)}: the horizon is not mapped at its azimuth`
+
 export const isUp = (placement: Placement | null) => placement === null || placement.line.above === 'until' || placement.line.above === 'always'
 
 const arcminutes = (value: number) => `${Number(value.toFixed(value < 10 ? 1 : 0))}′`

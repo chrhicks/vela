@@ -20,8 +20,12 @@ export const readHorizon = (path: string): Effect.Effect<Horizon, HorizonUnreada
   )
 
 export const loadHorizon = (path: string): Effect.Effect<Horizon> =>
-  readHorizon(path).pipe(
-    Effect.catchTag('HorizonUnreadable', error =>
-      Effect.logWarning(`the horizon could not be read from ${error.path}: ${error.reason}. Every direction is treated as unknown`).pipe(Effect.as(noHorizon)),
-    ),
+  Effect.flatMap(written(path), found =>
+    found
+      ? readHorizon(path).pipe(
+          Effect.catchTag('HorizonUnreadable', error =>
+            Effect.logWarning(`the horizon could not be read from ${error.path}: ${error.reason}. Every direction is treated as unknown`).pipe(Effect.as(noHorizon)),
+          ),
+        )
+      : Effect.logWarning(`there is no horizon file at ${path}. Every direction is treated as unknown`).pipe(Effect.as(noHorizon)),
   )

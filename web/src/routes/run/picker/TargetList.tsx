@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 
 import type { TargetFound } from '../../../../../state/targets.ts'
-import { aboveLineOf, altitudeOf, degrees, frameShareOf, isUp, moonOf, unknown } from './words.ts'
+import { aboveLineOf, altitudeOf, degrees, frameShareOf, isUp, lineWordsOf, moonOf } from './words.ts'
 import styles from './TargetList.module.css'
 
 interface TargetListProps {
@@ -12,14 +12,15 @@ interface TargetListProps {
 export const addressOf = (id: string) => `/?target=${encodeURIComponent(id)}`
 
 export function TargetList({ targets, chosen }: TargetListProps) {
-  const line = targets.find(target => target.placement !== null)?.placement?.lineDegrees
+  const placed = targets.flatMap(target => (target.placement === null ? [] : [target.placement]))
+  const flatLine = placed.length > 0 && placed.every(placement => placement.lineSource === 'up-line') ? placed[0]?.lineDegrees : undefined
 
   return (
     <div className={styles.list}>
       <div className={`${styles.row} ${styles.head}`} aria-hidden="true">
         <span>Target</span>
         <span>Alt now</span>
-        <span>Above {line === undefined ? unknown : degrees(line)} until</span>
+        <span>{flatLine === undefined ? 'Up until' : `Above ${degrees(flatLine)} until`}</span>
         <span>From moon</span>
         <span>Dual band</span>
         <span>Of frame</span>
@@ -38,7 +39,7 @@ export function TargetList({ targets, chosen }: TargetListProps) {
 
           <span className={styles.altitude}>{altitudeOf(target.placement)}</span>
 
-          <span className={styles.detail}>
+          <span className={styles.detail} title={lineWordsOf(target.placement)}>
             <span className={styles.prefix}>Until </span>
             {aboveLineOf(target.placement)}
           </span>
