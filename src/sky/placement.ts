@@ -63,8 +63,11 @@ export function placementOf(targetJ2000: EquatorialPosition, site: Site, at: num
 
     if (clear > 0 !== isAbove) {
       const crossing = Math.round(at + (step - 1 + before / (before - clear)) * up.stepSeconds * secondMs)
+      const { azimuthDegrees } = sky(step)
+      const mapped = altitudeAt(up.horizon, azimuthDegrees)
+      const there = { lineSource: mapped === null ? ('up-line' as const) : ('horizon' as const), lineDegrees: mapped ?? up.upLineDegrees }
 
-      return { ...placed, line: isAbove ? { above: 'until', until: crossing } : { above: 'rises', at: crossing } }
+      return { ...placed, line: isAbove ? { above: 'until', until: crossing, ...there } : { above: 'rises', at: crossing, ...there } }
     }
 
     before = clear

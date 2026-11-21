@@ -83,7 +83,7 @@ describe('where a target is in the sky', () => {
     const target = overheadAt(at, -6, 20)
 
     expect(placementOf(target, phoenix, at, flat, elsewhere).lineSource).toBe('up-line')
-    expect(placementOf(target, phoenix, at, upLine(horizonOf(lineDegrees)), elsewhere).line).toEqual(placementOf(target, phoenix, at, flat, elsewhere).line)
+    expect(placementOf(target, phoenix, at, upLine(horizonOf(lineDegrees)), elsewhere).line).toEqual({ ...placementOf(target, phoenix, at, flat, elsewhere).line, lineSource: 'horizon' })
   })
 })
 
@@ -158,6 +158,15 @@ describe('where a target is against the horizon at its azimuth', () => {
     expect(placed.lineSource).toBe('up-line')
     expect(placed.lineDegrees).toBe(lineDegrees)
     expect(placed.line).toEqual(flatRise.line)
+  })
+
+  it('says which line it crossed, the horizon where it is mapped and the up line where it is not', () => {
+    const mappedOnlyEast: Horizon = { ...noHorizon, altitudesDegrees: noHorizon.altitudesDegrees.map((_, bin) => (bin < 180 ? 40 : null)) }
+    const crossed = placementOf(rising, phoenix, at, upLine(mappedOnlyEast), elsewhere)
+    const flatCrossed = placementOf(rising, phoenix, at, flat, elsewhere)
+
+    expect(crossed.line).toMatchObject({ above: 'rises', lineSource: 'horizon', lineDegrees: 40 })
+    expect(flatCrossed.line).toMatchObject({ above: 'rises', lineSource: 'up-line', lineDegrees: lineDegrees })
   })
 
   it('finds a rise within one step of a finer search, whatever the step', () => {
