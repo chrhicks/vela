@@ -157,10 +157,6 @@ export function HorizonChart({ night, now, selected, layers }: HorizonChartProps
           </g>
         )}
 
-        {footprintCopies.map((copy, index) => (
-          <polygon key={`frame${index}`} className={styles.frameBox} points={pointsOf(copy)} />
-        ))}
-
         {frameWords === undefined ? null : (
           <text
             className={styles.frameLabel}
@@ -178,6 +174,10 @@ export function HorizonChart({ night, now, selected, layers }: HorizonChartProps
             <circle className={chosenClear ? styles.selectedClear : styles.selectedOther} cx={xOf(chosen.azimuthDegrees)} cy={yOf(chosen.altitudeDegrees)} r={selectedDotRadius} />
           </g>
         )}
+
+        {footprintCopies.map((copy, index) => (
+          <polygon key={`frame${index}`} className={styles.frameBox} points={pointsOf(copy)} />
+        ))}
 
         {moon === undefined ? null : (
           <g>

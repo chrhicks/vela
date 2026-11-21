@@ -171,9 +171,8 @@
 }
 
 .frameBox {
-  fill: var(--ember);
-  fill-opacity: 0.12;
-  stroke: var(--ember);
+  fill: none;
+  stroke: var(--star);
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
