@@ -205,3 +205,14 @@
   background: var(--star);
   opacity: 0.6;
 }
+
+.cloudBar {
+  background: var(--cloud);
+}
+
+.unknownBar {
+  height: 0;
+  border-top: 1px dashed var(--cloud-quiet);
+  background: none;
+  top: 0.4375rem;
+}

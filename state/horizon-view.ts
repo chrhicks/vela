@@ -10,6 +10,7 @@ export interface SkyPoint {
 
 export interface PathPiece {
   readonly clear: boolean
+  readonly cloudy: boolean
   readonly points: ReadonlyArray<SkyPoint>
 }
 
@@ -92,9 +93,10 @@ export function skyPointAt(path: SkyTrack, at: number): SkyPoint | undefined {
   }
 }
 
-export function pathPieces(path: SkyTrack, clear: ReadonlyArray<TimeRun>): ReadonlyArray<PathPiece> {
+export function pathPieces(path: SkyTrack, clear: ReadonlyArray<TimeRun>, cloudy: ReadonlyArray<TimeRun> = []): ReadonlyArray<PathPiece> {
   const isClear = (at: number) => clear.some(spell => at >= spell.from && at <= spell.until)
-  const pieces: Array<{ clear: boolean; points: Array<SkyPoint> }> = []
+  const isCloudy = (at: number) => cloudy.some(run => at >= run.from && at < run.until)
+  const pieces: Array<{ clear: boolean; cloudy: boolean; points: Array<SkyPoint> }> = []
   let previous: Sample | undefined
 
   for (const sample of samplesOf(path)) {
@@ -108,15 +110,16 @@ export function pathPieces(path: SkyTrack, clear: ReadonlyArray<TimeRun>): Reado
     previous = sample
 
     const clearHere = isClear(sample.at)
+    const cloudyHere = isCloudy(sample.at)
     const open = pieces.at(-1)
     const wrapped = before !== undefined && Math.abs(sample.azimuthDegrees - before.azimuthDegrees) > halfTurn
 
     if (before === undefined || wrapped || open === undefined) {
-      pieces.push({ clear: clearHere, points: [sample] })
-    } else if (open.clear === clearHere) {
+      pieces.push({ clear: clearHere, cloudy: cloudyHere, points: [sample] })
+    } else if (open.clear === clearHere && open.cloudy === cloudyHere) {
       open.points.push(sample)
     } else {
-      pieces.push({ clear: clearHere, points: [before, sample] })
+      pieces.push({ clear: clearHere, cloudy: cloudyHere, points: [before, sample] })
     }
   }
 

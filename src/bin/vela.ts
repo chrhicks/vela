@@ -67,6 +67,10 @@ import { makePlacedTargets } from '../catalog/placed.ts'
 import { loadHorizon } from '../horizon/file.ts'
 import { noHorizon } from '../horizon/horizon.ts'
 import { HorizonNights } from '../feed/horizon-night.ts'
+import { ForecastNights } from '../feed/forecast.ts'
+import { makeForecasts } from '../forecast/forecasts.ts'
+import { makeForecastNights } from '../forecast/night.ts'
+import { fetchSource } from '../forecast/source.ts'
 import { operationObjects } from '../../state/entries.ts'
 import { NightName, RehearsalId, StartId, SweepId } from '../../state/entries.ts'
 import { runHandledPromise, runHandledSync } from '../edge.ts'
@@ -163,6 +167,11 @@ const horizonNights = makeHorizonNights({
   cameraAngleDegrees: () => remembered.cameraAngle?.degrees,
   naming,
   settings: { ...settings.horizonNight, upLineDegrees: settings.pointing.upLineDegrees },
+})
+const forecastNights = makeForecastNights({
+  site: () => siteOf(picture, settings.devices.mount),
+  forecasts: await runHandledPromise(makeForecasts({ source: fetchSource(settings.forecast), settings: settings.forecast, report: line => Effect.sync(() => console.error(`vela: ${line}`)) })),
+  cloudyPercent: settings.horizonNight.cloudyPercent,
 })
 const pointing = makePointing({ picture, catalog, sender, settings: { mount: settings.devices.mount, searchResults: settings.pointing.searchResults }, now: Date.now })
 const capture = makeCapture({
@@ -541,6 +550,7 @@ const feedApp = FeedServer.pipe(
         }),
       }),
       Layer.succeed(HorizonNights, { night: (id, at) => horizonNights.night(id, at) }),
+      Layer.succeed(ForecastNights, { night: at => forecastNights.night(at) }),
       Layer.succeed(Targets, {
         search: text => Effect.map(Clock.currentTimeMillis, at => placedTargets.search(text, at)),
         bestPlaced: asked => Effect.map(Clock.currentTimeMillis, at => placedTargets.bestPlaced(at, asked)),

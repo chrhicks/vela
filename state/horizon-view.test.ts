@@ -78,6 +78,14 @@ describe('the target path as pieces', () => {
     expect(pieces[2]?.points.map(point => point.altitudeDegrees)).toEqual([30, 40])
   })
 
+  it('is cloudy only where a cloudy run holds the sample, and a cloudy piece is its own piece', () => {
+    const pieces = pathPieces(path([10, 20, 30, 40], [100, 110, 120, 130]), [], [{ from: start + minuteMs, until: start + 2 * minuteMs }])
+
+    expect(pieces.map(piece => piece.cloudy)).toEqual([false, true, false])
+    expect(pieces[1]?.points.map(point => point.altitudeDegrees)).toEqual([10, 20])
+    expect(pathPieces(path([10, 20], [100, 110]), []).every(piece => !piece.cloudy)).toBe(true)
+  })
+
   it('splits where the azimuth wraps through north', () => {
     const pieces = pathPieces(path([10, 20, 30, 40], [350, 358, 3, 10]), [])
 
