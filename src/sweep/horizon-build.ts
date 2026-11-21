@@ -1,4 +1,4 @@
-import type { Horizon } from '../horizon/horizon.ts'
+import type { Horizon, HorizonOrigin } from '../horizon/horizon.ts'
 import { noHorizon } from '../horizon/horizon.ts'
 import type { SweepColumnBody } from '../../state/entries.ts'
 import type { Edge } from './edges.ts'
@@ -52,16 +52,18 @@ export function binsOfSweep(columns: ReadonlyArray<TimedColumn>, edges: Readonly
   }).flat()
 }
 
-export function mergeSweep(existing: Horizon, bins: ReadonlyArray<SweepBin>): Horizon {
+export function mergeSweep(existing: Horizon, bins: ReadonlyArray<SweepBin>, origin: HorizonOrigin): Horizon {
   const altitudesDegrees = [...existing.altitudesDegrees]
   const sources = [...existing.sources]
   const observedAt = [...existing.observedAt]
+  const origins = [...existing.origins]
 
   for (const { bin, altitudeDegrees, at } of bins) {
     altitudesDegrees[bin] = altitudeDegrees
     sources[bin] = 'sweep'
     observedAt[bin] = new Date(at).toISOString()
+    origins[bin] = origin
   }
 
-  return { ...noHorizon, altitudesDegrees, sources, observedAt }
+  return { ...noHorizon, altitudesDegrees, sources, observedAt, origins }
 }

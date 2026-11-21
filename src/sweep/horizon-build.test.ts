@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { SweepId } from '../../state/entries.ts'
+import type { NightName, SweepId } from '../../state/entries.ts'
 import { altitudeAt, noHorizon } from '../horizon/horizon.ts'
 import { binsOfSweep, mergeSweep, type TimedColumn } from './horizon-build.ts'
 import type { Edge } from './edges.ts'
 
 const settings = { columnDegrees: 2.5 }
 const at = Date.UTC(2026, 10, 9, 4, 0, 0)
+const origin = { sweep: 'sweep-a' as SweepId, night: '2026-11-08' as NightName }
+const laterOrigin = { sweep: 'sweep-b' as SweepId, night: '2026-11-09' as NightName }
 
 const column = (azimuthDegrees: number, edgeAltitudeDegrees: number, changes: Partial<TimedColumn> = {}): TimedColumn => ({
   sweep: 'sweep-a' as SweepId,
@@ -94,7 +96,7 @@ describe('merging a sweep into the horizon file', () => {
   ]
 
   it('fills the bins the sweep gives, as sweep sources with their time, and leaves the rest unknown', () => {
-    const merged = mergeSweep(noHorizon, bins)
+    const merged = mergeSweep(noHorizon, bins, origin)
 
     expect(merged.altitudesDegrees[10]).toBe(12.5)
     expect(merged.sources.slice(10, 12)).toEqual(['sweep', 'sweep'])
@@ -105,13 +107,36 @@ describe('merging a sweep into the horizon file', () => {
   })
 
   it('replaces only the bins the sweep gives and keeps the others, with their sources and times', () => {
-    const before = mergeSweep(noHorizon, [{ bin: 11, altitudeDegrees: 20, from: 'column', at: at - 1000 }, { bin: 50, altitudeDegrees: 8, from: 'column', at: at - 1000 }])
+    const before = mergeSweep(noHorizon, [{ bin: 11, altitudeDegrees: 20, from: 'column', at: at - 1000 }, { bin: 50, altitudeDegrees: 8, from: 'column', at: at - 1000 }], origin)
     const old = { ...before, sources: before.sources.map((source, bin) => (bin === 50 ? ('old-profile' as const) : source)) }
-    const merged = mergeSweep(old, bins)
+    const merged = mergeSweep(old, bins, laterOrigin)
 
     expect(merged.altitudesDegrees[11]).toBe(13)
     expect(merged.altitudesDegrees[50]).toBe(8)
     expect(merged.sources[50]).toBe('old-profile')
     expect(merged.observedAt[50]).toBe(old.observedAt[50])
+  })
+
+  it('gives each bin the sweep gave it its origin, and leaves the rest unknown', () => {
+    const merged = mergeSweep(noHorizon, bins, origin)
+
+    expect(merged.origins.slice(10, 12)).toEqual([origin, origin])
+    expect(merged.origins.filter(given => given === null)).toHaveLength(358)
+  })
+
+  it('keeps the origin of a bin it does not replace, and replaces the origin of one it does', () => {
+    const before = mergeSweep(noHorizon, [{ bin: 11, altitudeDegrees: 20, from: 'column', at: at - 1000 }, { bin: 50, altitudeDegrees: 8, from: 'column', at: at - 1000 }], origin)
+    const merged = mergeSweep(before, bins, laterOrigin)
+
+    expect(merged.origins[10]).toEqual(laterOrigin)
+    expect(merged.origins[11]).toEqual(laterOrigin)
+    expect(merged.origins[50]).toEqual(origin)
+  })
+
+  it('leaves a kept bin of unknown origin unknown', () => {
+    const merged = mergeSweep({ ...noHorizon, altitudesDegrees: noHorizon.altitudesDegrees.map((_, bin) => (bin === 50 ? 8 : null)) }, bins, origin)
+
+    expect(merged.altitudesDegrees[50]).toBe(8)
+    expect(merged.origins[50]).toBeNull()
   })
 })

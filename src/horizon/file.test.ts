@@ -33,6 +33,29 @@ describe('the horizon file', () => {
     expect(altitudeAt(horizon, 250)).toBeNull()
   })
 
+  it('reads a file with no origins as every bin of unknown origin', async () => {
+    const path = join(await folder(), 'horizon.json')
+
+    await writeFile(path, file())
+
+    const horizon = await Effect.runPromise(readHorizon(path))
+
+    expect(horizon.origins).toEqual(noHorizon.origins)
+    expect(horizon.origins).toHaveLength(360)
+  })
+
+  it('reads the origin of each bin, the sweep and the night its records are in', async () => {
+    const path = join(await folder(), 'horizon.json')
+    const origin = { sweep: 'sweep-aaaa-1111', night: '2026-01-02' }
+
+    await writeFile(path, file({ origins: bins('x').map((_, bin) => (bin < 180 ? origin : null)) }))
+
+    const horizon = await Effect.runPromise(readHorizon(path))
+
+    expect(horizon.origins[10]).toEqual(origin)
+    expect(horizon.origins[200]).toBeNull()
+  })
+
   it('has no horizon when there is no file', async () => {
     const path = join(await folder(), 'horizon.json')
 
@@ -60,6 +83,9 @@ describe('the horizon file', () => {
     ['a source that is not named', file({ sources: bins('moon') })],
     ['an altitude that is not a number', file({ altitudesDegrees: bins('high') })],
     ['a time that is not a time', file({ observedAt: bins('tonight') })],
+    ['an origin with a night that is not a night', file({ origins: bins('x').map(() => ({ sweep: 'sweep-aaaa-1111', night: 'last night' })) })],
+    ['an origin with no sweep', file({ origins: bins('x').map(() => ({ night: '2026-01-02' })) })],
+    ['origins that are not 360', file({ origins: [null] })],
   ])('says the file is unreadable with %s', async (_, text) => {
     const path = join(await folder(), 'horizon.json')
 

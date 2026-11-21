@@ -1,15 +1,16 @@
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { Effect } from 'effect'
+import { Effect, Option, Schema } from 'effect'
+import { NightName } from '../../state/entries.ts'
 import { readConfig } from '../config.ts'
 import { runHandledPromise } from '../edge.ts'
-import { nightPattern } from '../frames/night.ts'
 import { VelaSettings } from '../settings.ts'
 import { buildHorizon } from '../sweep/horizon-night.ts'
 
 const { values, positionals } = parseArgs({ args: process.argv.slice(2), options: { sweep: { type: 'string', default: '' }, out: { type: 'string' } }, allowPositionals: true })
 const [configPath, night] = positionals
 const settings = readConfig(VelaSettings, configPath)
+const nightName = Schema.decodeUnknownOption(NightName)(night)
 
 const failed = (reason: string) =>
   Effect.sync(() => {
@@ -18,9 +19,9 @@ const failed = (reason: string) =>
   })
 
 await runHandledPromise(
-  night === undefined || !nightPattern.test(night)
+  Option.isNone(nightName)
     ? failed('usage: sweep-horizon.ts <config.json> <night YYYY-MM-DD> [--sweep ID-PREFIX] [--out FILE]')
-    : buildHorizon({ recordsFolder: join(settings.sweep.recordDir, night), out: values.out ?? settings.horizonFile, sweepPrefix: values.sweep, settings: settings.sweep, now: Date.now }).pipe(
+    : buildHorizon({ recordsFolder: join(settings.sweep.recordDir, nightName.value), night: nightName.value, out: values.out ?? settings.horizonFile, sweepPrefix: values.sweep, settings: settings.sweep, now: Date.now }).pipe(
         Effect.flatMap(({ sweep, fromCells, fromColumns, unknown, kept, backup }) =>
           Effect.sync(() => {
             console.log(`sweep-horizon: ${sweep}: ${fromCells} bins from cells, ${fromColumns} from columns, ${kept} kept from the file before, ${unknown} unknown`)

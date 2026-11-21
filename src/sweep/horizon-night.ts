@@ -1,7 +1,7 @@
 import { copyFile, mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { Data, Effect, Schema } from 'effect'
-import { SweepColumnFields, SweepFrameFields, type SweepId } from '../../state/entries.ts'
+import { SweepColumnFields, SweepFrameFields, type NightName, type SweepId } from '../../state/entries.ts'
 import { readHorizon, type HorizonUnreadable } from '../horizon/file.ts'
 import { Horizon } from '../horizon/horizon.ts'
 import { EdgeRecord } from './cell-record.ts'
@@ -25,6 +25,7 @@ export interface HorizonResult {
 
 export interface HorizonOptions {
   readonly recordsFolder: string
+  readonly night: NightName
   readonly out: string
   readonly sweepPrefix: string
   readonly settings: Pick<SweepSettings, 'columnDegrees'>
@@ -58,7 +59,7 @@ const unwritable = (path: string) => (cause: unknown) => new HorizonUnwritable({
 
 export const buildHorizon = (options: HorizonOptions): Effect.Effect<HorizonResult, HorizonRecordsUnreadable | HorizonUnwritable | HorizonUnreadable | SweepNotOne> =>
   Effect.gen(function* () {
-    const { recordsFolder, out, sweepPrefix, settings, now } = options
+    const { recordsFolder, night, out, sweepPrefix, settings, now } = options
     const columnsPath = join(recordsFolder, 'columns.jsonl')
     const edgesPath = join(recordsFolder, 'edges.jsonl')
     const columnLines = (yield* readLines(columnsPath, ColumnLine)).filter(line => line.sweep.startsWith(sweepPrefix))
@@ -78,7 +79,7 @@ export const buildHorizon = (options: HorizonOptions): Effect.Effect<HorizonResu
     const bins: ReadonlyArray<SweepBin> = binsOfSweep(columns, edgeLines, settings)
     const existed = yield* present(out)
     const existing = yield* readHorizon(out)
-    const merged = mergeSweep(existing, bins)
+    const merged = mergeSweep(existing, bins, { sweep, night })
     const backup = existed ? `${out}.bak-${stamp(now())}` : undefined
 
     yield* Effect.tryPromise({ try: () => mkdir(dirname(out), { recursive: true }), catch: unwritable(dirname(out)) })

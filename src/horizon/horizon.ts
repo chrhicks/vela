@@ -1,4 +1,5 @@
-import { Schema } from 'effect'
+import { Effect, Schema } from 'effect'
+import { NightName, SweepId } from '../../state/entries.ts'
 import { HorizonSource } from '../../state/horizon-source.ts'
 
 const binsAround = 360
@@ -7,17 +8,26 @@ const Bins = <S extends Schema.Top>(item: S) => Schema.Array(item).check(Schema.
 
 const IsoTime = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/))
 
+export const HorizonOrigin = Schema.Struct({ sweep: SweepId, night: NightName })
+
+export type HorizonOrigin = typeof HorizonOrigin.Type
+
+const unknownEverywhere = <A>(): ReadonlyArray<A | null> => Array.from({ length: binsAround }, () => null)
+
+const originBins = Bins(Schema.NullOr(HorizonOrigin))
+
+const OriginBins = Schema.withDecodingDefaultKey<(typeof originBins)['Rebuild']>(Effect.sync(() => unknownEverywhere<HorizonOrigin>()))(originBins)
+
 export const Horizon = Schema.Struct({
   version: Schema.Literal(2),
   stepDegrees: Schema.Literal(1),
   altitudesDegrees: Bins(Schema.NullOr(Schema.Finite)),
   sources: Bins(Schema.NullOr(HorizonSource)),
   observedAt: Bins(Schema.NullOr(IsoTime)),
+  origins: OriginBins,
 })
 
 export type Horizon = typeof Horizon.Type
-
-const unknownEverywhere = <A>(): ReadonlyArray<A | null> => Array.from({ length: binsAround }, () => null)
 
 export const noHorizon: Horizon = {
   version: 2,
@@ -25,6 +35,7 @@ export const noHorizon: Horizon = {
   altitudesDegrees: unknownEverywhere(),
   sources: unknownEverywhere(),
   observedAt: unknownEverywhere(),
+  origins: unknownEverywhere(),
 }
 
 export const altitudeAt = (horizon: Horizon, azimuthDegrees: number): number | null => {
