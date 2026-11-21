@@ -123,7 +123,7 @@ describe('what Vela remembers, kept in a file', () => {
     const kept = await Effect.runPromise(readKept(path))
     const later = light(3 * day, 'c', 'soul').reduce(remember, kept)
 
-    expect(shortlistOf(kept, 5)).toEqual(['triangulum', 'orion'])
-    expect(shortlistOf(later, 5)).toEqual(['soul', 'triangulum', 'orion'])
+    expect(shortlistOf(kept, 5, () => true)).toEqual(['triangulum', 'orion'])
+    expect(shortlistOf(later, 5, () => true)).toEqual(['soul', 'triangulum', 'orion'])
   })
 })

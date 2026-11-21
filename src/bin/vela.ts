@@ -64,6 +64,7 @@ import { catalogOf, readCatalog } from '../catalog/catalog.ts'
 import { CatalogSettings } from '../catalog/database.ts'
 import { makeHorizonNights } from '../catalog/horizon-night.ts'
 import { makePlacedTargets } from '../catalog/placed.ts'
+import { positionTarget } from '../catalog/position.ts'
 import { loadHorizon } from '../horizon/file.ts'
 import { noHorizon } from '../horizon/horizon.ts'
 import { HorizonNights } from '../feed/horizon-night.ts'
@@ -129,6 +130,7 @@ const catalog = runHandledSync(
     ),
   ),
 )
+const catalogTarget = (id: string) => positionTarget(id) === undefined && catalog.find(id) !== undefined
 const surveyOf = (config: typeof settings.sky, missing: string) =>
   runHandledPromise(
     readSurvey.pipe(
@@ -509,7 +511,7 @@ const shortlistOperations = {
     Effect.gen(function* () {
       if (action === 'add' && catalog.find(target) === undefined) return yield* Effect.fail(new CommandRefused({ refusal: { code: 'unknown-target', text: target } }))
 
-      const from = remembered.shortlist === undefined ? shortlistOf(remembered, settings.shortlist.recentCount) : undefined
+      const from = remembered.shortlist === undefined ? shortlistOf(remembered, settings.shortlist.recentCount, catalogTarget) : undefined
       const edit = { target, action, ...(from === undefined ? {} : { from }) }
       const at = Date.now()
 
@@ -550,7 +552,7 @@ const feedApp = FeedServer.pipe(
         now: Effect.sync(() => ({
           lastLight: remembered.lastLight === undefined ? null : { exposureSeconds: remembered.lastLight.exposureSeconds, frames: remembered.lastLight.frames ?? null },
           cameraAngleDegrees: remembered.cameraAngle?.degrees ?? null,
-          shortlist: shortlistOf(remembered, settings.shortlist.recentCount),
+          shortlist: shortlistOf(remembered, settings.shortlist.recentCount, catalogTarget),
         })),
       }),
       Layer.succeed(SurveyKept, { survey: surveyKept, tilesDir: settings.sky.tilesDir }),
