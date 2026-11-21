@@ -33,6 +33,7 @@ describe('the sweep settings', () => {
       baselineTopFraction: 0.25,
       baselineMinFrames: 3,
       recordDir: '/mnt/storage/rig/horizon',
+      cells: { columns: 4, rows: 3, blockedBelow: 0.15, partlyBlockedBelow: 0.65, clearTopFraction: 0.1, edgeBinDegrees: 1 },
       rehearsal: { columnDegrees: 15, rowDegrees: 5 },
     })
   })

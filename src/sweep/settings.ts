@@ -14,6 +14,28 @@ export const RehearsalSettings = Schema.Struct({
   rowDegrees: described('The altitude, in degrees, between two stops down a column of the rehearsal, before each stop is split into steps by the axis limit', Positive, 5),
 })
 
+const Latitude = Schema.Number.check(Schema.isBetween({ minimum: -90, maximum: 90 }))
+
+const Longitude = Schema.Number.check(Schema.isBetween({ minimum: -180, maximum: 180 }))
+
+export const CellSite = Schema.Struct({
+  latitudeDegrees: Latitude.annotate({ description: 'The latitude of the site, in degrees north' }),
+  longitudeDegrees: Longitude.annotate({ description: 'The longitude of the site, in degrees east' }),
+  elevationMeters: Schema.Number.annotate({ description: 'The height of the site above sea level, in metres' }),
+})
+
+export const CellSettings = Schema.Struct({
+  columns: described('How many cells a frame is split into across its width', PositiveCount, 4),
+  rows: described('How many cells a frame is split into down its height', PositiveCount, 3),
+  blockedBelow: described('A cell with fewer stars than this share of the clear-sky star count of a cell is blocked', Fraction, 0.15),
+  partlyBlockedBelow: described('A cell with fewer stars than this share of the clear-sky star count of a cell, and not blocked, is partly blocked; the rest are sky', Fraction, 0.65),
+  clearTopFraction: described("The share of a frame's cells, most stars first, whose median star count is the frame's own clear-sky star count of a cell", Fraction.check(Schema.isGreaterThan(0)), 0.1),
+  edgeBinDegrees: described('The width, in degrees of azimuth, of one bin of the edge', Positive, 1),
+  site: Schema.optionalKey(CellSite.annotate({ description: 'The site the cells are placed in the sky for; the sweep itself takes it from the mount, so replaying a night needs it here' })),
+})
+
+export type CellSettings = typeof CellSettings.Type
+
 export const SweepSettings = Schema.Struct({
   columnDegrees: described('The azimuth, in degrees, between two neighbouring columns of the sweep', Positive, 2.5),
   legDegrees: described('The most, in degrees, either mount axis (hour angle or declination) turns in one step of a move', Positive, 5),
@@ -27,6 +49,7 @@ export const SweepSettings = Schema.Struct({
   baselineTopFraction: described('The share of the nearby solved frames, highest star counts first, whose median is the baseline star count', Fraction.check(Schema.isGreaterThan(0)), 0.25),
   baselineMinFrames: described('The fewest nearby solved frames the baseline is taken from; with fewer it is the highest star count of any solved frame so far', PositiveCount, 3),
   recordDir: described('The folder the sweep keeps one folder per night in, each with frames.jsonl and columns.jsonl', Schema.String, '/mnt/storage/rig/horizon'),
+  cells: described('The cells a kept sweep frame is split into on thuban, and how each is labelled', CellSettings, {}),
   rehearsal: described('The rehearsal: the sweep drives the mount through every pose it could reach, with no frames', RehearsalSettings, {}),
 })
 
