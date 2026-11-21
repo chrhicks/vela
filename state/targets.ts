@@ -36,6 +36,7 @@ export type BestPlacedAsked = typeof BestPlacedAsked.Type
 export const Placement = Schema.Struct({
   altitudeDegrees: Schema.Number,
   lineDegrees: Schema.Number,
+  lineSource: Schema.Literals(['horizon', 'up-line']),
   moonDegrees: Schema.Number,
   line: Schema.Union([
     Schema.Struct({ above: Schema.Literal('until'), until: Schema.Number }),

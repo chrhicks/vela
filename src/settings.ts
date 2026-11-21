@@ -136,9 +136,19 @@ export const PointingSettings = Schema.Struct({
   wheelPixelsPerDoubling: described("Wheel scroll, in pixels, that halves or doubles the scale of the picker's full-size view", Schema.Number, 200),
   zoomGlideMs: described("How long the picker's full-size view takes to glide to a new scale, in milliseconds", Schema.Number, 150),
   upLineDegrees: described(
-    'The altitude, in degrees, a target must be above for the target list to count it as up',
+    'The altitude, in degrees, a target must be above for the target list to count it as up where the horizon is unknown (no horizon file, or no measured edge at its azimuth)',
     Schema.Number,
     30,
+  ),
+  upStepSeconds: described(
+    "The time between the points, in seconds, at which the target list checks a target against the horizon at its azimuth when it finds when the target rises above it or sets below it",
+    Schema.Number.check(Schema.isGreaterThan(0)),
+    60,
+  ),
+  upLookAheadHours: described(
+    'How far ahead, in hours, the target list looks for a target to rise above the horizon or set below it. A target above it throughout is listed as up all night and one below it throughout as not up',
+    Schema.Number.check(Schema.isGreaterThan(0)),
+    12,
   ),
   bestPlacedRows: described(
     'Targets listed as best placed when nothing is typed',

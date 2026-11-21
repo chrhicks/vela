@@ -1,5 +1,6 @@
 import type { Site } from '../pointing/target.ts'
 import type { EquatorialPosition } from '../sky/coordinates.ts'
+import type { Horizon } from '../horizon/horizon.ts'
 import { moonPosition, placementOf } from '../sky/placement.ts'
 import { skyTonight } from '../sky/tonight.ts'
 import type { CoolerAtStart } from '../../state/remembered.ts'
@@ -12,6 +13,8 @@ import type { CatalogTarget } from './types.ts'
 export interface PlacedSettings {
   readonly searchResults: number
   readonly upLineDegrees: number
+  readonly upStepSeconds: number
+  readonly upLookAheadHours: number
   readonly bestPlacedRows: number
   readonly bestPlacedMinArcminutes: number
 }
@@ -21,6 +24,7 @@ export interface PlacedOptions {
   readonly site: () => Site | undefined
   readonly lastCentreNear: (position: EquatorialPosition) => (EquatorialPosition & { readonly at: number }) | undefined
   readonly lastCoolerFor: (id: string) => CoolerAtStart | undefined
+  readonly horizon: Horizon
   readonly settings: PlacedSettings
 }
 
@@ -35,7 +39,9 @@ const offsetFrom = (target: EquatorialPosition, centre: EquatorialPosition) => (
   northDegrees: centre.decDegrees - target.decDegrees,
 })
 
-export function makePlacedTargets({ catalog, site, lastCentreNear, lastCoolerFor, settings }: PlacedOptions) {
+export function makePlacedTargets({ catalog, site, lastCentreNear, lastCoolerFor, horizon, settings }: PlacedOptions) {
+  const upLine = { horizon, upLineDegrees: settings.upLineDegrees, stepSeconds: settings.upStepSeconds, lookAheadHours: settings.upLookAheadHours }
+
   const placer = (at: number) => {
     const here = site()
 
@@ -43,7 +49,7 @@ export function makePlacedTargets({ catalog, site, lastCentreNear, lastCoolerFor
 
     const moon = moonPosition(here, at)
 
-    return (target: CatalogTarget) => placementOf(target, here, at, settings.upLineDegrees, moon)
+    return (target: CatalogTarget) => placementOf(target, here, at, upLine, moon)
   }
 
   return {
