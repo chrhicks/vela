@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
 import type { CoolerSetting, FilterAnswer } from '../../../../../state/commands.ts'
+import { behindTrees, behindTreesWords } from '../../../../../state/behind-trees.ts'
 import { endsBy } from '../../../../../state/ends-by.ts'
 import type { RememberedAnswer } from '../../../../../state/remembered.ts'
 import type { Survey } from '../../../../../state/survey.ts'
@@ -13,7 +14,7 @@ import { Field } from '../../../components/Field.tsx'
 import { Picture } from '../../../components/Picture.tsx'
 import { Readings } from '../../../components/Readings.tsx'
 import { Statement } from '../../../components/Statement.tsx'
-import { useLocalNow } from '../../../rig/clock.ts'
+import { clockTime, useLocalNow } from '../../../rig/clock.ts'
 import { serviceNow } from '../../../rig/service-clock.ts'
 import { useLink, useRig } from '../../../rig/store.ts'
 import { targetFacts } from '../../../rig/targets.ts'
@@ -123,6 +124,8 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
     now === undefined
       ? unknown
       : endsByWords(endsBy({ now, exposureSeconds, frames: stop === 'frames' ? frameCount : undefined, line: target.placement?.line, darkUntil }), now)
+
+  const behind = behindTrees({ placement: target.placement, darkUntil })
 
   return (
     <section className={styles.panel}>
@@ -273,7 +276,7 @@ export function TargetPanel({ id, darkUntil, lastLight, cameraAngleDegrees, surv
           </div>
         </div>
 
-        <Readings rows={[{ label: 'Ends by', value: ends }]} />
+        <Readings rows={[...(behind === undefined ? [] : [{ label: 'Horizon', value: behindTreesWords(behind, clockTime) }]), { label: 'Ends by', value: ends }]} />
       </div>
 
       <div className={styles.start}>
