@@ -135,3 +135,37 @@
   stroke: var(--ember);
   stroke-width: 2;
 }
+
+.glowCentre {
+  stop-color: var(--star);
+  stop-opacity: 0.32;
+}
+
+.glowEdge {
+  stop-color: var(--star);
+  stop-opacity: 0;
+}
+
+.moonGlow {
+  pointer-events: none;
+}
+
+.moonPath {
+  fill: none;
+  stroke: var(--star);
+  stroke-width: 1.5;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.moonDisc {
+  fill: var(--star);
+}
+
+.moonLabel {
+  fill: var(--star);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

@@ -13,12 +13,17 @@ import {
   lineNote,
   lineRuns,
   meridianAzimuths,
+  moonMarkAt,
+  moonPercent,
+  moonPieces,
+  moonPointAt,
   nightFacts,
   nightSpan,
   nowPoint,
   pathPieces,
   readoutAt,
   readoutSentence,
+  separationDegrees,
   skyPointAt,
   spanWords,
   startingTime,
@@ -52,6 +57,7 @@ const night = (facts: HorizonNight['facts']): HorizonNight => ({
   times: { duskAt: start, darkAt: start, darkEndsAt: start, dawnAt: start },
   horizon: flat(10),
   path: path([10, 20, 30], [100, 110, 120]),
+  moon: { litFraction: 0.9, altitudes: [-5, 5, 15], azimuths: [250, 255, 260], upSpans: [{ from: start + minuteMs, until: start + 2 * minuteMs }] },
   clear: [],
   facts,
 })
@@ -202,6 +208,7 @@ describe('the facts row', () => {
       { label: 'Highest', value: '45° at 01:26', note: null },
       { label: 'Flip', value: '01:26', note: "Predicted from the mount's 5° limit" },
       { label: 'Ends', value: '05:15 · dark ends', note: null },
+      { label: 'Moon', value: '90% · down all night', note: null },
     ])
   })
 
@@ -218,7 +225,7 @@ describe('the facts row', () => {
   })
 
   it('says a target that never clears does, with no span or end', () => {
-    expect(nightFacts(night({ clear: null, highest, transitAt: null, flip: null }), clock).map(fact => fact.label)).toEqual(['Clears', 'Highest', 'Flip'])
+    expect(nightFacts(night({ clear: null, highest, transitAt: null, flip: null }), clock).map(fact => fact.label)).toEqual(['Clears', 'Highest', 'Flip', 'Moon'])
     expect(nightFacts(night({ clear: null, highest, transitAt: null, flip: null }), clock)[0]?.value).toBe('Never tonight')
   })
 
@@ -247,6 +254,7 @@ describe('the time slider', () => {
     ...night({ clear: null, highest: { altitudeDegrees: 50, at: at(3, 0) }, transitAt: null, flip: null }),
     times,
     path: { startAt: at(0, 0), stepSeconds: stepMinutes * 60, altitudes: high, azimuths: high.map(() => 100.5), lines: high.map(() => 20) },
+    moon: { litFraction: 0.5, altitudes: high, azimuths: high.map(() => 250), upSpans: [] },
     clear: [spell(at(2, 0), at(4, 0))],
     ...overrides,
   })
@@ -282,10 +290,19 @@ describe('the time slider', () => {
 
   describe('the lanes', () => {
     it('are the dark hours and the clear spells, cut to the span', () => {
-      expect(laneRuns(sliding())).toEqual({ dark: [{ from: at(1, 0), until: at(5, 0) }], clear: [{ from: at(2, 0), until: at(4, 0) }] })
+      expect(laneRuns(sliding())).toEqual({ dark: [{ from: at(1, 0), until: at(5, 0) }], clear: [{ from: at(2, 0), until: at(4, 0) }], moon: [] })
       expect(laneRuns(sliding({ clear: [spell(at(-1, 0), at(1, 30)), spell(at(5, 30), at(8, 0)), spell(at(9, 0), at(10, 0))] })).clear).toEqual([
         { from: at(0, 0), until: at(1, 30) },
         { from: at(5, 30), until: at(6, 0) },
+      ])
+    })
+
+    it('has the Moon-up spans cut to the span', () => {
+      const moon = (upSpans: HorizonNight['moon']['upSpans']) => laneRuns(sliding({ moon: { ...sliding().moon, upSpans } })).moon
+
+      expect(moon([{ from: at(-2, 0), until: at(2, 30) }, { from: at(5, 0), until: at(9, 0) }, { from: at(7, 0), until: at(8, 0) }])).toEqual([
+        { from: at(0, 0), until: at(2, 30) },
+        { from: at(5, 0), until: at(6, 0) },
       ])
     })
 
@@ -376,6 +393,87 @@ describe('the time slider', () => {
   describe('the zone', () => {
     it('is named the way the page names it, in the answer zone', () => {
       expect(zoneName('America/New_York', Date.UTC(2026, 10, 15, 12, 0, 0))).toBe('ET')
+    })
+  })
+})
+
+describe('the Moon on the chart', () => {
+  const clock = clockIn(zone)
+  const at = (minutes: number) => start + minutes * minuteMs
+  const facts = { clear: null, highest: { altitudeDegrees: 20, at: start }, transitAt: null, flip: null }
+  const moonOn = (moon: Partial<HorizonNight['moon']>, overrides: Partial<HorizonNight> = {}): HorizonNight => ({
+    ...night(facts),
+    times: { duskAt: start, darkAt: start, darkEndsAt: start + 4 * minuteMs, dawnAt: start + 4 * minuteMs },
+    path: path([40, 40, 40, 40, 40], [100, 100, 100, 100, 100]),
+    moon: { litFraction: 0.904, altitudes: [-4, 2, 10, 18, 26], azimuths: [250, 255, 260, 265, 270], upSpans: [{ from: at(0.5), until: at(4) }], ...moon },
+    ...overrides,
+  })
+
+  describe('the point at a time', () => {
+    it('is the sample on a step and the line between two, with the same wrap rule as the path', () => {
+      expect(moonPointAt(moonOn({}), at(2))).toEqual({ azimuthDegrees: 260, altitudeDegrees: 10 })
+      expect(moonPointAt(moonOn({}), at(2.5))).toEqual({ azimuthDegrees: 262.5, altitudeDegrees: 14 })
+      expect(moonPointAt(moonOn({ azimuths: [358, 2, 4, 6, 8] }), at(0.25))).toEqual({ azimuthDegrees: 358, altitudeDegrees: -4 })
+    })
+
+    it('is nothing outside the night', () => {
+      expect(moonPointAt(moonOn({}), at(-1))).toBeUndefined()
+      expect(moonPointAt(moonOn({}), at(4.5))).toBeUndefined()
+    })
+  })
+
+  describe('the angle between two points of the sky', () => {
+    it('is the difference in altitude straight up, and in azimuth along the horizon', () => {
+      expect(separationDegrees({ azimuthDegrees: 100, altitudeDegrees: 20 }, { azimuthDegrees: 100, altitudeDegrees: 50 })).toBeCloseTo(30, 9)
+      expect(separationDegrees({ azimuthDegrees: 100, altitudeDegrees: 0 }, { azimuthDegrees: 130, altitudeDegrees: 0 })).toBeCloseTo(30, 9)
+    })
+
+    it('shrinks with altitude for the same azimuth difference, and goes round the north', () => {
+      expect(separationDegrees({ azimuthDegrees: 100, altitudeDegrees: 60 }, { azimuthDegrees: 130, altitudeDegrees: 60 })).toBeCloseTo(15.0, 0)
+      expect(separationDegrees({ azimuthDegrees: 350, altitudeDegrees: 0 }, { azimuthDegrees: 10, altitudeDegrees: 0 })).toBeCloseTo(20, 9)
+    })
+
+    it('is a half turn between opposite points and zero for the same one', () => {
+      expect(separationDegrees({ azimuthDegrees: 0, altitudeDegrees: 0 }, { azimuthDegrees: 180, altitudeDegrees: 0 })).toBeCloseTo(180, 9)
+      expect(separationDegrees({ azimuthDegrees: 77, altitudeDegrees: 33 }, { azimuthDegrees: 77, altitudeDegrees: 33 })).toBe(0)
+    })
+  })
+
+  describe('the mark at the selected time', () => {
+    it('says the lit percent and the angle from the target, with the Moon where it is', () => {
+      const mark = moonMarkAt(moonOn({}), at(2))
+
+      expect(mark?.point).toEqual({ azimuthDegrees: 260, altitudeDegrees: 10 })
+      expect(mark?.words).toBe('Moon 90% · 127° from M 42')
+    })
+
+    it('is nothing while the Moon is down, or outside the night', () => {
+      expect(moonMarkAt(moonOn({}), at(0))).toBeUndefined()
+      expect(moonMarkAt(moonOn({}), at(5))).toBeUndefined()
+    })
+  })
+
+  describe('the path', () => {
+    it('is drawn only where the Moon is up, and breaks where it sets and rises again', () => {
+      expect(moonPieces(moonOn({})).map(piece => piece.points.map(point => point.altitudeDegrees))).toEqual([[2, 10, 18, 26]])
+      expect(moonPieces(moonOn({ altitudes: [4, -2, 6, 8, -1] })).map(piece => piece.points.length)).toEqual([1, 2])
+      expect(moonPieces(moonOn({ altitudes: [-4, -3, -2, -1, -5] }))).toEqual([])
+    })
+  })
+
+  describe('the fact', () => {
+    const moonFact = (night: HorizonNight) => nightFacts(night, clock).find(fact => fact.label === 'Moon')
+
+    it('says the lit percent and when the Moon rises, from dusk, or sets', () => {
+      expect(moonFact(moonOn({ upSpans: [{ from: at(1), until: at(4) }] }))).toEqual({ label: 'Moon', value: '90% · up from 17:31', note: null })
+      expect(moonFact(moonOn({ upSpans: [{ from: at(0), until: at(3) }] }))?.value).toBe('90% · up to 17:33')
+      expect(moonFact(moonOn({ upSpans: [{ from: at(1), until: at(3) }] }))?.value).toBe('90% · up 17:31 to 17:33')
+    })
+
+    it('says up all night, or down all night', () => {
+      expect(moonPercent(moonOn({}))).toBe(90)
+      expect(moonFact(moonOn({ upSpans: [{ from: at(0), until: at(4) }] }))?.value).toBe('90% · up all night')
+      expect(moonFact(moonOn({ upSpans: [] }))?.value).toBe('90% · down all night')
     })
   })
 })

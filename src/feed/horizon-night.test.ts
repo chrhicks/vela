@@ -34,8 +34,9 @@ describe('GET /horizon-night', () => {
     expect(answer.cache).toBe('no-store')
     expect(answer.asked).toEqual([{ id: 'orion', at: Date.parse(afternoon) }])
     expect(Schema.decodeUnknownSync(HorizonNight)(answer.body)).toMatchObject({ night: '2026-11-15', zone: 'America/Phoenix', at: Date.parse(afternoon) })
-    expect(Object.keys(HorizonNight.fields)).toEqual(['target', 'at', 'night', 'zone', 'times', 'horizon', 'path', 'clear', 'facts'])
+    expect(Object.keys(HorizonNight.fields)).toEqual(['target', 'at', 'night', 'zone', 'times', 'horizon', 'path', 'moon', 'clear', 'facts'])
     expect(Object.keys(HorizonNight.fields.path.fields)).toEqual(['startAt', 'stepSeconds', 'altitudes', 'azimuths', 'lines'])
+    expect(Object.keys(HorizonNight.fields.moon.fields)).toEqual(['litFraction', 'altitudes', 'azimuths', 'upSpans'])
     expect(Object.keys(HorizonNight.fields.facts.fields)).toEqual(['clear', 'highest', 'transitAt', 'flip'])
   })
 

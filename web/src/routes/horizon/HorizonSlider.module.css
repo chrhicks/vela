@@ -200,3 +200,8 @@
   border-radius: 50%;
   background: var(--ember);
 }
+
+.moonBar {
+  background: var(--star);
+  opacity: 0.6;
+}

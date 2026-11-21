@@ -1,5 +1,7 @@
 import type { HorizonNight, SpellEdge, TargetPath } from './horizon-night.ts'
 
+export type SkyTrack = Pick<TargetPath, 'startAt' | 'stepSeconds' | 'altitudes' | 'azimuths'>
+
 export interface SkyPoint {
   readonly azimuthDegrees: number
   readonly altitudeDegrees: number
@@ -55,16 +57,16 @@ const halfTurn = 180
 const fullTurn = 360
 const quarterTurn = 90
 
-const samplesOf = (path: TargetPath): ReadonlyArray<Sample> =>
+const samplesOf = (path: SkyTrack): ReadonlyArray<Sample> =>
   path.altitudes.flatMap((altitudeDegrees, index) => {
     const azimuthDegrees = path.azimuths[index]
 
     return azimuthDegrees === undefined ? [] : [{ at: path.startAt + index * path.stepSeconds * secondMs, azimuthDegrees, altitudeDegrees }]
   })
 
-export const nightEnd = (path: TargetPath): number => path.startAt + Math.max(path.altitudes.length - 1, 0) * path.stepSeconds * secondMs
+export const nightEnd = (path: SkyTrack): number => path.startAt + Math.max(path.altitudes.length - 1, 0) * path.stepSeconds * secondMs
 
-export function skyPointAt(path: TargetPath, at: number): SkyPoint | undefined {
+export function skyPointAt(path: SkyTrack, at: number): SkyPoint | undefined {
   if (at < path.startAt || at > nightEnd(path)) return undefined
 
   const samples = samplesOf(path)
@@ -89,7 +91,7 @@ export function skyPointAt(path: TargetPath, at: number): SkyPoint | undefined {
   }
 }
 
-export function pathPieces(path: TargetPath, clear: HorizonNight['clear']): ReadonlyArray<PathPiece> {
+export function pathPieces(path: SkyTrack, clear: ReadonlyArray<TimeRun>): ReadonlyArray<PathPiece> {
   const isClear = (at: number) => clear.some(spell => at >= spell.from && at <= spell.until)
   const pieces: Array<{ clear: boolean; points: Array<SkyPoint> }> = []
   let previous: Sample | undefined
@@ -161,6 +163,37 @@ export function nowPoint(path: TargetPath, now: number | undefined): SkyPoint | 
   const point = skyPointAt(path, now)
 
   return point !== undefined && point.altitudeDegrees >= 0 ? point : undefined
+}
+
+const radians = Math.PI / 180
+
+export const moonTrack = (night: HorizonNight): SkyTrack => ({ startAt: night.path.startAt, stepSeconds: night.path.stepSeconds, altitudes: night.moon.altitudes, azimuths: night.moon.azimuths })
+
+export const moonPointAt = (night: HorizonNight, at: number): SkyPoint | undefined => skyPointAt(moonTrack(night), at)
+
+export const moonPieces = (night: HorizonNight): ReadonlyArray<PathPiece> => pathPieces(moonTrack(night), [])
+
+export const moonPercent = (night: HorizonNight): number => Math.round(night.moon.litFraction * 100)
+
+export function separationDegrees(from: SkyPoint, to: SkyPoint): number {
+  const half = (degrees: number) => Math.sin((degrees * radians) / 2) ** 2
+  const around = half(from.altitudeDegrees - to.altitudeDegrees) + Math.cos(from.altitudeDegrees * radians) * Math.cos(to.altitudeDegrees * radians) * half(from.azimuthDegrees - to.azimuthDegrees)
+
+  return 2 * Math.asin(Math.min(1, Math.sqrt(around))) / radians
+}
+
+export interface MoonMark {
+  readonly point: SkyPoint
+  readonly words: string
+}
+
+export function moonMarkAt(night: HorizonNight, at: number): MoonMark | undefined {
+  const moon = moonPointAt(night, at)
+  const target = skyPointAt(night.path, at)
+
+  if (moon === undefined || target === undefined || moon.altitudeDegrees <= 0) return undefined
+
+  return { point: moon, words: `Moon ${moonPercent(night)}% · ${Math.round(separationDegrees(moon, target))}° from ${night.target.name}` }
 }
 
 export function meridianAzimuths(night: HorizonNight): ReadonlyArray<number> {
@@ -239,6 +272,25 @@ const endWords = (edge: SpellEdge, upLineDegrees: number): string => {
   }
 }
 
+const moonWords = (night: HorizonNight, clock: (at: number) => string): string => {
+  const span = nightSpan(night)
+  const runs = laneRuns(night).moon
+
+  if (runs.length === 0) return 'down all night'
+
+  return runs
+    .map(run =>
+      run.from <= span.from && run.until >= span.until
+        ? 'up all night'
+        : run.from <= span.from
+          ? `up to ${clock(run.until)}`
+          : run.until >= span.until
+            ? `up from ${clock(run.from)}`
+            : `up ${clock(run.from)} to ${clock(run.until)}`,
+    )
+    .join(', ')
+}
+
 export function nightFacts(night: HorizonNight, clock: (at: number) => string): ReadonlyArray<FactCell> {
   const { clear, highest, flip } = night.facts
   const { upLineDegrees } = night.horizon
@@ -260,7 +312,7 @@ export function nightFacts(night: HorizonNight, clock: (at: number) => string): 
       ? { label: 'Flip', value: 'Not tonight', note: null }
       : { label: 'Flip', value: clock(flip.at), note: flip.basis === 'meridian' ? 'Predicted at the meridian' : `Predicted from the mount's ${flip.limitDegrees === null ? '' : `${flip.limitDegrees}° `}limit` }
 
-  return [clears, ...clearFor, { label: 'Highest', value: `${Math.round(highest.altitudeDegrees)}° at ${clock(highest.at)}`, note: null }, flipCell, ...ends]
+  return [clears, ...clearFor, { label: 'Highest', value: `${Math.round(highest.altitudeDegrees)}° at ${clock(highest.at)}`, note: null }, flipCell, ...ends, { label: 'Moon', value: `${moonPercent(night)}% · ${moonWords(night, clock)}`, note: null }]
 }
 
 export const nightSpan = (night: HorizonNight): TimeRun => ({ from: night.times.duskAt, until: night.times.dawnAt })
@@ -278,13 +330,14 @@ export const steppedBy = (span: TimeRun, at: number, minutes: number): number =>
 const clippedTo = (span: TimeRun, runs: ReadonlyArray<TimeRun>): ReadonlyArray<TimeRun> =>
   runs.flatMap(run => (run.until < span.from || run.from > span.until ? [] : [{ from: Math.max(run.from, span.from), until: Math.min(run.until, span.until) }]))
 
-export function laneRuns(night: HorizonNight): { readonly dark: ReadonlyArray<TimeRun>; readonly clear: ReadonlyArray<TimeRun> } {
+export function laneRuns(night: HorizonNight): { readonly dark: ReadonlyArray<TimeRun>; readonly clear: ReadonlyArray<TimeRun>; readonly moon: ReadonlyArray<TimeRun> } {
   const span = nightSpan(night)
   const { darkAt, darkEndsAt } = night.times
 
   return {
     dark: darkAt === null || darkEndsAt === null ? [] : clippedTo(span, [{ from: darkAt, until: darkEndsAt }]),
     clear: clippedTo(span, night.clear.map(spell => ({ from: spell.from, until: spell.until }))),
+    moon: clippedTo(span, night.moon.upSpans),
   }
 }
 

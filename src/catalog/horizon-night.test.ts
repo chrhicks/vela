@@ -77,6 +77,16 @@ describe('the night of a catalog target', () => {
     expect((answered('orion', afternoon) as HorizonNight).horizon.sweepNights).toEqual([])
   })
 
+  it('carries the Moon on the same steps as the path, with its spans inside the night', () => {
+    const answer = answered('orion', afternoon) as HorizonNight
+
+    expect(answer.moon.altitudes).toHaveLength(answer.path.altitudes.length)
+    expect(answer.moon.azimuths).toHaveLength(answer.path.azimuths.length)
+    expect(answer.moon.litFraction).toBeGreaterThanOrEqual(0)
+    expect(answer.moon.litFraction).toBeLessThanOrEqual(1)
+    expect(answer.moon.upSpans.every(span => span.from >= answer.times.duskAt && span.until <= answer.times.dawnAt)).toBe(true)
+  })
+
   it('answers in a shape that decodes, whole, from its JSON', () => {
     const answer = answered('orion', afternoon, phoenix, mapped, 5)
 

@@ -2,7 +2,7 @@ import type { Site } from '../pointing/target.ts'
 import { Compass, type ClearSpell, type HorizonNight, type SpellEdge, type TargetPath } from '../../state/horizon-night.ts'
 import type { EquatorialPosition } from './coordinates.ts'
 import type { NightTimes } from './darkness.ts'
-import { clearanceOf, lineAt, siderealHoursPerHour, skyAlong, type HorizonLine } from './path.ts'
+import { clearanceOf, lineAt, rounder, siderealHoursPerHour, skyAlong, stepCountOf, wrapped, type HorizonLine } from './path.ts'
 
 export interface TargetNightInput {
   readonly target: EquatorialPosition
@@ -27,14 +27,6 @@ const hoursPerDay = 24
 const degreesPerHour = 15
 const secondsPerHour = 3600
 
-const wrapped = (degrees: number) => ((degrees % 360) + 360) % 360
-
-const rounder = (decimals: number) => {
-  const scale = 10 ** decimals
-
-  return (value: number) => Math.round(value * scale) / scale
-}
-
 export const compassOf = (azimuthDegrees: number) => Compass.literals[Math.round(wrapped(azimuthDegrees) / degreesPerCompassPoint) % Compass.literals.length]!
 
 export function targetNight({ target, site, night, at, line, stepSeconds, decimals, meridianLimitDegrees }: TargetNightInput): TargetNight {
@@ -42,7 +34,7 @@ export function targetNight({ target, site, night, at, line, stepSeconds, decima
   const stepMs = stepSeconds * secondMs
   const sky = skyAlong(target, site, night.duskAt, stepSeconds)
   const stepsAt = (time: number) => (time - night.duskAt) / stepMs
-  const count = Math.floor((night.dawnAt - night.duskAt) / stepMs) + 1
+  const count = stepCountOf(night, stepSeconds)
   const points = Array.from({ length: count }, (_, index) => sky(index))
   const timeOf = (index: number) => Math.round(night.duskAt + index * stepMs)
 
