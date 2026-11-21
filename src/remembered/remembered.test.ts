@@ -129,15 +129,16 @@ describe('what Vela remembers from the stream', () => {
   describe('the shortlist', () => {
     const exposed = (at: number, run: string) => entry('vela.run.exposed', at, { run, frame: 1 })
     const imaged = (at: number, run: string, id: string) => [lightOn(at, run, id), exposed(at + 10, run)]
+    const listed = () => true
     const edit = (at: number, target: string, action: 'add' | 'remove', from?: ReadonlyArray<string>) => entry('vela.shortlist', at, { target, action, ...(from === undefined ? {} : { from }) })
 
     it('is the most recently imaged targets, newest first, one entry each, until the first edit', () => {
       const state = fold([...imaged(100, 'a', 'orion'), ...imaged(200, 'b', 'triangulum'), ...imaged(300, 'c', 'orion'), ...imaged(400, 'd', 'pinwheel')])
 
       expect(state.shortlist).toBeUndefined()
-      expect(shortlistOf(state, 5)).toEqual(['pinwheel', 'orion', 'triangulum'])
-      expect(shortlistOf(state, 2)).toEqual(['pinwheel', 'orion'])
-      expect(shortlistOf(state, 0)).toEqual([])
+      expect(shortlistOf(state, 5, listed)).toEqual(['pinwheel', 'orion', 'triangulum'])
+      expect(shortlistOf(state, 2, listed)).toEqual(['pinwheel', 'orion'])
+      expect(shortlistOf(state, 0, listed)).toEqual([])
     })
 
     it('leaves out a light run that kept no frame, and what is not a light run on a catalogued target', () => {
@@ -150,7 +151,7 @@ describe('what Vela remembers from the stream', () => {
         exposed(420, 'b'),
       ])
 
-      expect(shortlistOf(state, 5)).toEqual(['orion'])
+      expect(shortlistOf(state, 5, listed)).toEqual(['orion'])
       expect(fold([lightOn(200, 'b', 'triangulum')]).lightTargets).toEqual([])
     })
 
@@ -164,8 +165,15 @@ describe('what Vela remembers from the stream', () => {
       ])
 
       expect(state.targetCoolers.map(known => known.target).sort()).toEqual(['orion', 'pinwheel', 'soul'])
-      expect(recentLightTargets(state, 5)).toEqual(['orion', 'pinwheel', 'soul'])
-      expect(recentLightTargets({ ...nothingRemembered, targetCoolers: [{ target: 'soul', setting: { state: 'on', celsius: -10 }, at: 100 }] }, 5)).toEqual(['soul'])
+      expect(recentLightTargets(state, 5, listed)).toEqual(['orion', 'pinwheel', 'soul'])
+      expect(recentLightTargets({ ...nothingRemembered, targetCoolers: [{ target: 'soul', setting: { state: 'on', celsius: -10 }, at: 100 }] }, 5, listed)).toEqual(['soul'])
+    })
+
+    it('leaves out a target that is not in the catalog, such as a typed position, before counting', () => {
+      const state = fold([...imaged(100, 'a', 'orion'), ...imaged(200, 'b', '10.000000 +20.000000'), ...imaged(300, 'c', 'triangulum')])
+
+      expect(shortlistOf(state, 2, id => id !== '10.000000 +20.000000')).toEqual(['triangulum', 'orion'])
+      expect(shortlistOf(state, 2, listed)).toEqual(['triangulum', '10.000000 +20.000000'])
     })
 
     it('starts the first edit from the list that was shown, and keeps it after that', () => {
@@ -173,7 +181,7 @@ describe('what Vela remembers from the stream', () => {
       const state = fold([...imaged(100, 'a', 'orion'), edit(500, 'triangulum', 'add', shown), ...imaged(600, 'b', 'soul')])
 
       expect(state.shortlist).toEqual(['pinwheel', 'orion', 'triangulum'])
-      expect(shortlistOf(state, 5)).toEqual(['pinwheel', 'orion', 'triangulum'])
+      expect(shortlistOf(state, 5, listed)).toEqual(['pinwheel', 'orion', 'triangulum'])
     })
 
     it('is empty, and stays empty, once its last target is removed, which is not the same as never edited', () => {
@@ -181,9 +189,9 @@ describe('what Vela remembers from the stream', () => {
       const never = fold([...imaged(100, 'a', 'orion'), ...imaged(600, 'b', 'soul')])
 
       expect(emptied.shortlist).toEqual([])
-      expect(shortlistOf(emptied, 5)).toEqual([])
+      expect(shortlistOf(emptied, 5, listed)).toEqual([])
       expect(never.shortlist).toBeUndefined()
-      expect(shortlistOf(never, 5)).toEqual(['soul', 'orion'])
+      expect(shortlistOf(never, 5, listed)).toEqual(['soul', 'orion'])
     })
 
     it('does not add a target twice or remove one that is not there, and keeps the order it was added in', () => {

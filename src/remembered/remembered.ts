@@ -173,17 +173,18 @@ export function withShortlistEdit(state: Remembered, { target, action, from }: S
   return base.includes(target) || state.shortlist === undefined ? { ...state, shortlist: base.filter(known => known !== target) } : state
 }
 
-export function recentLightTargets(state: Remembered, count: number): ReadonlyArray<string> {
+export function recentLightTargets(state: Remembered, count: number, listable: (id: string) => boolean): ReadonlyArray<string> {
   const imaged = new Set(state.lightTargets.map(known => known.target))
   const seeded = state.targetCoolers.filter(cooler => !imaged.has(cooler.target)).map(cooler => ({ target: cooler.target, at: cooler.at }))
 
   return [...state.lightTargets, ...seeded]
+    .filter(known => listable(known.target))
     .sort((a, b) => b.at - a.at)
     .slice(0, count)
     .map(known => known.target)
 }
 
-export const shortlistOf = (state: Remembered, count: number): ReadonlyArray<string> => state.shortlist ?? recentLightTargets(state, count)
+export const shortlistOf = (state: Remembered, count: number, listable: (id: string) => boolean): ReadonlyArray<string> => state.shortlist ?? recentLightTargets(state, count, listable)
 
 export function remember(state: Remembered, entry: Entry): Remembered {
   if (entry.kind === 'vela.centre.pass') return passed(state, entry)
