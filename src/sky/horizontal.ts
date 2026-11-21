@@ -30,11 +30,14 @@ const horizontalOf = (vector: Vector): Horizontal => ({
   azimuthDegrees: ((Math.atan2(-vector.y, vector.x) * degrees) % 360 + 360) % 360,
 })
 
-export function horizontalOfJ2000(position: { readonly raDegrees: number; readonly decDegrees: number }, at: number, site: Site): Horizontal {
+export function horizontalsOfJ2000(positions: ReadonlyArray<{ readonly raDegrees: number; readonly decDegrees: number }>, at: number, site: Site): ReadonlyArray<Horizontal> {
   const date = new Date(at)
+  const rotation = Rotation_EQJ_HOR(date, new Observer(site.latitudeDegrees, site.longitudeDegrees, site.elevationMeters))
 
-  return horizontalOf(RotateVector(Rotation_EQJ_HOR(date, new Observer(site.latitudeDegrees, site.longitudeDegrees, site.elevationMeters)), VectorFromSphere(new Spherical(position.decDegrees, position.raDegrees, 1), date)))
+  return positions.map(position => horizontalOf(RotateVector(rotation, VectorFromSphere(new Spherical(position.decDegrees, position.raDegrees, 1), date))))
 }
+
+export const horizontalOfJ2000 = (position: { readonly raDegrees: number; readonly decDegrees: number }, at: number, site: Site): Horizontal => horizontalsOfJ2000([position], at, site)[0]!
 
 export function horizontalOfDate(position: EquatorialOfDate, at: number, site: Site): Horizontal {
   const date = new Date(at)

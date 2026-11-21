@@ -160,6 +160,7 @@ const horizonNights = makeHorizonNights({
   horizon,
   horizonFileLoaded: horizon !== noHorizon,
   meridianLimitDegrees: () => meridianLimitDegreesOf(picture, settings.devices.mount),
+  cameraAngleDegrees: () => remembered.cameraAngle?.degrees,
   naming,
   settings: { ...settings.horizonNight, upLineDegrees: settings.pointing.upLineDegrees },
 })

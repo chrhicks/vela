@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 
 import { surveyTilesPath, type Survey } from '../../../../../state/survey.ts'
 import styles from './FramedSky.module.css'
-import { frameDegrees } from './frame.ts'
+import { frameDegrees } from '../../../../../state/frame-field.ts'
 import { skyPictureOf } from './sky-picture.ts'
 
 interface FramedSkyProps {

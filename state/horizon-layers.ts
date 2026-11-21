@@ -1,12 +1,12 @@
 import { Schema } from 'effect'
 import { described } from './described.ts'
 
-export const Layer = Schema.Literals(['moon'])
+export const Layer = Schema.Literals(['frame', 'moon'])
 
 export type Layer = typeof Layer.Type
 
 export const LayerSettings = Schema.Struct({
-  onAtStart: described('The layers of the horizon chart that are on when the page opens', Schema.Array(Layer), ['moon']),
+  onAtStart: described('The layers of the horizon chart that are on when the page opens', Schema.Array(Layer), ['frame', 'moon']),
 })
 
 export type LayerSettings = typeof LayerSettings.Type
@@ -19,7 +19,10 @@ export interface LayerChip {
   readonly label: string
 }
 
-export const layerChips: ReadonlyArray<LayerChip> = [{ layer: 'moon', letter: 'E', label: 'Moon' }]
+export const layerChips: ReadonlyArray<LayerChip> = [
+  { layer: 'frame', letter: 'A', label: 'Frame' },
+  { layer: 'moon', letter: 'E', label: 'Moon' },
+]
 
 export const layersAtStart = (): ReadonlySet<Layer> => new Set(layerSettings.onAtStart)
 

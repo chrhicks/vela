@@ -9,7 +9,7 @@ import { Choices } from '../../../components/Choices.tsx'
 import { PageHeader } from '../../../components/PageHeader.tsx'
 import { Statement } from '../../../components/Statement.tsx'
 import { useLink } from '../../../rig/store.ts'
-import { frameDegrees } from './frame.ts'
+import { frameDegrees } from '../../../../../state/frame-field.ts'
 import styles from './FullSky.module.css'
 import { makeSkyDrawing, type SkyDrawing } from './sky-drawing.ts'
 

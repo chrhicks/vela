@@ -1,3 +1,4 @@
+import { footprintOf, frameDrawing } from './horizon-frame.ts'
 import type { HorizonNight, SpellEdge, TargetPath } from './horizon-night.ts'
 
 export type SkyTrack = Pick<TargetPath, 'startAt' | 'stepSeconds' | 'altitudes' | 'azimuths'>
@@ -196,6 +197,52 @@ export function moonMarkAt(night: HorizonNight, at: number): MoonMark | undefine
   return { point: moon, words: `Moon ${moonPercent(night)}% · ${Math.round(separationDegrees(moon, target))}° from ${night.target.name}` }
 }
 
+export function northAngleAt(night: HorizonNight, at: number): number | undefined {
+  const { path, frame } = night
+  const position = (at - path.startAt) / (path.stepSeconds * secondMs)
+  const before = frame.northAngles[Math.floor(position)]
+  const after = frame.northAngles[Math.ceil(position)]
+
+  if (before === undefined || after === undefined) return undefined
+
+  const turn = ((((after - before) % fullTurn) + fullTurn + halfTurn) % fullTurn) - halfTurn
+
+  return before + turn * (position - Math.floor(position))
+}
+
+export function footprintAtTime(night: HorizonNight, at: number, edgeSamples: number = frameDrawing.edgeSamples): ReadonlyArray<SkyPoint> | undefined {
+  const centre = skyPointAt(night.path, at)
+  const north = northAngleAt(night, at)
+
+  return centre === undefined || north === undefined ? undefined : footprintOf(centre, north, night.frame.angleDegrees, edgeSamples)
+}
+
+export function turnsOfChart(points: ReadonlyArray<SkyPoint>): ReadonlyArray<ReadonlyArray<SkyPoint>> {
+  const azimuths = points.map(point => point.azimuthDegrees)
+  const first = Math.min(...azimuths)
+  const last = Math.max(...azimuths)
+
+  return [0, -fullTurn, fullTurn].filter(shift => last + shift >= 0 && first + shift <= fullTurn).map(shift => points.map(point => ({ azimuthDegrees: point.azimuthDegrees + shift, altitudeDegrees: point.altitudeDegrees })))
+}
+
+export interface FrameLabel {
+  readonly words: string
+  readonly point: SkyPoint
+}
+
+export function frameLabel(night: HorizonNight, clock: (at: number) => string): FrameLabel | undefined {
+  const centre = night.clear[0]?.from
+  const first = night.frame.firstCleanAt
+  const at = first ?? centre
+  const point = at === undefined ? undefined : skyPointAt(night.path, at)
+
+  if (point === undefined) return undefined
+
+  const parts = [first === null ? 'No clean frame tonight' : `First clean frame ${clock(first)}`, ...(centre === undefined ? [] : [`Centre clears ${clock(centre)}`]), ...(night.frame.angleDegrees === null ? ['Camera angle unknown'] : [])]
+
+  return { words: parts.join(' · '), point }
+}
+
 export function meridianAzimuths(night: HorizonNight): ReadonlyArray<number> {
   const transit = night.facts.transitAt === null ? undefined : skyPointAt(night.path, night.facts.transitAt)
 
@@ -304,6 +351,17 @@ export function nightFacts(night: HorizonNight, clock: (at: number) => string): 
           note: null,
         }
 
+  const firstFrame: ReadonlyArray<FactCell> =
+    clear === null
+      ? []
+      : [
+          {
+            label: 'First clean frame',
+            value: night.frame.firstCleanAt === null ? 'Not tonight' : clock(night.frame.firstCleanAt),
+            note: night.frame.angleDegrees === null ? 'Camera angle unknown, box square to north' : null,
+          },
+        ]
+
   const clearFor: ReadonlyArray<FactCell> = clear === null ? [] : [{ label: 'Clear for', value: spanWords(clear.clearForSeconds), note: null }]
   const ends: ReadonlyArray<FactCell> = clear === null ? [] : [{ label: 'Ends', value: `${clock(clear.endsAt)} · ${endWords(clear.endedBy, upLineDegrees)}`, note: null }]
 
@@ -312,7 +370,7 @@ export function nightFacts(night: HorizonNight, clock: (at: number) => string): 
       ? { label: 'Flip', value: 'Not tonight', note: null }
       : { label: 'Flip', value: clock(flip.at), note: flip.basis === 'meridian' ? 'Predicted at the meridian' : `Predicted from the mount's ${flip.limitDegrees === null ? '' : `${flip.limitDegrees}° `}limit` }
 
-  return [clears, ...clearFor, { label: 'Highest', value: `${Math.round(highest.altitudeDegrees)}° at ${clock(highest.at)}`, note: null }, flipCell, ...ends, { label: 'Moon', value: `${moonPercent(night)}% · ${moonWords(night, clock)}`, note: null }]
+  return [clears, ...firstFrame, ...clearFor, { label: 'Highest', value: `${Math.round(highest.altitudeDegrees)}° at ${clock(highest.at)}`, note: null }, flipCell, ...ends, { label: 'Moon', value: `${moonPercent(night)}% · ${moonWords(night, clock)}`, note: null }]
 }
 
 export const nightSpan = (night: HorizonNight): TimeRun => ({ from: night.times.duskAt, until: night.times.dawnAt })

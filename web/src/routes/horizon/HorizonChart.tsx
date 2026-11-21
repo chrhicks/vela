@@ -1,6 +1,6 @@
 import type { HorizonNight } from '../../../../state/horizon-night.ts'
 import type { Layer } from '../../../../state/horizon-layers.ts'
-import { clearAt, hourTicks, lineNote, lineRuns, meridianAzimuths, moonMarkAt, moonPieces, nowPoint, pathPieces, skyPointAt, type SkyPoint } from '../../../../state/horizon-view.ts'
+import { clearAt, clockIn, footprintAtTime, frameLabel, hourTicks, lineNote, lineRuns, meridianAzimuths, moonMarkAt, moonPieces, nowPoint, pathPieces, skyPointAt, turnsOfChart, type SkyPoint } from '../../../../state/horizon-view.ts'
 import styles from './HorizonChart.module.css'
 
 interface HorizonChartProps {
@@ -33,6 +33,8 @@ const moonDiscRadius = 8
 const moonGlowRadius = 150
 const moonLabelGap = 16
 const moonLabelWidth = 250
+const frameLabelGap = 16
+const frameLabelWidth = 520
 
 const xOf = (azimuthDegrees: number) => left + (azimuthDegrees / 360) * (right - left)
 
@@ -67,6 +69,12 @@ export function HorizonChart({ night, now, selected, layers }: HorizonChartProps
   const moon = moonOn ? moonMarkAt(night, selected) : undefined
   const moonX = moon === undefined ? 0 : xOf(moon.point.azimuthDegrees)
   const moonLabelLeft = moonX + moonDiscRadius + moonLabelGap + moonLabelWidth > right
+  const frameOn = layers.has('frame')
+  const footprint = frameOn && chosen !== undefined ? footprintAtTime(night, selected) : undefined
+  const footprintCopies = footprint === undefined ? [] : turnsOfChart(footprint)
+  const frameWords = frameOn ? frameLabel(night, clockIn(night.zone)) : undefined
+  const frameX = frameWords === undefined ? 0 : xOf(frameWords.point.azimuthDegrees)
+  const frameLabelLeft = frameX + frameLabelGap + frameLabelWidth > right
   const altitudes = Array.from({ length: maxAltitude / altitudeStep }, (_, index) => (index + 1) * altitudeStep)
 
   return (
@@ -147,6 +155,21 @@ export function HorizonChart({ night, now, selected, layers }: HorizonChartProps
               NOW
             </text>
           </g>
+        )}
+
+        {footprintCopies.map((copy, index) => (
+          <polygon key={`frame${index}`} className={styles.frameBox} points={pointsOf(copy)} />
+        ))}
+
+        {frameWords === undefined ? null : (
+          <text
+            className={styles.frameLabel}
+            x={frameX + (frameLabelLeft ? -frameLabelGap : frameLabelGap)}
+            y={yOf(frameWords.point.altitudeDegrees) + 4}
+            textAnchor={frameLabelLeft ? 'end' : 'start'}
+          >
+            {frameWords.words}
+          </text>
         )}
 
         {chosen === undefined ? null : (

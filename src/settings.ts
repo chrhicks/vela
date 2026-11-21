@@ -170,6 +170,8 @@ export const PointingSettings = Schema.Struct({
 export const HorizonNightSettings = Schema.Struct({
   stepSeconds: described("The time between the points, in seconds, of a target's path from dusk to dawn on the horizon page", Schema.Number.check(Schema.isGreaterThan(0)), 60),
   decimals: described("How many decimal places, in degrees, the horizon page's path altitudes, azimuths and line altitudes are rounded to", Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), 2),
+  frameAngleDecimals: described("How many decimal places, in degrees, the horizon page's camera footprint angles (the direction of celestial north from straight up at the target) are rounded to", Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), 1),
+  frameEdgeSamples: described("How many points along each edge of the camera's footprint the server checks against the horizon when it looks for the first clean frame of a night", Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)), 16),
 })
 
 export const StarSettings = Schema.Struct({

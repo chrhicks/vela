@@ -6,6 +6,7 @@ import { nightOf, type NightNaming } from '../frames/night.ts'
 import type { Horizon } from '../horizon/horizon.ts'
 import type { Site } from '../pointing/target.ts'
 import { nightTimes } from '../sky/darkness.ts'
+import { frameNight } from '../sky/frame-night.ts'
 import { moonNight } from '../sky/moon-night.ts'
 import { targetNight } from '../sky/target-night.ts'
 import type { Catalog } from './catalog.ts'
@@ -15,6 +16,8 @@ export class HorizonNightRefused extends Data.TaggedError('HorizonNightRefused')
 export interface HorizonNightSettings {
   readonly stepSeconds: number
   readonly decimals: number
+  readonly frameAngleDecimals: number
+  readonly frameEdgeSamples: number
   readonly upLineDegrees: number
 }
 
@@ -24,6 +27,7 @@ export interface HorizonNightOptions {
   readonly horizon: Horizon
   readonly horizonFileLoaded: boolean
   readonly meridianLimitDegrees: () => number | undefined
+  readonly cameraAngleDegrees: () => number | undefined
   readonly naming: NightNaming
   readonly settings: HorizonNightSettings
 }
@@ -31,7 +35,7 @@ export interface HorizonNightOptions {
 const sweepNightsOf = (horizon: Horizon): ReadonlyArray<NightName> =>
   [...new Set(horizon.origins.flatMap(origin => (origin === null ? [] : [origin.night])))].sort()
 
-export function makeHorizonNights({ catalog, site, horizon, horizonFileLoaded, meridianLimitDegrees, naming, settings }: HorizonNightOptions) {
+export function makeHorizonNights({ catalog, site, horizon, horizonFileLoaded, meridianLimitDegrees, cameraAngleDegrees, naming, settings }: HorizonNightOptions) {
   const line = { horizon, upLineDegrees: settings.upLineDegrees }
 
   return {
@@ -60,6 +64,7 @@ export function makeHorizonNights({ catalog, site, horizon, horizonFileLoaded, m
           horizon: { fileLoaded: horizonFileLoaded, altitudesDegrees: horizon.altitudesDegrees, sources: horizon.sources, sweepNights: sweepNightsOf(horizon), upLineDegrees: settings.upLineDegrees },
           path,
           moon: moonNight({ site: here, night, stepSeconds: settings.stepSeconds, decimals: settings.decimals }),
+          frame: frameNight({ target, site: here, night, line, stepSeconds: settings.stepSeconds, angleDecimals: settings.frameAngleDecimals, cameraAngleDegrees: cameraAngleDegrees(), edgeSamples: settings.frameEdgeSamples }),
           clear,
           facts,
         }

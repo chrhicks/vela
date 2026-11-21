@@ -12,14 +12,14 @@ const afternoon = Date.UTC(2026, 10, 15, 22, 0, 0)
 const night = nightTimes(phoenix, afternoon)!
 const hourMs = 3_600_000
 const naming = { zone: 'America/Phoenix', changesAtHour: 12 }
-const settings = { stepSeconds: 60, decimals: 2, upLineDegrees: 30 }
+const settings = { stepSeconds: 60, decimals: 2, frameAngleDecimals: 1, frameEdgeSamples: 16, upLineDegrees: 30 }
 const mapped: Horizon = { ...noHorizon, altitudesDegrees: noHorizon.altitudesDegrees.map(() => 10), sources: noHorizon.sources.map(() => 'sweep') }
 
-const nights = (site: typeof phoenix | null, horizon: Horizon = noHorizon, meridianLimit: number | undefined = undefined) =>
-  makeHorizonNights({ catalog: testCatalog, site: () => site ?? undefined, horizon, horizonFileLoaded: horizon !== noHorizon, meridianLimitDegrees: () => meridianLimit, naming, settings })
+const nights = (site: typeof phoenix | null, horizon: Horizon = noHorizon, meridianLimit: number | undefined = undefined, cameraAngle: number | undefined = undefined) =>
+  makeHorizonNights({ catalog: testCatalog, site: () => site ?? undefined, horizon, horizonFileLoaded: horizon !== noHorizon, meridianLimitDegrees: () => meridianLimit, cameraAngleDegrees: () => cameraAngle, naming, settings })
 
-const answered = (id: string, at: number, site: typeof phoenix | null = phoenix, horizon: Horizon = noHorizon, meridianLimit?: number) =>
-  Effect.runSync(nights(site, horizon, meridianLimit).night(id, at).pipe(Effect.catchTag('HorizonNightRefused', ({ refusal }) => Effect.succeed(refusal))))
+const answered = (id: string, at: number, site: typeof phoenix | null = phoenix, horizon: Horizon = noHorizon, meridianLimit?: number, cameraAngle?: number) =>
+  Effect.runSync(nights(site, horizon, meridianLimit, cameraAngle).night(id, at).pipe(Effect.catchTag('HorizonNightRefused', ({ refusal }) => Effect.succeed(refusal))))
 
 describe('the night of a catalog target', () => {
   it('answers with the night it falls in, named for the evening in the night zone', () => {
@@ -110,5 +110,15 @@ describe('the night of a catalog target', () => {
     const arctic = { latitudeDegrees: 80, longitudeDegrees: 0, elevationMeters: 0 }
 
     expect(answered('orion', Date.UTC(2026, 5, 21, 12, 0, 0), arctic)).toEqual({ code: 'no-night' })
+  })
+
+  it('carries the camera angle it was given, a direction of north on each step and the first clean frame', () => {
+    const answer = answered('orion', afternoon, phoenix, mapped, undefined, 20) as HorizonNight
+
+    expect(answer.frame.angleDegrees).toBe(20)
+    expect(answer.frame.northAngles).toHaveLength(answer.path.altitudes.length)
+    expect(answer.frame.firstCleanAt).toBeGreaterThanOrEqual(night.darkAt!)
+    expect(answer.frame.firstCleanAt).toBeGreaterThanOrEqual(answer.clear[0]!.from)
+    expect((answered('orion', afternoon) as HorizonNight).frame.angleDegrees).toBeNull()
   })
 })

@@ -2,7 +2,7 @@ import type { EndsBy, Limit } from '../../../../../state/ends-by.ts'
 import type { Sky } from '../../../../../state/sky.ts'
 import type { Placement, SizeArcminutes } from '../../../../../state/targets.ts'
 import { clockTime } from '../../../rig/clock.ts'
-import { frameDegrees } from './frame.ts'
+import { frameDegrees } from '../../../../../state/frame-field.ts'
 
 export const unknown = '—'
 
