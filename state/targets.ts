@@ -33,7 +33,9 @@ export const BestPlacedAsked = Schema.Struct({ show: ListShown, order: ListOrder
 
 export type BestPlacedAsked = typeof BestPlacedAsked.Type
 
-const LineSource = Schema.Literals(['horizon', 'up-line'])
+export const LineSource = Schema.Literals(['horizon', 'up-line'])
+
+export type LineSource = typeof LineSource.Type
 
 export const Placement = Schema.Struct({
   altitudeDegrees: Schema.Number,
