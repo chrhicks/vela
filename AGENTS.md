@@ -1,6 +1,6 @@
 # Vela
 
-Chris Hicks's observing program. Read `SOUL.md` for how to work on it and `/home/chicks/dev/personal/home/AGENTS.md` for the house rules. This repo is public: no personal data, no real site coordinates, no real-night data. Fixtures use the made-up Phoenix site (latitude 33.45, longitude -112.07, elevation 331).
+A personal observing program. Read `SOUL.md` for how to work on it and `/home/chicks/dev/personal/home/AGENTS.md` for the house rules. This repo is public: no personal data, no real site coordinates, no real-night data. Fixtures use the made-up Phoenix site (latitude 33.45, longitude -112.07, elevation 331).
 
 ## What is here
 
